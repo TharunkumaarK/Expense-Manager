@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a0f">
+    <title>Expense Manager</title>
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon.svg">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    
+    <!-- Main Content Area -->
+    <main id="app-content">
+        <!-- Views will be dynamically shown/hidden by JS -->
+        
+        <!-- Home View -->
+        <section id="home-view" class="view active">
+            <header class="top-bar">
+                <div class="date-selector">
+                    <span id="current-month-display">Loading...</span>
+                    <i data-lucide="chevron-down"></i>
+                </div>
+                <button class="icon-btn" onclick="app.showSettings()"><i data-lucide="settings"></i></button>
+            </header>
+
+            <div class="wallets-container">
+                <!-- Japan Wallets -->
+                <div class="region-card">
+                    <div class="region-header">
+                        <span class="region-title">🇯🇵 Japan</span>
+                        <span class="region-total" id="jp-total-balance">¥0</span>
+                    </div>
+                    <div class="wallet-grid" id="jp-wallets">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- India Wallets -->
+                <div class="region-card">
+                    <div class="region-header">
+                        <span class="region-title">🇮🇳 India</span>
+                        <span class="region-total" id="in-total-balance">₹0</span>
+                    </div>
+                    <div class="wallet-grid" id="in-wallets">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="budget-overview" id="budget-overview-card">
+                <!-- Populated by JS -->
+            </div>
+
+            <h3 class="section-title">Japan Spending Categories</h3>
+            <div class="category-grid" id="jp-categories-grid">
+                <!-- Populated by JS -->
+            </div>
+            
+            <h3 class="section-title">India Spending Categories</h3>
+            <div class="category-grid" id="in-categories-grid">
+                <!-- Populated by JS -->
+            </div>
+
+            <h3 class="section-title">Recent Transactions</h3>
+            <div class="recent-transactions" id="recent-transactions-list">
+                <!-- Populated by JS -->
+            </div>
+            
+            <!-- Spacer to prevent FAB overlay issues -->
+            <div style="height: 80px;"></div>
+        </section>
+
+        <!-- Analytics View -->
+        <section id="analytics-view" class="view">
+            <header class="top-bar">
+                <h2>Analytics</h2>
+            </header>
+            <div class="content-padded">
+                <div class="chart-container card">
+                    <h3>Japan Spending Breakdown</h3>
+                    <canvas id="jp-donut-chart"></canvas>
+                </div>
+                
+                <div class="chart-container card">
+                    <h3>India Spending Breakdown</h3>
+                    <canvas id="in-donut-chart"></canvas>
+                </div>
+                
+                <div class="chart-container card">
+                    <h3>Utilities Trend 🇯🇵</h3>
+                    <canvas id="utilities-line-chart"></canvas>
+                </div>
+            </div>
+            <div style="height: 80px;"></div>
+        </section>
+
+        <!-- History View -->
+        <section id="history-view" class="view">
+            <header class="top-bar">
+                <h2>History</h2>
+            </header>
+            <div class="content-padded" id="history-list">
+                <!-- Populated by JS -->
+            </div>
+            <div style="height: 80px;"></div>
+        </section>
+        
+        <!-- Settings View -->
+        <section id="settings-view" class="view">
+            <header class="top-bar">
+                <h2>Settings</h2>
+            </header>
+            <div class="content-padded" id="settings-content">
+                <!-- Settings Content -->
+                <div class="card mt-3">
+                    <h3>Wallet Balances</h3>
+                    <p class="help-text text-sm text-muted mb-2">Adjust your current wallet balances directly.</p>
+                    <div id="settings-wallets-list">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>Japan Total Budget</h3>
+                    <div class="form-group">
+                        <label>Monthly Budget (¥)</label>
+                        <input type="number" id="setting-jp-budget" onblur="app.updateSetting('jpTotalBudget', this.value)">
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <h3>Japan Category Budgets</h3>
+                    <p class="help-text text-sm text-muted mb-2">Adjust budgets for individual categories.</p>
+                    <div id="settings-categories-list">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <h3>Close Month</h3>
+                    <button class="btn btn-danger" onclick="app.closeMonth()">Close Current Month</button>
+                    <p class="help-text">Archives current transactions and creates a snapshot.</p>
+                </div>
+                
+                <div class="card mt-3">
+                    <h3>Data Management</h3>
+                    <button class="btn btn-primary" onclick="app.exportData()">Export Backup</button>
+                    <button class="btn btn-secondary mt-2" onclick="document.getElementById('import-file').click()">Import Backup</button>
+                    <input type="file" id="import-file" hidden accept=".json" onchange="app.importData(event)">
+                </div>
+            </div>
+            <div style="height: 80px;"></div>
+        </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item active" data-target="home-view">
+            <i data-lucide="home"></i>
+            <span>Home</span>
+        </a>
+        <a href="#" class="nav-item" data-target="analytics-view">
+            <i data-lucide="pie-chart"></i>
+            <span>Analytics</span>
+        </a>
+        <div class="nav-fab-placeholder"></div>
+        <a href="#" class="nav-item" data-target="history-view">
+            <i data-lucide="calendar"></i>
+            <span>History</span>
+        </a>
+        <a href="#" class="nav-item" data-target="settings-view">
+            <i data-lucide="settings"></i>
+            <span>Settings</span>
+        </a>
+    </nav>
+
+    <!-- Floating Action Button -->
+    <button class="fab" id="main-fab" onclick="app.toggleFabMenu()">
+        <i data-lucide="plus"></i>
+    </button>
+
+    <!-- FAB Overlay Menu -->
+    <div class="fab-menu-overlay" id="fab-menu" onclick="if(event.target === this) app.toggleFabMenu()">
+        <div class="fab-actions">
+            <button class="fab-action" onclick="app.openTransactionModal('expense')">
+                <span class="fab-label">Expense</span>
+                <div class="fab-icon bg-red"><i data-lucide="arrow-up-circle"></i></div>
+            </button>
+            <button class="fab-action" onclick="app.openTransactionModal('transfer')">
+                <span class="fab-label">Transfer</span>
+                <div class="fab-icon bg-blue"><i data-lucide="repeat"></i></div>
+            </button>
+            <button class="fab-action" onclick="app.openTransactionModal('remittance')">
+                <span class="fab-label">Remittance</span>
+                <div class="fab-icon bg-purple"><i data-lucide="globe"></i></div>
+            </button>
+            <button class="fab-action" onclick="app.openTransactionModal('income')">
+                <span class="fab-label">Income</span>
+                <div class="fab-icon bg-green"><i data-lucide="arrow-down-circle"></i></div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Transaction Modal (Bottom Sheet) -->
+    <div class="modal-overlay" id="transaction-modal" onclick="if(event.target === this) app.closeModal('transaction-modal')">
+        <div class="bottom-sheet">
+            <div class="sheet-header">
+                <h3 id="modal-title">New Transaction</h3>
+                <button class="icon-btn" onclick="app.closeModal('transaction-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="sheet-content" id="modal-content">
+                <!-- Dynamically populated by JS based on type -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/storage.js"></script>
+    <script src="js/wallet.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        lucide.createIcons();
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed', err));
+        }
+    </script>
+</body>
+</html>
