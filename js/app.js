@@ -52,7 +52,8 @@ class App {
     }
 
     openTransactionModal(type) {
-        this.toggleFabMenu(); // Close FAB menu
+        document.getElementById('main-fab').classList.remove('open');
+        document.getElementById('fab-menu').classList.remove('active');
 
         const modal = document.getElementById('transaction-modal');
         const title = document.getElementById('modal-title');
@@ -198,6 +199,116 @@ class App {
         }
     }
 
+    editTransaction(id) {
+        const tx = storage.state.transactions.find(t => t.id === id);
+        if (!tx) return;
+
+        this.openTransactionModal(tx.type);
+        document.getElementById('modal-title').innerText = 'Edit Transaction';
+
+        const content = document.getElementById('modal-content');
+        
+        // Add Delete button
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-danger mt-2';
+        delBtn.innerText = 'Delete Transaction';
+        delBtn.onclick = () => this.deleteTx(id);
+        content.appendChild(delBtn);
+
+        // Pre-fill and override submit
+        if (tx.type === 'expense') {
+            document.getElementById('tx-wallet').value = tx.walletId;
+            this.updateExpenseCategories();
+            document.getElementById('tx-category').value = tx.categoryId;
+            document.getElementById('tx-amount').value = tx.amount;
+            document.getElementById('tx-note').value = tx.note || '';
+            
+            const btn = content.querySelector('.btn-primary');
+            btn.innerText = 'Save Changes';
+            btn.onclick = () => this.submitEdit(id, 'expense');
+        } else if (tx.type === 'income') {
+            document.getElementById('tx-wallet').value = tx.walletId;
+            document.getElementById('tx-amount').value = tx.amount;
+            document.getElementById('tx-note').value = tx.note || '';
+            
+            const btn = content.querySelector('.btn-green');
+            btn.innerText = 'Save Changes';
+            btn.onclick = () => this.submitEdit(id, 'income');
+        } else if (tx.type === 'transfer') {
+            document.getElementById('tx-source').value = tx.sourceId;
+            document.getElementById('tx-dest').value = tx.destId;
+            document.getElementById('tx-amount').value = tx.amount;
+            document.getElementById('tx-note').value = tx.note || '';
+            
+            const btn = content.querySelector('.btn-blue');
+            btn.innerText = 'Save Changes';
+            btn.onclick = () => this.submitEdit(id, 'transfer');
+        } else if (tx.type === 'remittance') {
+            document.getElementById('tx-source').value = tx.sourceId;
+            document.getElementById('tx-dest').value = tx.destId;
+            document.getElementById('tx-amount-jpy').value = tx.sourceAmount;
+            document.getElementById('tx-amount-inr').value = tx.destAmount;
+            document.getElementById('tx-note').value = tx.note || '';
+            
+            const btn = content.querySelector('.btn-purple');
+            btn.innerText = 'Save Changes';
+            btn.onclick = () => this.submitEdit(id, 'remittance');
+        }
+    }
+
+    submitEdit(id, type) {
+        // Simple way to edit: delete old, create new with original date & id
+        const originalTx = storage.state.transactions.find(t => t.id === id);
+        if (!originalTx) return;
+        
+        const oldDate = originalTx.date;
+        const oldId = originalTx.id;
+        
+        walletManager.deleteTransaction(id);
+
+        if (type === 'expense') {
+            const wallet = document.getElementById('tx-wallet').value;
+            const cat = document.getElementById('tx-category').value;
+            const amt = document.getElementById('tx-amount').value;
+            const note = document.getElementById('tx-note').value;
+            walletManager.addExpense(wallet, cat, amt, note, oldDate);
+        } else if (type === 'income') {
+            const wallet = document.getElementById('tx-wallet').value;
+            const amt = document.getElementById('tx-amount').value;
+            const note = document.getElementById('tx-note').value;
+            walletManager.addIncome(wallet, amt, note, oldDate);
+        } else if (type === 'transfer') {
+            const src = document.getElementById('tx-source').value;
+            const dest = document.getElementById('tx-dest').value;
+            const amt = document.getElementById('tx-amount').value;
+            const note = document.getElementById('tx-note').value;
+            walletManager.transfer(src, dest, amt, note, oldDate);
+        } else if (type === 'remittance') {
+            const src = document.getElementById('tx-source').value;
+            const dest = document.getElementById('tx-dest').value;
+            const amtJpy = document.getElementById('tx-amount-jpy').value;
+            const amtInr = document.getElementById('tx-amount-inr').value;
+            const note = document.getElementById('tx-note').value;
+            walletManager.remittance(src, dest, amtJpy, amtInr, note, oldDate);
+        }
+
+        // Restore the original ID (since the above created a new one)
+        const newTx = storage.state.transactions[0];
+        newTx.id = oldId;
+        storage.saveData();
+
+        this.closeModal('transaction-modal');
+        this.renderAll();
+    }
+
+    deleteTx(id) {
+        if (confirm("Are you sure you want to delete this transaction?")) {
+            walletManager.deleteTransaction(id);
+            this.closeModal('transaction-modal');
+            this.renderAll();
+        }
+    }
+
     closeModal(id) {
         document.getElementById(id).classList.remove('active');
     }
@@ -290,24 +401,40 @@ class App {
                 const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
                 walletHtml += `
                     <div class="setting-row">
-                        <span><i data-lucide="${icon}"></i> ${w.id} (${w.currency})</span>
+                        <span><i data-lucide="${icon}"></i> ${w.id} <small class="text-muted">(${w.currency})</small></span>
                         <input type="number" value="${w.balance}" onblur="app.updateWalletBalance('${w.id}', this.value)">
                     </div>
                 `;
             });
             document.getElementById('settings-wallets-list').innerHTML = walletHtml;
 
-            // Render category budgets
-            let catHtml = '';
-            storage.state.categories.JP.forEach(c => {
+            // Render JP category budgets with delete and add-new
+            const renderCats = (region, elId) => {
+                let catHtml = '';
+                storage.state.categories[region].forEach(c => {
+                    catHtml += `
+                        <div class="setting-row">
+                            <span><i data-lucide="${c.icon || 'tag'}"></i> ${c.name}</span>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                ${region === 'JP' ? `<input type="number" value="${c.budget || 0}" onblur="app.updateCategoryBudget('${c.id}', this.value)" style="width:90px;">` : ''}
+                                <button onclick="app.removeCategory('${region}','${c.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;padding:4px;display:flex;align-items:center;"><i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
                 catHtml += `
-                    <div class="setting-row">
-                        <span><i data-lucide="${c.icon}"></i> ${c.name}</span>
-                        <input type="number" value="${c.budget || 0}" onblur="app.updateCategoryBudget('${c.id}', this.value)">
+                    <div class="add-category-form" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+                        <div style="font-size:0.8rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Add New Category</div>
+                        <input type="text" id="new-cat-name-${region}" placeholder="Category name (e.g. Car / Parking)" style="width:100%;padding:10px;background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-main);font-family:inherit;font-size:0.9rem;">
+                        ${region === 'JP' ? `<input type="number" id="new-cat-budget-${region}" placeholder="Budget (¥, optional)" style="width:100%;padding:10px;background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-main);font-family:inherit;font-size:0.9rem;">` : ''}
+                        <button onclick="app.addCategory('${region}')" style="padding:10px;background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);font-weight:600;cursor:pointer;font-family:inherit;">+ Add Category</button>
                     </div>
                 `;
-            });
-            document.getElementById('settings-categories-list').innerHTML = catHtml;
+                document.getElementById(elId).innerHTML = catHtml;
+            };
+
+            renderCats('JP', 'settings-categories-list');
+            renderCats('IN', 'settings-in-categories-list');
         }
     }
 
@@ -315,8 +442,35 @@ class App {
         if (storage.state.wallets[id]) {
             storage.state.wallets[id].balance = Number(val);
             storage.saveData();
-            this.renderAll(); // Re-render balances on home
+            this.renderWallets();
         }
+    }
+
+    removeCategory(region, id) {
+        if (!confirm('Remove this category?')) return;
+        storage.state.categories[region] = storage.state.categories[region].filter(c => c.id !== id);
+        storage.saveData();
+        this.renderSettings();
+        lucide.createIcons();
+    }
+
+    addCategory(region) {
+        const nameEl = document.getElementById(`new-cat-name-${region}`);
+        const name = nameEl ? nameEl.value.trim() : '';
+        if (!name) return alert('Please enter a category name.');
+
+        const id = region.toLowerCase() + '-' + name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Date.now();
+        const newCat = { id, name, icon: 'tag' };
+
+        if (region === 'JP') {
+            const budgetEl = document.getElementById(`new-cat-budget-${region}`);
+            newCat.budget = budgetEl ? Number(budgetEl.value) || 0 : 0;
+        }
+
+        storage.state.categories[region].push(newCat);
+        storage.saveData();
+        this.renderSettings();
+        lucide.createIcons();
     }
 
     updateCategoryBudget(id, val) {
@@ -324,7 +478,6 @@ class App {
         if (cat) {
             cat.budget = Number(val);
             storage.saveData();
-            this.renderAll(); // Re-render to update the progress bars on home if they switch back
         }
     }
 
@@ -455,7 +608,7 @@ class App {
             const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
             html += `
-                <div class="tx-item">
+                <div class="tx-item" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer;">
                     <div class="tx-left">
                         <div class="tx-icon"><i data-lucide="${icon}"></i></div>
                         <div class="tx-details">

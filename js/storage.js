@@ -55,8 +55,22 @@ class StorageManager {
             const data = localStorage.getItem(STORAGE_KEY);
             if (data) {
                 const parsed = JSON.parse(data);
-                // Merge with default to ensure new fields are present
-                return { ...defaultState, ...parsed, wallets: { ...defaultState.wallets, ...parsed.wallets }, categories: { ...defaultState.categories, ...parsed.categories } };
+                // Merge top-level fields but always trust saved wallets/categories
+                return {
+                    ...defaultState,
+                    ...parsed,
+                    // Wallets: merge defaults with saved (preserves balances)
+                    wallets: { ...defaultState.wallets, ...(parsed.wallets || {}) },
+                    // Categories: use saved if valid arrays, else use defaults
+                    categories: {
+                        JP: Array.isArray(parsed.categories?.JP) && parsed.categories.JP.length > 0
+                            ? parsed.categories.JP
+                            : JSON.parse(JSON.stringify(defaultState.categories.JP)),
+                        IN: Array.isArray(parsed.categories?.IN) && parsed.categories.IN.length > 0
+                            ? parsed.categories.IN
+                            : JSON.parse(JSON.stringify(defaultState.categories.IN)),
+                    }
+                };
             }
         } catch (e) {
             console.error("Failed to load data", e);

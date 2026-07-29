@@ -93,17 +93,23 @@
             <div class="content-padded">
                 <div class="chart-container card">
                     <h3>Japan Spending Breakdown</h3>
-                    <canvas id="jp-donut-chart"></canvas>
+                    <div class="chart-canvas-wrap">
+                        <canvas id="jp-donut-chart"></canvas>
+                    </div>
                 </div>
                 
                 <div class="chart-container card">
                     <h3>India Spending Breakdown</h3>
-                    <canvas id="in-donut-chart"></canvas>
+                    <div class="chart-canvas-wrap">
+                        <canvas id="in-donut-chart"></canvas>
+                    </div>
                 </div>
                 
                 <div class="chart-container card">
-                    <h3>Utilities Trend 🇯🇵</h3>
-                    <canvas id="utilities-line-chart"></canvas>
+                    <h3>Utilities (This Month) 🇯🇵</h3>
+                    <div class="chart-canvas-wrap bar-wrap">
+                        <canvas id="utilities-line-chart"></canvas>
+                    </div>
                 </div>
             </div>
             <div style="height: 80px;"></div>
@@ -145,10 +151,14 @@
                 
                 <div class="card mt-3">
                     <h3>Japan Category Budgets</h3>
-                    <p class="help-text text-sm text-muted mb-2">Adjust budgets for individual categories.</p>
-                    <div id="settings-categories-list">
-                        <!-- Populated by JS -->
-                    </div>
+                    <p class="help-text text-sm text-muted mb-2">Set budgets and manage Japan categories.</p>
+                    <div id="settings-categories-list"></div>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>India Categories</h3>
+                    <p class="help-text text-sm text-muted mb-2">Manage your India spending categories.</p>
+                    <div id="settings-in-categories-list"></div>
                 </div>
                 
                 <div class="card mt-3">

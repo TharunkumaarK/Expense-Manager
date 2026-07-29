@@ -89,14 +89,19 @@ class ChartManager {
 
         if (this.utilityLine) this.utilityLine.destroy();
 
-        // For simplicity, we just aggregate the current month data for utilities
-        // To build a true month-over-month, we'd need to parse history.
-        // Let's do a simple bar chart of utility spending for this month for now.
-        const utilityIds = ['jp-utility-electric', 'jp-utility-gas', 'jp-utility-water', 'jp-utility-internet'];
+        // Dynamically find utility categories
+        const utilityCats = storage.state.categories.JP.filter(c =>
+            c.id.includes('utility') ||
+            c.name.toLowerCase().includes('electric') ||
+            c.name.toLowerCase().includes('gas') ||
+            c.name.toLowerCase().includes('water') ||
+            c.name.toLowerCase().includes('internet')
+        );
+
         const totals = walletManager.getCategoryTotals('JP');
-        
-        const labels = ['Electric', 'Gas', 'Water', 'Internet'];
-        const data = utilityIds.map(id => totals[id] || 0);
+        const labels = utilityCats.map(c => c.name);
+        const data = utilityCats.map(c => totals[c.id] || 0);
+        const colors = ['#ffd60a', '#ff9f0a', '#0a84ff', '#bf5af2', '#32d74b', '#ff453a'];
 
         this.utilityLine = new Chart(ctx, {
             type: 'bar',
@@ -105,22 +110,33 @@ class ChartManager {
                 datasets: [{
                     label: 'Spent (¥)',
                     data: data,
-                    backgroundColor: ['#ffd60a', '#ff9f0a', '#0a84ff', '#bf5af2'],
-                    borderRadius: 4
+                    backgroundColor: utilityCats.map((_, i) => colors[i % colors.length]),
+                    borderRadius: 6
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ¥${ctx.parsed.y.toLocaleString()}`
+                        }
+                    }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: { color: '#2c2c35' }
+                        grid: { color: '#2c2c35' },
+                        ticks: {
+                            color: '#8b8b99',
+                            callback: val => `¥${val >= 1000 ? (val/1000).toFixed(0)+'k' : val}`
+                        }
                     },
                     x: {
-                        grid: { display: false }
+                        grid: { display: false },
+                        ticks: { color: '#8b8b99', maxRotation: 30 }
                     }
                 }
             }
@@ -130,11 +146,22 @@ class ChartManager {
     getDonutOptions() {
         return {
             responsive: true,
-            cutout: '70%',
+            maintainAspectRatio: false,
+            cutout: '65%',
             plugins: {
                 legend: {
-                    position: 'right',
-                    labels: { color: '#f0f0f5', boxWidth: 12, padding: 10 }
+                    position: 'bottom',
+                    labels: {
+                        color: '#f0f0f5',
+                        boxWidth: 10,
+                        padding: 8,
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ` ${ctx.label}: ¥${ctx.parsed.toLocaleString()}`
+                    }
                 }
             }
         };
