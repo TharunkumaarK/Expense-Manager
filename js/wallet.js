@@ -150,6 +150,26 @@ class WalletManager {
             .filter(tx => tx.type === 'expense' && tx.region === region)
             .reduce((sum, tx) => sum + tx.amount, 0);
     }
+
+    // Calculate current loan state based on manual config
+    getLoanState() {
+        const config = storage.state.loanConfig;
+        if (!config) return null;
+
+        const amountPaid = config.duesPaid * config.emi;
+        const totalExpected = config.emi * config.totalDues;
+        const principalPaid = config.totalPrincipal - config.principalLeft;
+        const percentPaid = Math.min(100, (config.duesPaid / config.totalDues) * 100).toFixed(0);
+
+        return {
+            amountPaid,
+            principalPaid,
+            principalLeft: config.principalLeft,
+            percentPaid,
+            emiCount: config.duesPaid,
+            config
+        };
+    }
 }
 
 const walletManager = new WalletManager();

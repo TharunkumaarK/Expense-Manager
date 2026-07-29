@@ -3,7 +3,7 @@ class ChartManager {
         this.jpDonut = null;
         this.inDonut = null;
         this.utilityLine = null;
-        
+
         Chart.defaults.color = '#8b8b99';
         Chart.defaults.font.family = 'Inter, sans-serif';
     }
@@ -14,6 +14,36 @@ class ChartManager {
         this.renderUtilityLine();
     }
 
+    getGlassStyles(canvasCtx, count, height = 300) {
+        // More saturated, vibrant versions of the previous colors
+        const baseColors = [
+            '59, 130, 246',   // Rich Blue
+            '139, 92, 246',   // Rich Purple
+            '16, 185, 129',   // Rich Emerald
+            '249, 115, 22',   // Rich Orange
+            '6, 182, 212',    // Rich Cyan
+            '236, 72, 153',   // Rich Pink
+        ];
+
+        const backgrounds = [];
+        const borders = [];
+
+        for (let i = 0; i < count; i++) {
+            const rgb = baseColors[i % baseColors.length];
+
+            // Fading glass gradient matching balance cards (increased opacity for saturation)
+            const grad = canvasCtx.createLinearGradient(0, 0, 0, height);
+            grad.addColorStop(0, `rgba(${rgb}, 0.75)`);
+            grad.addColorStop(1, `rgba(${rgb}, 0.3)`);
+            backgrounds.push(grad);
+
+            // Solid bright stroke matching balance cards (increased to 1.0 for more pop)
+            borders.push(`rgba(${rgb}, 1.0)`);
+        }
+
+        return { backgrounds, borders };
+    }
+
     renderJPDonut() {
         const ctx = document.getElementById('jp-donut-chart');
         if (!ctx) return;
@@ -22,7 +52,7 @@ class ChartManager {
 
         const totals = walletManager.getCategoryTotals('JP');
         const categories = storage.state.categories.JP.filter(c => totals[c.id] > 0);
-        
+
         if (categories.length === 0) {
             this.jpDonut = new Chart(ctx, this.getEmptyConfig('No data yet'));
             return;
@@ -30,18 +60,18 @@ class ChartManager {
 
         const labels = categories.map(c => c.name);
         const data = categories.map(c => totals[c.id]);
-        
+
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+
         this.jpDonut = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: labels,
                 datasets: [{
                     data: data,
-                    backgroundColor: [
-                        '#6b4cff', '#0a84ff', '#32d74b', '#ff9f0a', '#ff453a', 
-                        '#bf5af2', '#ff375f', '#5e5ce6', '#30d158', '#ffd60a'
-                    ],
-                    borderWidth: 0,
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
                     hoverOffset: 4
                 }]
             },
@@ -57,25 +87,26 @@ class ChartManager {
 
         const totals = walletManager.getCategoryTotals('IN');
         const categories = storage.state.categories.IN.filter(c => totals[c.id] > 0);
-        
+
         if (categories.length === 0) {
             this.inDonut = new Chart(ctx, this.getEmptyConfig('No data yet'));
             return;
         }
 
-        const labels = categories.map(c => c.name); 
+        const labels = categories.map(c => c.name);
         const data = categories.map(c => totals[c.id]);
-        
+
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+
         this.inDonut = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: labels,
                 datasets: [{
                     data: data,
-                    backgroundColor: [
-                        '#ff9f0a', '#ff453a', '#bf5af2', '#6b4cff', '#0a84ff', '#32d74b'
-                    ],
-                    borderWidth: 0,
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
                     hoverOffset: 4
                 }]
             },
@@ -101,7 +132,8 @@ class ChartManager {
         const totals = walletManager.getCategoryTotals('JP');
         const labels = utilityCats.map(c => c.name);
         const data = utilityCats.map(c => totals[c.id] || 0);
-        const colors = ['#ffd60a', '#ff9f0a', '#0a84ff', '#bf5af2', '#32d74b', '#ff453a'];
+
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
 
         this.utilityLine = new Chart(ctx, {
             type: 'bar',
@@ -110,7 +142,9 @@ class ChartManager {
                 datasets: [{
                     label: 'Spent (¥)',
                     data: data,
-                    backgroundColor: utilityCats.map((_, i) => colors[i % colors.length]),
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
                     borderRadius: 6
                 }]
             },
@@ -131,7 +165,7 @@ class ChartManager {
                         grid: { color: '#2c2c35' },
                         ticks: {
                             color: '#8b8b99',
-                            callback: val => `¥${val >= 1000 ? (val/1000).toFixed(0)+'k' : val}`
+                            callback: val => `¥${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
                         }
                     },
                     x: {
@@ -166,7 +200,7 @@ class ChartManager {
             }
         };
     }
-    
+
     getEmptyConfig(message) {
         return {
             type: 'doughnut',
@@ -176,6 +210,7 @@ class ChartManager {
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 cutout: '70%',
                 plugins: {
                     legend: { display: false },

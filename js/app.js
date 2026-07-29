@@ -51,6 +51,15 @@ class App {
         menu.classList.toggle('active');
     }
 
+    toggleCollapse(wrapId, iconId) {
+        const wrap = document.getElementById(wrapId);
+        const icon = document.getElementById(iconId);
+        if (wrap && icon) {
+            wrap.classList.toggle('collapsed');
+            icon.classList.toggle('rotated');
+        }
+    }
+
     openTransactionModal(type) {
         document.getElementById('main-fab').classList.remove('open');
         document.getElementById('fab-menu').classList.remove('active');
@@ -67,13 +76,12 @@ class App {
                 <div class="form-group">
                     <label>Wallet</label>
                     <select id="tx-wallet" onchange="app.updateExpenseCategories()">
-                        <optgroup label="🇯🇵 Japan">
+                        <optgroup label="Japan">
                             <option value="Salary Account">Salary Account (¥)</option>
-                            <option value="Forex Card">Forex Card (¥)</option>
                             <option value="Cash">Cash (¥)</option>
                             <option value="PayPay">PayPay (¥)</option>
                         </optgroup>
-                        <optgroup label="🇮🇳 India">
+                        <optgroup label="India">
                             <option value="Axis Bank">Axis Bank (₹)</option>
                             <option value="Bank of Baroda">Bank of Baroda (₹)</option>
                             <option value="Credit Card">Credit Card (₹)</option>
@@ -82,7 +90,11 @@ class App {
                 </div>
                 <div class="form-group">
                     <label>Category</label>
-                    <select id="tx-category"></select>
+                    <select id="tx-category" onchange="app.handleCategoryChange()"></select>
+                </div>
+                <div class="form-group hidden" id="tx-subcategory-group">
+                    <label>Specific Utility</label>
+                    <select id="tx-subcategory"></select>
                 </div>
                 <div class="form-group">
                     <label>Amount</label>
@@ -101,7 +113,6 @@ class App {
                     <label>From (Source)</label>
                     <select id="tx-source">
                         <option value="Salary Account">Salary Account (¥)</option>
-                        <option value="Forex Card">Forex Card (¥)</option>
                         <option value="Cash">Cash (¥)</option>
                         <option value="PayPay">PayPay (¥)</option>
                         <option value="Axis Bank">Axis Bank (₹)</option>
@@ -115,7 +126,6 @@ class App {
                         <option value="Cash">Cash (¥)</option>
                         <option value="PayPay">PayPay (¥)</option>
                         <option value="Salary Account">Salary Account (¥)</option>
-                        <option value="Forex Card">Forex Card (¥)</option>
                         <option value="Axis Bank">Axis Bank (₹)</option>
                         <option value="Bank of Baroda">Bank of Baroda (₹)</option>
                         <option value="Credit Card">Credit Card (₹)</option>
@@ -168,12 +178,12 @@ class App {
                 <div class="form-group">
                     <label>Credit To</label>
                     <select id="tx-wallet">
-                        <optgroup label="🇯🇵 Japan">
+                        <optgroup label="Japan">
                             <option value="Salary Account">Salary Account (¥)</option>
                             <option value="Cash">Cash (¥)</option>
                             <option value="PayPay">PayPay (¥)</option>
                         </optgroup>
-                        <optgroup label="🇮🇳 India">
+                        <optgroup label="India">
                             <option value="Axis Bank">Axis Bank (₹)</option>
                             <option value="Bank of Baroda">Bank of Baroda (₹)</option>
                         </optgroup>
@@ -219,7 +229,16 @@ class App {
         if (tx.type === 'expense') {
             document.getElementById('tx-wallet').value = tx.walletId;
             this.updateExpenseCategories();
-            document.getElementById('tx-category').value = tx.categoryId;
+            
+            if (tx.categoryId.startsWith('jp-utility-')) {
+                document.getElementById('tx-category').value = 'utility-group';
+                this.handleCategoryChange();
+                document.getElementById('tx-subcategory').value = tx.categoryId;
+            } else {
+                document.getElementById('tx-category').value = tx.categoryId;
+                this.handleCategoryChange();
+            }
+            
             document.getElementById('tx-amount').value = tx.amount;
             document.getElementById('tx-note').value = tx.note || '';
             
@@ -268,7 +287,10 @@ class App {
 
         if (type === 'expense') {
             const wallet = document.getElementById('tx-wallet').value;
-            const cat = document.getElementById('tx-category').value;
+            let cat = document.getElementById('tx-category').value;
+            if (cat === 'utility-group') {
+                cat = document.getElementById('tx-subcategory').value;
+            }
             const amt = document.getElementById('tx-amount').value;
             const note = document.getElementById('tx-note').value;
             walletManager.addExpense(wallet, cat, amt, note, oldDate);
@@ -313,21 +335,52 @@ class App {
         document.getElementById(id).classList.remove('active');
     }
 
+    handleCategoryChange() {
+        const catSelect = document.getElementById('tx-category');
+        const subGroup = document.getElementById('tx-subcategory-group');
+        if (!catSelect || !subGroup) return;
+        
+        if (catSelect.value === 'utility-group') {
+            subGroup.classList.remove('hidden');
+        } else {
+            subGroup.classList.add('hidden');
+        }
+    }
+
     updateExpenseCategories() {
         const walletSelect = document.getElementById('tx-wallet');
         if (!walletSelect) return;
 
         const region = storage.state.wallets[walletSelect.value].region;
         const catSelect = document.getElementById('tx-category');
+        const subSelect = document.getElementById('tx-subcategory');
 
-        catSelect.innerHTML = storage.state.categories[region].map(c =>
-            `<option value="${c.id}">${c.name}</option>`
-        ).join('');
+        let html = '';
+        if (region === 'JP') {
+            const utils = storage.state.categories.JP.filter(c => c.id.startsWith('jp-utility-'));
+            const others = storage.state.categories.JP.filter(c => !c.id.startsWith('jp-utility-'));
+            
+            html = others.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            if (utils.length > 0) {
+                html += `<option value="utility-group">Utilities</option>`;
+                if (subSelect) {
+                    subSelect.innerHTML = utils.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                }
+            }
+        } else {
+            html = storage.state.categories[region].map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
+        
+        catSelect.innerHTML = html;
+        this.handleCategoryChange();
     }
 
     submitExpense() {
         const wallet = document.getElementById('tx-wallet').value;
-        const cat = document.getElementById('tx-category').value;
+        let cat = document.getElementById('tx-category').value;
+        if (cat === 'utility-group') {
+            cat = document.getElementById('tx-subcategory').value;
+        }
         const amt = document.getElementById('tx-amount').value;
         const note = document.getElementById('tx-note').value;
 
@@ -384,6 +437,7 @@ class App {
 
     renderAll() {
         this.renderWallets();
+        this.renderLoanTracker();
         this.renderCategories();
         this.renderTransactions();
 
@@ -394,6 +448,11 @@ class App {
     renderSettings() {
         if (this.currentView === 'settings-view') {
             document.getElementById('setting-jp-budget').value = storage.state.jpTotalBudget;
+            
+            if (storage.state.loanConfig) {
+                document.getElementById('setting-loan-principal').value = storage.state.loanConfig.principalLeft;
+                document.getElementById('setting-loan-dues').value = storage.state.loanConfig.duesPaid;
+            }
 
             // Render wallet balances
             let walletHtml = '';
@@ -485,9 +544,19 @@ class App {
         let jpTotal = 0, inTotal = 0;
         let jpHtml = '', inHtml = '';
 
+        const themeMap = {
+            'Salary Account': 'wallet-theme-salary',
+            'PayPay': 'wallet-theme-paypay',
+            'Cash': 'wallet-theme-cash',
+            'Axis Bank': 'wallet-theme-axis',
+            'Bank of Baroda': 'wallet-theme-bob',
+            'Credit Card': 'wallet-theme-cc'
+        };
+
         Object.values(storage.state.wallets).forEach(w => {
+            const themeClass = themeMap[w.id] || '';
             const html = `
-                <div class="wallet-item">
+                <div class="wallet-item ${themeClass}">
                     <div class="wallet-name">
                         <i data-lucide="${w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone'}"></i>
                         ${w.id}
@@ -599,13 +668,23 @@ class App {
                 title = `Remittance: JP → IN`;
                 amt = `¥${tx.sourceAmount.toLocaleString()} → ₹${tx.destAmount.toLocaleString()}`;
             } else {
-                // Find category name
                 const regionCats = storage.state.categories[tx.region];
                 const cat = regionCats.find(c => c.id === tx.categoryId);
-                if (cat) title = cat.name;
+                if (cat) {
+                    title = cat.name;
+                }
             }
 
             const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+            
+            // For Income, title is currently set to tx.note if it exists. 
+            // For other types, we'll just append it to the meta line if it exists.
+            let metaString = `${date} • ${tx.walletId || 'Wallet'}`;
+            if (tx.note && tx.type !== 'income') {
+                metaString += ` • ${tx.note}`;
+            } else if (tx.type === 'transfer' || tx.type === 'remittance') {
+                metaString = `${date} • ${tx.note ? tx.note : 'Transfer'}`;
+            }
 
             html += `
                 <div class="tx-item" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer;">
@@ -613,7 +692,7 @@ class App {
                         <div class="tx-icon"><i data-lucide="${icon}"></i></div>
                         <div class="tx-details">
                             <span class="tx-title">${title}</span>
-                            <span class="tx-meta">${date} • ${tx.walletId || 'Wallet'}</span>
+                            <span class="tx-meta">${metaString}</span>
                         </div>
                     </div>
                     <div class="tx-right">
@@ -658,6 +737,77 @@ class App {
             storage.state.jpTotalBudget = Number(val);
         }
         storage.saveData();
+    }
+
+    updateWalletBalance(id, val) {
+        if (!val || isNaN(val)) return;
+        if (storage.state.wallets[id]) {
+            storage.state.wallets[id].balance = Number(val);
+            storage.saveData();
+            this.renderAll();
+        }
+    }
+
+    updateLoanSetting(key, val) {
+        if (!val || isNaN(val)) return;
+        if (storage.state.loanConfig) {
+            storage.state.loanConfig[key] = Number(val);
+            storage.saveData();
+            this.renderAll();
+        }
+    }
+
+    renderLoanTracker() {
+        if (this.currentView !== 'home-view') return;
+        
+        const loanState = walletManager.getLoanState();
+        const widget = document.getElementById('loan-tracker-widget');
+        
+        if (!loanState) {
+            if(widget) widget.style.display = 'none';
+            return;
+        }
+
+        if(widget) {
+            widget.style.display = 'block';
+            widget.innerHTML = `
+                <div class="loan-header">
+                    <div>
+                        <div class="loan-value">₹${loanState.config.totalPrincipal.toLocaleString('en-IN')}</div>
+                        <div class="loan-label">Total Loan Amount</div>
+                    </div>
+                    <div>
+                        <div class="loan-value">₹${loanState.config.emi.toLocaleString('en-IN')}</div>
+                        <div class="loan-label">EMI Amount</div>
+                    </div>
+                </div>
+                
+                <div class="loan-progress-box">
+                    <div class="loan-progress-header">
+                        <span class="loan-percent">${loanState.percentPaid}%</span>
+                        <div style="display:flex; flex-direction:column; line-height:1.2; text-align:left;">
+                            <span class="loan-label" style="font-size:0.75rem;">Paid</span>
+                            <span class="loan-label" style="font-size:0.75rem;">Till Date</span>
+                        </div>
+                        <span class="loan-status">ON TRACK</span>
+                    </div>
+                    <div class="loan-progress-bar-bg">
+                        <div class="loan-progress-bar" style="width: ${loanState.percentPaid}%;"></div>
+                    </div>
+                    
+                    <div class="loan-stats-grid">
+                        <span class="loan-stat-label">Amount Paid</span>
+                        <span class="loan-stat-value">₹${loanState.amountPaid.toLocaleString('en-IN')}</span>
+                        
+                        <span class="loan-stat-label">Principal Paid</span>
+                        <span class="loan-stat-value">₹${loanState.principalPaid.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        
+                        <span class="loan-stat-label">Principal Left</span>
+                        <span class="loan-stat-value">₹${loanState.principalLeft.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    </div>
+                </div>
+            `;
+        }
     }
 
     exportData() {

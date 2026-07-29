@@ -5,7 +5,6 @@ const defaultState = {
     jpTotalBudget: 150000,
     wallets: {
         'Salary Account': { id: 'Salary Account', type: 'bank', region: 'JP', balance: 0, currency: '¥' },
-        'Forex Card': { id: 'Forex Card', type: 'card', region: 'JP', balance: 34843, currency: '¥' },
         'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 7000, currency: '¥' },
         'PayPay': { id: 'PayPay', type: 'digital', region: 'JP', balance: 0, currency: '¥' },
         'Axis Bank': { id: 'Axis Bank', type: 'bank', region: 'IN', balance: 17084, currency: '₹' },
@@ -32,6 +31,7 @@ const defaultState = {
         ],
         IN: [
             { id: 'in-petrol', name: 'Petrol', icon: 'fuel' },
+            { id: 'in-loan', name: 'Loan EMI', icon: 'landmark' },
             { id: 'in-home', name: 'Home Needs', icon: 'home' },
             { id: 'in-medicine', name: 'Medicine & Health', icon: 'pill' },
             { id: 'in-eb', name: 'EB / Utility Bills', icon: 'zap' },
@@ -39,6 +39,14 @@ const defaultState = {
             { id: 'in-ration', name: 'Ration & Groceries', icon: 'shopping-basket' },
             { id: 'in-misc', name: 'Miscellaneous', icon: 'wrench' }
         ]
+    },
+    loanConfig: {
+        totalPrincipal: 211670,
+        principalLeft: 181206.29,
+        emi: 10566,
+        duesPaid: 4,
+        totalDues: 24,
+        annualInterestRate: 17.99
     },
     transactions: [],
     history: []
@@ -56,7 +64,7 @@ class StorageManager {
             if (data) {
                 const parsed = JSON.parse(data);
                 // Merge top-level fields but always trust saved wallets/categories
-                return {
+                const mergedState = {
                     ...defaultState,
                     ...parsed,
                     // Wallets: merge defaults with saved (preserves balances)
@@ -71,6 +79,62 @@ class StorageManager {
                             : JSON.parse(JSON.stringify(defaultState.categories.IN)),
                     }
                 };
+                
+                if (mergedState.wallets && mergedState.wallets['Forex Card']) {
+                    delete mergedState.wallets['Forex Card'];
+                }
+                
+                // Utility Categories Reverse Migration (Undo the previous merge)
+                const hasJpUtilities = mergedState.categories.JP.some(c => c.id === 'jp-utilities');
+                if (hasJpUtilities) {
+                    // Remove 'jp-utilities'
+                    mergedState.categories.JP = mergedState.categories.JP.filter(c => c.id !== 'jp-utilities');
+                    // Add the original 4 utilities back
+                    const oldUtils = [
+                        { id: 'jp-utility-electric', name: 'Electricity', icon: 'zap', budget: 0 },
+                        { id: 'jp-utility-gas', name: 'Gas', icon: 'flame', budget: 0 },
+                        { id: 'jp-utility-water', name: 'Water', icon: 'droplet', budget: 0 },
+                        { id: 'jp-utility-internet', name: 'Internet', icon: 'wifi', budget: 0 }
+                    ];
+                    // Insert at index 4 (after Rent)
+                    mergedState.categories.JP.splice(4, 0, ...oldUtils);
+                    
+                    // Recover transactions
+                    const revMap = {
+                        'Electricity': 'jp-utility-electric',
+                        'Gas': 'jp-utility-gas',
+                        'Water': 'jp-utility-water',
+                        'Internet': 'jp-utility-internet'
+                    };
+                    
+                    if (mergedState.transactions && mergedState.transactions.length > 0) {
+                        mergedState.transactions.forEach(tx => {
+                            if (tx.categoryId === 'jp-utilities' && tx.note) {
+                                for (const [oldName, oldId] of Object.entries(revMap)) {
+                                    if (tx.note.includes(oldName)) {
+                                        tx.categoryId = oldId;
+                                        // Clean up the note
+                                        if (tx.note === oldName) {
+                                            tx.note = '';
+                                        } else if (tx.note.startsWith(`${oldName} - `)) {
+                                            tx.note = tx.note.substring(oldName.length + 3);
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+                if (!mergedState.categories.IN.some(c => c.id === 'in-loan')) {
+                    mergedState.categories.IN.splice(1, 0, { id: 'in-loan', name: 'Loan EMI', icon: 'landmark' });
+                }
+                
+                if (!mergedState.loanConfig) {
+                    mergedState.loanConfig = defaultState.loanConfig;
+                }
+                
+                return mergedState;
             }
         } catch (e) {
             console.error("Failed to load data", e);

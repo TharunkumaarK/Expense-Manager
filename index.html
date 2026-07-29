@@ -39,10 +39,21 @@
             </header>
 
             <div class="wallets-container">
+                <!-- Loan Tracker Widget -->
+                <div class="loan-card" id="loan-tracker-widget" style="display: none;">
+                    <!-- Populated by JS -->
+                </div>
+
                 <!-- Japan Wallets -->
                 <div class="region-card">
                     <div class="region-header">
-                        <span class="region-title">🇯🇵 Japan</span>
+                        <span class="region-title" style="display:flex; align-items:center; gap:8px;">
+                            <svg width="20" height="20" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                                <circle fill="#EEEEEE" cx="18" cy="18" r="18"/>
+                                <circle fill="#D80027" cx="18" cy="18" r="7"/>
+                            </svg>
+                            Japan
+                        </span>
                         <span class="region-total" id="jp-total-balance">¥0</span>
                     </div>
                     <div class="wallet-grid" id="jp-wallets">
@@ -53,7 +64,21 @@
                 <!-- India Wallets -->
                 <div class="region-card">
                     <div class="region-header">
-                        <span class="region-title">🇮🇳 India</span>
+                        <span class="region-title" style="display:flex; align-items:center; gap:8px;">
+                            <svg width="20" height="20" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                                <clipPath id="circleViewIN">
+                                    <circle cx="18" cy="18" r="18" />
+                                </clipPath>
+                                <g clip-path="url(#circleViewIN)">
+                                    <rect x="0" y="0" width="36" height="12" fill="#FF9933" />
+                                    <rect x="0" y="12" width="36" height="12" fill="#FFFFFF" />
+                                    <rect x="0" y="24" width="36" height="12" fill="#138808" />
+                                    <circle cx="18" cy="18" r="3.5" fill="none" stroke="#000080" stroke-width="1.5"/>
+                                    <circle cx="18" cy="18" r="0.8" fill="#000080"/>
+                                </g>
+                            </svg>
+                            India
+                        </span>
                         <span class="region-total" id="in-total-balance">₹0</span>
                     </div>
                     <div class="wallet-grid" id="in-wallets">
@@ -66,14 +91,24 @@
                 <!-- Populated by JS -->
             </div>
 
-            <h3 class="section-title">Japan Spending Categories</h3>
-            <div class="category-grid" id="jp-categories-grid">
-                <!-- Populated by JS -->
+            <div class="section-header-toggle" onclick="app.toggleCollapse('jp-categories-wrap', 'jp-chevron')">
+                <h3 class="section-title" style="margin:0; padding:0;">Japan Spending Categories</h3>
+                <i data-lucide="chevron-down" id="jp-chevron"></i>
+            </div>
+            <div class="collapsible-wrapper" id="jp-categories-wrap">
+                <div class="category-grid" id="jp-categories-grid">
+                    <!-- Populated by JS -->
+                </div>
             </div>
             
-            <h3 class="section-title">India Spending Categories</h3>
-            <div class="category-grid" id="in-categories-grid">
-                <!-- Populated by JS -->
+            <div class="section-header-toggle" onclick="app.toggleCollapse('in-categories-wrap', 'in-chevron')">
+                <h3 class="section-title" style="margin:0; padding:0;">India Spending Categories</h3>
+                <i data-lucide="chevron-down" id="in-chevron" class="rotated"></i>
+            </div>
+            <div class="collapsible-wrapper collapsed" id="in-categories-wrap">
+                <div class="category-grid" id="in-categories-grid">
+                    <!-- Populated by JS -->
+                </div>
             </div>
 
             <h3 class="section-title">Recent Transactions</h3>
@@ -138,6 +173,19 @@
                     <p class="help-text text-sm text-muted mb-2">Adjust your current wallet balances directly.</p>
                     <div id="settings-wallets-list">
                         <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>Loan Tracker (India)</h3>
+                    <p class="help-text text-sm text-muted mb-2">Update manually once a month from your bank app to stay in sync.</p>
+                    <div class="form-group mt-2">
+                        <label>Principal Left (₹)</label>
+                        <input type="number" id="setting-loan-principal" onblur="app.updateLoanSetting('principalLeft', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label>EMIs Paid (Months)</label>
+                        <input type="number" id="setting-loan-dues" onblur="app.updateLoanSetting('duesPaid', this.value)">
                     </div>
                 </div>
 
