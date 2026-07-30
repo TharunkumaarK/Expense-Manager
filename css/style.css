@@ -245,43 +245,61 @@ button {
     background: linear-gradient(135deg, rgba(0, 153, 68, 0.2), rgba(0, 153, 68, 0.05));
     border: 1px solid rgba(0, 153, 68, 0.4);
 }
+
 .wallet-theme-salary .wallet-name,
-.wallet-theme-salary .wallet-balance { color: #80cca3; }
+.wallet-theme-salary .wallet-balance {
+    color: #80cca3;
+}
 
 .wallet-theme-paypay {
     background: linear-gradient(135deg, rgba(255, 0, 51, 0.15), rgba(255, 0, 51, 0.05));
     border: 1px solid rgba(255, 0, 51, 0.3);
 }
+
 .wallet-theme-paypay .wallet-name,
-.wallet-theme-paypay .wallet-balance { color: #ff8099; }
+.wallet-theme-paypay .wallet-balance {
+    color: #ff8099;
+}
 
 .wallet-theme-cash {
     background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.05));
     border: 1px solid rgba(212, 175, 55, 0.4);
 }
+
 .wallet-theme-cash .wallet-name,
-.wallet-theme-cash .wallet-balance { color: #e5cc80; }
+.wallet-theme-cash .wallet-balance {
+    color: #e5cc80;
+}
 
 .wallet-theme-axis {
     background: linear-gradient(135deg, rgba(151, 20, 77, 0.25), rgba(151, 20, 77, 0.1));
     border: 1px solid rgba(151, 20, 77, 0.5);
 }
+
 .wallet-theme-axis .wallet-name,
-.wallet-theme-axis .wallet-balance { color: #c97193; }
+.wallet-theme-axis .wallet-balance {
+    color: #c97193;
+}
 
 .wallet-theme-bob {
     background: linear-gradient(135deg, rgba(240, 90, 40, 0.15), rgba(240, 90, 40, 0.05));
     border: 1px solid rgba(240, 90, 40, 0.4);
 }
+
 .wallet-theme-bob .wallet-name,
-.wallet-theme-bob .wallet-balance { color: #f7a68a; }
+.wallet-theme-bob .wallet-balance {
+    color: #f7a68a;
+}
 
 .wallet-theme-cc {
     background: linear-gradient(135deg, rgba(160, 160, 160, 0.25), rgba(210, 210, 210, 0.05));
     border: 1px solid rgba(192, 192, 192, 0.5);
 }
+
 .wallet-theme-cc .wallet-name,
-.wallet-theme-cc .wallet-balance { color: #d1d5db; }
+.wallet-theme-cc .wallet-balance {
+    color: #d1d5db;
+}
 
 /* Loan Tracker */
 .loan-card {
@@ -291,39 +309,46 @@ button {
     margin: 16px;
     margin-bottom: 24px;
 }
+
 .loan-header {
     display: flex;
     justify-content: space-between;
     padding: 20px;
     border-bottom: 1px solid var(--border);
 }
+
 .loan-value {
     font-size: 1.15rem;
     font-weight: 700;
     color: var(--text-main);
     letter-spacing: 0.5px;
 }
+
 .loan-label {
     font-size: 0.75rem;
     color: var(--text-muted);
     text-transform: capitalize;
     margin-top: 4px;
 }
+
 .loan-progress-box {
     padding: 20px;
 }
+
 .loan-progress-header {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 12px;
 }
+
 .loan-percent {
     font-size: 2.5rem;
     font-weight: 800;
     color: #10b981;
     line-height: 1;
 }
+
 .loan-status {
     margin-left: auto;
     font-size: 0.75rem;
@@ -331,6 +356,7 @@ button {
     color: #10b981;
     letter-spacing: 1.5px;
 }
+
 .loan-progress-bar-bg {
     width: 100%;
     height: 4px;
@@ -338,22 +364,26 @@ button {
     border-radius: 2px;
     margin-bottom: 24px;
 }
+
 .loan-progress-bar {
     height: 100%;
     background-color: #10b981;
     border-radius: 2px;
     box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
 }
+
 .loan-stats-grid {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 12px 0;
     font-size: 0.9rem;
 }
+
 .loan-stat-label {
     color: var(--text-muted);
     text-transform: capitalize;
 }
+
 .loan-stat-value {
     text-align: right;
     font-weight: 600;
@@ -868,16 +898,19 @@ input:focus {
     user-select: none;
     -webkit-tap-highlight-color: transparent;
 }
+
 .section-header-toggle .section-title {
     margin: 0 !important;
     padding: 0 !important;
 }
+
 .section-header-toggle i {
     width: 20px;
     height: 20px;
     color: var(--text-muted);
     transition: transform 0.3s ease;
 }
+
 .section-header-toggle i.rotated {
     transform: rotate(-180deg);
 }
@@ -887,14 +920,120 @@ input:focus {
     grid-template-rows: 1fr;
     transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .collapsible-wrapper.collapsed {
     grid-template-rows: 0fr;
 }
-.collapsible-wrapper > div {
+
+.collapsible-wrapper>div {
     overflow: hidden;
 }
 
 /* Utilities */
 .hidden {
     display: none !important;
+}
+
+/* --- V2 NEON PROGRESS UI --- */
+
+@keyframes pulse-glow {
+    0% {
+        filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
+    }
+
+    50% {
+        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.8));
+    }
+
+    100% {
+        filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
+    }
+}
+
+.neon-row {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 0px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+}
+
+.neon-row:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.neon-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.neon-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.neon-title i {
+    width: 16px;
+    height: 16px;
+    opacity: 0.8;
+}
+
+.neon-amount {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.neon-amount-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.neon-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-main);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.neon-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+/* Gradients for different statuses */
+.neon-safe {
+    background: linear-gradient(90deg, #10b981, #34d399);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.neon-warn {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.neon-danger {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    animation: pulse-glow 2s infinite;
+}
+
+.neon-over {
+    background: linear-gradient(90deg, #991b1b, #dc2626);
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.8);
 }

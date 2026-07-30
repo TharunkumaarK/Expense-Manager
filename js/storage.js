@@ -130,8 +130,26 @@ class StorageManager {
                     mergedState.categories.IN.splice(1, 0, { id: 'in-loan', name: 'Loan EMI', icon: 'landmark' });
                 }
                 
-                if (!mergedState.loanConfig) {
+                if (!mergedState.loanConfig || Object.keys(mergedState.loanConfig).length === 0) {
                     mergedState.loanConfig = defaultState.loanConfig;
+                }
+                
+                // MIGRATION: Merge duplicate history ledgers with the same monthKey
+                if (mergedState.history && mergedState.history.length > 0) {
+                    const uniqueHistory = [];
+                    mergedState.history.forEach(snapshot => {
+                        const existing = uniqueHistory.find(h => h.monthKey === snapshot.monthKey);
+                        if (existing) {
+                            // Merge transactions
+                            existing.transactions = existing.transactions.concat(snapshot.transactions);
+                        } else {
+                            uniqueHistory.push(snapshot);
+                        }
+                    });
+                    
+                    // Sort descending by monthKey
+                    uniqueHistory.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+                    mergedState.history = uniqueHistory;
                 }
                 
                 return mergedState;
@@ -170,22 +188,30 @@ class StorageManager {
         }
     }
 
-    closeCurrentMonth(labelSuffix = "Manual Snapshot") {
+    closeCurrentMonth() {
         const monthKey = this.state.currentMonthKey;
-        const d = new Date();
-        const dateString = d.toLocaleDateString("en-GB", { month: "short", year: "numeric", day: "2-digit" });
         
-        // Deep copy required data
-        const snapshot = {
-            id: `${monthKey}_${Date.now()}`,
-            label: `${monthKey} (${labelSuffix} - ${dateString})`,
-            monthKey: monthKey,
-            transactions: JSON.parse(JSON.stringify(this.state.transactions)),
-            walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets)),
-            jpTotalBudget: this.state.jpTotalBudget
-        };
+        // Find existing ledger for this monthKey
+        let ledger = this.state.history.find(h => h.monthKey === monthKey);
+        
+        if (ledger) {
+            // Append transactions
+            ledger.transactions = ledger.transactions.concat(this.state.transactions);
+            // Update snapshot to latest wallets
+            ledger.walletsSnapshot = JSON.parse(JSON.stringify(this.state.wallets));
+        } else {
+            // Create new ledger
+            ledger = {
+                monthKey: monthKey,
+                transactions: JSON.parse(JSON.stringify(this.state.transactions)),
+                walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets)),
+                jpTotalBudget: this.state.jpTotalBudget
+            };
+            this.state.history.push(ledger);
+            // Keep history sorted descending
+            this.state.history.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+        }
 
-        this.state.history.unshift(snapshot);
         // Clear current month transactions
         this.state.transactions = [];
         this.saveData();

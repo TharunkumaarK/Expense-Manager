@@ -31,9 +31,12 @@
         <!-- Home View -->
         <section id="home-view" class="view active">
             <header class="top-bar">
-                <div class="date-selector">
-                    <span id="current-month-display">Loading...</span>
-                    <i data-lucide="chevron-down"></i>
+                <div class="summary-card text-center" style="margin-bottom: 24px; padding: 12px; background: transparent; box-shadow: none;">
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 16px;">
+                        <button class="icon-btn" onclick="app.changeMonth(-1)"><i data-lucide="chevron-left"></i></button>
+                        <h2 id="current-month-display" style="font-size: 1.4rem; font-weight: 700; min-width: 120px;">Month</h2>
+                        <button class="icon-btn" onclick="app.changeMonth(1)"><i data-lucide="chevron-right"></i></button>
+                    </div>
                 </div>
                 <button class="icon-btn" onclick="app.showSettings()"><i data-lucide="settings"></i></button>
             </header>
@@ -295,7 +298,11 @@
     <script>
         lucide.createIcons();
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed', err));
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                }
+            });
         }
     </script>
 </body>

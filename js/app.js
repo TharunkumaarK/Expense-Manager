@@ -1,17 +1,53 @@
 class App {
     constructor() {
         this.currentView = 'home-view';
+        this.viewingMonthKey = null; // null means current month
         this.init();
     }
 
     init() {
+        storage.checkRollover();
         this.setupNavigation();
         this.renderAll();
+    }
 
-        // Month display
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const d = new Date();
-        document.getElementById('current-month-display').innerText = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+    get activeMonthKey() {
+        return this.viewingMonthKey || storage.state.currentMonthKey;
+    }
+
+    isViewingPast() {
+        return this.viewingMonthKey && this.viewingMonthKey !== storage.state.currentMonthKey;
+    }
+
+    getActiveTransactions() {
+        if (this.isViewingPast()) {
+            const h = storage.state.history.find(x => x.monthKey === this.viewingMonthKey);
+            return h ? h.transactions : [];
+        }
+        return storage.state.transactions;
+    }
+
+    changeMonth(delta) {
+        // Collect all available months (current + history)
+        const allMonths = [storage.state.currentMonthKey, ...storage.state.history.map(h => h.monthKey)];
+        // Ensure unique
+        const uniqueMonths = [...new Set(allMonths)].sort().reverse(); 
+
+        const currentIndex = uniqueMonths.indexOf(this.activeMonthKey);
+        let newIndex = currentIndex - delta; // -1 means go older (higher index), +1 means go newer (lower index)
+
+        if (newIndex < 0) newIndex = 0;
+        if (newIndex >= uniqueMonths.length) newIndex = uniqueMonths.length - 1;
+
+        const newMonth = uniqueMonths[newIndex];
+        
+        if (newMonth === storage.state.currentMonthKey) {
+            this.viewingMonthKey = null;
+        } else {
+            this.viewingMonthKey = newMonth;
+        }
+
+        this.renderAll();
     }
 
     setupNavigation() {
@@ -578,22 +614,46 @@ class App {
         document.getElementById('jp-total-balance').innerText = `¥${jpTotal.toLocaleString()}`;
         document.getElementById('in-total-balance').innerText = `₹${inTotal.toLocaleString()}`;
 
-        // Render JP Budget Overview
-        const jpSpent = walletManager.getTotalSpent('JP');
-        const jpRem = storage.state.jpTotalBudget - jpSpent;
-        const pct = Math.min((jpSpent / storage.state.jpTotalBudget) * 100, 100) || 0;
+        // Update Month Header
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        let headerStr = "";
+        const mKey = this.activeMonthKey;
+        if (mKey) {
+            const [y, m] = mKey.split('-');
+            headerStr = `${monthNames[parseInt(m)-1]} ${y}`;
+            if (this.isViewingPast()) {
+                headerStr = `<span style="color:var(--orange)">${headerStr} (Past)</span>`;
+            }
+        }
+        const disp = document.getElementById('current-month-display');
+        if(disp) disp.innerHTML = headerStr;
 
-        document.getElementById('budget-overview-card').innerHTML = `
-            <div class="card" style="margin: 0 16px;">
-                <div class="region-header" style="margin-bottom: 4px;">
-                    <span class="text-muted text-sm">Japan Monthly Budget</span>
+        // Change layout of category grids to 2-columns
+        ['jp-categories-grid', 'in-categories-grid'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) {
+                el.style.display = 'grid';
+                el.style.gridTemplateColumns = '1fr 1fr';
+                el.style.gap = '12px';
+            }
+        });
+        
+        const jpTotalSpent = walletManager.getTotalSpent('JP', this.getActiveTransactions());
+        const jpRem = Math.max(0, storage.state.jpTotalBudget - jpTotalSpent);
+        const pct = Math.min((jpTotalSpent / storage.state.jpTotalBudget) * 100, 100);
+        
+        const card = document.getElementById('jp-budget-card');
+        card.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                    <span class="text-sm text-muted">Total Balance</span>
                     <span class="font-bold">¥${jpRem.toLocaleString()} left</span>
                 </div>
-                <div class="progress-bg">
-                    <div class="progress-fill ${pct > 90 ? 'danger' : pct > 75 ? 'warning' : ''}" style="width: ${pct}%"></div>
+                <div class="neon-bar-bg">
+                    <div class="neon-bar-fill ${pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${pct}%"></div>
                 </div>
                 <div class="text-muted text-sm" style="margin-top: 6px; text-align: right;">
-                    Spent ¥${jpSpent.toLocaleString()} of ¥${storage.state.jpTotalBudget.toLocaleString()}
+                    Spent ¥${jpTotalSpent.toLocaleString()} of ¥${storage.state.jpTotalBudget.toLocaleString()}
                 </div>
             </div>
         `;
@@ -601,35 +661,66 @@ class App {
 
     renderCategories() {
         const renderGrid = (region, elementId, showProgress) => {
-            const totals = walletManager.getCategoryTotals(region);
+            const activeTxs = this.getActiveTransactions();
+            const totals = {};
+            activeTxs.forEach(tx => {
+                if (tx.type === 'expense' && tx.region === region) {
+                    totals[tx.categoryId] = (totals[tx.categoryId] || 0) + tx.amount;
+                }
+            });
+
             let html = '';
+            const currency = region === 'JP' ? '¥' : '₹';
 
             storage.state.categories[region].forEach(c => {
                 const spent = totals[c.id] || 0;
                 let progressHtml = '';
+                
+                // Calculate Effective Budget taking Rollover into account
+                let activeBudget = c.budget || 0;
+                let rolloverVal = 0;
+                
+                if (showProgress && activeBudget > 0) {
+                    // Inject rollover logic
+                    activeBudget = walletManager.getEffectiveBudget(c.id, region, this.activeMonthKey);
+                    rolloverVal = activeBudget - (c.budget || 0);
+                }
 
-                if (showProgress && c.budget > 0) {
-                    const pct = Math.min((spent / c.budget) * 100, 100);
+                if (showProgress && activeBudget > 0) {
+                    const pct = Math.min((spent / activeBudget) * 100, 100);
+                    let barClass = 'neon-safe';
+                    if (pct > 90) barClass = 'neon-danger';
+                    else if (pct > 75) barClass = 'neon-warn';
+
+                    let rolloverPill = '';
+                    if (rolloverVal > 0) {
+                        rolloverPill = `<span style="font-size:0.65rem; background:rgba(16,185,129,0.15); color:#10b981; padding:2px 6px; border-radius:10px; margin-left:4px;">+${currency}${rolloverVal.toLocaleString()}</span>`;
+                    }
+
                     progressHtml = `
-                        <div class="progress-bg">
-                            <div class="progress-fill ${pct > 90 ? 'danger' : pct > 75 ? 'warning' : ''}" style="width: ${pct}%"></div>
+                        <div class="neon-bar-bg">
+                            <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                         </div>
-                        <div class="cat-meta">¥${spent.toLocaleString()} / ¥${c.budget.toLocaleString()}</div>
+                        <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
+                            <span>${currency}${spent.toLocaleString()}</span>
+                            <span>${currency}${activeBudget.toLocaleString()}${rolloverPill}</span>
+                        </div>
                     `;
                 } else {
-                    progressHtml = `<div class="cat-meta">${storage.state.wallets[region === 'JP' ? 'Cash' : 'Axis Bank'].currency}${spent.toLocaleString()}</div>`;
+                    progressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${currency}${spent.toLocaleString()}</div>`;
                 }
 
                 html += `
-                    <div class="category-card">
-                        <div class="cat-header">
-                            <span class="cat-icon-name"><i data-lucide="${c.icon}"></i> ${c.name}</span>
+                    <div class="neon-row" style="padding: 12px;" onclick="app.openQuickEditModal('category', '${c.id}', '${region}')">
+                        <div class="neon-header" style="margin-bottom: 8px;">
+                            <span class="neon-title"><i data-lucide="${c.icon}"></i> ${c.name}</span>
                         </div>
                         ${progressHtml}
                     </div>
                 `;
             });
-            document.getElementById(elementId).innerHTML = html;
+            const el = document.getElementById(elementId);
+            if(el) el.innerHTML = html;
         };
 
         renderGrid('JP', 'jp-categories-grid', true);
@@ -637,7 +728,8 @@ class App {
     }
 
     renderTransactions() {
-        const txs = walletManager.getTransactions().slice(0, 5); // Last 5 for home
+        const activeTxs = this.getActiveTransactions();
+        const txs = activeTxs.slice(0, 5); // Last 5 for home
         const container = document.getElementById('recent-transactions-list');
 
         if (txs.length === 0) {
@@ -713,15 +805,90 @@ class App {
         }
 
         let html = '';
-        storage.state.history.forEach(h => {
+        storage.state.history.forEach((h, index) => {
+            const totals = {};
+            h.transactions.forEach(tx => {
+                if (tx.type === 'expense') {
+                    if (!totals[tx.region]) totals[tx.region] = {};
+                    totals[tx.region][tx.categoryId] = (totals[tx.region][tx.categoryId] || 0) + tx.amount;
+                }
+            });
+
+            let catsHtml = '';
+            ['JP', 'IN'].forEach(region => {
+                const currency = region === 'JP' ? '¥' : '₹';
+                catsHtml += `
+                    <div style="margin-top:16px;">
+                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;">${region === 'JP' ? 'Japan' : 'India'} Expenses</h4>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                `;
+
+                if (totals[region]) {
+                    Object.keys(totals[region]).forEach(catId => {
+                        const catDef = storage.state.categories[region].find(c => c.id === catId);
+                        if (!catDef) return;
+                        
+                        const spent = totals[region][catId];
+                        let activeBudget = walletManager.getEffectiveBudget(catId, region, h.monthKey);
+
+                        let pct = 0;
+                        let barClass = 'neon-safe';
+                        
+                        if (activeBudget > 0) {
+                            pct = Math.min((spent / activeBudget) * 100, 100);
+                            if (pct > 90) barClass = 'neon-danger';
+                            else if (pct > 75) barClass = 'neon-warn';
+                        }
+                        
+                        catsHtml += `
+                            <div class="neon-row" style="padding: 10px;">
+                                <div class="neon-header" style="margin-bottom: 6px;">
+                                    <span class="neon-title" style="font-size:0.8rem;"><i data-lucide="${catDef.icon}" style="width:14px;height:14px;"></i> ${catDef.name}</span>
+                                </div>
+                                ${activeBudget > 0 ? `
+                                    <div class="neon-bar-bg" style="height:6px;">
+                                        <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
+                                    </div>
+                                    <div class="neon-amount-sub" style="margin-top:4px; font-size:0.7rem; display:flex; justify-content:space-between;">
+                                        <span>${currency}${spent.toLocaleString()}</span>
+                                        <span>${currency}${activeBudget.toLocaleString()}</span>
+                                    </div>
+                                ` : `
+                                    <div class="neon-amount-sub" style="font-size:0.7rem; margin-top:4px;">Spent: ${currency}${spent.toLocaleString()}</div>
+                                `}
+                            </div>
+                        `;
+                    });
+                } else {
+                    catsHtml += `<div class="text-muted text-sm">No expenses</div>`;
+                }
+                catsHtml += `</div></div>`;
+            });
+
             html += `
-                <div class="card">
-                    <h3>${h.label}</h3>
-                    <p class="text-muted text-sm mt-2">${h.transactions.length} transactions recorded</p>
+                <div class="card" style="margin-bottom: 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="app.toggleHistoryCard(${index})">
+                        <div>
+                            <h3 style="margin:0;">${h.label}</h3>
+                            <p class="text-muted text-sm mt-1">${h.transactions.length} transactions recorded</p>
+                        </div>
+                        <i data-lucide="chevron-down" style="color:var(--text-muted)"></i>
+                    </div>
+                    <div id="history-txs-${index}" class="hidden mt-3" style="border-top: 1px solid var(--border); padding-top: 12px;">
+                        ${catsHtml}
+                    </div>
                 </div>
             `;
         });
         container.innerHTML = html;
+        lucide.createIcons({ root: container });
+    }
+
+    toggleHistoryCard(index) {
+        const el = document.getElementById(`history-txs-${index}`);
+        if(el) {
+            el.classList.toggle('hidden');
+        }
     }
 
     showSettings() {

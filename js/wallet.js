@@ -144,11 +144,66 @@ class WalletManager {
         return totals;
     }
 
-    // Total spent in a region
-    getTotalSpent(region) {
-        return storage.state.transactions
+    // Total spent in a region for a specific set of transactions (defaults to current)
+    getTotalSpent(region, transactions = storage.state.transactions) {
+        return transactions
             .filter(tx => tx.type === 'expense' && tx.region === region)
             .reduce((sum, tx) => sum + tx.amount, 0);
+    }
+
+    // Recursively calculate rollover savings from previous months with proportional debt balancing
+    getRollover(categoryId, region, targetMonthKey) {
+        const prevLedger = storage.state.history.find(h => h.monthKey < targetMonthKey);
+        if (!prevLedger) return 0;
+        
+        let totalPositiveSavings = 0;
+        let totalDebt = 0;
+        const catSavings = {};
+        
+        storage.state.categories[region].forEach(c => {
+            const baseBudget = c.budget || 0;
+            if (baseBudget <= 0) return;
+            
+            const prevPrevRollover = this.getRollover(c.id, region, prevLedger.monthKey);
+            const effectivePrevBudget = baseBudget + prevPrevRollover;
+            
+            let spent = 0;
+            prevLedger.transactions.forEach(tx => {
+                if (tx.type === 'expense' && tx.region === region && tx.categoryId === c.id) {
+                    spent += tx.amount;
+                }
+            });
+            
+            const remaining = effectivePrevBudget - spent;
+            catSavings[c.id] = remaining;
+            
+            if (remaining > 0) {
+                totalPositiveSavings += remaining;
+            } else {
+                totalDebt += Math.abs(remaining);
+            }
+        });
+        
+        if (totalDebt >= totalPositiveSavings) return 0; // Total budget blown
+        
+        const myRemaining = catSavings[categoryId] || 0;
+        if (myRemaining <= 0) return 0; // In debt
+        
+        const myShareOfSavings = myRemaining / totalPositiveSavings;
+        const myDebtAbsorption = totalDebt * myShareOfSavings;
+        
+        const finalRollover = myRemaining - myDebtAbsorption;
+        return finalRollover > 0 ? finalRollover : 0;
+    }
+
+    // Get the effective budget for a category in a specific month
+    getEffectiveBudget(categoryId, region, monthKey) {
+        const cat = storage.state.categories[region].find(c => c.id === categoryId);
+        const baseBudget = cat ? (cat.budget || 0) : 0;
+        if (baseBudget <= 0) return 0;
+        
+        const rollover = this.getRollover(categoryId, region, monthKey);
+        return baseBudget + rollover;
     }
 
     // Calculate current loan state based on manual config
