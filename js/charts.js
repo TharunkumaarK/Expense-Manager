@@ -114,6 +114,37 @@ class ChartManager {
         });
     }
 
+    renderHistoryDonut(canvasId, region, totals) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return null;
+
+        const categories = storage.state.categories[region].filter(c => totals[c.id] > 0);
+
+        if (categories.length === 0) {
+            return new Chart(ctx, this.getEmptyConfig('No expenses'));
+        }
+
+        const labels = categories.map(c => c.name);
+        const data = categories.map(c => totals[c.id]);
+
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+
+        return new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
+                    hoverOffset: 4
+                }]
+            },
+            options: this.getDonutOptions()
+        });
+    }
+
     renderUtilityLine() {
         const ctx = document.getElementById('utilities-line-chart');
         if (!ctx) return;

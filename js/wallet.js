@@ -216,12 +216,26 @@ class WalletManager {
         const principalPaid = config.totalPrincipal - config.principalLeft;
         const percentPaid = Math.min(100, (config.duesPaid / config.totalDues) * 100).toFixed(0);
 
+        const today = new Date();
+        const drawDay = config.emiDrawDate || 7;
+        let nextEmiDate = new Date(today.getFullYear(), today.getMonth(), drawDay);
+        
+        if (today.getDate() >= drawDay) {
+            nextEmiDate.setMonth(nextEmiDate.getMonth() + 1);
+        }
+        
+        const diffTime = nextEmiDate - today;
+        const daysUntilNextEmi = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const nextEmiDateStr = nextEmiDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
         return {
             amountPaid,
             principalPaid,
             principalLeft: config.principalLeft,
             percentPaid,
             emiCount: config.duesPaid,
+            daysUntilNextEmi,
+            nextEmiDateStr,
             config
         };
     }

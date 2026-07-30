@@ -16,7 +16,6 @@ const defaultState = {
             { id: 'jp-food', name: 'Food & Groceries', icon: 'shopping-basket', budget: 30000 },
             { id: 'jp-dining', name: 'Dining Out', icon: 'utensils', budget: 10000 },
             { id: 'jp-transport', name: 'Transport', icon: 'train-front', budget: 15000 },
-            { id: 'jp-rent', name: 'Rent', icon: 'home', budget: 50000 },
             { id: 'jp-utility-electric', name: 'Electricity', icon: 'zap', budget: 0 },
             { id: 'jp-utility-gas', name: 'Gas', icon: 'flame', budget: 0 },
             { id: 'jp-utility-water', name: 'Water', icon: 'droplet', budget: 0 },
@@ -33,6 +32,7 @@ const defaultState = {
             { id: 'in-petrol', name: 'Petrol', icon: 'fuel' },
             { id: 'in-loan', name: 'Loan EMI', icon: 'landmark' },
             { id: 'in-home', name: 'Home Needs', icon: 'home' },
+            { id: 'in-rent', name: 'Rent', icon: 'home' },
             { id: 'in-medicine', name: 'Medicine & Health', icon: 'pill' },
             { id: 'in-eb', name: 'EB / Utility Bills', icon: 'zap' },
             { id: 'in-recharge', name: 'Recharge', icon: 'smartphone' },
@@ -46,7 +46,8 @@ const defaultState = {
         emi: 10566,
         duesPaid: 4,
         totalDues: 24,
-        annualInterestRate: 17.99
+        annualInterestRate: 17.99,
+        emiDrawDate: 7
     },
     transactions: [],
     history: []
@@ -132,6 +133,37 @@ class StorageManager {
                 
                 if (!mergedState.loanConfig || Object.keys(mergedState.loanConfig).length === 0) {
                     mergedState.loanConfig = defaultState.loanConfig;
+                } else if (typeof mergedState.loanConfig.emiDrawDate === 'undefined') {
+                    mergedState.loanConfig.emiDrawDate = 7;
+                }
+                
+                // MIGRATION: Move Rent from JP to IN
+                const jpRentIndex = mergedState.categories.JP.findIndex(c => c.id === 'jp-rent');
+                if (jpRentIndex !== -1) {
+                    const rentCat = mergedState.categories.JP.splice(jpRentIndex, 1)[0];
+                    if (!mergedState.categories.IN.some(c => c.id === 'in-rent')) {
+                        mergedState.categories.IN.push({ id: 'in-rent', name: 'Rent', icon: rentCat.icon || 'home' });
+                    }
+                    
+                    // Update transactions
+                    if (mergedState.transactions) {
+                        mergedState.transactions.forEach(tx => {
+                            if (tx.categoryId === 'jp-rent') {
+                                tx.categoryId = 'in-rent';
+                                tx.region = 'IN';
+                            }
+                        });
+                    }
+                    if (mergedState.history) {
+                        mergedState.history.forEach(h => {
+                            h.transactions.forEach(tx => {
+                                if (tx.categoryId === 'jp-rent') {
+                                    tx.categoryId = 'in-rent';
+                                    tx.region = 'IN';
+                                }
+                            });
+                        });
+                    }
                 }
                 
                 // MIGRATION: Merge duplicate history ledgers with the same monthKey
@@ -214,6 +246,11 @@ class StorageManager {
 
         // Clear current month transactions
         this.state.transactions = [];
+        this.saveData();
+    }
+
+    deleteLedger(monthKey) {
+        this.state.history = this.state.history.filter(h => h.monthKey !== monthKey);
         this.saveData();
     }
 

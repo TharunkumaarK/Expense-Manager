@@ -190,6 +190,10 @@
                         <label>EMIs Paid (Months)</label>
                         <input type="number" id="setting-loan-dues" onblur="app.updateLoanSetting('duesPaid', this.value)">
                     </div>
+                    <div class="form-group">
+                        <label>EMI Draw Date (Day of Month)</label>
+                        <input type="number" id="setting-loan-date" onblur="app.updateLoanSetting('emiDrawDate', this.value)" min="1" max="31">
+                    </div>
                 </div>
 
                 <div class="card mt-3">
@@ -286,6 +290,26 @@
             </div>
             <div class="sheet-content" id="modal-content">
                 <!-- Dynamically populated by JS based on type -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Edit Modal -->
+    <div class="modal-overlay" id="quick-edit-modal" onclick="if(event.target === this) app.closeModal('quick-edit-modal')">
+        <div class="bottom-sheet">
+            <div class="sheet-header">
+                <h3 id="quick-edit-title">Edit Budget</h3>
+                <button class="icon-btn" onclick="app.closeModal('quick-edit-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="sheet-content">
+                <div class="form-group">
+                    <label>New Amount</label>
+                    <input type="number" id="quick-edit-amount" placeholder="0">
+                </div>
+                <input type="hidden" id="quick-edit-id">
+                <input type="hidden" id="quick-edit-region">
+                <input type="hidden" id="quick-edit-type">
+                <button class="btn btn-primary" onclick="app.saveQuickEdit()">Save</button>
             </div>
         </div>
     </div>

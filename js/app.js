@@ -31,7 +31,7 @@ class App {
         // Collect all available months (current + history)
         const allMonths = [storage.state.currentMonthKey, ...storage.state.history.map(h => h.monthKey)];
         // Ensure unique
-        const uniqueMonths = [...new Set(allMonths)].sort().reverse(); 
+        const uniqueMonths = [...new Set(allMonths)].sort().reverse();
 
         const currentIndex = uniqueMonths.indexOf(this.activeMonthKey);
         let newIndex = currentIndex - delta; // -1 means go older (higher index), +1 means go newer (lower index)
@@ -40,7 +40,7 @@ class App {
         if (newIndex >= uniqueMonths.length) newIndex = uniqueMonths.length - 1;
 
         const newMonth = uniqueMonths[newIndex];
-        
+
         if (newMonth === storage.state.currentMonthKey) {
             this.viewingMonthKey = null;
         } else {
@@ -104,11 +104,16 @@ class App {
         const title = document.getElementById('modal-title');
         const content = document.getElementById('modal-content');
 
+        const currentDate = new Date().toISOString().split('T')[0];
         let html = '';
 
         if (type === 'expense') {
             title.innerText = 'Log Expense';
             html = `
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="tx-date" value="${currentDate}">
+                </div>
                 <div class="form-group">
                     <label>Wallet</label>
                     <select id="tx-wallet" onchange="app.updateExpenseCategories()">
@@ -146,6 +151,10 @@ class App {
             title.innerText = 'Transfer Between Wallets';
             html = `
                 <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="tx-date" value="${currentDate}">
+                </div>
+                <div class="form-group">
                     <label>From (Source)</label>
                     <select id="tx-source">
                         <option value="Salary Account">Salary Account (¥)</option>
@@ -181,6 +190,10 @@ class App {
             title.innerText = 'Remittance (Send to India)';
             html = `
                 <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="tx-date" value="${currentDate}">
+                </div>
+                <div class="form-group">
                     <label>From (Source JPY)</label>
                     <select id="tx-source">
                         <option value="Salary Account">Salary Account (¥)</option>
@@ -211,6 +224,10 @@ class App {
         } else if (type === 'income') {
             title.innerText = 'Add Income / Credit';
             html = `
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="tx-date" value="${currentDate}">
+                </div>
                 <div class="form-group">
                     <label>Credit To</label>
                     <select id="tx-wallet">
@@ -253,7 +270,7 @@ class App {
         document.getElementById('modal-title').innerText = 'Edit Transaction';
 
         const content = document.getElementById('modal-content');
-        
+
         // Add Delete button
         const delBtn = document.createElement('button');
         delBtn.className = 'btn btn-danger mt-2';
@@ -262,10 +279,11 @@ class App {
         content.appendChild(delBtn);
 
         // Pre-fill and override submit
+        document.getElementById('tx-date').value = tx.date;
         if (tx.type === 'expense') {
             document.getElementById('tx-wallet').value = tx.walletId;
             this.updateExpenseCategories();
-            
+
             if (tx.categoryId.startsWith('jp-utility-')) {
                 document.getElementById('tx-category').value = 'utility-group';
                 this.handleCategoryChange();
@@ -274,10 +292,10 @@ class App {
                 document.getElementById('tx-category').value = tx.categoryId;
                 this.handleCategoryChange();
             }
-            
+
             document.getElementById('tx-amount').value = tx.amount;
             document.getElementById('tx-note').value = tx.note || '';
-            
+
             const btn = content.querySelector('.btn-primary');
             btn.innerText = 'Save Changes';
             btn.onclick = () => this.submitEdit(id, 'expense');
@@ -285,7 +303,7 @@ class App {
             document.getElementById('tx-wallet').value = tx.walletId;
             document.getElementById('tx-amount').value = tx.amount;
             document.getElementById('tx-note').value = tx.note || '';
-            
+
             const btn = content.querySelector('.btn-green');
             btn.innerText = 'Save Changes';
             btn.onclick = () => this.submitEdit(id, 'income');
@@ -294,7 +312,7 @@ class App {
             document.getElementById('tx-dest').value = tx.destId;
             document.getElementById('tx-amount').value = tx.amount;
             document.getElementById('tx-note').value = tx.note || '';
-            
+
             const btn = content.querySelector('.btn-blue');
             btn.innerText = 'Save Changes';
             btn.onclick = () => this.submitEdit(id, 'transfer');
@@ -304,7 +322,7 @@ class App {
             document.getElementById('tx-amount-jpy').value = tx.sourceAmount;
             document.getElementById('tx-amount-inr').value = tx.destAmount;
             document.getElementById('tx-note').value = tx.note || '';
-            
+
             const btn = content.querySelector('.btn-purple');
             btn.innerText = 'Save Changes';
             btn.onclick = () => this.submitEdit(id, 'remittance');
@@ -315,10 +333,10 @@ class App {
         // Simple way to edit: delete old, create new with original date & id
         const originalTx = storage.state.transactions.find(t => t.id === id);
         if (!originalTx) return;
-        
+
         const oldDate = originalTx.date;
         const oldId = originalTx.id;
-        
+
         walletManager.deleteTransaction(id);
 
         if (type === 'expense') {
@@ -371,11 +389,60 @@ class App {
         document.getElementById(id).classList.remove('active');
     }
 
+    openQuickEditModal(type, id, region = null) {
+        // Only allow edits in current month
+        if (this.isViewingPast()) {
+            alert("Cannot edit budgets or wallets while viewing past months. Return to Current Month first.");
+            return;
+        }
+
+        document.getElementById('quick-edit-type').value = type;
+        document.getElementById('quick-edit-id').value = id;
+        document.getElementById('quick-edit-region').value = region || '';
+
+        const title = document.getElementById('quick-edit-title');
+        const input = document.getElementById('quick-edit-amount');
+
+        if (type === 'wallet') {
+            const wallet = storage.state.wallets[id];
+            title.innerText = `Edit ${id} Balance`;
+            input.value = wallet.balance;
+        } else if (type === 'category') {
+            const cat = storage.state.categories[region].find(c => c.id === id);
+            title.innerText = `Edit ${cat.name} Budget`;
+            input.value = cat.budget || 0;
+        }
+
+        document.getElementById('quick-edit-modal').classList.add('active');
+    }
+
+    saveQuickEdit() {
+        const type = document.getElementById('quick-edit-type').value;
+        const id = document.getElementById('quick-edit-id').value;
+        const region = document.getElementById('quick-edit-region').value;
+        const amt = Number(document.getElementById('quick-edit-amount').value);
+
+        if (isNaN(amt)) return;
+
+        if (type === 'wallet') {
+            this.updateWalletBalance(id, amt);
+        } else if (type === 'category') {
+            const cat = storage.state.categories[region].find(c => c.id === id);
+            if (cat) {
+                cat.budget = amt;
+                storage.saveData();
+                this.renderAll();
+            }
+        }
+
+        this.closeModal('quick-edit-modal');
+    }
+
     handleCategoryChange() {
         const catSelect = document.getElementById('tx-category');
         const subGroup = document.getElementById('tx-subcategory-group');
         if (!catSelect || !subGroup) return;
-        
+
         if (catSelect.value === 'utility-group') {
             subGroup.classList.remove('hidden');
         } else {
@@ -395,7 +462,7 @@ class App {
         if (region === 'JP') {
             const utils = storage.state.categories.JP.filter(c => c.id.startsWith('jp-utility-'));
             const others = storage.state.categories.JP.filter(c => !c.id.startsWith('jp-utility-'));
-            
+
             html = others.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
             if (utils.length > 0) {
                 html += `<option value="utility-group">Utilities</option>`;
@@ -406,7 +473,7 @@ class App {
         } else {
             html = storage.state.categories[region].map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         }
-        
+
         catSelect.innerHTML = html;
         this.handleCategoryChange();
     }
@@ -419,10 +486,11 @@ class App {
         }
         const amt = document.getElementById('tx-amount').value;
         const note = document.getElementById('tx-note').value;
+        const date = document.getElementById('tx-date').value || new Date().toISOString().split('T')[0];
 
         if (!amt || Number(amt) <= 0) return alert('Enter valid amount');
 
-        walletManager.addExpense(wallet, cat, amt, note);
+        walletManager.addExpense(wallet, cat, amt, note, date);
         this.closeModal('transaction-modal');
         this.renderAll();
     }
@@ -432,6 +500,7 @@ class App {
         const dest = document.getElementById('tx-dest').value;
         const amt = document.getElementById('tx-amount').value;
         const note = document.getElementById('tx-note').value;
+        const date = document.getElementById('tx-date').value || new Date().toISOString().split('T')[0];
 
         if (!amt || Number(amt) <= 0) return alert('Enter valid amount');
         if (src === dest) return alert('Source and destination must be different');
@@ -440,7 +509,7 @@ class App {
             return alert('Cross-currency transfers must use the Remittance tool');
         }
 
-        walletManager.transfer(src, dest, amt, note);
+        walletManager.transfer(src, dest, amt, note, date);
         this.closeModal('transaction-modal');
         this.renderAll();
     }
@@ -451,10 +520,11 @@ class App {
         const amtJpy = document.getElementById('tx-amount-jpy').value;
         const amtInr = document.getElementById('tx-amount-inr').value;
         const note = document.getElementById('tx-note').value;
+        const date = document.getElementById('tx-date').value || new Date().toISOString().split('T')[0];
 
         if (!amtJpy || !amtInr || Number(amtJpy) <= 0 || Number(amtInr) <= 0) return alert('Enter valid amounts');
 
-        walletManager.remittance(src, dest, amtJpy, amtInr, note);
+        walletManager.remittance(src, dest, amtJpy, amtInr, note, date);
         this.closeModal('transaction-modal');
         this.renderAll();
     }
@@ -463,10 +533,11 @@ class App {
         const wallet = document.getElementById('tx-wallet').value;
         const amt = document.getElementById('tx-amount').value;
         const note = document.getElementById('tx-note').value;
+        const date = document.getElementById('tx-date').value || new Date().toISOString().split('T')[0];
 
         if (!amt || Number(amt) <= 0) return alert('Enter valid amount');
 
-        walletManager.addIncome(wallet, amt, note);
+        walletManager.addIncome(wallet, amt, note, date);
         this.closeModal('transaction-modal');
         this.renderAll();
     }
@@ -484,10 +555,12 @@ class App {
     renderSettings() {
         if (this.currentView === 'settings-view') {
             document.getElementById('setting-jp-budget').value = storage.state.jpTotalBudget;
-            
+
             if (storage.state.loanConfig) {
                 document.getElementById('setting-loan-principal').value = storage.state.loanConfig.principalLeft;
                 document.getElementById('setting-loan-dues').value = storage.state.loanConfig.duesPaid;
+                const dateEl = document.getElementById('setting-loan-date');
+                if (dateEl) dateEl.value = storage.state.loanConfig.emiDrawDate || 7;
             }
 
             // Render wallet balances
@@ -592,7 +665,7 @@ class App {
         Object.values(storage.state.wallets).forEach(w => {
             const themeClass = themeMap[w.id] || '';
             const html = `
-                <div class="wallet-item ${themeClass}">
+                <div class="wallet-item ${themeClass}" onclick="app.openQuickEditModal('wallet', '${w.id}')" style="cursor: pointer;">
                     <div class="wallet-name">
                         <i data-lucide="${w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone'}"></i>
                         ${w.id}
@@ -620,43 +693,47 @@ class App {
         const mKey = this.activeMonthKey;
         if (mKey) {
             const [y, m] = mKey.split('-');
-            headerStr = `${monthNames[parseInt(m)-1]} ${y}`;
+            headerStr = `${monthNames[parseInt(m) - 1]} ${y}`;
             if (this.isViewingPast()) {
                 headerStr = `<span style="color:var(--orange)">${headerStr} (Past)</span>`;
             }
         }
         const disp = document.getElementById('current-month-display');
-        if(disp) disp.innerHTML = headerStr;
+        if (disp) disp.innerHTML = headerStr;
 
         // Change layout of category grids to 2-columns
         ['jp-categories-grid', 'in-categories-grid'].forEach(id => {
             const el = document.getElementById(id);
-            if(el) {
+            if (el) {
                 el.style.display = 'grid';
                 el.style.gridTemplateColumns = '1fr 1fr';
                 el.style.gap = '12px';
             }
         });
-        
+
         const jpTotalSpent = walletManager.getTotalSpent('JP', this.getActiveTransactions());
         const jpRem = Math.max(0, storage.state.jpTotalBudget - jpTotalSpent);
         const pct = Math.min((jpTotalSpent / storage.state.jpTotalBudget) * 100, 100);
-        
-        const card = document.getElementById('jp-budget-card');
-        card.innerHTML = `
-            <div style="display:flex; flex-direction:column; gap:4px;">
-                <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                    <span class="text-sm text-muted">Total Balance</span>
-                    <span class="font-bold">¥${jpRem.toLocaleString()} left</span>
+
+        const card = document.getElementById('budget-overview-card');
+        if (card) {
+            card.innerHTML = `
+                <div class="card" style="margin: 0 16px;">
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                            <span class="text-sm text-muted">Total Balance</span>
+                            <span class="font-bold">¥${jpRem.toLocaleString()} left</span>
+                        </div>
+                        <div class="neon-bar-bg">
+                            <div class="neon-bar-fill ${pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${pct}%"></div>
+                        </div>
+                        <div class="text-muted text-sm" style="margin-top: 6px; text-align: right;">
+                            Spent ¥${jpTotalSpent.toLocaleString()} of ¥${storage.state.jpTotalBudget.toLocaleString()}
+                        </div>
+                    </div>
                 </div>
-                <div class="neon-bar-bg">
-                    <div class="neon-bar-fill ${pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${pct}%"></div>
-                </div>
-                <div class="text-muted text-sm" style="margin-top: 6px; text-align: right;">
-                    Spent ¥${jpTotalSpent.toLocaleString()} of ¥${storage.state.jpTotalBudget.toLocaleString()}
-                </div>
-            </div>
-        `;
+            `;
+        }
     }
 
     renderCategories() {
@@ -675,11 +752,11 @@ class App {
             storage.state.categories[region].forEach(c => {
                 const spent = totals[c.id] || 0;
                 let progressHtml = '';
-                
+
                 // Calculate Effective Budget taking Rollover into account
                 let activeBudget = c.budget || 0;
                 let rolloverVal = 0;
-                
+
                 if (showProgress && activeBudget > 0) {
                     // Inject rollover logic
                     activeBudget = walletManager.getEffectiveBudget(c.id, region, this.activeMonthKey);
@@ -720,7 +797,7 @@ class App {
                 `;
             });
             const el = document.getElementById(elementId);
-            if(el) el.innerHTML = html;
+            if (el) el.innerHTML = html;
         };
 
         renderGrid('JP', 'jp-categories-grid', true);
@@ -768,7 +845,7 @@ class App {
             }
 
             const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-            
+
             // For Income, title is currently set to tx.note if it exists. 
             // For other types, we'll just append it to the meta line if it exists.
             let metaString = `${date} • ${tx.walletId || 'Wallet'}`;
@@ -806,88 +883,213 @@ class App {
 
         let html = '';
         storage.state.history.forEach((h, index) => {
-            const totals = {};
+            const totals = { JP: {}, IN: {} };
             h.transactions.forEach(tx => {
                 if (tx.type === 'expense') {
-                    if (!totals[tx.region]) totals[tx.region] = {};
-                    totals[tx.region][tx.categoryId] = (totals[tx.region][tx.categoryId] || 0) + tx.amount;
+                    let region = tx.region;
+                    if (!region) {
+                        region = storage.state.categories.JP.some(c => c.id === tx.categoryId) ? 'JP' : 'IN';
+                    }
+                    if (totals[region]) {
+                        totals[region][tx.categoryId] = (totals[region][tx.categoryId] || 0) + tx.amount;
+                    }
                 }
             });
+
+            let jpBalance = 0;
+            let inBalance = 0;
+            if (h.walletsSnapshot) {
+                Object.values(h.walletsSnapshot).forEach(w => {
+                    if (w.region === 'JP') jpBalance += w.balance;
+                    if (w.region === 'IN') inBalance += w.balance;
+                });
+            }
+
+            let balanceHtml = '';
+            if (h.walletsSnapshot) {
+                balanceHtml = `
+                    <div id="history-bal-${index}" style="display:flex; gap:16px; margin-top:8px; font-size:0.8rem;">
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">JP:</span> ¥${jpBalance.toLocaleString()}</span>
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">IN:</span> ₹${inBalance.toLocaleString('en-IN')}</span>
+                    </div>
+                `;
+            }
 
             let catsHtml = '';
             ['JP', 'IN'].forEach(region => {
                 const currency = region === 'JP' ? '¥' : '₹';
-                catsHtml += `
-                    <div style="margin-top:16px;">
-                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;">${region === 'JP' ? 'Japan' : 'India'} Expenses</h4>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                `;
+                let regionSpent = 0;
+                let regionBudget = 0;
+                let savedHtml = '';
 
                 if (totals[region]) {
                     Object.keys(totals[region]).forEach(catId => {
                         const catDef = storage.state.categories[region].find(c => c.id === catId);
                         if (!catDef) return;
-                        
+
                         const spent = totals[region][catId];
                         let activeBudget = walletManager.getEffectiveBudget(catId, region, h.monthKey);
 
-                        let pct = 0;
-                        let barClass = 'neon-safe';
-                        
+                        regionSpent += spent;
                         if (activeBudget > 0) {
-                            pct = Math.min((spent / activeBudget) * 100, 100);
-                            if (pct > 90) barClass = 'neon-danger';
-                            else if (pct > 75) barClass = 'neon-warn';
+                            regionBudget += activeBudget;
+                            if (spent < activeBudget) {
+                                savedHtml += `
+                                    <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.8rem;">
+                                        <span style="color:var(--text-main);"><i data-lucide="${catDef.icon}" style="width:12px;height:12px; margin-right:4px;"></i>${catDef.name}</span>
+                                        <span class="neon-safe">Saved ${currency}${(activeBudget - spent).toLocaleString()}</span>
+                                    </div>
+                                `;
+                            }
                         }
-                        
-                        catsHtml += `
-                            <div class="neon-row" style="padding: 10px;">
-                                <div class="neon-header" style="margin-bottom: 6px;">
-                                    <span class="neon-title" style="font-size:0.8rem;"><i data-lucide="${catDef.icon}" style="width:14px;height:14px;"></i> ${catDef.name}</span>
-                                </div>
-                                ${activeBudget > 0 ? `
-                                    <div class="neon-bar-bg" style="height:6px;">
-                                        <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
-                                    </div>
-                                    <div class="neon-amount-sub" style="margin-top:4px; font-size:0.7rem; display:flex; justify-content:space-between;">
-                                        <span>${currency}${spent.toLocaleString()}</span>
-                                        <span>${currency}${activeBudget.toLocaleString()}</span>
-                                    </div>
-                                ` : `
-                                    <div class="neon-amount-sub" style="font-size:0.7rem; margin-top:4px;">Spent: ${currency}${spent.toLocaleString()}</div>
-                                `}
-                            </div>
-                        `;
                     });
-                } else {
-                    catsHtml += `<div class="text-muted text-sm">No expenses</div>`;
                 }
-                catsHtml += `</div></div>`;
+
+                let progressHtml = '';
+                if (regionBudget > 0) {
+                    let pct = Math.min((regionSpent / regionBudget) * 100, 100);
+                    let barClass = 'neon-safe';
+                    let statusText = `<span class="neon-safe">Under Budget!</span>`;
+
+                    if (pct > 90) {
+                        barClass = 'neon-danger';
+                        statusText = `<span class="neon-danger">Over Budget!</span>`;
+                    } else if (pct > 75) {
+                        barClass = 'neon-warn';
+                        statusText = `<span class="neon-warn">Nearing Limit</span>`;
+                    }
+
+                    progressHtml = `
+                        <div class="neon-row" style="padding: 12px; margin-bottom: 16px;">
+                            <div class="neon-header" style="margin-bottom: 8px;">
+                                <span class="neon-title" style="font-size:0.85rem;"><i data-lucide="pie-chart" style="width:14px;height:14px;"></i> Overall Budget</span>
+                                <span style="font-size:0.8rem;">${statusText}</span>
+                            </div>
+                            <div class="neon-bar-bg" style="height:8px;">
+                                <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
+                            </div>
+                            <div class="neon-amount-sub" style="margin-top:6px; font-size:0.75rem; display:flex; justify-content:space-between;">
+                                <span>Spent: ${currency}${regionSpent.toLocaleString()}</span>
+                                <span>Budget: ${currency}${regionBudget.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    `;
+                } else if (regionSpent > 0) {
+                    progressHtml = `<div class="neon-row" style="padding:12px; margin-bottom:16px;"><div class="neon-amount-sub">Total Spent: ${currency}${regionSpent.toLocaleString()}</div></div>`;
+                }
+
+                catsHtml += `
+                    <div style="margin-top:16px;">
+                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">${region === 'JP' ? 'Japan' : 'India'} Analytics</h4>
+                        
+                        <div style="height: 160px; margin-bottom: 20px; position: relative;">
+                            <canvas id="history-donut-${index}-${region}"></canvas>
+                        </div>
+                        
+                        ${progressHtml}
+                        
+                        ${savedHtml ? `
+                            <div style="margin-top: 12px;">
+                                <h5 style="color:var(--text-muted); font-size:0.75rem; margin-bottom:8px;">CATEGORIES UNDER BUDGET</h5>
+                                ${savedHtml}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
             });
+
+            // Build grouped transactions list for this history snapshot
+            let txsHtml = '<div style="margin-top: 24px;"><h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">Transactions</h4>';
+
+            if (h.transactions && h.transactions.length > 0) {
+                // Group by date (same logic as renderTransactions)
+                const groupedTxs = {};
+                h.transactions.forEach(tx => {
+                    const dStr = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                    if (!groupedTxs[dStr]) groupedTxs[dStr] = [];
+                    groupedTxs[dStr].push(tx);
+                });
+
+                Object.keys(groupedTxs).forEach(dateStr => {
+                    txsHtml += `
+                        <div style="margin-top: 16px;">
+                            <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; padding-left: 4px; border-left: 2px solid var(--accent);">${dateStr}</div>
+                    `;
+                    groupedTxs[dateStr].forEach(tx => {
+                        txsHtml += this.getTransactionHtml(tx, true, false); // editable=true, showDateInMeta=false
+                    });
+                    txsHtml += `</div>`;
+                });
+            } else {
+                txsHtml += '<p class="text-muted text-sm">No transactions found.</p>';
+            }
+            txsHtml += '</div>';
 
             html += `
                 <div class="card" style="margin-bottom: 16px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="app.toggleHistoryCard(${index})">
-                        <div>
-                            <h3 style="margin:0;">${h.label}</h3>
-                            <p class="text-muted text-sm mt-1">${h.transactions.length} transactions recorded</p>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div style="cursor:pointer; flex: 1;" onclick="app.toggleHistoryCard(${index})">
+                            <h3 style="margin:0;">${h.label || h.monthKey}</h3>
+                            <p class="text-muted text-sm mt-1 mb-0">${h.transactions.length} transactions recorded</p>
+                            ${balanceHtml}
                         </div>
-                        <i data-lucide="chevron-down" style="color:var(--text-muted)"></i>
+                        <div style="display:flex; align-items:center; gap:12px; margin-top:2px;">
+                            <button class="icon-btn" onclick="app.deleteLedger('${h.monthKey}')" style="color:var(--red)"><i data-lucide="trash-2"></i></button>
+                            <i data-lucide="chevron-down" style="color:var(--text-muted); cursor:pointer;" onclick="app.toggleHistoryCard(${index})"></i>
+                        </div>
                     </div>
                     <div id="history-txs-${index}" class="hidden mt-3" style="border-top: 1px solid var(--border); padding-top: 12px;">
                         ${catsHtml}
+                        ${txsHtml}
                     </div>
                 </div>
             `;
         });
         container.innerHTML = html;
         lucide.createIcons({ root: container });
+
+        // Render charts for each history entry
+        storage.state.history.forEach((h, index) => {
+            const totals = { JP: {}, IN: {} };
+            h.transactions.forEach(tx => {
+                if (tx.type === 'expense') {
+                    let region = tx.region;
+                    if (!region) {
+                        region = storage.state.categories.JP.some(c => c.id === tx.categoryId) ? 'JP' : 'IN';
+                    }
+                    if (totals[region]) {
+                        totals[region][tx.categoryId] = (totals[region][tx.categoryId] || 0) + tx.amount;
+                    }
+                }
+            });
+
+            if (typeof chartManager !== 'undefined') {
+                chartManager.renderHistoryDonut(`history-donut-${index}-JP`, 'JP', totals.JP);
+                chartManager.renderHistoryDonut(`history-donut-${index}-IN`, 'IN', totals.IN);
+            }
+        });
+    }
+
+    deleteLedger(monthKey) {
+        if (confirm("Are you sure you want to permanently delete this archived month?")) {
+            storage.deleteLedger(monthKey);
+            this.renderHistory();
+
+            if (this.viewingMonthKey === monthKey) {
+                this.viewingMonthKey = null;
+                this.renderAll();
+            }
+        }
     }
 
     toggleHistoryCard(index) {
         const el = document.getElementById(`history-txs-${index}`);
-        if(el) {
-            el.classList.toggle('hidden');
+        const bal = document.getElementById(`history-bal-${index}`);
+        if (el) {
+            const isHidden = el.classList.toggle('hidden');
+            if (bal) {
+                bal.style.display = isHidden ? 'flex' : 'none';
+            }
         }
     }
 
@@ -926,26 +1128,29 @@ class App {
 
     renderLoanTracker() {
         if (this.currentView !== 'home-view') return;
-        
+
         const loanState = walletManager.getLoanState();
         const widget = document.getElementById('loan-tracker-widget');
-        
+
         if (!loanState) {
-            if(widget) widget.style.display = 'none';
+            if (widget) widget.style.display = 'none';
             return;
         }
 
-        if(widget) {
+        if (widget) {
             widget.style.display = 'block';
             widget.innerHTML = `
-                <div class="loan-header">
-                    <div>
+                <div class="loan-header" style="flex-wrap: wrap; padding-bottom: 12px;">
+                    <div style="width: 50%;">
                         <div class="loan-value">₹${loanState.config.totalPrincipal.toLocaleString('en-IN')}</div>
-                        <div class="loan-label">Total Loan Amount</div>
+                        <div class="loan-label">Total Loan</div>
                     </div>
-                    <div>
+                    <div style="width: 50%; text-align: right;">
                         <div class="loan-value">₹${loanState.config.emi.toLocaleString('en-IN')}</div>
-                        <div class="loan-label">EMI Amount</div>
+                        <div class="loan-label">EMI</div>
+                    </div>
+                    <div style="width: 100%; text-align: center; font-size: 0.7rem; color: var(--text-muted); margin-top: 12px;">
+                        Next draw in <span style="color: var(--text-main); font-weight: 600;">${loanState.daysUntilNextEmi} Days</span> (${loanState.nextEmiDateStr})
                     </div>
                 </div>
                 
@@ -967,10 +1172,10 @@ class App {
                         <span class="loan-stat-value">₹${loanState.amountPaid.toLocaleString('en-IN')}</span>
                         
                         <span class="loan-stat-label">Principal Paid</span>
-                        <span class="loan-stat-value">₹${loanState.principalPaid.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        <span class="loan-stat-value">₹${loanState.principalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         
                         <span class="loan-stat-label">Principal Left</span>
-                        <span class="loan-stat-value">₹${loanState.principalLeft.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        <span class="loan-stat-value">₹${loanState.principalLeft.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 </div>
             `;
