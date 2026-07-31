@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://xrovzkibilgbpawnunle.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_YasI1XuZZBMPWAcvRhoBAQ_bah4wBVS';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhyb3Z6a2liaWxnYnBhd251bmxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDc2ODksImV4cCI6MjEwMTA4MzY4OX0.GUYo0D0itCakd7KaEdElOfUlbYxT3IoHGmMvPqWDOnY';
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
