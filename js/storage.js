@@ -54,6 +54,10 @@ const defaultState = {
 
 class StorageManager {
     constructor() {
+        // IMPORTANT: block pushToSupabase until after syncFromSupabase runs.
+        // Without this, a fresh device (empty localStorage) will push defaultState
+        // to Supabase and overwrite real data before the sync has a chance to pull it.
+        this.initialSyncDone = false;
         this.state = this.loadData();
         this.checkRollover();
     }
@@ -209,7 +213,11 @@ class StorageManager {
     }
 
     async syncFromSupabase() {
-        if (typeof supabaseClient === 'undefined' || !supabaseClient.session) return false;
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session) {
+            // Not logged in — allow local saves to work normally
+            this.initialSyncDone = true;
+            return false;
+        }
         
         try {
             const { data, error } = await supabaseClient.client
@@ -222,9 +230,12 @@ class StorageManager {
                 if (error.code === 'PGRST116') {
                     // No row exists yet — this device has the only copy, push it up
                     console.log('[Sync] No remote state found. Pushing local state to Supabase...');
+                    this.initialSyncDone = true; // allow push
                     await this.pushToSupabase();
                 } else {
                     console.error('[Sync] Error fetching from Supabase:', error);
+                    // Allow future saves to push even if first sync failed
+                    this.initialSyncDone = true;
                 }
                 return false;
             }
@@ -235,7 +246,8 @@ class StorageManager {
                 const remoteIsValid = remote && remote.wallets && Array.isArray(remote.transactions);
                 
                 if (!remoteIsValid) {
-                    console.warn('[Sync] Remote state invalid or empty. Keeping local state.');
+                    console.warn('[Sync] Remote state invalid or empty. Keeping local and pushing up.');
+                    this.initialSyncDone = true;
                     await this.pushToSupabase();
                     return false;
                 }
@@ -243,36 +255,40 @@ class StorageManager {
                 const remoteUpdatedAt = data.updated_at ? new Date(data.updated_at) : null;
                 const localUpdatedAt = this.state._updatedAt ? new Date(this.state._updatedAt) : null;
 
-                // Count data richness as a tiebreaker when timestamps are missing
-                const remoteTxCount = (remote.transactions || []).length + (remote.history || []).reduce((s, h) => s + h.transactions.length, 0);
-                const localTxCount = (this.state.transactions || []).length + (this.state.history || []).reduce((s, h) => s + h.transactions.length, 0);
+                // Count total transactions as richness tiebreaker
+                const remoteTxCount = (remote.transactions || []).length
+                    + (remote.history || []).reduce((s, h) => s + (h.transactions || []).length, 0);
+                const localTxCount = (this.state.transactions || []).length
+                    + (this.state.history || []).reduce((s, h) => s + (h.transactions || []).length, 0);
 
                 let shouldUseRemote;
                 if (remoteUpdatedAt && localUpdatedAt) {
-                    // Both have timestamps — trust the newer one
                     shouldUseRemote = remoteUpdatedAt > localUpdatedAt;
                 } else if (remoteUpdatedAt && !localUpdatedAt) {
-                    // Remote has timestamp, local doesn't — remote wins
+                    // Remote has a timestamp, local doesn't — remote wins
                     shouldUseRemote = true;
                 } else {
-                    // No timestamps — use whichever has more transactions (more data = more complete)
+                    // No timestamps on either — more data = more complete
                     shouldUseRemote = remoteTxCount >= localTxCount;
                 }
 
                 if (shouldUseRemote) {
-                    console.log(`[Sync] Loading remote state (${remoteTxCount} txs) over local (${localTxCount} txs)`);
+                    console.log(`[Sync] Remote state wins (${remoteTxCount} txs vs local ${localTxCount} txs). Loading...`);
                     this.state = this.parseAndMergeData(remote);
+                    this.initialSyncDone = true; // set before checkRollover so rollover saves can push
                     this.checkRollover();
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
                     return true; // signal caller to re-render
                 } else {
-                    console.log(`[Sync] Local state (${localTxCount} txs) is newer. Pushing to Supabase...`);
+                    console.log(`[Sync] Local state wins (${localTxCount} txs vs remote ${remoteTxCount} txs). Pushing up...`);
+                    this.initialSyncDone = true;
                     await this.pushToSupabase();
                     return false;
                 }
             }
         } catch (e) {
             console.error('[Sync] Supabase sync failed:', e);
+            this.initialSyncDone = true; // don't block future saves on error
         }
         return false;
     }
@@ -297,10 +313,13 @@ class StorageManager {
 
     saveData() {
         try {
-            // Stamp the current time so sync can compare freshness
             this.state._updatedAt = new Date().toISOString();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-            this.pushToSupabase(); // Fire and forget async
+            // Only push to Supabase after the initial sync has run.
+            // This prevents a fresh device from overwriting real cloud data.
+            if (this.initialSyncDone) {
+                this.pushToSupabase();
+            }
         } catch (e) {
             console.error("Failed to save data", e);
         }
