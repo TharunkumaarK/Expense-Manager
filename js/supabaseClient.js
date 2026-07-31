@@ -50,7 +50,6 @@ const supabaseClient = {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         
         if (error) {
-            // If invalid credentials, maybe the user doesn't exist. Let's try to sign up automatically as requested.
             if (error.message.toLowerCase().includes('invalid login credentials')) {
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
                 if (signUpError) {
@@ -58,14 +57,19 @@ const supabaseClient = {
                 } else if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
                     this.showError('User already exists, but invalid password.');
                 } else {
-                    // Sign up successful!
-                    // Note: If email confirmations are enabled in Supabase, they will need to verify their email.
-                    // Assuming for a personal project, email confirmations might be disabled.
-                    // If not disabled, they'll be asked to check their email.
+                    if (!signUpData.session) {
+                        this.showError('Account created! Please check your email for a confirmation link (or disable Email Confirmations in Supabase settings).');
+                    } else {
+                        this.session = signUpData.session;
+                        await this.updateUI(true);
+                    }
                 }
             } else {
                 this.showError(error.message);
             }
+        } else if (data && data.session) {
+            this.session = data.session;
+            await this.updateUI(true);
         }
         
         btn.innerText = 'Sign In / Sign Up';
