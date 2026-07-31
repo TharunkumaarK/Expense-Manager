@@ -13,7 +13,7 @@ const supabaseClient = {
         
         this.client.auth.onAuthStateChange((event, session) => {
             this.session = session;
-            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'PASSWORD_RECOVERY') {
                 this.updateUI(true);
             }
         });
@@ -21,10 +21,11 @@ const supabaseClient = {
         await this.updateUI(false);
     },
 
-    showError(msg) {
+    showError(msg, isError = true) {
         const errEl = document.getElementById('auth-error');
         if (errEl) {
             errEl.innerText = msg;
+            errEl.style.color = isError ? 'var(--red)' : '#10b981'; // red or green
             errEl.style.display = 'block';
         }
     },
@@ -82,10 +83,12 @@ const supabaseClient = {
     async updateUI(isAuthChange = false) {
         const authScreen = document.getElementById('auth-screen');
         const appContent = document.getElementById('app-content');
+        const bottomNav = document.getElementById('bottom-nav');
         
         if (this.session) {
             authScreen.style.display = 'none';
             appContent.style.display = 'block';
+            if (bottomNav) bottomNav.style.display = 'flex';
             
             const emailDisplay = document.getElementById('account-email-display');
             if (emailDisplay) emailDisplay.innerText = `Logged in as ${this.session.user.email}`;
@@ -100,7 +103,36 @@ const supabaseClient = {
         } else {
             authScreen.style.display = 'flex';
             appContent.style.display = 'none';
+            if (bottomNav) bottomNav.style.display = 'none';
         }
+    },
+
+    async handleForgotPassword() {
+        this.clearError();
+        const email = document.getElementById('auth-email').value;
+        if (!email) {
+            this.showError('Please enter your email address first.');
+            return;
+        }
+        
+        const btn = document.getElementById('auth-btn');
+        btn.innerText = 'Sending link...';
+        btn.disabled = true;
+
+        const { data, error } = await this.client.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + window.location.pathname,
+        });
+
+        if (error) {
+            this.showError(error.message);
+        } else {
+            this.showError('Password reset link sent! Check your email.', false); // It's green actually, but red is fine for now
+            const errEl = document.getElementById('auth-error');
+            errEl.style.color = 'var(--green)';
+        }
+
+        btn.innerText = 'Sign In / Sign Up';
+        btn.disabled = false;
     }
 };
 

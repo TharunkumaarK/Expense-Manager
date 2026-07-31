@@ -2,31 +2,29 @@ const STORAGE_KEY = 'em_connected_v2';
 
 const defaultState = {
     currentMonthKey: "",
-    jpTotalBudget: 150000,
+    jpTotalBudget: 0,
     wallets: {
         'Salary Account': { id: 'Salary Account', type: 'bank', region: 'JP', balance: 0, currency: '¥', color: '#009944' },
-        'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 7000, currency: '¥', color: '#d4af37' },
+        'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 0, currency: '¥', color: '#d4af37' },
         'PayPay': { id: 'PayPay', type: 'digital', region: 'JP', balance: 0, currency: '¥', color: '#ff0033' },
-        'Axis Bank': { id: 'Axis Bank', type: 'bank', region: 'IN', balance: 17084, currency: '₹', color: '#97144d' },
-        'Bank of Baroda': { id: 'Bank of Baroda', type: 'bank', region: 'IN', balance: 23485, currency: '₹', color: '#f05a28' },
-        'Credit Card': { id: 'Credit Card', type: 'card', region: 'IN', balance: 0, currency: '₹', color: '#94a3b8' }
+        'Bank Account': { id: 'Bank Account', type: 'bank', region: 'IN', balance: 0, currency: '₹', color: '#97144d' }
     },
     categories: {
         JP: [
-            { id: 'jp-food', name: 'Food & Groceries', icon: 'shopping-basket', budget: 30000 },
-            { id: 'jp-dining', name: 'Dining Out', icon: 'utensils', budget: 10000 },
-            { id: 'jp-transport', name: 'Transport', icon: 'train-front', budget: 15000 },
+            { id: 'jp-food', name: 'Food & Groceries', icon: 'shopping-basket', budget: 0 },
+            { id: 'jp-dining', name: 'Dining Out', icon: 'utensils', budget: 0 },
+            { id: 'jp-transport', name: 'Transport', icon: 'train-front', budget: 0 },
             { id: 'jp-utility-electric', name: 'Electricity', icon: 'zap', budget: 0 },
             { id: 'jp-utility-gas', name: 'Gas', icon: 'flame', budget: 0 },
             { id: 'jp-utility-water', name: 'Water', icon: 'droplet', budget: 0 },
             { id: 'jp-utility-internet', name: 'Internet', icon: 'wifi', budget: 0 },
-            { id: 'jp-shopping', name: 'Shopping', icon: 'shopping-bag', budget: 15000 },
-            { id: 'jp-entertainment', name: 'Entertainment', icon: 'gamepad-2', budget: 10000 },
-            { id: 'jp-health', name: 'Health', icon: 'heart-pulse', budget: 5000 },
-            { id: 'jp-personal-care', name: 'Personal Care', icon: 'scissors', budget: 5000 },
-            { id: 'jp-subscriptions', name: 'Subscriptions', icon: 'smartphone', budget: 3000 },
-            { id: 'jp-tax', name: 'Tax & Fees', icon: 'file-text', budget: 2000 },
-            { id: 'jp-misc', name: 'Miscellaneous', icon: 'wrench', budget: 5000 }
+            { id: 'jp-shopping', name: 'Shopping', icon: 'shopping-bag', budget: 0 },
+            { id: 'jp-entertainment', name: 'Entertainment', icon: 'gamepad-2', budget: 0 },
+            { id: 'jp-health', name: 'Health', icon: 'heart-pulse', budget: 0 },
+            { id: 'jp-personal-care', name: 'Personal Care', icon: 'scissors', budget: 0 },
+            { id: 'jp-subscriptions', name: 'Subscriptions', icon: 'smartphone', budget: 0 },
+            { id: 'jp-tax', name: 'Tax & Fees', icon: 'file-text', budget: 0 },
+            { id: 'jp-misc', name: 'Miscellaneous', icon: 'wrench', budget: 0 }
         ],
         IN: [
             { id: 'in-petrol', name: 'Petrol', icon: 'fuel' },
@@ -41,12 +39,13 @@ const defaultState = {
         ]
     },
     loanConfig: {
-        totalPrincipal: 211670,
-        principalLeft: 181206.29,
-        emi: 10566,
-        duesPaid: 4,
-        totalDues: 24,
-        annualInterestRate: 17.99,
+        enabled: false,
+        totalPrincipal: 0,
+        principalLeft: 0,
+        emi: 0,
+        duesPaid: 0,
+        totalDues: 0,
+        annualInterestRate: 0,
         emiDrawDate: 7
     },
     transactions: [],

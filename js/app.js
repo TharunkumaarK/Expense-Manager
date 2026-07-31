@@ -1619,6 +1619,19 @@ class App {
             this.init();
         }
     }
+
+    forceUpdate() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                }
+                window.location.reload(true);
+            });
+        } else {
+            window.location.reload(true);
+        }
+    }
     openPdfModal() {
         const fromSelect = document.getElementById('pdf-from-month');
         const toSelect = document.getElementById('pdf-to-month');

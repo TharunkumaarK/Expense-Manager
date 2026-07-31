@@ -39,7 +39,10 @@
                     <input type="email" id="auth-email" required style="width: 100%; padding: 12px; background: var(--bg-main); border: 1px solid var(--border); border-radius: var(--radius-md); color: white;">
                 </div>
                 <div class="form-group text-left mb-4">
-                    <label>Password</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label>Password</label>
+                        <span style="font-size: 0.75rem; color: var(--accent); cursor: pointer;" onclick="supabaseClient.handleForgotPassword()">Forgot?</span>
+                    </div>
                     <input type="password" id="auth-password" required style="width: 100%; padding: 12px; background: var(--bg-main); border: 1px solid var(--border); border-radius: var(--radius-md); color: white;">
                 </div>
                 <button type="submit" id="auth-btn" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 700;">Sign In / Sign Up</button>
@@ -315,6 +318,12 @@
                 </div>
                 
                 <div class="card mt-3">
+                    <h3>App Updates</h3>
+                    <p class="help-text text-sm text-muted mb-2">Force the app to fetch the latest version of the code if you are stuck on an old layout.</p>
+                    <button class="btn" style="background:var(--card-bg-light);color:var(--text-main);border:1px solid var(--border);width:100%;" onclick="app.forceUpdate()">Fetch Latest Version</button>
+                </div>
+                
+                <div class="card mt-3">
                     <h3>Statement Export</h3>
                     <button class="btn mt-2" style="background:var(--accent);color:white;" onclick="app.openPdfModal()">Download PDF Statement</button>
                 </div>
@@ -330,7 +339,7 @@
     </main>
 
     <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
+    <nav id="bottom-nav" class="bottom-nav">
         <a href="#" class="nav-item active" data-target="home-view">
             <i data-lucide="home"></i>
             <span>Home</span>
