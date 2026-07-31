@@ -64,6 +64,16 @@ class StorageManager {
             const data = localStorage.getItem(STORAGE_KEY);
             if (data) {
                 const parsed = JSON.parse(data);
+                return this.parseAndMergeData(parsed);
+            }
+        } catch (e) {
+            console.error("Failed to load local data", e);
+        }
+        return JSON.parse(JSON.stringify(defaultState));
+    }
+
+    parseAndMergeData(parsed) {
+        try {
                 // Merge top-level fields but always trust saved wallets/categories
                 const mergedState = {
                     ...defaultState,
@@ -193,16 +203,62 @@ class StorageManager {
                 }
                 
                 return mergedState;
-            }
         } catch (e) {
-            console.error("Failed to load data", e);
+            console.error("Failed to parse data", e);
         }
         return JSON.parse(JSON.stringify(defaultState));
+    }
+
+    async syncFromSupabase() {
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session) return;
+        
+        try {
+            const { data, error } = await supabase
+                .from('app_state')
+                .select('state')
+                .eq('user_id', supabaseClient.session.user.id)
+                .single();
+                
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    // No row exists for this user. We should upload our current local state.
+                    this.pushToSupabase();
+                } else {
+                    console.error("Error fetching from Supabase", error);
+                }
+            } else if (data && data.state) {
+                // We got state from Supabase! Load it.
+                this.state = this.parseAndMergeData(data.state);
+                // Save this new state locally
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+            }
+        } catch (e) {
+            console.error("Supabase sync failed", e);
+        }
+    }
+
+    async pushToSupabase() {
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session) return;
+        
+        try {
+            const { error } = await supabase
+                .from('app_state')
+                .upsert({
+                    user_id: supabaseClient.session.user.id,
+                    state: this.state,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+                
+            if (error) console.error("Failed to push to Supabase", error);
+        } catch (e) {
+            console.error("Push to supabase failed", e);
+        }
     }
 
     saveData() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+            this.pushToSupabase(); // Fire and forget async
         } catch (e) {
             console.error("Failed to save data", e);
         }
