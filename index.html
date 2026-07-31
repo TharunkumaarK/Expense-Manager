@@ -30,15 +30,14 @@
         
         <!-- Home View -->
         <section id="home-view" class="view active">
-            <header class="top-bar">
-                <div class="summary-card text-center" style="margin-bottom: 24px; padding: 12px; background: transparent; box-shadow: none;">
+            <header class="top-bar" style="justify-content: center;">
+                <div class="summary-card text-center" style="padding: 0; background: transparent; box-shadow: none;">
                     <div style="display: flex; justify-content: center; align-items: center; gap: 16px;">
                         <button class="icon-btn" onclick="app.changeMonth(-1)"><i data-lucide="chevron-left"></i></button>
-                        <h2 id="current-month-display" style="font-size: 1.4rem; font-weight: 700; min-width: 120px;">Month</h2>
+                        <h2 id="current-month-display" style="font-size: 1.4rem; font-weight: 700; min-width: 120px; margin: 0;">Month</h2>
                         <button class="icon-btn" onclick="app.changeMonth(1)"><i data-lucide="chevron-right"></i></button>
                     </div>
                 </div>
-                <button class="icon-btn" onclick="app.showSettings()"><i data-lucide="settings"></i></button>
             </header>
 
             <div class="wallets-container">
@@ -188,20 +187,42 @@
                     </div>
                 </div>
 
-                <div class="card mt-3">
-                    <h3>Loan Tracker (India)</h3>
-                    <p class="help-text text-sm text-muted mb-2">Update manually once a month from your bank app to stay in sync.</p>
-                    <div class="form-group mt-2">
-                        <label>Principal Left (₹)</label>
-                        <input type="number" id="setting-loan-principal" onblur="app.updateLoanSetting('principalLeft', this.value)">
+                <div class="card mt-3" style="padding:0;">
+                    <div class="section-header-toggle" style="padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+                        <div onclick="app.toggleCollapse('settings-loan-wrap', this.querySelector('.chevron'))" style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main); flex: 1; cursor: pointer;">
+                            <i data-lucide="landmark" style="width:18px;height:18px;color:var(--text-muted);"></i> LOAN TRACKER 
+                            <i data-lucide="chevron-down" class="chevron" style="width:18px;height:18px;color:var(--text-muted); transition: transform 0.3s;"></i>
+                        </div>
+                        <button class="icon-btn" onclick="app.toggleLoanVisibility()" id="loan-visibility-btn" style="color: var(--text-muted); padding: 5px; margin-left: 10px;" title="Toggle Dashboard Visibility">
+                            <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <label>EMIs Paid (Months)</label>
-                        <input type="number" id="setting-loan-dues" onblur="app.updateLoanSetting('duesPaid', this.value)">
-                    </div>
-                    <div class="form-group">
-                        <label>EMI Draw Date (Day of Month)</label>
-                        <input type="number" id="setting-loan-date" onblur="app.updateLoanSetting('emiDrawDate', this.value)" min="1" max="31">
+                    <div id="settings-loan-wrap" class="collapsible-wrapper collapsed">
+                        <div>
+                            <div style="padding: 0 16px 16px;">
+                                <p class="help-text text-sm text-muted mb-2">Update manually once a month from your bank app to stay in sync.</p>
+                                <div class="form-group mt-2">
+                                    <label>Total Loan Amount (₹)</label>
+                                    <input type="number" id="setting-loan-total-principal" onblur="app.updateLoanSetting('totalPrincipal', this.value)">
+                                </div>
+                                <div class="form-group">
+                                    <label>Principal Left (₹)</label>
+                                    <input type="number" id="setting-loan-principal" onblur="app.updateLoanSetting('principalLeft', this.value)">
+                                </div>
+                                <div class="form-group">
+                                    <label>Total EMIs (Months)</label>
+                                    <input type="number" id="setting-loan-total-dues" onblur="app.updateLoanSetting('totalDues', this.value)">
+                                </div>
+                                <div class="form-group">
+                                    <label>EMIs Paid (Months)</label>
+                                    <input type="number" id="setting-loan-dues" onblur="app.updateLoanSetting('duesPaid', this.value)">
+                                </div>
+                                <div class="form-group">
+                                    <label>EMI Draw Date (Day of Month)</label>
+                                    <input type="number" id="setting-loan-date" onblur="app.updateLoanSetting('emiDrawDate', this.value)" min="1" max="31">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

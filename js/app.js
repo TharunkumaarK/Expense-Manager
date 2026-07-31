@@ -566,10 +566,26 @@ class App {
             document.getElementById('setting-jp-budget').value = storage.state.jpTotalBudget;
 
             if (storage.state.loanConfig) {
+                document.getElementById('setting-loan-total-principal').value = storage.state.loanConfig.totalPrincipal;
                 document.getElementById('setting-loan-principal').value = storage.state.loanConfig.principalLeft;
+                document.getElementById('setting-loan-total-dues').value = storage.state.loanConfig.totalDues;
                 document.getElementById('setting-loan-dues').value = storage.state.loanConfig.duesPaid;
                 const dateEl = document.getElementById('setting-loan-date');
                 if (dateEl) dateEl.value = storage.state.loanConfig.emiDrawDate || 7;
+
+                const btn = document.getElementById('loan-visibility-btn');
+                if (btn) {
+                    const isEnabled = storage.state.loanConfig.enabled !== false;
+                    btn.innerHTML = `<i data-lucide="${isEnabled ? 'eye' : 'eye-off'}" style="width: 18px; height: 18px;"></i>`;
+                    if (isEnabled) {
+                        btn.style.color = 'var(--text-muted)';
+                        btn.style.background = 'transparent';
+                    } else {
+                        btn.style.color = 'var(--red)';
+                        btn.style.background = 'rgba(239, 68, 68, 0.1)';
+                        btn.style.borderRadius = '5px';
+                    }
+                }
             }
 
             // Render wallet balances
@@ -584,7 +600,7 @@ class App {
                                 <i data-lucide="${icon}"></i> ${w.id} <small class="text-muted">(${w.currency})</small>
                             </span>
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <input type="number" value="${w.balance}" onblur="app.updateWalletBalance('${w.id}', this.value)" style="width:80px;">
+                                <input type="number" value="${w.balance}" onblur="app.updateWalletBalance('${w.id}', this.value)" style="width:100px;">
                                 <button onclick="app.openColorPicker('${w.id}')" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;padding:5px 8px;border-radius:6px;font-size:0.75rem;font-family:inherit;display:flex;align-items:center;gap:4px;"><i data-lucide="palette" style="width:13px;height:13px;"></i> Color</button>
                                 <button onclick="app.removeWallet('${w.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;padding:4px;display:flex;align-items:center;"><i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>
                             </div>
@@ -885,7 +901,7 @@ class App {
         const ctx = canvas.getContext('2d');
 
         const grad = ctx.createLinearGradient(0, 0, 0, H);
-        [0,60,120,180,240,300,360].forEach(h => grad.addColorStop(h/360, `hsl(${h},100%,50%)`));
+        [0, 60, 120, 180, 240, 300, 360].forEach(h => grad.addColorStop(h / 360, `hsl(${h},100%,50%)`));
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
 
@@ -918,7 +934,7 @@ class App {
 
     _cpHexToHsv(hex) {
         const { r, g, b } = this._cpHexToRgb(hex);
-        const rr = r/255, gg = g/255, bb = b/255;
+        const rr = r / 255, gg = g / 255, bb = b / 255;
         const max = Math.max(rr, gg, bb), min = Math.min(rr, gg, bb), d = max - min;
         let h = 0;
         if (d) {
@@ -932,7 +948,7 @@ class App {
 
     _cpHexToRgb(hex) {
         const h = hex.replace('#', '');
-        return { r: parseInt(h.slice(0,2),16), g: parseInt(h.slice(2,4),16), b: parseInt(h.slice(4,6),16) };
+        return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
     }
 
     renderWallets() {
@@ -1302,8 +1318,8 @@ class App {
                     const statusText = pct > 90
                         ? `<span style="color:#ef4444; font-weight:600;">Over Budget!</span>`
                         : pct > 75
-                        ? `<span style="color:#f59e0b; font-weight:600;">Nearing Limit</span>`
-                        : `<span style="color:#10b981; font-weight:600;">Under Budget!</span>`;
+                            ? `<span style="color:#f59e0b; font-weight:600;">Nearing Limit</span>`
+                            : `<span style="color:#10b981; font-weight:600;">Under Budget!</span>`;
 
                     overallHtml = `
                         <div class="neon-row" style="padding: 12px; margin-bottom: 16px;">
@@ -1470,6 +1486,31 @@ class App {
         storage.saveData();
     }
 
+    toggleLoanVisibility() {
+        if (storage.state.loanConfig) {
+            storage.state.loanConfig.enabled = (storage.state.loanConfig.enabled === false);
+            storage.saveData();
+            this.renderSettings();
+            lucide.createIcons();
+            this.renderLoanTracker();
+        }
+    }
+
+    updateLoanSetting(key, value) {
+        if (!storage.state.loanConfig) return;
+
+        if (key === 'enabled') {
+            storage.state.loanConfig[key] = value === true || value === 'true';
+        } else {
+            let numValue = parseFloat(value);
+            if (!isNaN(numValue)) {
+                storage.state.loanConfig[key] = numValue;
+            }
+        }
+        storage.saveData();
+        this.renderLoanTracker();
+    }
+
     updateWalletBalance(id, val) {
         if (!val || isNaN(val)) return;
         if (storage.state.wallets[id]) {
@@ -1494,7 +1535,7 @@ class App {
         const loanState = walletManager.getLoanState();
         const widget = document.getElementById('loan-tracker-widget');
 
-        if (!loanState) {
+        if (!loanState || loanState.config.enabled === false) {
             if (widget) widget.style.display = 'none';
             return;
         }
@@ -1544,6 +1585,17 @@ class App {
         }
     }
 
+    deleteLoan(event) {
+        event.stopPropagation();
+        if (confirm("Are you sure you want to remove the Loan Tracker? You can re-enable it in Settings.")) {
+            if (storage.state.loanConfig) {
+                storage.state.loanConfig.enabled = false;
+                storage.saveData();
+                this.renderLoanTracker();
+            }
+        }
+    }
+
     exportData() {
         storage.exportJSON();
     }
@@ -1572,43 +1624,43 @@ class App {
         const toSelect = document.getElementById('pdf-to-month');
         fromSelect.innerHTML = '';
         toSelect.innerHTML = '';
-        
+
         // Gather all months
         const months = storage.state.history.map(h => h.monthKey);
         // Sort chronologically ascending
         months.sort((a, b) => a.localeCompare(b));
         // Add current month at the end
         months.push(storage.state.currentMonthKey);
-        
+
         months.forEach(m => {
             const label = m === storage.state.currentMonthKey ? `${m} (Current)` : m;
             fromSelect.innerHTML += `<option value="${m}">${label}</option>`;
             toSelect.innerHTML += `<option value="${m}">${label}</option>`;
         });
-        
+
         // Select the earliest month for "From" and latest for "To"
         if (months.length > 0) {
             fromSelect.value = months[0];
             toSelect.value = months[months.length - 1];
         }
-        
+
         document.getElementById('pdf-modal').classList.add('active');
     }
-    
+
     generatePdf() {
         const fromMonth = document.getElementById('pdf-from-month').value;
         const toMonth = document.getElementById('pdf-to-month').value;
-        
+
         if (fromMonth.localeCompare(toMonth) > 0) {
             alert('Invalid range. "From Month" must be before or equal to "To Month".');
             return;
         }
-        
+
         // Collect ledgers to print
-        let ledgersToPrint = storage.state.history.filter(h => 
+        let ledgersToPrint = storage.state.history.filter(h =>
             h.monthKey.localeCompare(fromMonth) >= 0 && h.monthKey.localeCompare(toMonth) <= 0
         );
-        
+
         if (storage.state.currentMonthKey.localeCompare(fromMonth) >= 0 && storage.state.currentMonthKey.localeCompare(toMonth) <= 0) {
             // Mock a ledger structure for current month
             ledgersToPrint.push({
@@ -1618,10 +1670,10 @@ class App {
                 walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets))
             });
         }
-        
+
         // Filter out any ledgers that have 0 transactions (like an empty current month)
         ledgersToPrint = ledgersToPrint.filter(h => h.transactions && h.transactions.length > 0);
-        
+
         if (ledgersToPrint.length === 0) {
             alert("No transactions found in this range. Nothing to generate.");
             return;
@@ -1629,7 +1681,7 @@ class App {
 
         let html = '';
         const chartDataToRender = []; // To store chart data for rendering after DOM injection
-        
+
         ledgersToPrint.forEach((h, index) => {
             const totals = { JP: {}, IN: {} };
             h.transactions.forEach(tx => {
@@ -1717,8 +1769,8 @@ class App {
                     const statusText = pct > 90
                         ? `<span style="color:#ef4444; font-weight:600;">Over Budget!</span>`
                         : pct > 75
-                        ? `<span style="color:#f59e0b; font-weight:600;">Nearing Limit</span>`
-                        : `<span style="color:#10b981; font-weight:600;">Under Budget!</span>`;
+                            ? `<span style="color:#f59e0b; font-weight:600;">Nearing Limit</span>`
+                            : `<span style="color:#10b981; font-weight:600;">Under Budget!</span>`;
 
                     overallHtml = `
                         <div class="neon-row" style="padding: 12px; margin-bottom: 16px;">
@@ -1767,7 +1819,7 @@ class App {
                         ` : ''}
                     </div>
                 `;
-                
+
                 chartDataToRender.push({ id: canvasId, region: region, totals: totals[region] });
             });
 
@@ -1808,16 +1860,16 @@ class App {
                 </div>
             `;
         });
-        
+
         document.getElementById('print-container').innerHTML = html;
         document.getElementById('pdf-modal').classList.remove('active');
         lucide.createIcons({ root: document.getElementById('print-container') });
-        
+
         // Render all the charts for the print view
         chartDataToRender.forEach(chart => {
             charts.renderHistoryDonut(chart.id, chart.region, chart.totals, true);
         });
-        
+
         // Convert canvases to images to guarantee they print in all browsers
         setTimeout(() => {
             chartDataToRender.forEach(chart => {
@@ -1832,7 +1884,7 @@ class App {
                     canvas.parentNode.replaceChild(img, canvas);
                 }
             });
-            
+
             // Let UI update, then print
             setTimeout(() => {
                 window.print();
