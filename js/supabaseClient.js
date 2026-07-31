@@ -84,11 +84,13 @@ const supabaseClient = {
         const authScreen = document.getElementById('auth-screen');
         const appContent = document.getElementById('app-content');
         const bottomNav = document.getElementById('bottom-nav');
+        const mainFab = document.getElementById('main-fab');
         
         if (this.session) {
             authScreen.style.display = 'none';
             appContent.style.display = 'block';
             if (bottomNav) bottomNav.style.display = 'flex';
+            if (mainFab) mainFab.style.display = 'flex';
             
             const emailDisplay = document.getElementById('account-email-display');
             if (emailDisplay) emailDisplay.innerText = `Logged in as ${this.session.user.email}`;
@@ -104,6 +106,7 @@ const supabaseClient = {
             authScreen.style.display = 'flex';
             appContent.style.display = 'none';
             if (bottomNav) bottomNav.style.display = 'none';
+            if (mainFab) mainFab.style.display = 'none';
         }
     },
 
