@@ -220,7 +220,7 @@ class StorageManager {
                 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    // No row exists for this user yet — push our local state up.
+                    // No row exists yet — this device has the only copy, push it up
                     console.log('[Sync] No remote state found. Pushing local state to Supabase...');
                     await this.pushToSupabase();
                 } else {
@@ -230,22 +230,43 @@ class StorageManager {
             }
             
             if (data && data.state) {
+                // Validate the remote state looks real (has wallets & transactions keys)
+                const remote = data.state;
+                const remoteIsValid = remote && remote.wallets && Array.isArray(remote.transactions);
+                
+                if (!remoteIsValid) {
+                    console.warn('[Sync] Remote state invalid or empty. Keeping local state.');
+                    await this.pushToSupabase();
+                    return false;
+                }
+
                 const remoteUpdatedAt = data.updated_at ? new Date(data.updated_at) : null;
                 const localUpdatedAt = this.state._updatedAt ? new Date(this.state._updatedAt) : null;
-                
-                // Use remote if: no local timestamp, or remote is newer
-                const shouldUseRemote = !localUpdatedAt || !remoteUpdatedAt || remoteUpdatedAt > localUpdatedAt;
-                
-                if (shouldUseRemote) {
-                    console.log('[Sync] Remote state is newer. Loading from Supabase...');
-                    this.state = this.parseAndMergeData(data.state);
-                    // Re-run rollover check with the freshly loaded state
-                    this.checkRollover();
-                    // Persist the remote state locally so next offline load is correct
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-                    return true; // signal that state changed
+
+                // Count data richness as a tiebreaker when timestamps are missing
+                const remoteTxCount = (remote.transactions || []).length + (remote.history || []).reduce((s, h) => s + h.transactions.length, 0);
+                const localTxCount = (this.state.transactions || []).length + (this.state.history || []).reduce((s, h) => s + h.transactions.length, 0);
+
+                let shouldUseRemote;
+                if (remoteUpdatedAt && localUpdatedAt) {
+                    // Both have timestamps — trust the newer one
+                    shouldUseRemote = remoteUpdatedAt > localUpdatedAt;
+                } else if (remoteUpdatedAt && !localUpdatedAt) {
+                    // Remote has timestamp, local doesn't — remote wins
+                    shouldUseRemote = true;
                 } else {
-                    console.log('[Sync] Local state is up-to-date. Pushing to Supabase...');
+                    // No timestamps — use whichever has more transactions (more data = more complete)
+                    shouldUseRemote = remoteTxCount >= localTxCount;
+                }
+
+                if (shouldUseRemote) {
+                    console.log(`[Sync] Loading remote state (${remoteTxCount} txs) over local (${localTxCount} txs)`);
+                    this.state = this.parseAndMergeData(remote);
+                    this.checkRollover();
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+                    return true; // signal caller to re-render
+                } else {
+                    console.log(`[Sync] Local state (${localTxCount} txs) is newer. Pushing to Supabase...`);
                     await this.pushToSupabase();
                     return false;
                 }
