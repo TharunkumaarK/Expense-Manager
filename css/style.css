@@ -1073,3 +1073,119 @@ input:focus {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
     transform: scale(1.15);
 }
+
+/* --- Print Styles --- */
+@media screen {
+    #print-container {
+        position: absolute !important;
+        left: -9999px !important;
+        top: -9999px !important;
+        width: 100% !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+}
+
+@media print {
+    @page {
+        margin: 0;
+    }
+    
+    body, html {
+        background-color: #0a0a0f !important;
+        color: #f8f9fa !important;
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        height: 100%;
+    }
+    
+    /* Hide everything except print container */
+    #app-content, .bottom-nav, .fab, .modal-overlay, #toast-container, .fab-menu-overlay {
+        display: none !important;
+    }
+    
+    #print-container {
+        display: block !important;
+        width: 100%;
+        margin: 0;
+        padding: 40px;
+        background-color: #0a0a0f !important;
+    }
+    
+    /* PDF Document Styles */
+    .print-header {
+        text-align: center;
+        margin-bottom: 30px;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .print-header h1 {
+        margin: 0;
+        font-size: 24px;
+        color: #ffffff;
+    }
+    
+    .print-header p {
+        margin: 5px 0 0 0;
+        color: #a0a0b0;
+    }
+    
+    .print-summary {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 30px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.03);
+        padding: 15px;
+        border-radius: 8px;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .print-summary-item {
+        text-align: center;
+    }
+    
+    .print-summary-item span {
+        display: block;
+        color: #a0a0b0;
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+    
+    .print-summary-item strong {
+        display: block;
+        font-size: 18px;
+        color: #ffffff;
+    }
+    
+    .print-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+    }
+    
+    .print-table th, .print-table td {
+        border: 1px solid rgba(255,255,255,0.1);
+        padding: 12px;
+        text-align: left;
+    }
+    
+    .print-table th {
+        background-color: rgba(255,255,255,0.05) !important;
+        font-weight: 600;
+        color: #ffffff;
+    }
+    
+    .print-table td.amount-out {
+        color: #fb7185 !important;
+    }
+    
+    .print-table td.amount-in {
+        color: #34d399 !important;
+    }
+}

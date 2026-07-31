@@ -114,20 +114,25 @@ class ChartManager {
         });
     }
 
-    renderHistoryDonut(canvasId, region, totals) {
+    renderHistoryDonut(canvasId, region, totals, isPrint = false) {
         const ctx = document.getElementById(canvasId);
         if (!ctx) return null;
 
         const categories = storage.state.categories[region].filter(c => totals[c.id] > 0);
 
         if (categories.length === 0) {
-            return new Chart(ctx, this.getEmptyConfig('No expenses'));
+            return new Chart(ctx, this.getEmptyConfig('No expenses', isPrint));
         }
 
         const labels = categories.map(c => c.name);
         const data = categories.map(c => totals[c.id]);
 
         const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+        
+        let options = this.getDonutOptions();
+        if (isPrint) {
+            options.animation = false;
+        }
 
         return new Chart(ctx, {
             type: 'doughnut',
@@ -141,7 +146,7 @@ class ChartManager {
                     hoverOffset: 4
                 }]
             },
-            options: this.getDonutOptions()
+            options: options
         });
     }
 
@@ -232,22 +237,26 @@ class ChartManager {
         };
     }
 
-    getEmptyConfig(message) {
+    getEmptyConfig(message, isPrint = false) {
+        const options = {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false }
+            }
+        };
+        if (isPrint) {
+            options.animation = false;
+        }
         return {
             type: 'doughnut',
             data: {
                 labels: [message],
                 datasets: [{ data: [1], backgroundColor: ['#2c2c35'], borderWidth: 0 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '70%',
-                plugins: {
-                    legend: { display: false },
-                    tooltip: { enabled: false }
-                }
-            }
+            options: options
         };
     }
 }

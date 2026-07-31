@@ -1567,6 +1567,281 @@ class App {
             this.init();
         }
     }
-}
+    openPdfModal() {
+        const fromSelect = document.getElementById('pdf-from-month');
+        const toSelect = document.getElementById('pdf-to-month');
+        fromSelect.innerHTML = '';
+        toSelect.innerHTML = '';
+        
+        // Gather all months
+        const months = storage.state.history.map(h => h.monthKey);
+        // Sort chronologically ascending
+        months.sort((a, b) => a.localeCompare(b));
+        // Add current month at the end
+        months.push(storage.state.currentMonthKey);
+        
+        months.forEach(m => {
+            const label = m === storage.state.currentMonthKey ? `${m} (Current)` : m;
+            fromSelect.innerHTML += `<option value="${m}">${label}</option>`;
+            toSelect.innerHTML += `<option value="${m}">${label}</option>`;
+        });
+        
+        // Select the earliest month for "From" and latest for "To"
+        if (months.length > 0) {
+            fromSelect.value = months[0];
+            toSelect.value = months[months.length - 1];
+        }
+        
+        document.getElementById('pdf-modal').classList.add('active');
+    }
+    
+    generatePdf() {
+        const fromMonth = document.getElementById('pdf-from-month').value;
+        const toMonth = document.getElementById('pdf-to-month').value;
+        
+        if (fromMonth.localeCompare(toMonth) > 0) {
+            alert('Invalid range. "From Month" must be before or equal to "To Month".');
+            return;
+        }
+        
+        // Collect ledgers to print
+        let ledgersToPrint = storage.state.history.filter(h => 
+            h.monthKey.localeCompare(fromMonth) >= 0 && h.monthKey.localeCompare(toMonth) <= 0
+        );
+        
+        if (storage.state.currentMonthKey.localeCompare(fromMonth) >= 0 && storage.state.currentMonthKey.localeCompare(toMonth) <= 0) {
+            // Mock a ledger structure for current month
+            ledgersToPrint.push({
+                monthKey: storage.state.currentMonthKey,
+                label: storage.state.currentMonthKey + ' (Current)',
+                transactions: JSON.parse(JSON.stringify(storage.state.transactions)),
+                walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets))
+            });
+        }
+        
+        // Filter out any ledgers that have 0 transactions (like an empty current month)
+        ledgersToPrint = ledgersToPrint.filter(h => h.transactions && h.transactions.length > 0);
+        
+        if (ledgersToPrint.length === 0) {
+            alert("No transactions found in this range. Nothing to generate.");
+            return;
+        }
 
+        let html = '';
+        const chartDataToRender = []; // To store chart data for rendering after DOM injection
+        
+        ledgersToPrint.forEach((h, index) => {
+            const totals = { JP: {}, IN: {} };
+            h.transactions.forEach(tx => {
+                if (tx.type === 'expense') {
+                    let region = tx.region;
+                    if (!region) {
+                        region = storage.state.categories.JP.some(c => c.id === tx.categoryId) ? 'JP' : 'IN';
+                    }
+                    if (totals[region]) {
+                        totals[region][tx.categoryId] = (totals[region][tx.categoryId] || 0) + tx.amount;
+                    }
+                }
+            });
+
+            let jpBalance = 0;
+            let inBalance = 0;
+            if (h.walletsSnapshot) {
+                Object.values(h.walletsSnapshot).forEach(w => {
+                    if (w.region === 'JP') jpBalance += w.balance;
+                    if (w.region === 'IN') inBalance += w.balance;
+                });
+            }
+
+            let balanceHtml = '';
+            if (h.walletsSnapshot) {
+                balanceHtml = `
+                    <div style="display:flex; gap:16px; margin-top:8px; font-size:0.8rem;">
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">JP:</span> ¥${jpBalance.toLocaleString()}</span>
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">IN:</span> ₹${inBalance.toLocaleString('en-IN')}</span>
+                    </div>
+                `;
+            }
+
+            let catsHtml = '';
+            ['JP', 'IN'].forEach(region => {
+                const currency = region === 'JP' ? '¥' : '₹';
+                let regionSpent = 0;
+                let regionBudget = 0;
+                let catCardsHtml = '';
+
+                storage.state.categories[region].forEach(catDef => {
+                    const spent = (totals[region] && totals[region][catDef.id]) || 0;
+                    if (spent === 0) return;
+
+                    const activeBudget = walletManager.getEffectiveBudget(catDef.id, region, h.monthKey);
+                    regionSpent += spent;
+
+                    let catProgressHtml = '';
+                    if (activeBudget > 0) {
+                        regionBudget += activeBudget;
+                        const pct = Math.min((spent / activeBudget) * 100, 100);
+                        let barClass = 'neon-safe';
+                        if (pct > 90) barClass = 'neon-danger';
+                        else if (pct > 75) barClass = 'neon-warn';
+
+                        catProgressHtml = `
+                            <div class="neon-bar-bg">
+                                <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
+                            </div>
+                            <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
+                                <span>${currency}${spent.toLocaleString()}</span>
+                                <span>${currency}${activeBudget.toLocaleString()}</span>
+                            </div>
+                        `;
+                    } else {
+                        catProgressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${currency}${spent.toLocaleString()}</div>`;
+                    }
+
+                    catCardsHtml += `
+                        <div class="neon-row" style="padding: 12px;">
+                            <div class="neon-header" style="margin-bottom: 8px;">
+                                <span class="neon-title"><i data-lucide="${catDef.icon || 'tag'}"></i> ${catDef.name}</span>
+                            </div>
+                            ${catProgressHtml}
+                        </div>
+                    `;
+                });
+
+                if (regionSpent === 0) return;
+
+                let overallHtml = '';
+                if (regionBudget > 0) {
+                    const pct = Math.min((regionSpent / regionBudget) * 100, 100);
+                    const barClass = pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe';
+                    const statusText = pct > 90
+                        ? `<span style="color:#ef4444; font-weight:600;">Over Budget!</span>`
+                        : pct > 75
+                        ? `<span style="color:#f59e0b; font-weight:600;">Nearing Limit</span>`
+                        : `<span style="color:#10b981; font-weight:600;">Under Budget!</span>`;
+
+                    overallHtml = `
+                        <div class="neon-row" style="padding: 12px; margin-bottom: 16px;">
+                            <div class="neon-header" style="margin-bottom: 8px;">
+                                <span class="neon-title" style="font-size:0.85rem;">
+                                    <i data-lucide="bar-chart-2" style="width:14px;height:14px;"></i> Overall Budget
+                                </span>
+                                ${statusText}
+                            </div>
+                            <div class="neon-bar-bg">
+                                <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
+                            </div>
+                            <div class="neon-amount-sub" style="margin-top: 6px; display:flex; justify-content:space-between;">
+                                <span>Spent: ${currency}${regionSpent.toLocaleString()}</span>
+                                <span>Budget: ${currency}${regionBudget.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    overallHtml = `
+                        <div class="neon-row" style="padding:12px; margin-bottom:16px;">
+                            <div class="neon-amount-sub">Total Spent: ${currency}${regionSpent.toLocaleString()}</div>
+                        </div>
+                    `;
+                }
+
+                // Add canvas with unique print ID
+                const canvasId = `print-donut-${index}-${region}`;
+                catsHtml += `
+                    <div style="margin-top:16px; break-inside: avoid;">
+                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
+                            ${region === 'JP' ? '🇯🇵 Japan' : '🇮🇳 India'} Analytics
+                        </h4>
+
+                        <div style="height: 180px; margin-bottom: 16px; position: relative;">
+                            <canvas id="${canvasId}"></canvas>
+                        </div>
+
+                        ${overallHtml}
+
+                        ${catCardsHtml ? `
+                            <h5 style="color:var(--text-muted); font-size:0.72rem; margin: 12px 0 10px; text-transform:uppercase; letter-spacing:0.5px;">By Category</h5>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
+                                ${catCardsHtml}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                chartDataToRender.push({ id: canvasId, region: region, totals: totals[region] });
+            });
+
+            let txsHtml = '<div style="margin-top: 24px; break-inside: avoid;"><h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">Transactions</h4>';
+
+            if (h.transactions && h.transactions.length > 0) {
+                const groupedTxs = {};
+                h.transactions.forEach(tx => {
+                    const dStr = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                    if (!groupedTxs[dStr]) groupedTxs[dStr] = [];
+                    groupedTxs[dStr].push(tx);
+                });
+
+                Object.keys(groupedTxs).forEach(dateStr => {
+                    txsHtml += `
+                        <div style="margin-top: 16px;">
+                            <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; padding-left: 4px; border-left: 2px solid var(--accent);">${dateStr}</div>
+                    `;
+                    groupedTxs[dateStr].forEach(tx => {
+                        txsHtml += this.getTransactionHtml(tx, false, false); // editable=false
+                    });
+                    txsHtml += `</div>`;
+                });
+            } else {
+                txsHtml += '<p class="text-muted text-sm">No transactions found.</p>';
+            }
+            txsHtml += '</div>';
+
+            html += `
+                <div class="card" style="margin-bottom: 24px; page-break-after: always; box-shadow: none; border: 1px solid rgba(255,255,255,0.1);">
+                    <h3 style="margin:0;">${h.label || h.monthKey}</h3>
+                    <p class="text-muted text-sm mt-1 mb-0">${h.transactions.length} transactions recorded</p>
+                    ${balanceHtml}
+                    <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top:16px;">
+                        ${catsHtml}
+                        ${txsHtml}
+                    </div>
+                </div>
+            `;
+        });
+        
+        document.getElementById('print-container').innerHTML = html;
+        document.getElementById('pdf-modal').classList.remove('active');
+        lucide.createIcons({ root: document.getElementById('print-container') });
+        
+        // Render all the charts for the print view
+        chartDataToRender.forEach(chart => {
+            charts.renderHistoryDonut(chart.id, chart.region, chart.totals, true);
+        });
+        
+        // Convert canvases to images to guarantee they print in all browsers
+        setTimeout(() => {
+            chartDataToRender.forEach(chart => {
+                const canvas = document.getElementById(chart.id);
+                if (canvas) {
+                    const img = document.createElement('img');
+                    img.src = canvas.toDataURL('image/png');
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'contain';
+                    img.style.display = 'block';
+                    canvas.parentNode.replaceChild(img, canvas);
+                }
+            });
+            
+            // Let UI update, then print
+            setTimeout(() => {
+                window.print();
+                // Optional: clear it after
+                setTimeout(() => {
+                    document.getElementById('print-container').innerHTML = '';
+                }, 1000);
+            }, 500);
+        }, 500);
+    }
+}
 const app = new App();
