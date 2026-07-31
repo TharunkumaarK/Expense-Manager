@@ -209,31 +209,51 @@ class StorageManager {
     }
 
     async syncFromSupabase() {
-        if (typeof supabaseClient === 'undefined' || !supabaseClient.session) return;
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session) return false;
         
         try {
             const { data, error } = await supabaseClient.client
                 .from('app_state')
-                .select('state')
+                .select('state, updated_at')
                 .eq('user_id', supabaseClient.session.user.id)
                 .single();
                 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    // No row exists for this user. We should upload our current local state.
-                    this.pushToSupabase();
+                    // No row exists for this user yet — push our local state up.
+                    console.log('[Sync] No remote state found. Pushing local state to Supabase...');
+                    await this.pushToSupabase();
                 } else {
-                    console.error("Error fetching from Supabase", error);
+                    console.error('[Sync] Error fetching from Supabase:', error);
                 }
-            } else if (data && data.state) {
-                // We got state from Supabase! Load it.
-                this.state = this.parseAndMergeData(data.state);
-                // Save this new state locally
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+                return false;
+            }
+            
+            if (data && data.state) {
+                const remoteUpdatedAt = data.updated_at ? new Date(data.updated_at) : null;
+                const localUpdatedAt = this.state._updatedAt ? new Date(this.state._updatedAt) : null;
+                
+                // Use remote if: no local timestamp, or remote is newer
+                const shouldUseRemote = !localUpdatedAt || !remoteUpdatedAt || remoteUpdatedAt > localUpdatedAt;
+                
+                if (shouldUseRemote) {
+                    console.log('[Sync] Remote state is newer. Loading from Supabase...');
+                    this.state = this.parseAndMergeData(data.state);
+                    // Re-run rollover check with the freshly loaded state
+                    this.checkRollover();
+                    // Persist the remote state locally so next offline load is correct
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+                    return true; // signal that state changed
+                } else {
+                    console.log('[Sync] Local state is up-to-date. Pushing to Supabase...');
+                    await this.pushToSupabase();
+                    return false;
+                }
             }
         } catch (e) {
-            console.error("Supabase sync failed", e);
+            console.error('[Sync] Supabase sync failed:', e);
         }
+        return false;
     }
 
     async pushToSupabase() {
@@ -256,6 +276,8 @@ class StorageManager {
 
     saveData() {
         try {
+            // Stamp the current time so sync can compare freshness
+            this.state._updatedAt = new Date().toISOString();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
             this.pushToSupabase(); // Fire and forget async
         } catch (e) {

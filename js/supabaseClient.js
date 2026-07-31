@@ -95,11 +95,17 @@ const supabaseClient = {
             const emailDisplay = document.getElementById('account-email-display');
             if (emailDisplay) emailDisplay.innerText = `Logged in as ${this.session.user.email}`;
             
-            // Re-load data from Supabase
+            // Sync from Supabase — if remote is newer, fully re-initialize the app
             if (window.storage) {
-                await storage.syncFromSupabase();
-                if (window.app && typeof app.renderAll === 'function') {
-                    app.renderAll();
+                const stateChanged = await storage.syncFromSupabase();
+                if (window.app) {
+                    if (stateChanged) {
+                        // Remote state was newer: fully re-init to apply rollover etc.
+                        console.log('[Sync] State updated from remote. Re-initializing app...');
+                        app.init();
+                    } else if (typeof app.renderAll === 'function') {
+                        app.renderAll();
+                    }
                 }
             }
         } else {
