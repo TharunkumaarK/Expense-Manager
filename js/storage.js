@@ -4,12 +4,12 @@ const defaultState = {
     currentMonthKey: "",
     jpTotalBudget: 150000,
     wallets: {
-        'Salary Account': { id: 'Salary Account', type: 'bank', region: 'JP', balance: 0, currency: '¥' },
-        'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 7000, currency: '¥' },
-        'PayPay': { id: 'PayPay', type: 'digital', region: 'JP', balance: 0, currency: '¥' },
-        'Axis Bank': { id: 'Axis Bank', type: 'bank', region: 'IN', balance: 17084, currency: '₹' },
-        'Bank of Baroda': { id: 'Bank of Baroda', type: 'bank', region: 'IN', balance: 23485, currency: '₹' },
-        'Credit Card': { id: 'Credit Card', type: 'card', region: 'IN', balance: 0, currency: '₹' }
+        'Salary Account': { id: 'Salary Account', type: 'bank', region: 'JP', balance: 0, currency: '¥', color: '#009944' },
+        'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 7000, currency: '¥', color: '#d4af37' },
+        'PayPay': { id: 'PayPay', type: 'digital', region: 'JP', balance: 0, currency: '¥', color: '#ff0033' },
+        'Axis Bank': { id: 'Axis Bank', type: 'bank', region: 'IN', balance: 17084, currency: '₹', color: '#97144d' },
+        'Bank of Baroda': { id: 'Bank of Baroda', type: 'bank', region: 'IN', balance: 23485, currency: '₹', color: '#f05a28' },
+        'Credit Card': { id: 'Credit Card', type: 'card', region: 'IN', balance: 0, currency: '₹', color: '#94a3b8' }
     },
     categories: {
         JP: [
@@ -84,7 +84,15 @@ class StorageManager {
                 if (mergedState.wallets && mergedState.wallets['Forex Card']) {
                     delete mergedState.wallets['Forex Card'];
                 }
-                
+
+                // MIGRATION: Add color field to wallets that don't have one
+                const legacyColors = {
+                    'Salary Account': '#009944', 'PayPay': '#ff0033', 'Cash': '#d4af37',
+                    'Axis Bank': '#97144d', 'Bank of Baroda': '#f05a28', 'Credit Card': '#94a3b8'
+                };
+                Object.values(mergedState.wallets).forEach(w => {
+                    if (!w.color) w.color = legacyColors[w.id] || '#3351d6';
+                });
                 // Utility Categories Reverse Migration (Undo the previous merge)
                 const hasJpUtilities = mergedState.categories.JP.some(c => c.id === 'jp-utilities');
                 if (hasJpUtilities) {
@@ -222,26 +230,44 @@ class StorageManager {
 
     closeCurrentMonth() {
         const monthKey = this.state.currentMonthKey;
-        
+
+        // --- Rollover Calculation ---
+        // Pool all positive JP category savings into the overall budget cushion.
+        // Individual category budgets stay fixed; only jpTotalBudget grows.
+        let totalRollover = 0;
+        this.state.categories.JP.forEach(cat => {
+            if (!cat.budget || cat.budget <= 0) return;
+            const spent = this.state.transactions
+                .filter(tx => tx.type === 'expense' && tx.region === 'JP' && tx.categoryId === cat.id)
+                .reduce((sum, tx) => sum + tx.amount, 0);
+            const saving = cat.budget - spent;
+            if (saving > 0) totalRollover += saving;
+        });
+
         // Find existing ledger for this monthKey
         let ledger = this.state.history.find(h => h.monthKey === monthKey);
-        
+
         if (ledger) {
             // Append transactions
             ledger.transactions = ledger.transactions.concat(this.state.transactions);
             // Update snapshot to latest wallets
             ledger.walletsSnapshot = JSON.parse(JSON.stringify(this.state.wallets));
         } else {
-            // Create new ledger
+            // Snapshot the budget BEFORE rollover is applied (historical record)
             ledger = {
                 monthKey: monthKey,
                 transactions: JSON.parse(JSON.stringify(this.state.transactions)),
                 walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets)),
-                jpTotalBudget: this.state.jpTotalBudget
+                jpTotalBudget: this.state.jpTotalBudget,
+                jpRolloverAdded: Math.round(totalRollover)
             };
             this.state.history.push(ledger);
-            // Keep history sorted descending
             this.state.history.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+        }
+
+        // Add savings to next month's overall budget as cushion
+        if (totalRollover > 0) {
+            this.state.jpTotalBudget += Math.round(totalRollover);
         }
 
         // Clear current month transactions

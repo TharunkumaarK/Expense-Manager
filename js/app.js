@@ -1,7 +1,14 @@
+const WALLET_COLORS = [
+    '#10b981', '#ef4444', '#d4af37', '#bf5af2', '#f97316',
+    '#3b82f6', '#06b6d4', '#ec4899', '#94a3b8', '#8b5cf6',
+    '#14b8a6', '#f59e0b'
+];
+
 class App {
     constructor() {
         this.currentView = 'home-view';
         this.viewingMonthKey = null; // null means current month
+        this.renderedHistoryCharts = new Set(); // track which history indices have had charts drawn
         this.init();
     }
 
@@ -89,10 +96,12 @@ class App {
 
     toggleCollapse(wrapId, iconId) {
         const wrap = document.getElementById(wrapId);
-        const icon = document.getElementById(iconId);
-        if (wrap && icon) {
+        if (wrap) {
             wrap.classList.toggle('collapsed');
-            icon.classList.toggle('rotated');
+        }
+        if (iconId) {
+            const icon = document.getElementById(iconId);
+            if (icon) icon.classList.toggle('rotated');
         }
     }
 
@@ -568,12 +577,47 @@ class App {
             Object.values(storage.state.wallets).forEach(w => {
                 const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
                 walletHtml += `
-                    <div class="setting-row">
-                        <span><i data-lucide="${icon}"></i> ${w.id} <small class="text-muted">(${w.currency})</small></span>
-                        <input type="number" value="${w.balance}" onblur="app.updateWalletBalance('${w.id}', this.value)">
+                    <div style="padding:12px 0; border-bottom:1px solid var(--border);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="display:flex; align-items:center; gap:8px; font-size:0.9rem;">
+                                <span style="width:10px;height:10px;border-radius:50%;background:${w.color};flex-shrink:0;"></span>
+                                <i data-lucide="${icon}"></i> ${w.id} <small class="text-muted">(${w.currency})</small>
+                            </span>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <input type="number" value="${w.balance}" onblur="app.updateWalletBalance('${w.id}', this.value)" style="width:80px;">
+                                <button onclick="app.openColorPicker('${w.id}')" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;padding:5px 8px;border-radius:6px;font-size:0.75rem;font-family:inherit;display:flex;align-items:center;gap:4px;"><i data-lucide="palette" style="width:13px;height:13px;"></i> Color</button>
+                                <button onclick="app.removeWallet('${w.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;padding:4px;display:flex;align-items:center;"><i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>
+                            </div>
+                        </div>
                     </div>
                 `;
             });
+
+            const inputStyle = 'width:100%;padding:10px;background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-main);font-family:inherit;font-size:0.9rem;';
+            walletHtml += `
+                <div style="margin-top:16px;">
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Add New Wallet</div>
+                    <input type="text" id="new-wallet-name" placeholder="Wallet name (e.g. Rakuten Bank)" style="${inputStyle} margin-bottom:8px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                        <select id="new-wallet-type" style="${inputStyle}">
+                            <option value="bank">🏦 Bank</option>
+                            <option value="digital">📱 Digital</option>
+                            <option value="cash">💵 Cash</option>
+                            <option value="card">💳 Card</option>
+                        </select>
+                        <select id="new-wallet-region" style="${inputStyle}">
+                            <option value="JP">🇯🇵 Japan (¥)</option>
+                            <option value="IN">🇮🇳 India (₹)</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <div id="new-wallet-color-preview" style="width:38px;height:38px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,rgba(16,185,129,0.22),rgba(16,185,129,0.06));border:1px solid rgba(16,185,129,0.45);"></div>
+                        <button onclick="app.openColorPicker(null)" style="flex:1;padding:9px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-main);border-radius:var(--radius-sm);font-family:inherit;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="palette" style="width:15px;height:15px;"></i> Pick Color</button>
+                        <input type="hidden" id="new-wallet-color" value="${WALLET_COLORS[0]}">
+                    </div>
+                    <button onclick="app.addWallet()" style="padding:10px;background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);font-weight:600;cursor:pointer;font-family:inherit;width:100%;">+ Add Wallet</button>
+                </div>
+            `;
             document.getElementById('settings-wallets-list').innerHTML = walletHtml;
 
             // Render JP category budgets with delete and add-new
@@ -649,28 +693,262 @@ class App {
         }
     }
 
+    // Converts a hex color into inline gradient styles for wallet cards
+    getWalletStyle(hexColor) {
+        const hex = (hexColor || '#3351d6').replace('#', '');
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        // Lighter pastel text — blend towards white
+        const lr = Math.round(r * 0.6 + 255 * 0.4);
+        const lg = Math.round(g * 0.6 + 255 * 0.4);
+        const lb = Math.round(b * 0.6 + 255 * 0.4);
+        return {
+            card: `background:linear-gradient(135deg,rgba(${r},${g},${b},0.22),rgba(${r},${g},${b},0.06));border:1px solid rgba(${r},${g},${b},0.45);`,
+            text: `rgb(${lr},${lg},${lb})`
+        };
+    }
+
+    addWallet() {
+        const name = (document.getElementById('new-wallet-name').value || '').trim();
+        if (!name) return alert('Please enter a wallet name.');
+        if (storage.state.wallets[name]) return alert('A wallet with this name already exists.');
+
+        const type = document.getElementById('new-wallet-type').value;
+        const region = document.getElementById('new-wallet-region').value;
+        const color = document.getElementById('new-wallet-color').value || WALLET_COLORS[0];
+        const currency = region === 'JP' ? '¥' : '₹';
+
+        storage.state.wallets[name] = { id: name, type, region, balance: 0, currency, color };
+        storage.saveData();
+        this.renderAll();
+        this.renderSettings();
+        lucide.createIcons();
+    }
+
+    removeWallet(id) {
+        const txCount = storage.state.transactions.filter(tx =>
+            tx.walletId === id || tx.sourceId === id || tx.destId === id
+        ).length;
+        const msg = txCount > 0
+            ? `"${id}" has ${txCount} transaction(s). They stay in history but wallet will be removed. Continue?`
+            : `Remove wallet "${id}"?`;
+        if (!confirm(msg)) return;
+        delete storage.state.wallets[id];
+        storage.saveData();
+        this.renderAll();
+        this.renderSettings();
+        lucide.createIcons();
+    }
+
+    updateWalletColor(id, color) {
+        if (storage.state.wallets[id]) {
+            storage.state.wallets[id].color = color;
+            storage.saveData();
+            this.renderWallets();
+            this.renderSettings();
+            lucide.createIcons();
+        }
+    }
+
+    selectNewWalletColor(color, el) {
+        document.querySelectorAll('#new-wallet-color-picker .color-swatch').forEach(s => s.classList.remove('selected'));
+        el.classList.add('selected');
+        const input = document.getElementById('new-wallet-color');
+        if (input) input.value = color;
+    }
+
+    // ─── HSV Canvas Color Picker ──────────────────────────────────────────────
+
+    openColorPicker(walletId) {
+        this._cpWalletId = walletId; // null = new wallet mode
+        const color = walletId
+            ? (storage.state.wallets[walletId]?.color || WALLET_COLORS[0])
+            : (document.getElementById('new-wallet-color')?.value || WALLET_COLORS[0]);
+        const hsv = this._cpHexToHsv(color);
+        this._cpH = hsv.h; this._cpS = hsv.s; this._cpV = hsv.v;
+        document.getElementById('color-picker-modal').classList.add('active');
+        requestAnimationFrame(() => this._cpInit());
+    }
+
+    applyWalletColor() {
+        const hex = this._cpHsvToHex(this._cpH, this._cpS, this._cpV);
+        if (this._cpWalletId) {
+            this.updateWalletColor(this._cpWalletId, hex);
+        } else {
+            const input = document.getElementById('new-wallet-color');
+            if (input) input.value = hex;
+            const preview = document.getElementById('new-wallet-color-preview');
+            if (preview) {
+                const ws = this.getWalletStyle(hex);
+                preview.style.cssText = `width:38px;height:38px;border-radius:8px;flex-shrink:0;${ws.card}`;
+            }
+        }
+        this.closeModal('color-picker-modal');
+    }
+
+    cpHexInput(val) {
+        if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+            const hsv = this._cpHexToHsv(val);
+            this._cpH = hsv.h; this._cpS = hsv.s; this._cpV = hsv.v;
+            this._cpDrawAll();
+        }
+    }
+
+    _cpInit() {
+        if (!this._cpEventsSet) {
+            this._cpEventsSet = true;
+            this._cpSvDrag = false;
+            this._cpHueDrag = false;
+
+            const getSv = (e) => {
+                const sv = document.getElementById('cp-sv-canvas');
+                const rect = sv.getBoundingClientRect();
+                const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                const cy = e.touches ? e.touches[0].clientY : e.clientY;
+                this._cpS = Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+                this._cpV = Math.max(0, Math.min(1, 1 - (cy - rect.top) / rect.height));
+            };
+            const getHue = (e) => {
+                const hue = document.getElementById('cp-hue-canvas');
+                const rect = hue.getBoundingClientRect();
+                const cy = e.touches ? e.touches[0].clientY : e.clientY;
+                this._cpH = Math.max(0, Math.min(359.99, ((cy - rect.top) / rect.height) * 360));
+            };
+
+            const sv = document.getElementById('cp-sv-canvas');
+            const hue = document.getElementById('cp-hue-canvas');
+
+            sv.addEventListener('mousedown', e => { this._cpSvDrag = true; getSv(e); this._cpDrawAll(); });
+            sv.addEventListener('touchstart', e => { this._cpSvDrag = true; getSv(e); this._cpDrawAll(); e.preventDefault(); }, { passive: false });
+            hue.addEventListener('mousedown', e => { this._cpHueDrag = true; getHue(e); this._cpDrawAll(); });
+            hue.addEventListener('touchstart', e => { this._cpHueDrag = true; getHue(e); this._cpDrawAll(); e.preventDefault(); }, { passive: false });
+
+            document.addEventListener('mousemove', e => {
+                if (this._cpSvDrag) { getSv(e); this._cpDrawAll(); }
+                if (this._cpHueDrag) { getHue(e); this._cpDrawAll(); }
+            });
+            document.addEventListener('touchmove', e => {
+                if (this._cpSvDrag) { getSv(e); this._cpDrawAll(); e.preventDefault(); }
+                if (this._cpHueDrag) { getHue(e); this._cpDrawAll(); e.preventDefault(); }
+            }, { passive: false });
+            document.addEventListener('mouseup', () => { this._cpSvDrag = false; this._cpHueDrag = false; });
+            document.addEventListener('touchend', () => { this._cpSvDrag = false; this._cpHueDrag = false; });
+        }
+        this._cpDrawAll();
+    }
+
+    _cpDrawAll() {
+        this._cpDrawSV();
+        this._cpDrawHue();
+        this._cpUpdateHeader();
+    }
+
+    _cpDrawSV() {
+        const canvas = document.getElementById('cp-sv-canvas');
+        if (!canvas) return;
+        const W = canvas.clientWidth, H = canvas.clientHeight;
+        if (!W || !H) return;
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        // Base hue fill
+        ctx.fillStyle = `hsl(${this._cpH},100%,50%)`;
+        ctx.fillRect(0, 0, W, H);
+        // White gradient left→right
+        const gw = ctx.createLinearGradient(0, 0, W, 0);
+        gw.addColorStop(0, 'rgba(255,255,255,1)');
+        gw.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = gw;
+        ctx.fillRect(0, 0, W, H);
+        // Black gradient top→bottom
+        const gb = ctx.createLinearGradient(0, 0, 0, H);
+        gb.addColorStop(0, 'rgba(0,0,0,0)');
+        gb.addColorStop(1, 'rgba(0,0,0,1)');
+        ctx.fillStyle = gb;
+        ctx.fillRect(0, 0, W, H);
+
+        // Cursor
+        const cx = this._cpS * W, cy = (1 - this._cpV) * H;
+        ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    _cpDrawHue() {
+        const canvas = document.getElementById('cp-hue-canvas');
+        if (!canvas) return;
+        const W = canvas.clientWidth, H = canvas.clientHeight;
+        if (!W || !H) return;
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        [0,60,120,180,240,300,360].forEach(h => grad.addColorStop(h/360, `hsl(${h},100%,50%)`));
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        // Indicator
+        const y = (this._cpH / 360) * H;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillRect(0, y - 2, W, 4);
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(0, y - 2, W, 4);
+    }
+
+    _cpUpdateHeader() {
+        const hex = this._cpHsvToHex(this._cpH, this._cpS, this._cpV);
+        const inp = document.getElementById('cp-hex-input');
+        if (inp) inp.value = hex;
+        const header = document.getElementById('cp-header');
+        if (header) {
+            const { r, g, b } = this._cpHexToRgb(hex);
+            header.style.background = `rgba(${r},${g},${b},0.18)`;
+        }
+    }
+
+    // ─── Color Math Utilities ─────────────────────────────────────────────────
+    _cpHsvToHex(h, s, v) {
+        const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+        const r = Math.round(f(5) * 255), g = Math.round(f(3) * 255), b = Math.round(f(1) * 255);
+        return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    _cpHexToHsv(hex) {
+        const { r, g, b } = this._cpHexToRgb(hex);
+        const rr = r/255, gg = g/255, bb = b/255;
+        const max = Math.max(rr, gg, bb), min = Math.min(rr, gg, bb), d = max - min;
+        let h = 0;
+        if (d) {
+            if (max === rr) h = ((gg - bb) / d + 6) % 6;
+            else if (max === gg) h = (bb - rr) / d + 2;
+            else h = (rr - gg) / d + 4;
+            h *= 60;
+        }
+        return { h, s: max ? d / max : 0, v: max };
+    }
+
+    _cpHexToRgb(hex) {
+        const h = hex.replace('#', '');
+        return { r: parseInt(h.slice(0,2),16), g: parseInt(h.slice(2,4),16), b: parseInt(h.slice(4,6),16) };
+    }
+
     renderWallets() {
         let jpTotal = 0, inTotal = 0;
         let jpHtml = '', inHtml = '';
 
-        const themeMap = {
-            'Salary Account': 'wallet-theme-salary',
-            'PayPay': 'wallet-theme-paypay',
-            'Cash': 'wallet-theme-cash',
-            'Axis Bank': 'wallet-theme-axis',
-            'Bank of Baroda': 'wallet-theme-bob',
-            'Credit Card': 'wallet-theme-cc'
-        };
-
         Object.values(storage.state.wallets).forEach(w => {
-            const themeClass = themeMap[w.id] || '';
+            const ws = this.getWalletStyle(w.color);
+            const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
             const html = `
-                <div class="wallet-item ${themeClass}" onclick="app.openQuickEditModal('wallet', '${w.id}')" style="cursor: pointer;">
-                    <div class="wallet-name">
-                        <i data-lucide="${w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone'}"></i>
+                <div class="wallet-item" onclick="app.openQuickEditModal('wallet', '${w.id}')" style="cursor:pointer; ${ws.card}">
+                    <div class="wallet-name" style="color:${ws.text};">
+                        <i data-lucide="${icon}"></i>
                         ${w.id}
                     </div>
-                    <div class="wallet-balance">${w.currency}${w.balance.toLocaleString()}</div>
+                    <div class="wallet-balance" style="color:${ws.text};">${w.currency}${w.balance.toLocaleString()}</div>
                 </div>
             `;
             if (w.region === 'JP') {
@@ -715,20 +993,25 @@ class App {
         const jpRem = Math.max(0, storage.state.jpTotalBudget - jpTotalSpent);
         const pct = Math.min((jpTotalSpent / storage.state.jpTotalBudget) * 100, 100);
 
+        // Cushion = overall budget minus sum of individual category budgets
+        const sumCatBudgets = storage.state.categories.JP.reduce((s, c) => s + (c.budget || 0), 0);
+        const cushion = Math.max(0, storage.state.jpTotalBudget - sumCatBudgets);
+
         const card = document.getElementById('budget-overview-card');
         if (card) {
             card.innerHTML = `
                 <div class="card" style="margin: 0 16px;">
                     <div style="display:flex; flex-direction:column; gap:4px;">
                         <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                            <span class="text-sm text-muted">Total Balance</span>
+                            <span class="text-sm text-muted">Japan Budget</span>
                             <span class="font-bold">¥${jpRem.toLocaleString()} left</span>
                         </div>
                         <div class="neon-bar-bg">
                             <div class="neon-bar-fill ${pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${pct}%"></div>
                         </div>
-                        <div class="text-muted text-sm" style="margin-top: 6px; text-align: right;">
-                            Spent ¥${jpTotalSpent.toLocaleString()} of ¥${storage.state.jpTotalBudget.toLocaleString()}
+                        <div style="margin-top: 6px; display:flex; justify-content:space-between; align-items:center;">
+                            <span class="text-muted text-sm">Spent ¥${jpTotalSpent.toLocaleString()} of ¥${storage.state.jpTotalBudget.toLocaleString()}</span>
+                            ${cushion > 0 ? `<span style="font-size:0.72rem; background:rgba(16,185,129,0.12); color:#10b981; padding:2px 8px; border-radius:10px; font-weight:600;">+¥${cushion.toLocaleString()} cushion</span>` : ''}
                         </div>
                     </div>
                 </div>
@@ -753,15 +1036,7 @@ class App {
                 const spent = totals[c.id] || 0;
                 let progressHtml = '';
 
-                // Calculate Effective Budget taking Rollover into account
-                let activeBudget = c.budget || 0;
-                let rolloverVal = 0;
-
-                if (showProgress && activeBudget > 0) {
-                    // Inject rollover logic
-                    activeBudget = walletManager.getEffectiveBudget(c.id, region, this.activeMonthKey);
-                    rolloverVal = activeBudget - (c.budget || 0);
-                }
+                const activeBudget = c.budget || 0;
 
                 if (showProgress && activeBudget > 0) {
                     const pct = Math.min((spent / activeBudget) * 100, 100);
@@ -769,18 +1044,13 @@ class App {
                     if (pct > 90) barClass = 'neon-danger';
                     else if (pct > 75) barClass = 'neon-warn';
 
-                    let rolloverPill = '';
-                    if (rolloverVal > 0) {
-                        rolloverPill = `<span style="font-size:0.65rem; background:rgba(16,185,129,0.15); color:#10b981; padding:2px 6px; border-radius:10px; margin-left:4px;">+${currency}${rolloverVal.toLocaleString()}</span>`;
-                    }
-
                     progressHtml = `
                         <div class="neon-bar-bg">
                             <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                         </div>
                         <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
                             <span>${currency}${spent.toLocaleString()}</span>
-                            <span>${currency}${activeBudget.toLocaleString()}${rolloverPill}</span>
+                            <span>${currency}${activeBudget.toLocaleString()}</span>
                         </div>
                     `;
                 } else {
@@ -874,6 +1144,67 @@ class App {
         container.innerHTML = html;
     }
 
+    getTransactionHtml(tx, editable = false, showDateInMeta = true) {
+        let icon = 'arrow-up-right';
+        let colorCls = 'debit';
+        let title = tx.note || tx.categoryId || 'Expense';
+        let amt = '';
+
+        if (tx.type === 'income') {
+            icon = 'arrow-down-left';
+            colorCls = 'credit';
+            title = tx.note || 'Income';
+            amt = `+${tx.currency}${tx.amount.toLocaleString()}`;
+        } else if (tx.type === 'transfer') {
+            icon = 'repeat';
+            colorCls = 'text-muted';
+            title = `Transfer: ${tx.sourceId} \u2192 ${tx.destId}`;
+            amt = `${tx.currency}${tx.amount.toLocaleString()}`;
+        } else if (tx.type === 'remittance') {
+            icon = 'globe';
+            colorCls = 'text-muted';
+            title = tx.note || 'Remittance';
+            amt = `\u00a5${tx.sourceAmount.toLocaleString()} \u2192 \u20b9${tx.destAmount.toLocaleString()}`;
+        } else {
+            // expense
+            const regionKey = tx.region || (storage.state.categories.JP.some(c => c.id === tx.categoryId) ? 'JP' : 'IN');
+            const regionCats = storage.state.categories[regionKey];
+            if (regionCats) {
+                const cat = regionCats.find(c => c.id === tx.categoryId);
+                if (cat) title = cat.name;
+            }
+            const currency = tx.currency || (tx.region === 'JP' ? '\u00a5' : '\u20b9');
+            amt = `-${currency}${tx.amount.toLocaleString()}`;
+        }
+
+        const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+        let metaString = tx.walletId || tx.sourceId || 'Wallet';
+        if (showDateInMeta) {
+            metaString = `${date} \u2022 ${metaString}`;
+        }
+        if (tx.note && tx.type !== 'income' && tx.type !== 'transfer' && tx.type !== 'remittance') {
+            metaString += ` \u2022 ${tx.note}`;
+        }
+
+        const clickAttr = editable ? `onclick="app.editTransaction('${tx.id}')" style="cursor:pointer;"` : '';
+
+        return `
+            <div class="tx-item" ${clickAttr}>
+                <div class="tx-left">
+                    <div class="tx-icon"><i data-lucide="${icon}"></i></div>
+                    <div class="tx-details">
+                        <span class="tx-title">${title}</span>
+                        <span class="tx-meta">${metaString}</span>
+                    </div>
+                </div>
+                <div class="tx-right">
+                    <span class="tx-amount ${colorCls}">${amt}</span>
+                </div>
+            </div>
+        `;
+    }
+
     renderHistory() {
         const container = document.getElementById('history-list');
         if (storage.state.history.length === 0) {
@@ -920,78 +1251,101 @@ class App {
                 const currency = region === 'JP' ? '¥' : '₹';
                 let regionSpent = 0;
                 let regionBudget = 0;
-                let savedHtml = '';
+                let catCardsHtml = '';
 
-                if (totals[region]) {
-                    Object.keys(totals[region]).forEach(catId => {
-                        const catDef = storage.state.categories[region].find(c => c.id === catId);
-                        if (!catDef) return;
+                // Build per-category neon-row cards — same design as Home tab's renderCategories()
+                storage.state.categories[region].forEach(catDef => {
+                    const spent = (totals[region] && totals[region][catDef.id]) || 0;
+                    if (spent === 0) return; // skip categories with no spend this month
 
-                        const spent = totals[region][catId];
-                        let activeBudget = walletManager.getEffectiveBudget(catId, region, h.monthKey);
+                    const activeBudget = walletManager.getEffectiveBudget(catDef.id, region, h.monthKey);
+                    regionSpent += spent;
 
-                        regionSpent += spent;
-                        if (activeBudget > 0) {
-                            regionBudget += activeBudget;
-                            if (spent < activeBudget) {
-                                savedHtml += `
-                                    <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.8rem;">
-                                        <span style="color:var(--text-main);"><i data-lucide="${catDef.icon}" style="width:12px;height:12px; margin-right:4px;"></i>${catDef.name}</span>
-                                        <span class="neon-safe">Saved ${currency}${(activeBudget - spent).toLocaleString()}</span>
-                                    </div>
-                                `;
-                            }
-                        }
-                    });
-                }
+                    let catProgressHtml = '';
+                    if (activeBudget > 0) {
+                        regionBudget += activeBudget;
+                        const pct = Math.min((spent / activeBudget) * 100, 100);
+                        let barClass = 'neon-safe';
+                        if (pct > 90) barClass = 'neon-danger';
+                        else if (pct > 75) barClass = 'neon-warn';
 
-                let progressHtml = '';
-                if (regionBudget > 0) {
-                    let pct = Math.min((regionSpent / regionBudget) * 100, 100);
-                    let barClass = 'neon-safe';
-                    let statusText = `<span class="neon-safe">Under Budget!</span>`;
-
-                    if (pct > 90) {
-                        barClass = 'neon-danger';
-                        statusText = `<span class="neon-danger">Over Budget!</span>`;
-                    } else if (pct > 75) {
-                        barClass = 'neon-warn';
-                        statusText = `<span class="neon-warn">Nearing Limit</span>`;
-                    }
-
-                    progressHtml = `
-                        <div class="neon-row" style="padding: 12px; margin-bottom: 16px;">
-                            <div class="neon-header" style="margin-bottom: 8px;">
-                                <span class="neon-title" style="font-size:0.85rem;"><i data-lucide="pie-chart" style="width:14px;height:14px;"></i> Overall Budget</span>
-                                <span style="font-size:0.8rem;">${statusText}</span>
-                            </div>
-                            <div class="neon-bar-bg" style="height:8px;">
+                        catProgressHtml = `
+                            <div class="neon-bar-bg">
                                 <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                             </div>
-                            <div class="neon-amount-sub" style="margin-top:6px; font-size:0.75rem; display:flex; justify-content:space-between;">
+                            <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
+                                <span>${currency}${spent.toLocaleString()}</span>
+                                <span>${currency}${activeBudget.toLocaleString()}</span>
+                            </div>
+                        `;
+                    } else {
+                        catProgressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${currency}${spent.toLocaleString()}</div>`;
+                    }
+
+                    catCardsHtml += `
+                        <div class="neon-row" style="padding: 12px;">
+                            <div class="neon-header" style="margin-bottom: 8px;">
+                                <span class="neon-title"><i data-lucide="${catDef.icon || 'tag'}"></i> ${catDef.name}</span>
+                            </div>
+                            ${catProgressHtml}
+                        </div>
+                    `;
+                });
+
+                if (regionSpent === 0) return; // skip region entirely if nothing spent
+
+                // Overall budget summary row — mirrors Home tab's budget-overview-card
+                let overallHtml = '';
+                if (regionBudget > 0) {
+                    const pct = Math.min((regionSpent / regionBudget) * 100, 100);
+                    const barClass = pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe';
+                    const statusText = pct > 90
+                        ? `<span style="color:#ef4444; font-weight:600;">Over Budget!</span>`
+                        : pct > 75
+                        ? `<span style="color:#f59e0b; font-weight:600;">Nearing Limit</span>`
+                        : `<span style="color:#10b981; font-weight:600;">Under Budget!</span>`;
+
+                    overallHtml = `
+                        <div class="neon-row" style="padding: 12px; margin-bottom: 16px;">
+                            <div class="neon-header" style="margin-bottom: 8px;">
+                                <span class="neon-title" style="font-size:0.85rem;">
+                                    <i data-lucide="bar-chart-2" style="width:14px;height:14px;"></i> Overall Budget
+                                </span>
+                                ${statusText}
+                            </div>
+                            <div class="neon-bar-bg">
+                                <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
+                            </div>
+                            <div class="neon-amount-sub" style="margin-top: 6px; display:flex; justify-content:space-between;">
                                 <span>Spent: ${currency}${regionSpent.toLocaleString()}</span>
                                 <span>Budget: ${currency}${regionBudget.toLocaleString()}</span>
                             </div>
                         </div>
                     `;
-                } else if (regionSpent > 0) {
-                    progressHtml = `<div class="neon-row" style="padding:12px; margin-bottom:16px;"><div class="neon-amount-sub">Total Spent: ${currency}${regionSpent.toLocaleString()}</div></div>`;
+                } else {
+                    overallHtml = `
+                        <div class="neon-row" style="padding:12px; margin-bottom:16px;">
+                            <div class="neon-amount-sub">Total Spent: ${currency}${regionSpent.toLocaleString()}</div>
+                        </div>
+                    `;
                 }
 
                 catsHtml += `
                     <div style="margin-top:16px;">
-                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">${region === 'JP' ? 'Japan' : 'India'} Analytics</h4>
-                        
-                        <div style="height: 160px; margin-bottom: 20px; position: relative;">
+                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
+                            ${region === 'JP' ? '🇯🇵 Japan' : '🇮🇳 India'} Analytics
+                        </h4>
+
+                        <div style="height: 180px; margin-bottom: 16px; position: relative;">
                             <canvas id="history-donut-${index}-${region}"></canvas>
                         </div>
-                        
-                        ${progressHtml}
-                        
-                        ${savedHtml ? `
-                            <div style="margin-top: 12px;">
-                                <h5 style="color:var(--text-muted); font-size:0.75rem; margin-bottom:8px;">CATEGORIES UNDER BUDGET</h5>
-                                ${savedHtml}
+
+                        ${overallHtml}
+
+                        ${catCardsHtml ? `
+                            <h5 style="color:var(--text-muted); font-size:0.72rem; margin: 12px 0 10px; text-transform:uppercase; letter-spacing:0.5px;">By Category</h5>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
+                                ${catCardsHtml}
                             </div>
                         ` : ''}
                     </div>
@@ -1048,26 +1402,8 @@ class App {
         container.innerHTML = html;
         lucide.createIcons({ root: container });
 
-        // Render charts for each history entry
-        storage.state.history.forEach((h, index) => {
-            const totals = { JP: {}, IN: {} };
-            h.transactions.forEach(tx => {
-                if (tx.type === 'expense') {
-                    let region = tx.region;
-                    if (!region) {
-                        region = storage.state.categories.JP.some(c => c.id === tx.categoryId) ? 'JP' : 'IN';
-                    }
-                    if (totals[region]) {
-                        totals[region][tx.categoryId] = (totals[region][tx.categoryId] || 0) + tx.amount;
-                    }
-                }
-            });
-
-            if (typeof chartManager !== 'undefined') {
-                chartManager.renderHistoryDonut(`history-donut-${index}-JP`, 'JP', totals.JP);
-                chartManager.renderHistoryDonut(`history-donut-${index}-IN`, 'IN', totals.IN);
-            }
-        });
+        // Reset rendered chart tracking when history re-renders
+        this.renderedHistoryCharts = new Set();
     }
 
     deleteLedger(monthKey) {
@@ -1089,6 +1425,32 @@ class App {
             const isHidden = el.classList.toggle('hidden');
             if (bal) {
                 bal.style.display = isHidden ? 'flex' : 'none';
+            }
+
+            // Render charts lazily on first expand
+            if (!isHidden && !this.renderedHistoryCharts.has(index)) {
+                this.renderedHistoryCharts.add(index);
+                const h = storage.state.history[index];
+                if (h) {
+                    const totals = { JP: {}, IN: {} };
+                    h.transactions.forEach(tx => {
+                        if (tx.type === 'expense') {
+                            let region = tx.region;
+                            if (!region) {
+                                region = storage.state.categories.JP.some(c => c.id === tx.categoryId) ? 'JP' : 'IN';
+                            }
+                            if (totals[region]) {
+                                totals[region][tx.categoryId] = (totals[region][tx.categoryId] || 0) + tx.amount;
+                            }
+                        }
+                    });
+                    // Small delay so the container is visible before chart renders
+                    setTimeout(() => {
+                        charts.renderHistoryDonut(`history-donut-${index}-JP`, 'JP', totals.JP);
+                        charts.renderHistoryDonut(`history-donut-${index}-IN`, 'IN', totals.IN);
+                        lucide.createIcons({ root: el });
+                    }, 50);
+                }
             }
         }
     }
