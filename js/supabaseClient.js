@@ -1,18 +1,17 @@
 const SUPABASE_URL = 'https://xrovzkibilgbpawnunle.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhyb3Z6a2liaWxnYnBhd251bmxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDc2ODksImV4cCI6MjEwMTA4MzY4OX0.GUYo0D0itCakd7KaEdElOfUlbYxT3IoHGmMvPqWDOnY';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 const supabaseClient = {
+    client: window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY),
     session: null,
     isInitialized: false,
 
     async init() {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await this.client.auth.getSession();
         this.session = session;
         this.isInitialized = true;
         
-        supabase.auth.onAuthStateChange((event, session) => {
+        this.client.auth.onAuthStateChange((event, session) => {
             this.session = session;
             if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
                 this.updateUI(true);
@@ -47,11 +46,11 @@ const supabaseClient = {
         btn.disabled = true;
 
         // Try to log in
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await this.client.auth.signInWithPassword({ email, password });
         
         if (error) {
             if (error.message.toLowerCase().includes('invalid login credentials')) {
-                const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+                const { data: signUpData, error: signUpError } = await this.client.auth.signUp({ email, password });
                 if (signUpError) {
                     this.showError(signUpError.message);
                 } else if (signUpData.user && signUpData.user.identities && signUpData.user.identities.length === 0) {
@@ -77,7 +76,7 @@ const supabaseClient = {
     },
 
     async handleLogout() {
-        await supabase.auth.signOut();
+        await this.client.auth.signOut();
     },
 
     async updateUI(isAuthChange = false) {

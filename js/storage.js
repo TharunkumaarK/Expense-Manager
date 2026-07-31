@@ -213,7 +213,7 @@ class StorageManager {
         if (typeof supabaseClient === 'undefined' || !supabaseClient.session) return;
         
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient.client
                 .from('app_state')
                 .select('state')
                 .eq('user_id', supabaseClient.session.user.id)
@@ -241,7 +241,7 @@ class StorageManager {
         if (typeof supabaseClient === 'undefined' || !supabaseClient.session) return;
         
         try {
-            const { error } = await supabase
+            const { error } = await supabaseClient.client
                 .from('app_state')
                 .upsert({
                     user_id: supabaseClient.session.user.id,
