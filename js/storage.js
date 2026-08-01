@@ -81,8 +81,11 @@ class StorageManager {
                 const mergedState = {
                     ...defaultState,
                     ...parsed,
-                    // Wallets: merge defaults with saved (preserves balances)
-                    wallets: { ...defaultState.wallets, ...(parsed.wallets || {}) },
+                    // Wallets: use parsed.wallets if it exists and is populated, else fallback to defaults.
+                    // This prevents deleted default wallets from magically reappearing.
+                    wallets: parsed.wallets && Object.keys(parsed.wallets).length > 0
+                        ? parsed.wallets
+                        : JSON.parse(JSON.stringify(defaultState.wallets)),
                     // Categories: use saved if valid arrays, else use defaults
                     categories: {
                         JP: Array.isArray(parsed.categories?.JP) && parsed.categories.JP.length > 0
