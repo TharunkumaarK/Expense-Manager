@@ -96,9 +96,9 @@ const supabaseClient = {
             if (emailDisplay) emailDisplay.innerText = `Logged in as ${this.session.user.email}`;
             
             // Sync from Supabase — if remote is newer, fully re-initialize the app
-            if (window.storage) {
+            if (typeof storage !== 'undefined') {
                 const stateChanged = await storage.syncFromSupabase();
-                if (window.app) {
+                if (typeof app !== 'undefined') {
                     if (!app._hasInit) {
                         console.log('[Sync] Initializing app after sync...');
                         app._hasInit = true;
