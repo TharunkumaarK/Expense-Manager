@@ -5,6 +5,7 @@ const supabaseClient = {
     client: window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY),
     session: null,
     isInitialized: false,
+    realtimeChannel: null,
 
     async init() {
         const { data: { session } } = await this.client.auth.getSession();
@@ -95,6 +96,9 @@ const supabaseClient = {
             const emailDisplay = document.getElementById('account-email-display');
             if (emailDisplay) emailDisplay.innerText = `Logged in as ${this.session.user.email}`;
             
+            // Set up Realtime Sync
+            this.setupRealtimeSubscription();
+
             // Sync from Supabase — if remote is newer, fully re-initialize the app
             if (typeof storage !== 'undefined') {
                 const stateChanged = await storage.syncFromSupabase();
@@ -117,7 +121,34 @@ const supabaseClient = {
             appContent.style.display = 'none';
             if (bottomNav) bottomNav.style.display = 'none';
             if (mainFab) mainFab.style.display = 'none';
+            
+            if (this.realtimeChannel) {
+                this.client.removeChannel(this.realtimeChannel);
+                this.realtimeChannel = null;
+            }
         }
+    },
+
+    setupRealtimeSubscription() {
+        if (!this.session || this.realtimeChannel) return;
+
+        this.realtimeChannel = this.client.channel('public:app_state')
+            .on('postgres_changes', 
+                { event: 'UPDATE', schema: 'public', table: 'app_state', filter: `user_id=eq.${this.session.user.id}` }, 
+                (payload) => {
+                    if (typeof storage !== 'undefined' && typeof app !== 'undefined') {
+                        const applied = storage.applyRealtimeUpdate(payload.new.state, payload.new.updated_at);
+                        if (applied) {
+                            app.renderAll();
+                        }
+                    }
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('[Realtime] Listening for remote updates...');
+                }
+            });
     },
 
     async handleForgotPassword() {
