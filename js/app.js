@@ -592,9 +592,10 @@ class App {
             Object.values(storage.state.wallets).forEach(w => {
                 const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
                 walletHtml += `
-                    <div style="padding:12px 0; border-bottom:1px solid var(--border);">
+                    <div class="draggable-item" data-id="${w.id}" data-type="wallet" draggable="true" ondragstart="app.handleDragStart(event)" ondragover="app.handleDragOver(event)" ondrop="app.handleDrop(event, 'wallet')" ondragenter="app.handleDragEnter(event)" ondragleave="app.handleDragLeave(event)" ondragend="app.handleDragEnd(event)" style="padding:12px 0; border-bottom:1px solid var(--border); transition: all 0.2s ease;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <span style="display:flex; align-items:center; gap:8px; font-size:0.9rem;">
+                                <i data-lucide="grip-vertical" style="color:var(--text-muted); cursor:grab; width:16px; height:16px;"></i>
                                 <span style="width:10px;height:10px;border-radius:50%;background:${w.color};flex-shrink:0;"></span>
                                 <i data-lucide="${icon}"></i> ${w.id} <small class="text-muted">(${w.currency})</small>
                             </span>
@@ -640,8 +641,11 @@ class App {
                 let catHtml = '';
                 storage.state.categories[region].forEach(c => {
                     catHtml += `
-                        <div class="setting-row">
-                            <span><i data-lucide="${c.icon || 'tag'}"></i> ${c.name}</span>
+                        <div class="setting-row draggable-item" data-id="${c.id}" data-type="category" data-region="${region}" draggable="true" ondragstart="app.handleDragStart(event)" ondragover="app.handleDragOver(event)" ondrop="app.handleDrop(event, 'category', '${region}')" ondragenter="app.handleDragEnter(event)" ondragleave="app.handleDragLeave(event)" ondragend="app.handleDragEnd(event)" style="transition: all 0.2s ease;">
+                            <span style="display:flex; align-items:center; gap:8px;">
+                                <i data-lucide="grip-vertical" style="color:var(--text-muted); cursor:grab; width:16px; height:16px;"></i>
+                                <i data-lucide="${c.icon || 'tag'}"></i> ${c.name}
+                            </span>
                             <div style="display:flex;align-items:center;gap:8px;">
                                 ${region === 'JP' ? `<input type="number" value="${c.budget || 0}" onblur="app.updateCategoryBudget('${c.id}', this.value)" style="width:90px;">` : ''}
                                 <button onclick="app.removeCategory('${region}','${c.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;padding:4px;display:flex;align-items:center;"><i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>
@@ -772,6 +776,101 @@ class App {
         const input = document.getElementById('new-wallet-color');
         if (input) input.value = color;
     }
+
+    // ─── Drag and Drop Reordering ──────────────────────────────────────────────
+    
+    handleDragStart(e) {
+        const item = e.target.closest('.draggable-item');
+        if (!item) return;
+        
+        e.dataTransfer.setData('text/plain', item.dataset.id);
+        item.style.opacity = '0.4';
+        this.draggedElement = item;
+    }
+
+    handleDragOver(e) {
+        e.preventDefault(); // Necessary to allow dropping
+        e.dataTransfer.dropEffect = 'move';
+    }
+
+    handleDragEnter(e) {
+        e.preventDefault();
+        const target = e.target.closest('.draggable-item');
+        if (target && target !== this.draggedElement && target.dataset.type === this.draggedElement.dataset.type) {
+            target.style.borderTop = '2px solid var(--accent)';
+        }
+    }
+
+    handleDragLeave(e) {
+        const target = e.target.closest('.draggable-item');
+        if (target && target !== this.draggedElement) {
+            target.style.borderTop = '';
+        }
+    }
+
+    handleDrop(e, type, region = null) {
+        e.preventDefault();
+        const target = e.target.closest('.draggable-item');
+        if (target) {
+            target.style.borderTop = '';
+        }
+        
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (!draggedId || !target || target.dataset.id === draggedId || target.dataset.type !== type) return;
+
+        const targetId = target.dataset.id;
+        
+        if (type === 'wallet') {
+            this.reorderWallets(draggedId, targetId);
+        } else if (type === 'category') {
+            this.reorderCategories(region, draggedId, targetId);
+        }
+    }
+
+    handleDragEnd(e) {
+        const item = e.target.closest('.draggable-item');
+        if (item) item.style.opacity = '1';
+        this.draggedElement = null;
+        document.querySelectorAll('.draggable-item').forEach(el => {
+            el.style.borderTop = '';
+        });
+    }
+
+    reorderWallets(draggedId, targetId) {
+        const keys = Object.keys(storage.state.wallets);
+        const draggedIndex = keys.indexOf(draggedId);
+        const targetIndex = keys.indexOf(targetId);
+        
+        if (draggedIndex === -1 || targetIndex === -1) return;
+        
+        keys.splice(draggedIndex, 1);
+        keys.splice(targetIndex, 0, draggedId);
+        
+        const newWallets = {};
+        keys.forEach(k => newWallets[k] = storage.state.wallets[k]);
+        storage.state.wallets = newWallets;
+        
+        storage.saveData();
+        this.renderAll();
+        this.renderSettings();
+        lucide.createIcons();
+    }
+
+    reorderCategories(region, draggedId, targetId) {
+        const cats = storage.state.categories[region];
+        const draggedIndex = cats.findIndex(c => c.id === draggedId);
+        const targetIndex = cats.findIndex(c => c.id === targetId);
+        
+        if (draggedIndex === -1 || targetIndex === -1) return;
+        
+        const [draggedItem] = cats.splice(draggedIndex, 1);
+        cats.splice(targetIndex, 0, draggedItem);
+        
+        storage.saveData();
+        this.renderSettings();
+        lucide.createIcons();
+    }
+
 
     // ─── HSV Canvas Color Picker ──────────────────────────────────────────────
 
