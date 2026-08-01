@@ -57,9 +57,9 @@ class StorageManager {
         // IMPORTANT: block pushToSupabase until after syncFromSupabase runs.
         // Without this, a fresh device (empty localStorage) will push defaultState
         // to Supabase and overwrite real data before the sync has a chance to pull it.
+        this.isFirstLoad = !localStorage.getItem(STORAGE_KEY);
         this.initialSyncDone = false;
         this.state = this.loadData();
-        this.checkRollover();
     }
 
     loadData() {
@@ -245,6 +245,17 @@ class StorageManager {
                 const remote = data.state;
                 const remoteIsValid = remote && remote.wallets && Array.isArray(remote.transactions);
                 
+                if (this.isFirstLoad && remoteIsValid) {
+                    // Fresh device — always use remote, no timestamp comparison
+                    console.log('[Sync] Fresh device detected. Using remote state.');
+                    this.state = this.parseAndMergeData(remote);
+                    this.isFirstLoad = false;
+                    this.initialSyncDone = true;
+                    this.checkRollover();
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+                    return true;
+                }
+
                 if (!remoteIsValid) {
                     console.warn('[Sync] Remote state invalid or empty. Keeping local and pushing up.');
                     this.initialSyncDone = true;
@@ -313,7 +324,9 @@ class StorageManager {
 
     saveData() {
         try {
-            this.state._updatedAt = new Date().toISOString();
+            if (this.initialSyncDone || typeof supabaseClient === 'undefined' || !supabaseClient.session) {
+                this.state._updatedAt = new Date().toISOString();
+            }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
             // Only push to Supabase after the initial sync has run.
             // This prevents a fresh device from overwriting real cloud data.

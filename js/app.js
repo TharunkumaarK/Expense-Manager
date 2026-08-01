@@ -9,7 +9,6 @@ class App {
         this.currentView = 'home-view';
         this.viewingMonthKey = null; // null means current month
         this.renderedHistoryCharts = new Set(); // track which history indices have had charts drawn
-        this.init();
     }
 
     init() {

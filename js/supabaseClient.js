@@ -99,7 +99,11 @@ const supabaseClient = {
             if (window.storage) {
                 const stateChanged = await storage.syncFromSupabase();
                 if (window.app) {
-                    if (stateChanged) {
+                    if (!app._hasInit) {
+                        console.log('[Sync] Initializing app after sync...');
+                        app._hasInit = true;
+                        app.init();
+                    } else if (stateChanged) {
                         // Remote state was newer: fully re-init to apply rollover etc.
                         console.log('[Sync] State updated from remote. Re-initializing app...');
                         app.init();
