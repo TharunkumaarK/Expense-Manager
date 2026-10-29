@@ -1,4 +1,8 @@
-const STORAGE_KEY = 'em_connected_v2';
+if (!window.SUPABASE_CONFIG?.storageKey) {
+    throw new Error('Development storage namespace is missing.');
+}
+
+const STORAGE_KEY = window.SUPABASE_CONFIG.storageKey;
 
 const defaultState = {
     currentMonthKey: "",

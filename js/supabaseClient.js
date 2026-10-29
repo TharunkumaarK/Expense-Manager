@@ -1,8 +1,18 @@
-const SUPABASE_URL = 'https://xrovzkibilgbpawnunle.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhyb3Z6a2liaWxnYnBhd251bmxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDc2ODksImV4cCI6MjEwMTA4MzY4OX0.GUYo0D0itCakd7KaEdElOfUlbYxT3IoHGmMvPqWDOnY';
+const SUPABASE_CONFIG = window.SUPABASE_CONFIG;
+const DEV_PROJECT_REF = 'nyetklojxqnawdtrrhma';
+
+if (
+    !SUPABASE_CONFIG ||
+    SUPABASE_CONFIG.environment !== 'development' ||
+    SUPABASE_CONFIG.projectRef !== DEV_PROJECT_REF ||
+    new URL(SUPABASE_CONFIG.url).hostname !== `${DEV_PROJECT_REF}.supabase.co` ||
+    !SUPABASE_CONFIG.publishableKey.startsWith('sb_publishable_')
+) {
+    throw new Error('Development Supabase configuration is missing or invalid.');
+}
 
 const supabaseClient = {
-    client: window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY),
+    client: window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.publishableKey),
     session: null,
     isInitialized: false,
     realtimeChannel: null,
