@@ -81,7 +81,7 @@ class ChartManager {
                     hoverOffset: 4
                 }]
             },
-            options: this.getDonutOptions()
+            options: this.getDonutOptions('JP')
         });
     }
 
@@ -116,7 +116,7 @@ class ChartManager {
                     hoverOffset: 4
                 }]
             },
-            options: this.getDonutOptions()
+            options: this.getDonutOptions('IN')
         });
     }
 
@@ -135,7 +135,7 @@ class ChartManager {
 
         const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
         
-        let options = this.getDonutOptions();
+        let options = this.getDonutOptions(region);
         if (isPrint) {
             options.animation = false;
         }
@@ -197,7 +197,12 @@ class ChartManager {
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: ctx => ` ¥${ctx.parsed.y.toLocaleString()}`
+                            label: ctx => {
+                                if (typeof app !== 'undefined' && app.isPrivacyHidden) {
+                                    return ' ******';
+                                }
+                                return ` ¥${ctx.parsed.y.toLocaleString()}`;
+                            }
                         }
                     }
                 },
@@ -207,7 +212,12 @@ class ChartManager {
                         grid: { color: '#2c2c35' },
                         ticks: {
                             color: '#8b8b99',
-                            callback: val => `¥${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
+                            callback: val => {
+                                if (typeof app !== 'undefined' && app.isPrivacyHidden) {
+                                    return '';
+                                }
+                                return `¥${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`;
+                            }
                         }
                     },
                     x: {
@@ -219,7 +229,8 @@ class ChartManager {
         });
     }
 
-    getDonutOptions() {
+    getDonutOptions(region = 'JP') {
+        const currency = region === 'IN' ? '₹' : '¥';
         return {
             responsive: true,
             maintainAspectRatio: false,
@@ -236,11 +247,30 @@ class ChartManager {
                 },
                 tooltip: {
                     callbacks: {
-                        label: ctx => ` ${ctx.label}: ¥${ctx.parsed.toLocaleString()}`
+                        label: ctx => {
+                            if (typeof app !== 'undefined' && app.isPrivacyHidden) {
+                                return ` ${ctx.label}: ******`;
+                            }
+                            return ` ${ctx.label}: ${currency}${ctx.parsed.toLocaleString()}`;
+                        }
                     }
                 }
             }
         };
+    }
+
+    updatePrivacy() {
+        if (this.jpDonut) this.jpDonut.update();
+        if (this.inDonut) this.inDonut.update();
+        if (this.utilityLine) this.utilityLine.update();
+        if (typeof app !== 'undefined' && app.renderedHistoryCharts) {
+            app.renderedHistoryCharts.forEach(index => {
+                const jpChart = Chart.getChart(`history-donut-${index}-JP`);
+                if (jpChart) jpChart.update();
+                const inChart = Chart.getChart(`history-donut-${index}-IN`);
+                if (inChart) inChart.update();
+            });
+        }
     }
 
     getEmptyConfig(message, isPrint = false) {

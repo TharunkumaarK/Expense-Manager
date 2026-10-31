@@ -9,13 +9,137 @@ class App {
         this.currentView = 'home-view';
         this.viewingMonthKey = null; // null means current month
         this.renderedHistoryCharts = new Set(); // track which history indices have had charts drawn
+        this.isPrivacyHidden = true; // Central privacy state: default concealed
+        this.inactivityTimer = null;
+        this.lastActivityTime = Date.now();
+        this.inactivityTimeoutMs = 3 * 60 * 1000; // 3 minutes
+        this.inactivityEventsRegistered = false;
+        this.activityThrottleTimer = null;
     }
 
     init() {
         storage.checkRollover();
         this.setupNavigation();
+        this.setupInactivityMonitoring();
+        this.updatePrivacyUI();
         this.renderAll();
     }
+
+    formatMoney(amount, currency = '', options = {}) {
+        if (this.isPrivacyHidden) {
+            return '******';
+        }
+        const num = Number(amount) || 0;
+        const prefix = options.prefix || '';
+        const locale = options.locale || (currency === '₹' ? 'en-IN' : undefined);
+        const formatted = num.toLocaleString(locale, options.formatOptions);
+        return `${prefix}${currency}${formatted}`;
+    }
+
+    setupInactivityMonitoring() {
+        if (this.inactivityEventsRegistered) return;
+        this.inactivityEventsRegistered = true;
+
+        const onUserActivity = () => {
+            if (this.activityThrottleTimer) return;
+            this.activityThrottleTimer = setTimeout(() => {
+                this.activityThrottleTimer = null;
+            }, 3000); // Throttle activity resets to at most once per 3 seconds
+
+            this.resetInactivityTimer();
+        };
+
+        const events = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'click'];
+        events.forEach(evt => {
+            window.addEventListener(evt, onUserActivity, { passive: true });
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                if (!this.isPrivacyHidden) {
+                    const elapsed = Date.now() - this.lastActivityTime;
+                    if (elapsed >= this.inactivityTimeoutMs) {
+                        this.setPrivacyHidden(true);
+                    } else {
+                        this.startInactivityTimer(this.inactivityTimeoutMs - elapsed);
+                    }
+                }
+            }
+        });
+    }
+
+    resetInactivityTimer() {
+        this.lastActivityTime = Date.now();
+        if (!this.isPrivacyHidden) {
+            this.startInactivityTimer(this.inactivityTimeoutMs);
+        }
+    }
+
+    startInactivityTimer(delayMs) {
+        this.clearInactivityTimer();
+        this.inactivityTimer = setTimeout(() => {
+            this.setPrivacyHidden(true);
+        }, Math.max(0, delayMs));
+    }
+
+    clearInactivityTimer() {
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+            this.inactivityTimer = null;
+        }
+    }
+
+    togglePrivacy() {
+        this.setPrivacyHidden(!this.isPrivacyHidden);
+    }
+
+    setPrivacyHidden(hidden) {
+        this.isPrivacyHidden = Boolean(hidden);
+
+        if (this.isPrivacyHidden) {
+            this.clearInactivityTimer();
+        } else {
+            this.resetInactivityTimer();
+        }
+
+        this.updatePrivacyUI();
+
+        // Re-render the active view to reflect privacy state
+        if (this.currentView === 'home-view') {
+            this.renderAll();
+        } else if (this.currentView === 'analytics-view') {
+            if (typeof charts !== 'undefined' && typeof charts.updatePrivacy === 'function') {
+                charts.updatePrivacy();
+            }
+        } else if (this.currentView === 'history-view') {
+            this.renderHistory();
+        } else if (this.currentView === 'settings-view') {
+            this.renderSettings();
+        }
+
+    }
+
+    updatePrivacyUI() {
+        const btns = document.querySelectorAll('.global-privacy-btn');
+        btns.forEach(btn => {
+            if (this.isPrivacyHidden) {
+                btn.innerHTML = '<i data-lucide="eye-off"></i>';
+                btn.setAttribute('aria-label', 'Reveal monetary values');
+                btn.setAttribute('title', 'Reveal monetary values');
+                btn.classList.remove('revealed');
+            } else {
+                btn.innerHTML = '<i data-lucide="eye"></i>';
+                btn.setAttribute('aria-label', 'Conceal monetary values');
+                btn.setAttribute('title', 'Conceal monetary values');
+                btn.classList.add('revealed');
+            }
+        });
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    }
+
+
 
     get activeMonthKey() {
         return this.viewingMonthKey || storage.state.currentMonthKey;
@@ -268,6 +392,7 @@ class App {
         if (type === 'expense') {
             this.updateExpenseCategories();
         }
+
     }
 
     editTransaction(id) {
@@ -335,6 +460,7 @@ class App {
             btn.innerText = 'Save Changes';
             btn.onclick = () => this.submitEdit(id, 'remittance');
         }
+
     }
 
     submitEdit(id, type) {
@@ -420,6 +546,7 @@ class App {
             title.innerText = `Edit ${cat.name} Budget`;
             input.value = cat.budget || 0;
         }
+
 
         document.getElementById('quick-edit-modal').classList.add('active');
     }
@@ -561,6 +688,8 @@ class App {
     }
 
     clearViewsOnLogout() {
+        this.setPrivacyHidden(true);
+        this.clearInactivityTimer();
         this.viewingMonthKey = null;
         if (this.renderedHistoryCharts && typeof this.renderedHistoryCharts.clear === 'function') {
             this.renderedHistoryCharts.clear();
@@ -578,6 +707,11 @@ class App {
             if (el) el.innerHTML = '';
         });
 
+        const jpBal = document.getElementById('jp-total-balance');
+        if (jpBal) jpBal.innerText = '******';
+        const inBal = document.getElementById('in-total-balance');
+        if (inBal) inBal.innerText = '******';
+
         const loanWidget = document.getElementById('loan-tracker-widget');
         if (loanWidget) loanWidget.style.display = 'none';
 
@@ -588,11 +722,22 @@ class App {
 
     renderSettings() {
         if (this.currentView === 'settings-view') {
-            document.getElementById('setting-jp-budget').value = storage.state.jpTotalBudget;
+            const jpBudEl = document.getElementById('setting-jp-budget');
+            if (jpBudEl) {
+                jpBudEl.value = storage.state.jpTotalBudget;
+            }
 
             if (storage.state.loanConfig) {
-                document.getElementById('setting-loan-total-principal').value = storage.state.loanConfig.totalPrincipal;
-                document.getElementById('setting-loan-principal').value = storage.state.loanConfig.principalLeft;
+                const loanTotalEl = document.getElementById('setting-loan-total-principal');
+                if (loanTotalEl) {
+                    loanTotalEl.value = storage.state.loanConfig.totalPrincipal;
+                }
+
+                const loanPrinEl = document.getElementById('setting-loan-principal');
+                if (loanPrinEl) {
+                    loanPrinEl.value = storage.state.loanConfig.principalLeft;
+                }
+
                 document.getElementById('setting-loan-total-dues').value = storage.state.loanConfig.totalDues;
                 document.getElementById('setting-loan-dues').value = storage.state.loanConfig.duesPaid;
                 const dateEl = document.getElementById('setting-loan-date');
@@ -696,6 +841,7 @@ class App {
     }
 
     updateWalletBalance(id, val) {
+        if (val === '' || isNaN(val)) return;
         if (storage.state.wallets[id]) {
             storage.state.wallets[id].balance = Number(val);
             storage.saveData();
@@ -731,6 +877,7 @@ class App {
     }
 
     updateCategoryBudget(id, val) {
+        if (val === '' || isNaN(val)) return;
         const cat = storage.state.categories.JP.find(c => c.id === id);
         if (cat) {
             cat.budget = Number(val);
@@ -1088,7 +1235,7 @@ class App {
                         <i data-lucide="${icon}"></i>
                         ${w.id}
                     </div>
-                    <div class="wallet-balance" style="color:${ws.text};">${w.currency}${w.balance.toLocaleString()}</div>
+                    <div class="wallet-balance" style="color:${ws.text};">${this.formatMoney(w.balance, w.currency)}</div>
                 </div>
             `;
             if (w.region === 'JP') {
@@ -1102,8 +1249,8 @@ class App {
 
         document.getElementById('jp-wallets').innerHTML = jpHtml;
         document.getElementById('in-wallets').innerHTML = inHtml;
-        document.getElementById('jp-total-balance').innerText = `¥${jpTotal.toLocaleString()}`;
-        document.getElementById('in-total-balance').innerText = `₹${inTotal.toLocaleString()}`;
+        document.getElementById('jp-total-balance').innerText = this.formatMoney(jpTotal, '¥');
+        document.getElementById('in-total-balance').innerText = this.formatMoney(inTotal, '₹');
 
         // Update Month Header
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -1144,14 +1291,14 @@ class App {
                     <div style="display:flex; flex-direction:column; gap:4px;">
                         <div style="display:flex; justify-content:space-between; align-items:baseline;">
                             <span class="text-sm text-muted">Japan Budget</span>
-                            <span class="font-bold">¥${jpRem.toLocaleString()} left</span>
+                            <span class="font-bold">${this.formatMoney(jpRem, '¥')} left</span>
                         </div>
                         <div class="neon-bar-bg">
                             <div class="neon-bar-fill ${pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${pct}%"></div>
                         </div>
                         <div style="margin-top: 6px; display:flex; justify-content:space-between; align-items:center;">
-                            <span class="text-muted text-sm">Spent ¥${jpTotalSpent.toLocaleString()} of ¥${storage.state.jpTotalBudget.toLocaleString()}</span>
-                            ${cushion > 0 ? `<span style="font-size:0.72rem; background:rgba(16,185,129,0.12); color:#10b981; padding:2px 8px; border-radius:10px; font-weight:600;">+¥${cushion.toLocaleString()} cushion</span>` : ''}
+                            <span class="text-muted text-sm">Spent ${this.formatMoney(jpTotalSpent, '¥')} of ${this.formatMoney(storage.state.jpTotalBudget, '¥')}</span>
+                            ${cushion > 0 ? `<span style="font-size:0.72rem; background:rgba(16,185,129,0.12); color:#10b981; padding:2px 8px; border-radius:10px; font-weight:600;">+${this.formatMoney(cushion, '¥')} cushion</span>` : ''}
                         </div>
                     </div>
                 </div>
@@ -1189,12 +1336,12 @@ class App {
                             <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                         </div>
                         <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
-                            <span>${currency}${spent.toLocaleString()}</span>
-                            <span>${currency}${activeBudget.toLocaleString()}</span>
+                            <span>${this.formatMoney(spent, currency)}</span>
+                            <span>${this.formatMoney(activeBudget, currency)}</span>
                         </div>
                     `;
                 } else {
-                    progressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${currency}${spent.toLocaleString()}</div>`;
+                    progressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${this.formatMoney(spent, currency)}</div>`;
                 }
 
                 html += `
@@ -1229,23 +1376,23 @@ class App {
             let icon = 'arrow-up-right';
             let colorCls = 'debit';
             let title = tx.note || tx.categoryId || 'Expense';
-            let amt = `-${tx.currency}${tx.amount.toLocaleString()}`;
+            let amt = this.formatMoney(tx.amount, tx.currency, { prefix: '-' });
 
             if (tx.type === 'income') {
                 icon = 'arrow-down-left';
                 colorCls = 'credit';
                 title = tx.note || 'Income';
-                amt = `+${tx.currency}${tx.amount.toLocaleString()}`;
+                amt = this.formatMoney(tx.amount, tx.currency, { prefix: '+' });
             } else if (tx.type === 'transfer') {
                 icon = 'repeat';
                 colorCls = 'text-muted';
                 title = `Transfer: ${tx.sourceId} → ${tx.destId}`;
-                amt = `${tx.currency}${tx.amount.toLocaleString()}`;
+                amt = this.formatMoney(tx.amount, tx.currency);
             } else if (tx.type === 'remittance') {
                 icon = 'globe';
                 colorCls = 'text-muted';
                 title = `Remittance: JP → IN`;
-                amt = `¥${tx.sourceAmount.toLocaleString()} → ₹${tx.destAmount.toLocaleString()}`;
+                amt = this.isPrivacyHidden ? '******' : `¥${tx.sourceAmount.toLocaleString()} → ₹${tx.destAmount.toLocaleString()}`;
             } else {
                 const regionCats = storage.state.categories[tx.region];
                 const cat = regionCats.find(c => c.id === tx.categoryId);
@@ -1294,17 +1441,17 @@ class App {
             icon = 'arrow-down-left';
             colorCls = 'credit';
             title = tx.note || 'Income';
-            amt = `+${tx.currency}${tx.amount.toLocaleString()}`;
+            amt = this.formatMoney(tx.amount, tx.currency, { prefix: '+' });
         } else if (tx.type === 'transfer') {
             icon = 'repeat';
             colorCls = 'text-muted';
             title = `Transfer: ${tx.sourceId} \u2192 ${tx.destId}`;
-            amt = `${tx.currency}${tx.amount.toLocaleString()}`;
+            amt = this.formatMoney(tx.amount, tx.currency);
         } else if (tx.type === 'remittance') {
             icon = 'globe';
             colorCls = 'text-muted';
             title = tx.note || 'Remittance';
-            amt = `\u00a5${tx.sourceAmount.toLocaleString()} \u2192 \u20b9${tx.destAmount.toLocaleString()}`;
+            amt = this.isPrivacyHidden ? '******' : `\u00a5${tx.sourceAmount.toLocaleString()} \u2192 \u20b9${tx.destAmount.toLocaleString()}`;
         } else {
             // expense
             const regionKey = tx.region || (storage.state.categories.JP.some(c => c.id === tx.categoryId) ? 'JP' : 'IN');
@@ -1314,7 +1461,7 @@ class App {
                 if (cat) title = cat.name;
             }
             const currency = tx.currency || (tx.region === 'JP' ? '\u00a5' : '\u20b9');
-            amt = `-${currency}${tx.amount.toLocaleString()}`;
+            amt = this.formatMoney(tx.amount, currency, { prefix: '-' });
         }
 
         const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
@@ -1380,8 +1527,8 @@ class App {
             if (h.walletsSnapshot) {
                 balanceHtml = `
                     <div id="history-bal-${index}" style="display:flex; gap:16px; margin-top:8px; font-size:0.8rem;">
-                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">JP:</span> ¥${jpBalance.toLocaleString()}</span>
-                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">IN:</span> ₹${inBalance.toLocaleString('en-IN')}</span>
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">JP:</span> ${this.formatMoney(jpBalance, '¥')}</span>
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">IN:</span> ${this.formatMoney(inBalance, '₹', { locale: 'en-IN' })}</span>
                     </div>
                 `;
             }
@@ -1414,12 +1561,12 @@ class App {
                                 <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                             </div>
                             <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
-                                <span>${currency}${spent.toLocaleString()}</span>
-                                <span>${currency}${activeBudget.toLocaleString()}</span>
+                                <span>${this.formatMoney(spent, currency)}</span>
+                                <span>${this.formatMoney(activeBudget, currency)}</span>
                             </div>
                         `;
                     } else {
-                        catProgressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${currency}${spent.toLocaleString()}</div>`;
+                        catProgressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${this.formatMoney(spent, currency)}</div>`;
                     }
 
                     catCardsHtml += `
@@ -1457,15 +1604,15 @@ class App {
                                 <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                             </div>
                             <div class="neon-amount-sub" style="margin-top: 6px; display:flex; justify-content:space-between;">
-                                <span>Spent: ${currency}${regionSpent.toLocaleString()}</span>
-                                <span>Budget: ${currency}${regionBudget.toLocaleString()}</span>
+                                <span>Spent: ${this.formatMoney(regionSpent, currency)}</span>
+                                <span>Budget: ${this.formatMoney(regionBudget, currency)}</span>
                             </div>
                         </div>
                     `;
                 } else {
                     overallHtml = `
                         <div class="neon-row" style="padding:12px; margin-bottom:16px;">
-                            <div class="neon-amount-sub">Total Spent: ${currency}${regionSpent.toLocaleString()}</div>
+                            <div class="neon-amount-sub">Total Spent: ${this.formatMoney(regionSpent, currency)}</div>
                         </div>
                     `;
                 }
@@ -1669,11 +1816,11 @@ class App {
             widget.innerHTML = `
                 <div class="loan-header" style="flex-wrap: wrap; padding-bottom: 12px;">
                     <div style="width: 50%;">
-                        <div class="loan-value">₹${loanState.config.totalPrincipal.toLocaleString('en-IN')}</div>
+                        <div class="loan-value">${this.formatMoney(loanState.config.totalPrincipal, '₹', { locale: 'en-IN' })}</div>
                         <div class="loan-label">Total Loan</div>
                     </div>
                     <div style="width: 50%; text-align: right;">
-                        <div class="loan-value">₹${loanState.config.emi.toLocaleString('en-IN')}</div>
+                        <div class="loan-value">${this.formatMoney(loanState.config.emi, '₹', { locale: 'en-IN' })}</div>
                         <div class="loan-label">EMI</div>
                     </div>
                     <div style="width: 100%; text-align: center; font-size: 0.7rem; color: var(--text-muted); margin-top: 12px;">
@@ -1696,13 +1843,13 @@ class App {
                     
                     <div class="loan-stats-grid">
                         <span class="loan-stat-label">Amount Paid</span>
-                        <span class="loan-stat-value">₹${loanState.amountPaid.toLocaleString('en-IN')}</span>
+                        <span class="loan-stat-value">${this.formatMoney(loanState.amountPaid, '₹', { locale: 'en-IN' })}</span>
                         
                         <span class="loan-stat-label">Principal Paid</span>
-                        <span class="loan-stat-value">₹${loanState.principalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span class="loan-stat-value">${this.formatMoney(loanState.principalPaid, '₹', { locale: 'en-IN', formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
                         
                         <span class="loan-stat-label">Principal Left</span>
-                        <span class="loan-stat-value">₹${loanState.principalLeft.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span class="loan-stat-value">${this.formatMoney(loanState.principalLeft, '₹', { locale: 'en-IN', formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
                     </div>
                 </div>
             `;
@@ -1785,11 +1932,16 @@ class App {
     }
 
     generatePdf() {
+        // PDF exports always contain actual financial values regardless of privacy state
+        const savedPrivacy = this.isPrivacyHidden;
+        this.isPrivacyHidden = false;
+
         const fromMonth = document.getElementById('pdf-from-month').value;
         const toMonth = document.getElementById('pdf-to-month').value;
 
         if (fromMonth.localeCompare(toMonth) > 0) {
             alert('Invalid range. "From Month" must be before or equal to "To Month".');
+            this.isPrivacyHidden = savedPrivacy;
             return;
         }
 
@@ -1813,6 +1965,7 @@ class App {
 
         if (ledgersToPrint.length === 0) {
             alert("No transactions found in this range. Nothing to generate.");
+            this.isPrivacyHidden = savedPrivacy;
             return;
         }
 
@@ -1846,8 +1999,8 @@ class App {
             if (h.walletsSnapshot) {
                 balanceHtml = `
                     <div style="display:flex; gap:16px; margin-top:8px; font-size:0.8rem;">
-                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">JP:</span> ¥${jpBalance.toLocaleString()}</span>
-                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">IN:</span> ₹${inBalance.toLocaleString('en-IN')}</span>
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">JP:</span> ${this.formatMoney(jpBalance, '¥')}</span>
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">IN:</span> ${this.formatMoney(inBalance, '₹', { locale: 'en-IN' })}</span>
                     </div>
                 `;
             }
@@ -1879,12 +2032,12 @@ class App {
                                 <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                             </div>
                             <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
-                                <span>${currency}${spent.toLocaleString()}</span>
-                                <span>${currency}${activeBudget.toLocaleString()}</span>
+                                <span>${this.formatMoney(spent, currency)}</span>
+                                <span>${this.formatMoney(activeBudget, currency)}</span>
                             </div>
                         `;
                     } else {
-                        catProgressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${currency}${spent.toLocaleString()}</div>`;
+                        catProgressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${this.formatMoney(spent, currency)}</div>`;
                     }
 
                     catCardsHtml += `
@@ -1921,15 +2074,15 @@ class App {
                                 <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                             </div>
                             <div class="neon-amount-sub" style="margin-top: 6px; display:flex; justify-content:space-between;">
-                                <span>Spent: ${currency}${regionSpent.toLocaleString()}</span>
-                                <span>Budget: ${currency}${regionBudget.toLocaleString()}</span>
+                                <span>Spent: ${this.formatMoney(regionSpent, currency)}</span>
+                                <span>Budget: ${this.formatMoney(regionBudget, currency)}</span>
                             </div>
                         </div>
                     `;
                 } else {
                     overallHtml = `
                         <div class="neon-row" style="padding:12px; margin-bottom:16px;">
-                            <div class="neon-amount-sub">Total Spent: ${currency}${regionSpent.toLocaleString()}</div>
+                            <div class="neon-amount-sub">Total Spent: ${this.formatMoney(regionSpent, currency)}</div>
                         </div>
                     `;
                 }
@@ -2025,6 +2178,8 @@ class App {
             // Let UI update, then print
             setTimeout(() => {
                 window.print();
+                // Restore privacy state after printing
+                this.isPrivacyHidden = savedPrivacy;
                 // Optional: clear it after
                 setTimeout(() => {
                     document.getElementById('print-container').innerHTML = '';

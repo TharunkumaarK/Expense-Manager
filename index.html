@@ -131,7 +131,8 @@
 
         <!-- Home View -->
         <section id="home-view" class="view active">
-            <header class="top-bar" style="justify-content: center;">
+            <header class="top-bar">
+                <div style="width: 36px; height: 36px;" class="top-bar-spacer"></div>
                 <div class="summary-card text-center" style="padding: 0; background: transparent; box-shadow: none;">
                     <div style="display: flex; justify-content: center; align-items: center; gap: 16px;">
                         <button class="icon-btn" onclick="app.changeMonth(-1)"><i
@@ -142,6 +143,10 @@
                                 data-lucide="chevron-right"></i></button>
                     </div>
                 </div>
+                <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                    aria-label="Reveal monetary values" title="Reveal monetary values">
+                    <i data-lucide="eye-off"></i>
+                </button>
             </header>
 
             <div class="wallets-container">
@@ -160,7 +165,7 @@
                             </svg>
                             Japan
                         </span>
-                        <span class="region-total" id="jp-total-balance">¥0</span>
+                        <span class="region-total" id="jp-total-balance">******</span>
                     </div>
                     <div class="wallet-grid" id="jp-wallets">
                         <!-- Populated by JS -->
@@ -185,7 +190,7 @@
                             </svg>
                             India
                         </span>
-                        <span class="region-total" id="in-total-balance">₹0</span>
+                        <span class="region-total" id="in-total-balance">******</span>
                     </div>
                     <div class="wallet-grid" id="in-wallets">
                         <!-- Populated by JS -->
@@ -230,6 +235,10 @@
         <section id="analytics-view" class="view">
             <header class="top-bar">
                 <h2>Analytics</h2>
+                <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                    aria-label="Reveal monetary values" title="Reveal monetary values">
+                    <i data-lucide="eye-off"></i>
+                </button>
             </header>
             <div class="content-padded">
                 <div class="chart-container card">
@@ -260,6 +269,10 @@
         <section id="history-view" class="view">
             <header class="top-bar">
                 <h2>History</h2>
+                <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                    aria-label="Reveal monetary values" title="Reveal monetary values">
+                    <i data-lucide="eye-off"></i>
+                </button>
             </header>
             <div class="content-padded" id="history-list">
                 <!-- Populated by JS -->
@@ -271,6 +284,10 @@
         <section id="settings-view" class="view">
             <header class="top-bar">
                 <h2>Settings</h2>
+                <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                    aria-label="Reveal monetary values" title="Reveal monetary values">
+                    <i data-lucide="eye-off"></i>
+                </button>
             </header>
             <div class="content-padded" id="settings-content">
                 <!-- Settings Content -->
