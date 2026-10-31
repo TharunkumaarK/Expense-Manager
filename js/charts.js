@@ -14,6 +14,12 @@ class ChartManager {
         this.renderUtilityLine();
     }
 
+    destroyCharts() {
+        if (this.jpDonut) { this.jpDonut.destroy(); this.jpDonut = null; }
+        if (this.inDonut) { this.inDonut.destroy(); this.inDonut = null; }
+        if (this.utilityLine) { this.utilityLine.destroy(); this.utilityLine = null; }
+    }
+
     getGlassStyles(canvasCtx, count, height = 300) {
         // More saturated, vibrant versions of the previous colors
         const baseColors = [

@@ -53,7 +53,22 @@ const supabaseClient = {
                 return;
             }
 
-            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+            if (event === 'SIGNED_OUT') {
+                this.isRecoveryMode = false;
+                if (typeof storage !== 'undefined') {
+                    storage.onUserLogout();
+                }
+                if (typeof app !== 'undefined') {
+                    app._hasInit = false;
+                    if (typeof app.clearViewsOnLogout === 'function') {
+                        app.clearViewsOnLogout();
+                    }
+                }
+                await this.updateUI(true);
+                return;
+            }
+
+            if (event === 'SIGNED_IN') {
                 await this.updateUI(true);
             }
         });
@@ -164,7 +179,27 @@ const supabaseClient = {
     },
 
     async handleLogout() {
-        await this.client.auth.signOut();
+        try {
+            await this.client.auth.signOut();
+        } catch (e) {
+            console.error('[Auth] Sign out error:', e);
+        }
+        this.session = null;
+
+        // Clean up storage and reset to clean state
+        if (typeof storage !== 'undefined') {
+            storage.onUserLogout();
+        }
+
+        // Clean up app state and DOM
+        if (typeof app !== 'undefined') {
+            app._hasInit = false;
+            if (typeof app.clearViewsOnLogout === 'function') {
+                app.clearViewsOnLogout();
+            }
+        }
+
+        await this.updateUI(false);
     },
 
     async updateUI(isAuthChange = false) {
@@ -196,6 +231,7 @@ const supabaseClient = {
 
             // Sync from Supabase — if remote is newer, fully re-initialize the app
             if (typeof storage !== 'undefined') {
+                storage.onUserLogin(this.session.user.id);
                 const stateChanged = await storage.syncFromSupabase();
                 if (typeof app !== 'undefined') {
                     if (!app._hasInit) {

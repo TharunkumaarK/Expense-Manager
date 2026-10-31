@@ -2,7 +2,7 @@ if (!window.SUPABASE_CONFIG?.storageKey) {
     throw new Error('Development storage namespace is missing.');
 }
 
-const STORAGE_KEY = window.SUPABASE_CONFIG.storageKey;
+const BASE_STORAGE_KEY = window.SUPABASE_CONFIG.storageKey;
 
 const defaultState = {
     currentMonthKey: "",
@@ -58,17 +58,93 @@ const defaultState = {
 
 class StorageManager {
     constructor() {
-        // IMPORTANT: block pushToSupabase until after syncFromSupabase runs.
-        // Without this, a fresh device (empty localStorage) will push defaultState
-        // to Supabase and overwrite real data before the sync has a chance to pull it.
-        this.isFirstLoad = !localStorage.getItem(STORAGE_KEY);
+        this.currentUserId = null;
         this.initialSyncDone = false;
         this.state = this.loadData();
+        this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
+    }
+
+    /**
+     * Compute the active storage key scoped to the authenticated user.
+     * Prevents cross-account data leakage on shared browsers.
+     */
+    getActiveStorageKey() {
+        const userId = this.currentUserId || (typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id);
+        if (userId) {
+            return `${BASE_STORAGE_KEY}_${userId}`;
+        }
+        return `${BASE_STORAGE_KEY}_guest`;
+    }
+
+    /**
+     * Handle user login / account switch.
+     * Migrates legacy un-scoped data if present, loads the user's isolated local data,
+     * and prepares for Supabase cloud sync.
+     */
+    onUserLogin(userId) {
+        if (!userId) return;
+
+        const previousUserId = this.currentUserId;
+        this.currentUserId = userId;
+
+        const userKey = `${BASE_STORAGE_KEY}_${userId}`;
+
+        // MIGRATION: If legacy single-user storage exists, only migrate if verified to belong to this user.
+        // Prevents a new or secondary user from hijacking a previous user's legacy local data.
+        const legacyData = localStorage.getItem(BASE_STORAGE_KEY);
+        if (legacyData && !localStorage.getItem(userKey)) {
+            let isVerifiedOwner = false;
+            try {
+                const projectRef = window.SUPABASE_CONFIG?.projectRef;
+                const authKey = projectRef ? `sb-${projectRef}-auth-token` : null;
+                const authData = authKey ? localStorage.getItem(authKey) : null;
+                if (authData) {
+                    const parsedAuth = JSON.parse(authData);
+                    if (parsedAuth?.user?.id === userId) {
+                        isVerifiedOwner = true;
+                    }
+                }
+            } catch (e) {
+                console.warn('[Storage] Error verifying legacy storage ownership:', e);
+            }
+
+            if (isVerifiedOwner) {
+                console.log('[Storage] Verified ownership. Migrating legacy local storage to user-scoped key for:', userId);
+                try {
+                    localStorage.setItem(userKey, legacyData);
+                    localStorage.removeItem(BASE_STORAGE_KEY);
+                } catch (e) {
+                    console.error('[Storage] Error migrating legacy storage:', e);
+                }
+            } else {
+                console.warn('[Storage] Legacy un-scoped data detected but ownership cannot be verified for user:', userId, '- Leaving legacy data intact without assigning to this account.');
+            }
+        }
+
+        // If the user changed or this is first init:
+        if (previousUserId !== userId) {
+            this.initialSyncDone = false;
+            this.state = this.loadData();
+            this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
+        }
+    }
+
+    /**
+     * Handle user logout.
+     * Clears in-memory financial data and resets state to default so no data
+     * bleeds into subsequent logins or unauthenticated views.
+     */
+    onUserLogout() {
+        this.currentUserId = null;
+        this.initialSyncDone = false;
+        this.isFirstLoad = true;
+        this.state = JSON.parse(JSON.stringify(defaultState));
     }
 
     loadData() {
         try {
-            const data = localStorage.getItem(STORAGE_KEY);
+            const key = this.getActiveStorageKey();
+            const data = localStorage.getItem(key);
             if (data) {
                 const parsed = JSON.parse(data);
                 return this.parseAndMergeData(parsed);
@@ -220,28 +296,30 @@ class StorageManager {
     }
 
     async syncFromSupabase() {
-        if (typeof supabaseClient === 'undefined' || !supabaseClient.session) {
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session || !supabaseClient.session.user) {
             // Not logged in — allow local saves to work normally
             this.initialSyncDone = true;
             return false;
         }
         
+        const userId = supabaseClient.session.user.id;
+        this.onUserLogin(userId);
+        
         try {
             const { data, error } = await supabaseClient.client
                 .from('app_state')
                 .select('state, updated_at')
-                .eq('user_id', supabaseClient.session.user.id)
+                .eq('user_id', userId)
                 .single();
                 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    // No row exists yet — this device has the only copy, push it up
-                    console.log('[Sync] No remote state found. Pushing local state to Supabase...');
-                    this.initialSyncDone = true; // allow push
+                    // No row exists yet for this user in cloud — push local state up
+                    console.log('[Sync] No remote state found for user. Pushing local state to Supabase...');
+                    this.initialSyncDone = true;
                     await this.pushToSupabase();
                 } else {
                     console.error('[Sync] Error fetching from Supabase:', error);
-                    // Allow future saves to push even if first sync failed
                     this.initialSyncDone = true;
                 }
                 return false;
@@ -253,13 +331,12 @@ class StorageManager {
                 const remoteIsValid = remote && remote.wallets && Array.isArray(remote.transactions);
                 
                 if (this.isFirstLoad && remoteIsValid) {
-                    // Fresh device — always use remote, no timestamp comparison
-                    console.log('[Sync] Fresh device detected. Using remote state.');
+                    console.log('[Sync] Fresh device/account detected. Using remote state.');
                     this.state = this.parseAndMergeData(remote);
                     this.isFirstLoad = false;
                     this.initialSyncDone = true;
                     this.checkRollover();
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+                    localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
                     return true;
                 }
 
@@ -293,9 +370,9 @@ class StorageManager {
                 if (shouldUseRemote) {
                     console.log(`[Sync] Remote state wins (${remoteTxCount} txs vs local ${localTxCount} txs). Loading...`);
                     this.state = this.parseAndMergeData(remote);
-                    this.initialSyncDone = true; // set before checkRollover so rollover saves can push
+                    this.initialSyncDone = true;
                     this.checkRollover();
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+                    localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
                     return true; // signal caller to re-render
                 } else {
                     console.log(`[Sync] Local state wins (${localTxCount} txs vs remote ${remoteTxCount} txs). Pushing up...`);
@@ -306,26 +383,39 @@ class StorageManager {
             }
         } catch (e) {
             console.error('[Sync] Supabase sync failed:', e);
-            this.initialSyncDone = true; // don't block future saves on error
+            this.initialSyncDone = true;
         }
         return false;
     }
 
     async pushToSupabase() {
-        if (typeof supabaseClient === 'undefined' || !supabaseClient.session) return;
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session || !supabaseClient.session.user) {
+            return;
+        }
         
+        const userId = supabaseClient.session.user.id;
+        if (!userId) return;
+
+        // Basic payload integrity validation
+        if (!this.state || !this.state.wallets || !Array.isArray(this.state.transactions)) {
+            console.error("[Storage] Refusing to push invalid state payload to Supabase");
+            return;
+        }
+
         try {
             const { error } = await supabaseClient.client
                 .from('app_state')
                 .upsert({
-                    user_id: supabaseClient.session.user.id,
+                    user_id: userId,
                     state: this.state,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
                 
-            if (error) console.error("Failed to push to Supabase", error);
+            if (error) {
+                console.error("[Sync] Failed to push to Supabase:", error);
+            }
         } catch (e) {
-            console.error("Push to supabase failed", e);
+            console.error("[Sync] Push to Supabase failed:", e);
         }
     }
 
@@ -350,7 +440,7 @@ class StorageManager {
             console.log('[Realtime] Incoming update is newer. Applying...');
             this.state = this.parseAndMergeData(remoteState);
             this.checkRollover();
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+            localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
             return true; // signals caller to re-render
         }
         return false;
@@ -361,10 +451,10 @@ class StorageManager {
             if (this.initialSyncDone || typeof supabaseClient === 'undefined' || !supabaseClient.session) {
                 this.state._updatedAt = new Date().toISOString();
             }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+            localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
             // Only push to Supabase after the initial sync has run.
             // This prevents a fresh device from overwriting real cloud data.
-            if (this.initialSyncDone) {
+            if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
                 this.pushToSupabase();
             }
         } catch (e) {

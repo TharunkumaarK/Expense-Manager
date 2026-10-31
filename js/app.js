@@ -560,6 +560,32 @@ class App {
         lucide.createIcons();
     }
 
+    clearViewsOnLogout() {
+        this.viewingMonthKey = null;
+        if (this.renderedHistoryCharts && typeof this.renderedHistoryCharts.clear === 'function') {
+            this.renderedHistoryCharts.clear();
+        }
+        this._hasInit = false;
+
+        const elIds = [
+            'jp-wallets-list', 'in-wallets-list',
+            'jp-categories-list', 'in-categories-list',
+            'recent-transactions-list', 'settings-wallets-list',
+            'settings-categories-list', 'settings-in-categories-list'
+        ];
+        elIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '';
+        });
+
+        const loanWidget = document.getElementById('loan-tracker-widget');
+        if (loanWidget) loanWidget.style.display = 'none';
+
+        if (typeof charts !== 'undefined' && typeof charts.destroyCharts === 'function') {
+            charts.destroyCharts();
+        }
+    }
+
     renderSettings() {
         if (this.currentView === 'settings-view') {
             document.getElementById('setting-jp-budget').value = storage.state.jpTotalBudget;
