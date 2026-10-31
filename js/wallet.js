@@ -1,8 +1,93 @@
 class WalletManager {
     
-    // Get all transactions
-    getTransactions() {
-        return storage.state.transactions;
+    // Return all transactions from continuous ledger
+    getAllTransactions() {
+        return (storage.state && Array.isArray(storage.state.transactions))
+            ? storage.state.transactions.slice()
+            : [];
+    }
+
+    // Query transactions with filtering and chronological sorting
+    getTransactions(filters = {}) {
+        let txs = this.getAllTransactions();
+
+        if (!filters || Object.keys(filters).length === 0) {
+            return txs;
+        }
+
+        if (filters.startDate) {
+            txs = txs.filter(tx => tx.date && tx.date >= filters.startDate);
+        }
+
+        if (filters.endDate) {
+            txs = txs.filter(tx => tx.date && tx.date <= filters.endDate);
+        }
+
+        if (filters.monthKey) {
+            txs = txs.filter(tx => tx.date && tx.date.startsWith(filters.monthKey));
+        }
+
+        if (filters.walletId) {
+            txs = txs.filter(tx => tx.walletId === filters.walletId || tx.sourceId === filters.walletId || tx.destId === filters.walletId);
+        }
+
+        if (filters.categoryId) {
+            txs = txs.filter(tx => tx.categoryId === filters.categoryId);
+        }
+
+        if (filters.type) {
+            txs = txs.filter(tx => tx.type === filters.type);
+        }
+
+        if (filters.region) {
+            txs = txs.filter(tx => {
+                if (tx.region) return tx.region === filters.region;
+                if (tx.walletId && storage.state?.wallets?.[tx.walletId]) {
+                    return storage.state.wallets[tx.walletId].region === filters.region;
+                }
+                return false;
+            });
+        }
+
+        const searchText = (filters.search || filters.text || filters.query || '').trim().toLowerCase();
+        if (searchText) {
+            txs = txs.filter(tx => {
+                if (tx.note && tx.note.toLowerCase().includes(searchText)) return true;
+                if (tx.categoryId && tx.categoryId.toLowerCase().includes(searchText)) return true;
+                if (tx.walletId && tx.walletId.toLowerCase().includes(searchText)) return true;
+                if (tx.sourceId && tx.sourceId.toLowerCase().includes(searchText)) return true;
+                if (tx.destId && tx.destId.toLowerCase().includes(searchText)) return true;
+                if (tx.amount && String(tx.amount).includes(searchText)) return true;
+                if (tx.sourceAmount && String(tx.sourceAmount).includes(searchText)) return true;
+                if (tx.destAmount && String(tx.destAmount).includes(searchText)) return true;
+                if (tx.categoryId && tx.region && storage.state?.categories?.[tx.region]) {
+                    const cat = storage.state.categories[tx.region].find(c => c.id === tx.categoryId);
+                    if (cat && cat.name && cat.name.toLowerCase().includes(searchText)) return true;
+                }
+                return false;
+            });
+        }
+
+        const sortOrder = filters.sort === 'asc' ? 'asc' : 'desc';
+        txs.sort((a, b) => {
+            const dateCmp = (b.date || '').localeCompare(a.date || '');
+            const idCmp = String(b.id || '').localeCompare(String(a.id || ''));
+            const res = dateCmp !== 0 ? dateCmp : idCmp;
+            return sortOrder === 'asc' ? -res : res;
+        });
+
+        return txs;
+    }
+
+    // Helper to keep storage.state.transactions sorted chronologically descending
+    _sortContinuousTransactions() {
+        if (storage.state && Array.isArray(storage.state.transactions)) {
+            storage.state.transactions.sort((a, b) => {
+                const dateCmp = (b.date || '').localeCompare(a.date || '');
+                if (dateCmp !== 0) return dateCmp;
+                return String(b.id || '').localeCompare(String(a.id || ''));
+            });
+        }
     }
 
     // Add a standard expense (debit)
@@ -25,6 +110,7 @@ class WalletManager {
         };
         
         storage.state.transactions.unshift(tx);
+        this._sortContinuousTransactions();
         storage.saveData();
         return true;
     }
@@ -48,6 +134,7 @@ class WalletManager {
         };
         
         storage.state.transactions.unshift(tx);
+        this._sortContinuousTransactions();
         storage.saveData();
         return true;
     }
@@ -74,6 +161,7 @@ class WalletManager {
         };
 
         storage.state.transactions.unshift(tx);
+        this._sortContinuousTransactions();
         storage.saveData();
         return true;
     }
@@ -103,38 +191,42 @@ class WalletManager {
         };
 
         storage.state.transactions.unshift(tx);
+        this._sortContinuousTransactions();
         storage.saveData();
         return true;
     }
     
-    // Find transaction in active month or history ledgers
+    // Find transaction anywhere in continuous ledger (with legacy fallback)
     findTransaction(txId) {
         if (!storage.state) return null;
 
         if (Array.isArray(storage.state.transactions)) {
             const index = storage.state.transactions.findIndex(t => t.id === txId);
             if (index !== -1) {
+                const tx = storage.state.transactions[index];
                 return {
-                    tx: storage.state.transactions[index],
-                    location: 'current',
+                    tx,
+                    location: 'continuous',
                     index,
-                    monthKey: storage.state.currentMonthKey
+                    monthKey: tx.date ? tx.date.substring(0, 7) : (storage.state.currentMonthKey || '')
                 };
             }
         }
 
+        // Legacy fallback for unmigrated states or testing
         if (Array.isArray(storage.state.history)) {
             for (let hIndex = 0; hIndex < storage.state.history.length; hIndex++) {
                 const ledger = storage.state.history[hIndex];
                 if (ledger && Array.isArray(ledger.transactions)) {
                     const index = ledger.transactions.findIndex(t => t.id === txId);
                     if (index !== -1) {
+                        const tx = ledger.transactions[index];
                         return {
-                            tx: ledger.transactions[index],
+                            tx,
                             location: 'history',
                             ledgerIndex: hIndex,
                             index,
-                            monthKey: ledger.monthKey
+                            monthKey: tx.date ? tx.date.substring(0, 7) : (ledger.monthKey || '')
                         };
                     }
                 }
@@ -255,47 +347,8 @@ class WalletManager {
         // 3. Apply new financial balance impacts
         this.applyTransactionEffects(tx);
 
-        // 4. Handle date / month routing if date changed
-        const newMonthKey = tx.date ? tx.date.substring(0, 7) : storage.state.currentMonthKey;
-        const currentMonthKey = storage.state.currentMonthKey;
-
-        if (found.location === 'current') {
-            if (newMonthKey !== currentMonthKey) {
-                // Moved from current active month into past archive
-                storage.state.transactions.splice(found.index, 1);
-                let ledger = storage.state.history.find(h => h.monthKey === newMonthKey);
-                if (!ledger) {
-                    ledger = {
-                        monthKey: newMonthKey,
-                        transactions: [],
-                        walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets))
-                    };
-                    storage.state.history.push(ledger);
-                    storage.state.history.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-                }
-                ledger.transactions.unshift(tx);
-            }
-        } else if (found.location === 'history') {
-            if (newMonthKey === currentMonthKey) {
-                // Moved from past archive into current active month
-                storage.state.history[found.ledgerIndex].transactions.splice(found.index, 1);
-                storage.state.transactions.unshift(tx);
-            } else if (newMonthKey !== found.monthKey) {
-                // Moved between two history archives
-                storage.state.history[found.ledgerIndex].transactions.splice(found.index, 1);
-                let ledger = storage.state.history.find(h => h.monthKey === newMonthKey);
-                if (!ledger) {
-                    ledger = {
-                        monthKey: newMonthKey,
-                        transactions: [],
-                        walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets))
-                    };
-                    storage.state.history.push(ledger);
-                    storage.state.history.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-                }
-                ledger.transactions.unshift(tx);
-            }
-        }
+        // 4. In Continuous Ledger: Keep chronological sort descending
+        this._sortContinuousTransactions();
 
         // 5. Persist once atomically
         storage.saveData();
@@ -309,34 +362,66 @@ class WalletManager {
 
         this.reverseTransactionEffects(found.tx);
 
-        if (found.location === 'current') {
-            storage.state.transactions.splice(found.index, 1);
-        } else if (found.location === 'history') {
-            storage.state.history[found.ledgerIndex].transactions.splice(found.index, 1);
+        // 1. Remove from canonical continuous transactions if present
+        let deleted = false;
+        if (Array.isArray(storage.state.transactions)) {
+            const cIndex = storage.state.transactions.findIndex(t => t.id === txId);
+            if (cIndex !== -1) {
+                storage.state.transactions.splice(cIndex, 1);
+                deleted = true;
+            }
+        }
+
+        // 2. If found in legacy history with raw own-property transactions array (unmigrated)
+        if (found.location === 'history' && found.ledgerIndex !== undefined) {
+            const ledger = storage.state.history[found.ledgerIndex];
+            if (ledger) {
+                const desc = Object.getOwnPropertyDescriptor(ledger, 'transactions');
+                if (desc && Array.isArray(desc.value)) {
+                    const hIndex = ledger.transactions.findIndex(t => t.id === txId);
+                    if (hIndex !== -1) {
+                        ledger.transactions.splice(hIndex, 1);
+                        deleted = true;
+                    }
+                }
+            }
         }
 
         storage.saveData();
         return true;
     }
 
-    // Compute total spent per category in a given region
-    getCategoryTotals(region) {
+    // Compute total spent per category in a given region for a specific month (defaults to active month)
+    getCategoryTotals(region, monthKey = storage.state?.currentMonthKey) {
         const totals = {};
-        storage.state.categories[region].forEach(c => totals[c.id] = 0);
+        if (storage.state?.categories?.[region]) {
+            storage.state.categories[region].forEach(c => totals[c.id] = 0);
+        }
         
-        storage.state.transactions.forEach(tx => {
-            if (tx.type === 'expense' && tx.region === region && totals[tx.categoryId] !== undefined) {
-                totals[tx.categoryId] += tx.amount;
+        const txs = this.getTransactions({
+            region,
+            type: 'expense',
+            monthKey: monthKey || undefined
+        });
+
+        txs.forEach(tx => {
+            if (totals[tx.categoryId] !== undefined) {
+                totals[tx.categoryId] += Number(tx.amount || 0);
             }
         });
         return totals;
     }
 
-    // Total spent in a region for a specific set of transactions (defaults to current)
-    getTotalSpent(region, transactions = storage.state.transactions) {
-        return transactions
+    // Total spent in a region for a specific set of transactions (defaults to active month expenses)
+    getTotalSpent(region, transactions = null) {
+        const txs = transactions || this.getTransactions({
+            region,
+            type: 'expense',
+            monthKey: storage.state?.currentMonthKey
+        });
+        return txs
             .filter(tx => tx.type === 'expense' && tx.region === region)
-            .reduce((sum, tx) => sum + tx.amount, 0);
+            .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
     }
 
     // Rollover is now pooled into jpTotalBudget as a cushion — not distributed per-category.

@@ -151,11 +151,15 @@ class App {
     }
 
     getActiveTransactions() {
+        const mKey = this.viewingMonthKey || (storage.state ? storage.state.currentMonthKey : null);
+        if (mKey && typeof walletManager !== 'undefined' && typeof walletManager.getTransactions === 'function') {
+            return walletManager.getTransactions({ monthKey: mKey });
+        }
         if (this.isViewingPast()) {
             const h = storage.state.history.find(x => x.monthKey === this.viewingMonthKey);
-            return h ? h.transactions : [];
+            return h ? (h.transactions || []) : [];
         }
-        return storage.state.transactions;
+        return storage.state.transactions || [];
     }
 
     changeMonth(delta) {
@@ -2088,11 +2092,14 @@ class App {
         );
 
         if (storage.state.currentMonthKey.localeCompare(fromMonth) >= 0 && storage.state.currentMonthKey.localeCompare(toMonth) <= 0) {
-            // Mock a ledger structure for current month
+            // Mock a ledger structure for current month scoped to currentMonthKey
+            const currentTxs = typeof walletManager !== 'undefined' && typeof walletManager.getTransactions === 'function'
+                ? walletManager.getTransactions({ monthKey: storage.state.currentMonthKey })
+                : (storage.state.transactions || []).filter(t => t.date && t.date.startsWith(storage.state.currentMonthKey));
             ledgersToPrint.push({
                 monthKey: storage.state.currentMonthKey,
                 label: storage.state.currentMonthKey + ' (Current)',
-                transactions: JSON.parse(JSON.stringify(storage.state.transactions)),
+                transactions: currentTxs,
                 walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets))
             });
         }

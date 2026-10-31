@@ -5,6 +5,7 @@ if (!window.SUPABASE_CONFIG?.storageKey) {
 const BASE_STORAGE_KEY = window.SUPABASE_CONFIG.storageKey;
 
 const defaultState = {
+    schemaVersion: 3,
     currentMonthKey: "",
     jpTotalBudget: 0,
     wallets: {
@@ -53,6 +54,7 @@ const defaultState = {
         emiDrawDate: 7
     },
     transactions: [],
+    closedMonths: {},
     history: []
 };
 
@@ -158,7 +160,7 @@ class StorageManager {
     parseAndMergeData(parsed) {
         try {
                 // Merge top-level fields but always trust saved wallets/categories
-                const mergedState = {
+                let mergedState = {
                     ...defaultState,
                     ...parsed,
                     // Wallets: use parsed.wallets if it exists and is populated, else fallback to defaults.
@@ -277,7 +279,9 @@ class StorageManager {
                         const existing = uniqueHistory.find(h => h.monthKey === snapshot.monthKey);
                         if (existing) {
                             // Merge transactions
-                            existing.transactions = existing.transactions.concat(snapshot.transactions);
+                            if (Array.isArray(snapshot.transactions)) {
+                                existing.transactions = (existing.transactions || []).concat(snapshot.transactions);
+                            }
                         } else {
                             uniqueHistory.push(snapshot);
                         }
@@ -288,11 +292,312 @@ class StorageManager {
                     mergedState.history = uniqueHistory;
                 }
                 
+                // MIGRATION: Migrate to Continuous Ledger (v3)
+                mergedState = this.migrateToContinuousLedger(mergedState);
+                if (mergedState.closedMonths) {
+                    mergedState.history = Object.values(mergedState.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+                }
+                this._attachHistoryGetters(mergedState);
+
                 return mergedState;
         } catch (e) {
             console.error("Failed to parse data", e);
         }
         return JSON.parse(JSON.stringify(defaultState));
+    }
+
+    /**
+     * Attach backward-compatible non-enumerable getters to history entries
+     * so legacy views reading h.transactions dynamically query the continuous ledger
+     * without duplicating transaction data in serialized JSON.
+     */
+    _attachHistoryGetters(state) {
+        if (!state || !Array.isArray(state.history)) return;
+        state.history.forEach(h => {
+            if (h && typeof h === 'object') {
+                const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
+                if (!desc || desc.configurable) {
+                    Object.defineProperty(h, 'transactions', {
+                        get() {
+                            if (!state.transactions) return [];
+                            return state.transactions.filter(t => t.date && t.date.startsWith(this.monthKey));
+                        },
+                        enumerable: false,
+                        configurable: true
+                    });
+                }
+            }
+        });
+    }
+
+    /**
+     * Migrate state to Continuous Transaction Ledger (Schema v3).
+     * Idempotent, safe, preserves historical metadata and does not mutate wallet balances.
+     */
+    migrateToContinuousLedger(state) {
+        if (!state) return state;
+
+        const hasHistoryTransactions = Array.isArray(state.history) &&
+            state.history.some(h => {
+                const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
+                return desc && Array.isArray(desc.value) && desc.value.length > 0;
+            });
+
+        // If already migrated to v3 and has no raw nested transactions in history, return idempotently
+        if (state.schemaVersion >= 3 && !hasHistoryTransactions && state.closedMonths) {
+            this._attachHistoryGetters(state);
+            return state;
+        }
+
+        console.log('[Migration] Migrating state to Continuous Transaction Ledger (v3)...');
+
+        // 1. Safety Backup: save untouched copy before modifying
+        try {
+            const backupKey = `${this.getActiveStorageKey()}_backup_pre_v3`;
+            if (typeof localStorage !== 'undefined' && !localStorage.getItem(backupKey)) {
+                localStorage.setItem(backupKey, JSON.stringify(state));
+                console.log('[Migration] Safety backup saved to:', backupKey);
+            }
+        } catch (e) {
+            console.warn('[Migration] Could not save safety backup:', e);
+        }
+
+        // 2. Snapshot pre-migration wallet balances for invariant validation
+        const preBalances = {};
+        if (state.wallets) {
+            Object.keys(state.wallets).forEach(wId => {
+                preBalances[wId] = state.wallets[wId].balance;
+            });
+        }
+
+        // 3. Collect transactions and detect conflicting duplicate IDs
+        const continuousTransactions = [];
+        const seenTxIds = new Map();
+        const closedMonths = state.closedMonths ? { ...state.closedMonths } : {};
+
+        // Canonical comparison of all semantically meaningful transaction properties
+        function areTransactionsConflicting(tx1, tx2) {
+            // Numerical comparisons
+            const numFields = ['amount', 'sourceAmount', 'destAmount'];
+            for (const f of numFields) {
+                const v1 = tx1[f];
+                const v2 = tx2[f];
+                if (v1 !== undefined || v2 !== undefined) {
+                    if (Number(v1) !== Number(v2)) {
+                        return `Conflicting numerical field "${f}": ${v1} !== ${v2}`;
+                    }
+                }
+            }
+
+            // Note & description
+            const note1 = (tx1.note ?? tx1.description ?? '').toString().trim();
+            const note2 = (tx2.note ?? tx2.description ?? '').toString().trim();
+            if (note1 !== note2) {
+                return `Conflicting note/description: "${note1}" !== "${note2}"`;
+            }
+
+            // Category
+            const cat1 = (tx1.categoryId ?? tx1.category ?? '').toString().trim();
+            const cat2 = (tx2.categoryId ?? tx2.category ?? '').toString().trim();
+            if (cat1 !== cat2) {
+                return `Conflicting category: "${cat1}" !== "${cat2}"`;
+            }
+
+            // Exchange rate
+            if (tx1.exchangeRate !== undefined || tx2.exchangeRate !== undefined) {
+                const r1 = tx1.exchangeRate != null ? Number(tx1.exchangeRate).toFixed(4) : '';
+                const r2 = tx2.exchangeRate != null ? Number(tx2.exchangeRate).toFixed(4) : '';
+                if (r1 !== r2) {
+                    return `Conflicting exchangeRate: "${tx1.exchangeRate}" !== "${tx2.exchangeRate}"`;
+                }
+            }
+
+            // Currencies
+            const curFields = ['currency', 'sourceCurrency', 'destCurrency'];
+            for (const f of curFields) {
+                const c1 = (tx1[f] ?? '').toString().trim();
+                const c2 = (tx2[f] ?? '').toString().trim();
+                if (c1 !== c2) {
+                    return `Conflicting currency field "${f}": "${c1}" !== "${c2}"`;
+                }
+            }
+
+            // Wallets & transfer endpoints
+            const walletFields = ['walletId', 'sourceId', 'destId'];
+            for (const f of walletFields) {
+                const w1 = (tx1[f] ?? '').toString().trim();
+                const w2 = (tx2[f] ?? '').toString().trim();
+                if (w1 !== w2) {
+                    return `Conflicting wallet/endpoint field "${f}": "${w1}" !== "${w2}"`;
+                }
+            }
+
+            // Type, region, and date
+            const strFields = ['type', 'date', 'region'];
+            for (const f of strFields) {
+                const s1 = (tx1[f] ?? '').toString().trim();
+                const s2 = (tx2[f] ?? '').toString().trim();
+                if (s1 !== s2) {
+                    return `Conflicting field "${f}": "${s1}" !== "${s2}"`;
+                }
+            }
+
+            // Compare all remaining fields (including arbitrary unknown metadata)
+            const allKeys = new Set([...Object.keys(tx1), ...Object.keys(tx2)]);
+            const handledKeys = new Set([
+                'id',
+                'amount', 'sourceAmount', 'destAmount',
+                'note', 'description',
+                'categoryId', 'category',
+                'exchangeRate',
+                'currency', 'sourceCurrency', 'destCurrency',
+                'walletId', 'sourceId', 'destId',
+                'type', 'date', 'region',
+                'updatedAt'
+            ]);
+
+            for (const key of allKeys) {
+                if (handledKeys.has(key)) continue;
+                const v1 = tx1[key];
+                const v2 = tx2[key];
+
+                if (typeof v1 === 'object' && v1 !== null && typeof v2 === 'object' && v2 !== null) {
+                    if (JSON.stringify(v1) !== JSON.stringify(v2)) {
+                        return `Conflicting object field "${key}": ${JSON.stringify(v1)} !== ${JSON.stringify(v2)}`;
+                    }
+                } else if (v1 !== v2) {
+                    return `Conflicting field "${key}": "${v1}" !== "${v2}"`;
+                }
+            }
+
+            return null; // Identical duplicate
+        }
+
+        const ingestTransaction = (tx, source) => {
+            if (!tx || !tx.id) return;
+
+            const existing = seenTxIds.get(tx.id);
+            if (existing) {
+                const conflictReason = areTransactionsConflicting(existing, tx);
+                if (conflictReason) {
+                    console.error('[Migration] CONFLICT DETECTED on transaction ID:', tx.id, {
+                        reason: conflictReason,
+                        existing,
+                        duplicate: tx,
+                        source
+                    });
+                    throw new Error(`Migration conflict detected on transaction ID "${tx.id}" (${conflictReason}). Halting to prevent data corruption.`);
+                }
+                // Identical duplicate — skip safely
+                return;
+            }
+
+            const cloned = { ...tx };
+            seenTxIds.set(cloned.id, cloned);
+            continuousTransactions.push(cloned);
+        };
+
+        // Ingest active transactions first
+        if (Array.isArray(state.transactions)) {
+            state.transactions.forEach(tx => ingestTransaction(tx, 'active'));
+        }
+
+        // Ingest historical transactions and preserve metadata
+        if (Array.isArray(state.history)) {
+            state.history.forEach(h => {
+                if (!h || !h.monthKey) return;
+
+                const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
+                const rawTxList = desc && Array.isArray(desc.value) ? desc.value : null;
+                if (rawTxList) {
+                    rawTxList.forEach(tx => ingestTransaction(tx, `history_${h.monthKey}`));
+                }
+
+                // Preserve ALL archive metadata properties, safely excluding only nested transactions
+                const { transactions, ...archiveMetadata } = h;
+
+                // Apply defaults ONLY when a field is genuinely absent (undefined)
+                if (!closedMonths[h.monthKey]) {
+                    closedMonths[h.monthKey] = {
+                        ...archiveMetadata,
+                        monthKey: h.monthKey,
+                        label: archiveMetadata.label !== undefined ? archiveMetadata.label : h.monthKey,
+                        closedAt: archiveMetadata.closedAt !== undefined ? archiveMetadata.closedAt : `${h.monthKey}-28T23:59:59.000Z`,
+                        walletsSnapshot: archiveMetadata.walletsSnapshot !== undefined 
+                            ? (archiveMetadata.walletsSnapshot ? JSON.parse(JSON.stringify(archiveMetadata.walletsSnapshot)) : null)
+                            : null,
+                        jpTotalBudget: archiveMetadata.jpTotalBudget !== undefined 
+                            ? archiveMetadata.jpTotalBudget 
+                            : (archiveMetadata.budget !== undefined ? archiveMetadata.budget : 0),
+                        jpRolloverAdded: archiveMetadata.jpRolloverAdded !== undefined ? archiveMetadata.jpRolloverAdded : 0,
+                        budgetLimits: archiveMetadata.budgetLimits !== undefined ? archiveMetadata.budgetLimits : null,
+                        status: archiveMetadata.status !== undefined ? archiveMetadata.status : 'closed'
+                    };
+                } else {
+                    // Merge any additional fields if closedMonths[h.monthKey] was already partially populated
+                    closedMonths[h.monthKey] = {
+                        ...archiveMetadata,
+                        ...closedMonths[h.monthKey]
+                    };
+                }
+            });
+        }
+
+        // 4. Chronological sort (newest first, secondary sort by ID)
+        continuousTransactions.sort((a, b) => {
+            const dateCmp = (b.date || '').localeCompare(a.date || '');
+            if (dateCmp !== 0) return dateCmp;
+            return String(b.id).localeCompare(String(a.id));
+        });
+
+        // 5. Validation
+        if (!Array.isArray(continuousTransactions)) {
+            throw new Error('Migration validation failed: continuousTransactions is not an array.');
+        }
+
+        if (state.wallets) {
+            Object.keys(preBalances).forEach(wId => {
+                if (state.wallets[wId].balance !== preBalances[wId]) {
+                    throw new Error(`Migration validation failed: Balance altered for wallet "${wId}". Expected ${preBalances[wId]}, got ${state.wallets[wId].balance}`);
+                }
+            });
+        }
+
+        // 6. Apply migration to state
+        state.transactions = continuousTransactions;
+        state.closedMonths = closedMonths;
+
+        // Reconstruct history array as closed months metadata list
+        state.history = Object.values(closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+        this._attachHistoryGetters(state);
+
+        // 7. Update version
+        state.schemaVersion = 3;
+        state._updatedAt = new Date().toISOString();
+
+        console.log(`[Migration] Successfully migrated: ${state.transactions.length} total transactions, ${Object.keys(closedMonths).length} closed months.`);
+        return state;
+    }
+
+    /**
+     * Compute actual unique transaction count without double-counting compatibility getters.
+     * Works identically across v3 (continuous ledger) and v2 (partitioned archives).
+     */
+    getUniqueTransactionCount(state) {
+        if (!state) return 0;
+        const activeCount = Array.isArray(state.transactions) ? state.transactions.length : 0;
+        let historyRawCount = 0;
+        if (Array.isArray(state.history)) {
+            state.history.forEach(h => {
+                if (!h) return;
+                const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
+                // Only count if it's an OWN property raw array (v2 legacy partitioned schema), NEVER a getter
+                if (desc && Array.isArray(desc.value)) {
+                    historyRawCount += desc.value.length;
+                }
+            });
+        }
+        return activeCount + historyRawCount;
     }
 
     async syncFromSupabase() {
@@ -330,13 +635,55 @@ class StorageManager {
                 const remote = data.state;
                 const remoteIsValid = remote && remote.wallets && Array.isArray(remote.transactions);
                 
+                const key = this.getActiveStorageKey();
+                const backupKey = `${key}_backup_pre_v3`;
+                const remoteNeedsMigration = remote && (!remote.schemaVersion || remote.schemaVersion < 3 || 
+                    (Array.isArray(remote.history) && remote.history.some(h => {
+                        const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
+                        return desc && Array.isArray(desc.value) && desc.value.length > 0;
+                    })));
+
                 if (this.isFirstLoad && remoteIsValid) {
                     console.log('[Sync] Fresh device/account detected. Using remote state.');
-                    this.state = this.parseAndMergeData(remote);
+                    if (remoteNeedsMigration && typeof localStorage !== 'undefined') {
+                        try {
+                            localStorage.setItem(backupKey, JSON.stringify(remote));
+                            console.log('[Sync] Fresh account authoritative remote backup saved to:', backupKey);
+                        } catch (e) {
+                            console.warn('[Sync] Could not save remote backup:', e);
+                        }
+                    }
+
+                    let migratedRemote;
+                    try {
+                        migratedRemote = this.parseAndMergeData(remote);
+                    } catch (e) {
+                        console.error('[Sync] Fresh load remote migration failed. Aborting:', e);
+                        this.initialSyncDone = true;
+                        return false;
+                    }
+
+                    const isValidMigrated = migratedRemote &&
+                        migratedRemote.wallets &&
+                        Array.isArray(migratedRemote.transactions) &&
+                        migratedRemote.closedMonths &&
+                        migratedRemote.schemaVersion >= 3;
+
+                    if (!isValidMigrated) {
+                        console.error('[Sync] Migrated remote state failed validation on fresh load.');
+                        this.initialSyncDone = true;
+                        return false;
+                    }
+
+                    this.state = migratedRemote;
                     this.isFirstLoad = false;
                     this.initialSyncDone = true;
                     this.checkRollover();
                     localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
+
+                    if (remoteNeedsMigration) {
+                        await this.pushToSupabase();
+                    }
                     return true;
                 }
 
@@ -350,11 +697,9 @@ class StorageManager {
                 const remoteUpdatedAt = data.updated_at ? new Date(data.updated_at) : null;
                 const localUpdatedAt = this.state._updatedAt ? new Date(this.state._updatedAt) : null;
 
-                // Count total transactions as richness tiebreaker
-                const remoteTxCount = (remote.transactions || []).length
-                    + (remote.history || []).reduce((s, h) => s + (h.transactions || []).length, 0);
-                const localTxCount = (this.state.transactions || []).length
-                    + (this.state.history || []).reduce((s, h) => s + (h.transactions || []).length, 0);
+                // Count unique transactions as richness tiebreaker without getter double-counting
+                const remoteTxCount = this.getUniqueTransactionCount(remote);
+                const localTxCount = this.getUniqueTransactionCount(this.state);
 
                 let shouldUseRemote;
                 if (remoteUpdatedAt && localUpdatedAt) {
@@ -363,16 +708,56 @@ class StorageManager {
                     // Remote has a timestamp, local doesn't — remote wins
                     shouldUseRemote = true;
                 } else {
-                    // No timestamps on either — more data = more complete
+                    // No timestamps on either — more unique data = more complete
                     shouldUseRemote = remoteTxCount >= localTxCount;
                 }
 
                 if (shouldUseRemote) {
                     console.log(`[Sync] Remote state wins (${remoteTxCount} txs vs local ${localTxCount} txs). Loading...`);
-                    this.state = this.parseAndMergeData(remote);
+                    
+                    // Preserve untouched authoritative pre-migration remote backup
+                    if (remoteNeedsMigration && typeof localStorage !== 'undefined') {
+                        try {
+                            localStorage.setItem(backupKey, JSON.stringify(remote));
+                            console.log('[Sync] Authoritative remote pre-migration backup saved to:', backupKey);
+                        } catch (e) {
+                            console.warn('[Sync] Could not save remote backup:', e);
+                        }
+                    }
+
+                    // Attempt migration of authoritative remote state
+                    let migratedRemote;
+                    try {
+                        migratedRemote = this.parseAndMergeData(remote);
+                    } catch (e) {
+                        console.error('[Sync] Migration of authoritative remote state failed. Halting sync:', e);
+                        this.initialSyncDone = true;
+                        return false;
+                    }
+
+                    // Validate migrated state before persisting
+                    const isValidMigrated = migratedRemote &&
+                        migratedRemote.wallets &&
+                        Array.isArray(migratedRemote.transactions) &&
+                        migratedRemote.closedMonths &&
+                        migratedRemote.schemaVersion >= 3;
+
+                    if (!isValidMigrated) {
+                        console.error('[Sync] Migrated remote state failed validation. Aborting sync.');
+                        this.initialSyncDone = true;
+                        return false;
+                    }
+
+                    this.state = migratedRemote;
                     this.initialSyncDone = true;
                     this.checkRollover();
                     localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
+
+                    // Push migrated v3 state to Supabase only after successful validation
+                    if (remoteNeedsMigration) {
+                        await this.pushToSupabase();
+                    }
+
                     return true; // signal caller to re-render
                 } else {
                     console.log(`[Sync] Local state wins (${localTxCount} txs vs remote ${remoteTxCount} txs). Pushing up...`);
@@ -489,48 +874,54 @@ class StorageManager {
         // Pool all positive JP category savings into the overall budget cushion.
         // Individual category budgets stay fixed; only jpTotalBudget grows.
         let totalRollover = 0;
-        this.state.categories.JP.forEach(cat => {
-            if (!cat.budget || cat.budget <= 0) return;
-            const spent = this.state.transactions
-                .filter(tx => tx.type === 'expense' && tx.region === 'JP' && tx.categoryId === cat.id)
-                .reduce((sum, tx) => sum + tx.amount, 0);
-            const saving = cat.budget - spent;
-            if (saving > 0) totalRollover += saving;
-        });
-
-        // Find existing ledger for this monthKey
-        let ledger = this.state.history.find(h => h.monthKey === monthKey);
-
-        if (ledger) {
-            // Append transactions
-            ledger.transactions = ledger.transactions.concat(this.state.transactions);
-            // Update snapshot to latest wallets
-            ledger.walletsSnapshot = JSON.parse(JSON.stringify(this.state.wallets));
-        } else {
-            // Snapshot the budget BEFORE rollover is applied (historical record)
-            ledger = {
-                monthKey: monthKey,
-                transactions: JSON.parse(JSON.stringify(this.state.transactions)),
-                walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets)),
-                jpTotalBudget: this.state.jpTotalBudget,
-                jpRolloverAdded: Math.round(totalRollover)
-            };
-            this.state.history.push(ledger);
-            this.state.history.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+        if (this.state.categories && Array.isArray(this.state.categories.JP)) {
+            this.state.categories.JP.forEach(cat => {
+                if (!cat.budget || cat.budget <= 0) return;
+                const spent = this.state.transactions
+                    .filter(tx => tx.type === 'expense' && tx.region === 'JP' && tx.categoryId === cat.id && (tx.date || '').startsWith(monthKey))
+                    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+                const saving = cat.budget - spent;
+                if (saving > 0) totalRollover += saving;
+            });
         }
+
+        if (!this.state.closedMonths) {
+            this.state.closedMonths = {};
+        }
+
+        // Record month snapshot in closedMonths
+        this.state.closedMonths[monthKey] = {
+            monthKey: monthKey,
+            label: monthKey,
+            closedAt: new Date().toISOString(),
+            walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets)),
+            jpTotalBudget: this.state.jpTotalBudget,
+            jpRolloverAdded: Math.round(totalRollover),
+            status: 'closed'
+        };
+
+        // Derive history view directly from closedMonths so they share identical object references
+        this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+        this._attachHistoryGetters(this.state);
 
         // Add savings to next month's overall budget as cushion
         if (totalRollover > 0) {
             this.state.jpTotalBudget += Math.round(totalRollover);
         }
 
-        // Clear current month transactions
-        this.state.transactions = [];
+        // GUARD: Continuous Ledger must NEVER clear this.state.transactions!
+        // All transactions remain in the continuous collection.
         this.saveData();
     }
 
     deleteLedger(monthKey) {
-        this.state.history = this.state.history.filter(h => h.monthKey !== monthKey);
+        if (this.state.closedMonths) {
+            delete this.state.closedMonths[monthKey];
+            this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+        } else if (Array.isArray(this.state.history)) {
+            this.state.history = this.state.history.filter(h => h.monthKey !== monthKey);
+        }
+        this._attachHistoryGetters(this.state);
         this.saveData();
     }
 
