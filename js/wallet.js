@@ -107,26 +107,214 @@ class WalletManager {
         return true;
     }
     
+    // Find transaction in active month or history ledgers
+    findTransaction(txId) {
+        if (!storage.state) return null;
+
+        if (Array.isArray(storage.state.transactions)) {
+            const index = storage.state.transactions.findIndex(t => t.id === txId);
+            if (index !== -1) {
+                return {
+                    tx: storage.state.transactions[index],
+                    location: 'current',
+                    index,
+                    monthKey: storage.state.currentMonthKey
+                };
+            }
+        }
+
+        if (Array.isArray(storage.state.history)) {
+            for (let hIndex = 0; hIndex < storage.state.history.length; hIndex++) {
+                const ledger = storage.state.history[hIndex];
+                if (ledger && Array.isArray(ledger.transactions)) {
+                    const index = ledger.transactions.findIndex(t => t.id === txId);
+                    if (index !== -1) {
+                        return {
+                            tx: ledger.transactions[index],
+                            location: 'history',
+                            ledgerIndex: hIndex,
+                            index,
+                            monthKey: ledger.monthKey
+                        };
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // Reverse financial balance impacts of a transaction
+    reverseTransactionEffects(tx) {
+        if (!tx || !storage.state.wallets) return;
+        if (tx.type === 'expense') {
+            if (storage.state.wallets[tx.walletId]) {
+                storage.state.wallets[tx.walletId].balance += Number(tx.amount);
+            }
+        } else if (tx.type === 'income') {
+            if (storage.state.wallets[tx.walletId]) {
+                storage.state.wallets[tx.walletId].balance -= Number(tx.amount);
+            }
+        } else if (tx.type === 'transfer') {
+            if (storage.state.wallets[tx.sourceId]) {
+                storage.state.wallets[tx.sourceId].balance += Number(tx.amount);
+            }
+            if (storage.state.wallets[tx.destId]) {
+                storage.state.wallets[tx.destId].balance -= Number(tx.amount);
+            }
+        } else if (tx.type === 'remittance') {
+            if (storage.state.wallets[tx.sourceId]) {
+                storage.state.wallets[tx.sourceId].balance += Number(tx.sourceAmount);
+            }
+            if (storage.state.wallets[tx.destId]) {
+                storage.state.wallets[tx.destId].balance -= Number(tx.destAmount);
+            }
+        }
+    }
+
+    // Apply financial balance impacts of a transaction
+    applyTransactionEffects(tx) {
+        if (!tx || !storage.state.wallets) return;
+        if (tx.type === 'expense') {
+            if (storage.state.wallets[tx.walletId]) {
+                storage.state.wallets[tx.walletId].balance -= Number(tx.amount);
+            }
+        } else if (tx.type === 'income') {
+            if (storage.state.wallets[tx.walletId]) {
+                storage.state.wallets[tx.walletId].balance += Number(tx.amount);
+            }
+        } else if (tx.type === 'transfer') {
+            if (storage.state.wallets[tx.sourceId]) {
+                storage.state.wallets[tx.sourceId].balance -= Number(tx.amount);
+            }
+            if (storage.state.wallets[tx.destId]) {
+                storage.state.wallets[tx.destId].balance += Number(tx.amount);
+            }
+        } else if (tx.type === 'remittance') {
+            if (storage.state.wallets[tx.sourceId]) {
+                storage.state.wallets[tx.sourceId].balance -= Number(tx.sourceAmount);
+            }
+            if (storage.state.wallets[tx.destId]) {
+                storage.state.wallets[tx.destId].balance += Number(tx.destAmount);
+            }
+        }
+    }
+
+    // In-place update preserving transaction ID and metadata
+    updateTransaction(txId, updatedData) {
+        const found = this.findTransaction(txId);
+        if (!found) return false;
+
+        const tx = found.tx;
+
+        // 1. Reverse old financial balance impacts
+        this.reverseTransactionEffects(tx);
+
+        // 2. Update transaction fields in place
+        if (updatedData.date) tx.date = updatedData.date;
+        if (typeof updatedData.note !== 'undefined') tx.note = updatedData.note;
+        tx.updatedAt = new Date().toISOString();
+
+        if (tx.type === 'expense') {
+            if (updatedData.walletId) tx.walletId = updatedData.walletId;
+            const wallet = storage.state.wallets[tx.walletId];
+            if (wallet) {
+                tx.currency = wallet.currency;
+                tx.region = wallet.region;
+            }
+            if (updatedData.categoryId) tx.categoryId = updatedData.categoryId;
+            if (typeof updatedData.amount !== 'undefined') tx.amount = Number(updatedData.amount);
+        } else if (tx.type === 'income') {
+            if (updatedData.walletId) tx.walletId = updatedData.walletId;
+            const wallet = storage.state.wallets[tx.walletId];
+            if (wallet) {
+                tx.currency = wallet.currency;
+                tx.region = wallet.region;
+            }
+            if (typeof updatedData.amount !== 'undefined') tx.amount = Number(updatedData.amount);
+        } else if (tx.type === 'transfer') {
+            if (updatedData.sourceId) tx.sourceId = updatedData.sourceId;
+            if (updatedData.destId) tx.destId = updatedData.destId;
+            if (typeof updatedData.amount !== 'undefined') tx.amount = Number(updatedData.amount);
+            const source = storage.state.wallets[tx.sourceId];
+            if (source) tx.currency = source.currency;
+        } else if (tx.type === 'remittance') {
+            if (updatedData.sourceId) tx.sourceId = updatedData.sourceId;
+            if (updatedData.destId) tx.destId = updatedData.destId;
+            if (typeof updatedData.sourceAmount !== 'undefined') tx.sourceAmount = Number(updatedData.sourceAmount);
+            if (typeof updatedData.destAmount !== 'undefined') tx.destAmount = Number(updatedData.destAmount);
+            const source = storage.state.wallets[tx.sourceId];
+            const dest = storage.state.wallets[tx.destId];
+            if (source) tx.sourceCurrency = source.currency;
+            if (dest) tx.destCurrency = dest.currency;
+            if (tx.sourceAmount > 0 && tx.destAmount > 0) {
+                tx.exchangeRate = (tx.destAmount / tx.sourceAmount).toFixed(4);
+            }
+        }
+
+        // 3. Apply new financial balance impacts
+        this.applyTransactionEffects(tx);
+
+        // 4. Handle date / month routing if date changed
+        const newMonthKey = tx.date ? tx.date.substring(0, 7) : storage.state.currentMonthKey;
+        const currentMonthKey = storage.state.currentMonthKey;
+
+        if (found.location === 'current') {
+            if (newMonthKey !== currentMonthKey) {
+                // Moved from current active month into past archive
+                storage.state.transactions.splice(found.index, 1);
+                let ledger = storage.state.history.find(h => h.monthKey === newMonthKey);
+                if (!ledger) {
+                    ledger = {
+                        monthKey: newMonthKey,
+                        transactions: [],
+                        walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets))
+                    };
+                    storage.state.history.push(ledger);
+                    storage.state.history.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+                }
+                ledger.transactions.unshift(tx);
+            }
+        } else if (found.location === 'history') {
+            if (newMonthKey === currentMonthKey) {
+                // Moved from past archive into current active month
+                storage.state.history[found.ledgerIndex].transactions.splice(found.index, 1);
+                storage.state.transactions.unshift(tx);
+            } else if (newMonthKey !== found.monthKey) {
+                // Moved between two history archives
+                storage.state.history[found.ledgerIndex].transactions.splice(found.index, 1);
+                let ledger = storage.state.history.find(h => h.monthKey === newMonthKey);
+                if (!ledger) {
+                    ledger = {
+                        monthKey: newMonthKey,
+                        transactions: [],
+                        walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets))
+                    };
+                    storage.state.history.push(ledger);
+                    storage.state.history.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+                }
+                ledger.transactions.unshift(tx);
+            }
+        }
+
+        // 5. Persist once atomically
+        storage.saveData();
+        return true;
+    }
+
     // Delete a transaction and reverse its effects
     deleteTransaction(txId) {
-        const txIndex = storage.state.transactions.findIndex(t => t.id === txId);
-        if (txIndex === -1) return false;
-        
-        const tx = storage.state.transactions[txIndex];
-        
-        if (tx.type === 'expense') {
-            storage.state.wallets[tx.walletId].balance += tx.amount;
-        } else if (tx.type === 'income') {
-            storage.state.wallets[tx.walletId].balance -= tx.amount;
-        } else if (tx.type === 'transfer') {
-            storage.state.wallets[tx.sourceId].balance += tx.amount;
-            storage.state.wallets[tx.destId].balance -= tx.amount;
-        } else if (tx.type === 'remittance') {
-            storage.state.wallets[tx.sourceId].balance += tx.sourceAmount;
-            storage.state.wallets[tx.destId].balance -= tx.destAmount;
+        const found = this.findTransaction(txId);
+        if (!found) return false;
+
+        this.reverseTransactionEffects(found.tx);
+
+        if (found.location === 'current') {
+            storage.state.transactions.splice(found.index, 1);
+        } else if (found.location === 'history') {
+            storage.state.history[found.ledgerIndex].transactions.splice(found.index, 1);
         }
-        
-        storage.state.transactions.splice(txIndex, 1);
+
         storage.saveData();
         return true;
     }

@@ -15,6 +15,7 @@ class App {
         this.inactivityTimeoutMs = 3 * 60 * 1000; // 3 minutes
         this.inactivityEventsRegistered = false;
         this.activityThrottleTimer = null;
+        this._isSubmitting = false;
     }
 
     init() {
@@ -228,6 +229,57 @@ class App {
         }
     }
 
+    getWalletOptionsHtml(selectedWalletId = null, regionFilter = null) {
+        if (!storage.state || !storage.state.wallets) {
+            return `
+                <optgroup label="Japan">
+                    <option value="Salary Account">Salary Account (¥)</option>
+                    <option value="Cash">Cash (¥)</option>
+                    <option value="PayPay">PayPay (¥)</option>
+                </optgroup>
+                <optgroup label="India">
+                    <option value="Axis Bank">Axis Bank (₹)</option>
+                    <option value="Bank of Baroda">Bank of Baroda (₹)</option>
+                    <option value="Credit Card">Credit Card (₹)</option>
+                </optgroup>
+            `;
+        }
+
+        let jpOpts = '';
+        let inOpts = '';
+
+        Object.values(storage.state.wallets).forEach(w => {
+            if (regionFilter && w.region !== regionFilter) return;
+            const sel = (w.id === selectedWalletId) ? ' selected' : '';
+            const opt = `<option value="${w.id}"${sel}>${w.id} (${w.currency})</option>`;
+            if (w.region === 'JP') jpOpts += opt;
+            else inOpts += opt;
+        });
+
+        if (regionFilter === 'JP') return jpOpts;
+        if (regionFilter === 'IN') return inOpts;
+
+        let html = '';
+        if (jpOpts) html += `<optgroup label="Japan">${jpOpts}</optgroup>`;
+        if (inOpts) html += `<optgroup label="India">${inOpts}</optgroup>`;
+        return html;
+    }
+
+    setupDatePickerHelper() {
+        const dateInput = document.getElementById('tx-date');
+        if (dateInput) {
+            dateInput.addEventListener('click', () => {
+                if (typeof dateInput.showPicker === 'function') {
+                    try {
+                        dateInput.showPicker();
+                    } catch (e) {
+                        // Browser security or unsupported fallback
+                    }
+                }
+            });
+        }
+    }
+
     openTransactionModal(type) {
         document.getElementById('main-fab').classList.remove('open');
         document.getElementById('fab-menu').classList.remove('active');
@@ -237,11 +289,15 @@ class App {
         const content = document.getElementById('modal-content');
 
         const currentDate = new Date().toISOString().split('T')[0];
-        let html = '';
+        let formInnerHtml = '';
+
+        const allWalletOpts = this.getWalletOptionsHtml();
+        const jpWalletOpts = this.getWalletOptionsHtml(null, 'JP');
+        const inWalletOpts = this.getWalletOptionsHtml(null, 'IN');
 
         if (type === 'expense') {
             title.innerText = 'Log Expense';
-            html = `
+            formInnerHtml = `
                 <div class="form-group">
                     <label>Date</label>
                     <input type="date" id="tx-date" value="${currentDate}">
@@ -249,16 +305,7 @@ class App {
                 <div class="form-group">
                     <label>Wallet</label>
                     <select id="tx-wallet" onchange="app.updateExpenseCategories()">
-                        <optgroup label="Japan">
-                            <option value="Salary Account">Salary Account (¥)</option>
-                            <option value="Cash">Cash (¥)</option>
-                            <option value="PayPay">PayPay (¥)</option>
-                        </optgroup>
-                        <optgroup label="India">
-                            <option value="Axis Bank">Axis Bank (₹)</option>
-                            <option value="Bank of Baroda">Bank of Baroda (₹)</option>
-                            <option value="Credit Card">Credit Card (₹)</option>
-                        </optgroup>
+                        ${allWalletOpts}
                     </select>
                 </div>
                 <div class="form-group">
@@ -277,11 +324,11 @@ class App {
                     <label>Note (Optional)</label>
                     <input type="text" id="tx-note" placeholder="What was this for?">
                 </div>
-                <button class="btn btn-primary" onclick="app.submitExpense()">Save Expense</button>
+                <button type="submit" class="btn btn-primary">Save Expense</button>
             `;
         } else if (type === 'transfer') {
             title.innerText = 'Transfer Between Wallets';
-            html = `
+            formInnerHtml = `
                 <div class="form-group">
                     <label>Date</label>
                     <input type="date" id="tx-date" value="${currentDate}">
@@ -289,23 +336,13 @@ class App {
                 <div class="form-group">
                     <label>From (Source)</label>
                     <select id="tx-source">
-                        <option value="Salary Account">Salary Account (¥)</option>
-                        <option value="Cash">Cash (¥)</option>
-                        <option value="PayPay">PayPay (¥)</option>
-                        <option value="Axis Bank">Axis Bank (₹)</option>
-                        <option value="Bank of Baroda">Bank of Baroda (₹)</option>
-                        <option value="Credit Card">Credit Card (₹)</option>
+                        ${allWalletOpts}
                     </select>
                 </div>
                 <div class="form-group">
                     <label>To (Destination)</label>
                     <select id="tx-dest">
-                        <option value="Cash">Cash (¥)</option>
-                        <option value="PayPay">PayPay (¥)</option>
-                        <option value="Salary Account">Salary Account (¥)</option>
-                        <option value="Axis Bank">Axis Bank (₹)</option>
-                        <option value="Bank of Baroda">Bank of Baroda (₹)</option>
-                        <option value="Credit Card">Credit Card (₹)</option>
+                        ${allWalletOpts}
                     </select>
                 </div>
                 <div class="form-group">
@@ -316,11 +353,11 @@ class App {
                     <label>Note (Optional)</label>
                     <input type="text" id="tx-note" placeholder="ATM withdraw, topup, etc.">
                 </div>
-                <button class="btn btn-blue" onclick="app.submitTransfer()">Complete Transfer</button>
+                <button type="submit" class="btn btn-blue">Complete Transfer</button>
             `;
         } else if (type === 'remittance') {
             title.innerText = 'Remittance (Send to India)';
-            html = `
+            formInnerHtml = `
                 <div class="form-group">
                     <label>Date</label>
                     <input type="date" id="tx-date" value="${currentDate}">
@@ -328,8 +365,7 @@ class App {
                 <div class="form-group">
                     <label>From (Source JPY)</label>
                     <select id="tx-source">
-                        <option value="Salary Account">Salary Account (¥)</option>
-                        <option value="Cash">Cash (¥)</option>
+                        ${jpWalletOpts}
                     </select>
                 </div>
                 <div class="form-group">
@@ -339,8 +375,7 @@ class App {
                 <div class="form-group">
                     <label>To (Destination INR)</label>
                     <select id="tx-dest">
-                        <option value="Axis Bank">Axis Bank (₹)</option>
-                        <option value="Bank of Baroda">Bank of Baroda (₹)</option>
+                        ${inWalletOpts}
                     </select>
                 </div>
                 <div class="form-group">
@@ -351,11 +386,11 @@ class App {
                     <label>Note</label>
                     <input type="text" id="tx-note" value="Monthly Remittance">
                 </div>
-                <button class="btn btn-purple" onclick="app.submitRemittance()">Log Remittance</button>
+                <button type="submit" class="btn btn-purple">Log Remittance</button>
             `;
         } else if (type === 'income') {
             title.innerText = 'Add Income / Credit';
-            html = `
+            formInnerHtml = `
                 <div class="form-group">
                     <label>Date</label>
                     <input type="date" id="tx-date" value="${currentDate}">
@@ -363,15 +398,7 @@ class App {
                 <div class="form-group">
                     <label>Credit To</label>
                     <select id="tx-wallet">
-                        <optgroup label="Japan">
-                            <option value="Salary Account">Salary Account (¥)</option>
-                            <option value="Cash">Cash (¥)</option>
-                            <option value="PayPay">PayPay (¥)</option>
-                        </optgroup>
-                        <optgroup label="India">
-                            <option value="Axis Bank">Axis Bank (₹)</option>
-                            <option value="Bank of Baroda">Bank of Baroda (₹)</option>
-                        </optgroup>
+                        ${allWalletOpts}
                     </select>
                 </div>
                 <div class="form-group">
@@ -382,133 +409,285 @@ class App {
                     <label>Note / Source</label>
                     <input type="text" id="tx-note" placeholder="Salary, refund, etc.">
                 </div>
-                <button class="btn btn-green" onclick="app.submitIncome()">Add Income</button>
+                <button type="submit" class="btn btn-green">Add Income</button>
             `;
         }
 
-        content.innerHTML = html;
+        content.innerHTML = `
+            <form id="tx-form" onsubmit="app.handleFormSubmit(event, null, '${type}')">
+                ${formInnerHtml}
+            </form>
+        `;
         modal.classList.add('active');
+
+        this.setupDatePickerHelper();
 
         if (type === 'expense') {
             this.updateExpenseCategories();
         }
-
     }
 
     editTransaction(id) {
-        const tx = storage.state.transactions.find(t => t.id === id);
-        if (!tx) return;
+        const found = walletManager.findTransaction(id);
+        if (!found) return;
+
+        const tx = found.tx;
 
         this.openTransactionModal(tx.type);
         document.getElementById('modal-title').innerText = 'Edit Transaction';
 
+        const form = document.getElementById('tx-form');
+        if (form) {
+            form.onsubmit = (e) => this.handleFormSubmit(e, id, tx.type);
+        }
+
         const content = document.getElementById('modal-content');
+        let delBtn = document.getElementById('tx-delete-btn');
+        if (!delBtn) {
+            delBtn = document.createElement('button');
+            delBtn.id = 'tx-delete-btn';
+            delBtn.type = 'button';
+            delBtn.className = 'btn btn-danger mt-2';
+            delBtn.innerText = 'Delete Transaction';
+            delBtn.onclick = () => this.deleteTx(id);
+            if (form) form.appendChild(delBtn);
+            else content.appendChild(delBtn);
+        } else {
+            delBtn.onclick = () => this.deleteTx(id);
+        }
 
-        // Add Delete button
-        const delBtn = document.createElement('button');
-        delBtn.className = 'btn btn-danger mt-2';
-        delBtn.innerText = 'Delete Transaction';
-        delBtn.onclick = () => this.deleteTx(id);
-        content.appendChild(delBtn);
+        // Pre-fill fields
+        const dateInput = document.getElementById('tx-date');
+        if (dateInput) dateInput.value = tx.date;
 
-        // Pre-fill and override submit
-        document.getElementById('tx-date').value = tx.date;
         if (tx.type === 'expense') {
-            document.getElementById('tx-wallet').value = tx.walletId;
+            const walletSelect = document.getElementById('tx-wallet');
+            if (walletSelect) walletSelect.value = tx.walletId;
             this.updateExpenseCategories();
 
-            if (tx.categoryId.startsWith('jp-utility-')) {
-                document.getElementById('tx-category').value = 'utility-group';
+            if (tx.categoryId && tx.categoryId.startsWith('jp-utility-')) {
+                const catSelect = document.getElementById('tx-category');
+                if (catSelect) catSelect.value = 'utility-group';
                 this.handleCategoryChange();
-                document.getElementById('tx-subcategory').value = tx.categoryId;
+                const subSelect = document.getElementById('tx-subcategory');
+                if (subSelect) subSelect.value = tx.categoryId;
             } else {
-                document.getElementById('tx-category').value = tx.categoryId;
+                const catSelect = document.getElementById('tx-category');
+                if (catSelect) catSelect.value = tx.categoryId;
                 this.handleCategoryChange();
             }
 
-            document.getElementById('tx-amount').value = tx.amount;
-            document.getElementById('tx-note').value = tx.note || '';
+            const amtInput = document.getElementById('tx-amount');
+            if (amtInput) amtInput.value = tx.amount;
+            const noteInput = document.getElementById('tx-note');
+            if (noteInput) noteInput.value = tx.note || '';
 
             const btn = content.querySelector('.btn-primary');
-            btn.innerText = 'Save Changes';
-            btn.onclick = () => this.submitEdit(id, 'expense');
+            if (btn) btn.innerText = 'Save Changes';
         } else if (tx.type === 'income') {
-            document.getElementById('tx-wallet').value = tx.walletId;
-            document.getElementById('tx-amount').value = tx.amount;
-            document.getElementById('tx-note').value = tx.note || '';
+            const walletSelect = document.getElementById('tx-wallet');
+            if (walletSelect) walletSelect.value = tx.walletId;
+            const amtInput = document.getElementById('tx-amount');
+            if (amtInput) amtInput.value = tx.amount;
+            const noteInput = document.getElementById('tx-note');
+            if (noteInput) noteInput.value = tx.note || '';
 
             const btn = content.querySelector('.btn-green');
-            btn.innerText = 'Save Changes';
-            btn.onclick = () => this.submitEdit(id, 'income');
+            if (btn) btn.innerText = 'Save Changes';
         } else if (tx.type === 'transfer') {
-            document.getElementById('tx-source').value = tx.sourceId;
-            document.getElementById('tx-dest').value = tx.destId;
-            document.getElementById('tx-amount').value = tx.amount;
-            document.getElementById('tx-note').value = tx.note || '';
+            const srcSelect = document.getElementById('tx-source');
+            if (srcSelect) srcSelect.value = tx.sourceId;
+            const destSelect = document.getElementById('tx-dest');
+            if (destSelect) destSelect.value = tx.destId;
+            const amtInput = document.getElementById('tx-amount');
+            if (amtInput) amtInput.value = tx.amount;
+            const noteInput = document.getElementById('tx-note');
+            if (noteInput) noteInput.value = tx.note || '';
 
             const btn = content.querySelector('.btn-blue');
-            btn.innerText = 'Save Changes';
-            btn.onclick = () => this.submitEdit(id, 'transfer');
+            if (btn) btn.innerText = 'Save Changes';
         } else if (tx.type === 'remittance') {
-            document.getElementById('tx-source').value = tx.sourceId;
-            document.getElementById('tx-dest').value = tx.destId;
-            document.getElementById('tx-amount-jpy').value = tx.sourceAmount;
-            document.getElementById('tx-amount-inr').value = tx.destAmount;
-            document.getElementById('tx-note').value = tx.note || '';
+            const srcSelect = document.getElementById('tx-source');
+            if (srcSelect) srcSelect.value = tx.sourceId;
+            const destSelect = document.getElementById('tx-dest');
+            if (destSelect) destSelect.value = tx.destId;
+            const jpyInput = document.getElementById('tx-amount-jpy');
+            if (jpyInput) jpyInput.value = tx.sourceAmount;
+            const inrInput = document.getElementById('tx-amount-inr');
+            if (inrInput) inrInput.value = tx.destAmount;
+            const noteInput = document.getElementById('tx-note');
+            if (noteInput) noteInput.value = tx.note || '';
 
             const btn = content.querySelector('.btn-purple');
-            btn.innerText = 'Save Changes';
-            btn.onclick = () => this.submitEdit(id, 'remittance');
+            if (btn) btn.innerText = 'Save Changes';
         }
-
     }
 
-    submitEdit(id, type) {
-        // Simple way to edit: delete old, create new with original date & id
-        const originalTx = storage.state.transactions.find(t => t.id === id);
-        if (!originalTx) return;
-
-        const oldDate = originalTx.date;
-        const oldId = originalTx.id;
-
-        walletManager.deleteTransaction(id);
-
-        if (type === 'expense') {
-            const wallet = document.getElementById('tx-wallet').value;
-            let cat = document.getElementById('tx-category').value;
-            if (cat === 'utility-group') {
-                cat = document.getElementById('tx-subcategory').value;
-            }
-            const amt = document.getElementById('tx-amount').value;
-            const note = document.getElementById('tx-note').value;
-            walletManager.addExpense(wallet, cat, amt, note, oldDate);
-        } else if (type === 'income') {
-            const wallet = document.getElementById('tx-wallet').value;
-            const amt = document.getElementById('tx-amount').value;
-            const note = document.getElementById('tx-note').value;
-            walletManager.addIncome(wallet, amt, note, oldDate);
-        } else if (type === 'transfer') {
-            const src = document.getElementById('tx-source').value;
-            const dest = document.getElementById('tx-dest').value;
-            const amt = document.getElementById('tx-amount').value;
-            const note = document.getElementById('tx-note').value;
-            walletManager.transfer(src, dest, amt, note, oldDate);
-        } else if (type === 'remittance') {
-            const src = document.getElementById('tx-source').value;
-            const dest = document.getElementById('tx-dest').value;
-            const amtJpy = document.getElementById('tx-amount-jpy').value;
-            const amtInr = document.getElementById('tx-amount-inr').value;
-            const note = document.getElementById('tx-note').value;
-            walletManager.remittance(src, dest, amtJpy, amtInr, note, oldDate);
+    handleFormSubmit(event, editId = null, type) {
+        if (event && typeof event.preventDefault === 'function') {
+            event.preventDefault();
         }
 
-        // Restore the original ID (since the above created a new one)
-        const newTx = storage.state.transactions[0];
-        newTx.id = oldId;
-        storage.saveData();
+        if (this._isSubmitting) return;
+
+        const dateEl = document.getElementById('tx-date');
+        const date = (dateEl && dateEl.value) ? dateEl.value : new Date().toISOString().split('T')[0];
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            alert('Please select a valid date.');
+            return;
+        }
+
+        let updatedData = { date };
+
+        if (type === 'expense') {
+            const walletEl = document.getElementById('tx-wallet');
+            const walletId = walletEl ? walletEl.value : '';
+            let cat = document.getElementById('tx-category')?.value;
+            if (cat === 'utility-group') {
+                cat = document.getElementById('tx-subcategory')?.value;
+            }
+            const amtStr = document.getElementById('tx-amount')?.value;
+            const amt = Number(amtStr);
+            const note = document.getElementById('tx-note')?.value || '';
+
+            if (!amtStr || isNaN(amt) || amt <= 0) {
+                alert('Please enter a valid amount greater than 0.');
+                return;
+            }
+            if (!walletId || !storage.state.wallets[walletId]) {
+                alert('Please select a valid wallet.');
+                return;
+            }
+            if (!cat) {
+                alert('Please select a category.');
+                return;
+            }
+
+            if (editId) {
+                updatedData = { ...updatedData, walletId, categoryId: cat, amount: amt, note };
+            } else {
+                this._isSubmitting = true;
+                try {
+                    walletManager.addExpense(walletId, cat, amt, note, date);
+                } finally {
+                    this._isSubmitting = false;
+                }
+            }
+        } else if (type === 'income') {
+            const walletEl = document.getElementById('tx-wallet');
+            const walletId = walletEl ? walletEl.value : '';
+            const amtStr = document.getElementById('tx-amount')?.value;
+            const amt = Number(amtStr);
+            const note = document.getElementById('tx-note')?.value || '';
+
+            if (!amtStr || isNaN(amt) || amt <= 0) {
+                alert('Please enter a valid amount greater than 0.');
+                return;
+            }
+            if (!walletId || !storage.state.wallets[walletId]) {
+                alert('Please select a valid wallet.');
+                return;
+            }
+
+            if (editId) {
+                updatedData = { ...updatedData, walletId, amount: amt, note };
+            } else {
+                this._isSubmitting = true;
+                try {
+                    walletManager.addIncome(walletId, amt, note, date);
+                } finally {
+                    this._isSubmitting = false;
+                }
+            }
+        } else if (type === 'transfer') {
+            const src = document.getElementById('tx-source')?.value;
+            const dest = document.getElementById('tx-dest')?.value;
+            const amtStr = document.getElementById('tx-amount')?.value;
+            const amt = Number(amtStr);
+            const note = document.getElementById('tx-note')?.value || '';
+
+            if (!amtStr || isNaN(amt) || amt <= 0) {
+                alert('Please enter a valid amount greater than 0.');
+                return;
+            }
+            if (!src || !dest || !storage.state.wallets[src] || !storage.state.wallets[dest]) {
+                alert('Please select valid source and destination wallets.');
+                return;
+            }
+            if (src === dest) {
+                alert('Source and destination must be different.');
+                return;
+            }
+            if (storage.state.wallets[src].currency !== storage.state.wallets[dest].currency) {
+                alert('Cross-currency transfers must use the Remittance tool.');
+                return;
+            }
+
+            if (editId) {
+                updatedData = { ...updatedData, sourceId: src, destId: dest, amount: amt, note };
+            } else {
+                this._isSubmitting = true;
+                try {
+                    walletManager.transfer(src, dest, amt, note, date);
+                } finally {
+                    this._isSubmitting = false;
+                }
+            }
+        } else if (type === 'remittance') {
+            const src = document.getElementById('tx-source')?.value;
+            const dest = document.getElementById('tx-dest')?.value;
+            const amtJpyStr = document.getElementById('tx-amount-jpy')?.value;
+            const amtInrStr = document.getElementById('tx-amount-inr')?.value;
+            const amtJpy = Number(amtJpyStr);
+            const amtInr = Number(amtInrStr);
+            const note = document.getElementById('tx-note')?.value || '';
+
+            if (!amtJpyStr || isNaN(amtJpy) || amtJpy <= 0 || !amtInrStr || isNaN(amtInr) || amtInr <= 0) {
+                alert('Please enter valid amounts for both JPY and INR.');
+                return;
+            }
+            if (!src || !dest || !storage.state.wallets[src] || !storage.state.wallets[dest]) {
+                alert('Please select valid source and destination wallets.');
+                return;
+            }
+
+            if (editId) {
+                updatedData = { ...updatedData, sourceId: src, destId: dest, sourceAmount: amtJpy, destAmount: amtInr, note };
+            } else {
+                this._isSubmitting = true;
+                try {
+                    walletManager.remittance(src, dest, amtJpy, amtInr, note, date);
+                } finally {
+                    this._isSubmitting = false;
+                }
+            }
+        }
+
+        if (editId) {
+            this._isSubmitting = true;
+            try {
+                const ok = walletManager.updateTransaction(editId, updatedData);
+                if (!ok) {
+                    alert('Could not update transaction.');
+                    return;
+                }
+            } finally {
+                this._isSubmitting = false;
+            }
+        }
 
         this.closeModal('transaction-modal');
         this.renderAll();
+        if (this.currentView === 'history-view') {
+            this.renderHistory();
+        } else if (this.currentView === 'analytics-view' && typeof charts !== 'undefined') {
+            charts.renderCharts();
+        }
+    }
+
+    submitEdit(id, type) {
+        this.handleFormSubmit(null, id, type);
     }
 
     deleteTx(id) {
@@ -516,6 +695,11 @@ class App {
             walletManager.deleteTransaction(id);
             this.closeModal('transaction-modal');
             this.renderAll();
+            if (this.currentView === 'history-view') {
+                this.renderHistory();
+            } else if (this.currentView === 'analytics-view' && typeof charts !== 'undefined') {
+                charts.renderCharts();
+            }
         }
     }
 
@@ -589,7 +773,8 @@ class App {
         const walletSelect = document.getElementById('tx-wallet');
         if (!walletSelect) return;
 
-        const region = storage.state.wallets[walletSelect.value].region;
+        const wallet = storage.state.wallets[walletSelect.value];
+        const region = wallet ? wallet.region : 'JP';
         const catSelect = document.getElementById('tx-category');
         const subSelect = document.getElementById('tx-subcategory');
 
@@ -614,67 +799,19 @@ class App {
     }
 
     submitExpense() {
-        const wallet = document.getElementById('tx-wallet').value;
-        let cat = document.getElementById('tx-category').value;
-        if (cat === 'utility-group') {
-            cat = document.getElementById('tx-subcategory').value;
-        }
-        const amt = document.getElementById('tx-amount').value;
-        const note = document.getElementById('tx-note').value;
-        const date = document.getElementById('tx-date').value || new Date().toISOString().split('T')[0];
-
-        if (!amt || Number(amt) <= 0) return alert('Enter valid amount');
-
-        walletManager.addExpense(wallet, cat, amt, note, date);
-        this.closeModal('transaction-modal');
-        this.renderAll();
+        this.handleFormSubmit(null, null, 'expense');
     }
 
     submitTransfer() {
-        const src = document.getElementById('tx-source').value;
-        const dest = document.getElementById('tx-dest').value;
-        const amt = document.getElementById('tx-amount').value;
-        const note = document.getElementById('tx-note').value;
-        const date = document.getElementById('tx-date').value || new Date().toISOString().split('T')[0];
-
-        if (!amt || Number(amt) <= 0) return alert('Enter valid amount');
-        if (src === dest) return alert('Source and destination must be different');
-
-        if (storage.state.wallets[src].currency !== storage.state.wallets[dest].currency) {
-            return alert('Cross-currency transfers must use the Remittance tool');
-        }
-
-        walletManager.transfer(src, dest, amt, note, date);
-        this.closeModal('transaction-modal');
-        this.renderAll();
+        this.handleFormSubmit(null, null, 'transfer');
     }
 
     submitRemittance() {
-        const src = document.getElementById('tx-source').value;
-        const dest = document.getElementById('tx-dest').value;
-        const amtJpy = document.getElementById('tx-amount-jpy').value;
-        const amtInr = document.getElementById('tx-amount-inr').value;
-        const note = document.getElementById('tx-note').value;
-        const date = document.getElementById('tx-date').value || new Date().toISOString().split('T')[0];
-
-        if (!amtJpy || !amtInr || Number(amtJpy) <= 0 || Number(amtInr) <= 0) return alert('Enter valid amounts');
-
-        walletManager.remittance(src, dest, amtJpy, amtInr, note, date);
-        this.closeModal('transaction-modal');
-        this.renderAll();
+        this.handleFormSubmit(null, null, 'remittance');
     }
 
     submitIncome() {
-        const wallet = document.getElementById('tx-wallet').value;
-        const amt = document.getElementById('tx-amount').value;
-        const note = document.getElementById('tx-note').value;
-        const date = document.getElementById('tx-date').value || new Date().toISOString().split('T')[0];
-
-        if (!amt || Number(amt) <= 0) return alert('Enter valid amount');
-
-        walletManager.addIncome(wallet, amt, note, date);
-        this.closeModal('transaction-modal');
-        this.renderAll();
+        this.handleFormSubmit(null, null, 'income');
     }
 
     renderAll() {
