@@ -265,11 +265,10 @@
                     </div>
 
                     <div class="header-right">
-                        <!-- Monetary Concealment Toggle -->
+                        <!-- Monetary Concealment Toggle (Icon-Only Control) -->
                         <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
-                            aria-label="Reveal monetary values" title="Toggle monetary concealment">
+                            aria-label="Toggle monetary concealment" title="Toggle monetary concealment">
                             <i data-lucide="eye-off"></i>
-                            <span class="privacy-btn-label">Conceal</span>
                         </button>
 
                         <!-- Quick Add Button -->
@@ -412,6 +411,10 @@
                                     <i data-lucide="chevron-down" id="jp-chevron"></i>
                                 </div>
                                 <div class="collapsible-wrapper" id="jp-categories-wrap">
+                                    <!-- Central Japan Budget Bar Section (4.1 Repositioned & Balanced) -->
+                                    <div class="card budget-central-card" id="budget-overview-card" style="margin: 8px 16px 16px 16px; width: calc(100% - 32px);">
+                                        <!-- Populated dynamically by app.renderBudgetOverviewCard -->
+                                    </div>
                                     <div class="category-grid" id="jp-categories-grid">
                                         <!-- Populated by JS -->
                                     </div>
@@ -453,11 +456,6 @@
 
                             <!-- Right-hand Contextual Rail -->
                             <aside class="workspace-rail" id="dashboard-rail">
-                                <!-- Budget Overview Card -->
-                                <div class="rail-card budget-rail-card" id="budget-overview-card">
-                                    <!-- Populated by JS -->
-                                </div>
-
                                 <!-- Loan Tracker Widget -->
                                 <div class="rail-card loan-card" id="loan-tracker-widget" style="display: none;">
                                     <!-- Populated by JS -->
@@ -479,10 +477,12 @@
                         <header class="top-bar">
                             <div class="view-header-content">
                                 <h2>Transactions</h2>
-                                <p class="view-header-sub">Continuous financial ledger across all accounts & currencies</p>
+                                <p class="view-header-sub">Continuous financial ledger across all accounts & currencies
+                                </p>
                             </div>
                             <div class="view-header-actions">
-                                <button class="btn btn-secondary btn-sm" id="ledger-export-btn" onclick="app.exportTransactionsCsv()" title="Export filtered ledger as CSV">
+                                <button class="btn btn-secondary btn-sm" id="ledger-export-btn"
+                                    onclick="app.exportTransactionsCsv()" title="Export filtered ledger as CSV">
                                     <i data-lucide="download"></i>
                                     <span class="btn-text">Export</span>
                                 </button>
@@ -500,8 +500,13 @@
                                     <!-- Search Input with Debounce -->
                                     <div class="ledger-search-box">
                                         <i data-lucide="search" class="search-icon"></i>
-                                        <input type="text" id="ledger-search-input" placeholder="Search description, note, amount, category, wallet, date..." autocomplete="off" spellcheck="false" oninput="app.onLedgerSearchInput(event)" />
-                                        <button class="search-clear-btn" id="ledger-search-clear" onclick="app.clearLedgerSearch()" style="display: none;" title="Clear search">
+                                        <input type="text" id="ledger-search-input"
+                                            placeholder="Search description, note, amount, category, wallet, date..."
+                                            autocomplete="off" spellcheck="false"
+                                            oninput="app.onLedgerSearchInput(event)" />
+                                        <button class="search-clear-btn" id="ledger-search-clear"
+                                            onclick="app.clearLedgerSearch()" style="display: none;"
+                                            title="Clear search">
                                             <i data-lucide="x"></i>
                                         </button>
                                     </div>
@@ -509,17 +514,23 @@
                                     <!-- Quick Country Filter & Trigger Actions -->
                                     <div class="ledger-quick-actions">
                                         <!-- Country Segment -->
-                                        <div class="segmented-control ledger-country-segment" id="ledger-country-filter">
-                                            <button class="segment-btn active" data-region="all" onclick="app.setLedgerRegion('all')">All</button>
-                                            <button class="segment-btn" data-region="JP" onclick="app.setLedgerRegion('JP')">🇯🇵 JP</button>
-                                            <button class="segment-btn" data-region="IN" onclick="app.setLedgerRegion('IN')">🇮🇳 IN</button>
+                                        <div class="segmented-control ledger-country-segment"
+                                            id="ledger-country-filter">
+                                            <button class="segment-btn active" data-region="all"
+                                                onclick="app.setLedgerRegion('all')">All</button>
+                                            <button class="segment-btn" data-region="JP"
+                                                onclick="app.setLedgerRegion('JP')">🇯🇵 JP</button>
+                                            <button class="segment-btn" data-region="IN"
+                                                onclick="app.setLedgerRegion('IN')">🇮🇳 IN</button>
                                         </div>
 
                                         <!-- Filter Popover Trigger -->
-                                        <button class="btn btn-secondary filter-trigger-btn" id="ledger-filter-btn" onclick="app.toggleLedgerFilterPanel()" title="Open filter controls">
+                                        <button class="btn btn-secondary filter-trigger-btn" id="ledger-filter-btn"
+                                            onclick="app.toggleLedgerFilterPanel()" title="Open filter controls">
                                             <i data-lucide="sliders-horizontal"></i>
                                             <span>Filters</span>
-                                            <span class="filter-count-badge" id="ledger-active-filter-badge" style="display: none;">0</span>
+                                            <span class="filter-count-badge" id="ledger-active-filter-badge"
+                                                style="display: none;">0</span>
                                         </button>
 
                                         <!-- New Transaction Quick Trigger -->
@@ -534,10 +545,12 @@
                                 <div class="ledger-filter-dropdown" id="ledger-filter-panel" style="display: none;">
                                     <div class="filter-dropdown-header">
                                         <div class="filter-dropdown-title-row">
-                                            <i data-lucide="filter" style="width: 15px; height: 15px; color: var(--accent);"></i>
+                                            <i data-lucide="filter"
+                                                style="width: 15px; height: 15px; color: var(--accent);"></i>
                                             <span class="filter-dropdown-title">Filter Continuous Ledger</span>
                                         </div>
-                                        <button class="icon-btn filter-close-btn" onclick="app.toggleLedgerFilterPanel()" title="Close filters">
+                                        <button class="icon-btn filter-close-btn"
+                                            onclick="app.toggleLedgerFilterPanel()" title="Close filters">
                                             <i data-lucide="x"></i>
                                         </button>
                                     </div>
@@ -546,7 +559,8 @@
                                         <!-- Transaction Type -->
                                         <div class="filter-group">
                                             <label class="filter-label">Transaction Type</label>
-                                            <select id="filter-type-select" class="filter-select" onchange="app.onLedgerFilterChange()">
+                                            <select id="filter-type-select" class="filter-select"
+                                                onchange="app.onLedgerFilterChange()">
                                                 <option value="all">All Types</option>
                                                 <option value="expense">Expenses Only</option>
                                                 <option value="income">Income Only</option>
@@ -558,7 +572,8 @@
                                         <!-- Date Range Preset -->
                                         <div class="filter-group">
                                             <label class="filter-label">Date Range</label>
-                                            <select id="filter-date-preset" class="filter-select" onchange="app.onLedgerDatePresetChange()">
+                                            <select id="filter-date-preset" class="filter-select"
+                                                onchange="app.onLedgerDatePresetChange()">
                                                 <option value="all">All Time</option>
                                                 <option value="today">Today</option>
                                                 <option value="week">This Week</option>
@@ -571,7 +586,8 @@
                                         <!-- Category -->
                                         <div class="filter-group">
                                             <label class="filter-label">Category</label>
-                                            <select id="filter-category-select" class="filter-select" onchange="app.onLedgerFilterChange()">
+                                            <select id="filter-category-select" class="filter-select"
+                                                onchange="app.onLedgerFilterChange()">
                                                 <option value="all">All Categories</option>
                                             </select>
                                         </div>
@@ -579,18 +595,22 @@
                                         <!-- Wallet -->
                                         <div class="filter-group">
                                             <label class="filter-label">Wallet / Account</label>
-                                            <select id="filter-wallet-select" class="filter-select" onchange="app.onLedgerFilterChange()">
+                                            <select id="filter-wallet-select" class="filter-select"
+                                                onchange="app.onLedgerFilterChange()">
                                                 <option value="all">All Wallets</option>
                                             </select>
                                         </div>
 
                                         <!-- Custom Dates (hidden by default) -->
-                                        <div class="filter-group custom-date-group" id="filter-custom-date-wrap" style="display: none; grid-column: 1 / -1;">
+                                        <div class="filter-group custom-date-group" id="filter-custom-date-wrap"
+                                            style="display: none; grid-column: 1 / -1;">
                                             <label class="filter-label">Custom Date Interval</label>
                                             <div class="filter-date-inputs">
-                                                <input type="date" id="filter-date-start" class="filter-date-input" onchange="app.onLedgerFilterChange()" />
+                                                <input type="date" id="filter-date-start" class="filter-date-input"
+                                                    onchange="app.onLedgerFilterChange()" />
                                                 <span class="filter-date-sep">to</span>
-                                                <input type="date" id="filter-date-end" class="filter-date-input" onchange="app.onLedgerFilterChange()" />
+                                                <input type="date" id="filter-date-end" class="filter-date-input"
+                                                    onchange="app.onLedgerFilterChange()" />
                                             </div>
                                         </div>
 
@@ -598,16 +618,22 @@
                                         <div class="filter-group" style="grid-column: 1 / -1;">
                                             <label class="filter-label">Amount Range</label>
                                             <div class="filter-amount-inputs">
-                                                <input type="number" id="filter-amount-min" class="filter-amount-input" placeholder="Min Amount" min="0" oninput="app.onLedgerFilterChange()" />
+                                                <input type="number" id="filter-amount-min" class="filter-amount-input"
+                                                    placeholder="Min Amount" min="0"
+                                                    oninput="app.onLedgerFilterChange()" />
                                                 <span class="filter-date-sep">–</span>
-                                                <input type="number" id="filter-amount-max" class="filter-amount-input" placeholder="Max Amount" min="0" oninput="app.onLedgerFilterChange()" />
+                                                <input type="number" id="filter-amount-max" class="filter-amount-input"
+                                                    placeholder="Max Amount" min="0"
+                                                    oninput="app.onLedgerFilterChange()" />
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="filter-dropdown-actions">
-                                        <button class="btn btn-ghost btn-sm" onclick="app.resetAllLedgerFilters()">Reset All</button>
-                                        <button class="btn btn-primary btn-sm" onclick="app.toggleLedgerFilterPanel()">Apply & Done</button>
+                                        <button class="btn btn-ghost btn-sm" onclick="app.resetAllLedgerFilters()">Reset
+                                            All</button>
+                                        <button class="btn btn-primary btn-sm"
+                                            onclick="app.toggleLedgerFilterPanel()">Apply & Done</button>
                                     </div>
                                 </div>
 
@@ -617,7 +643,8 @@
                                         <!-- Active filter chips rendered dynamically -->
                                     </div>
                                     <div class="ledger-count-info" id="ledger-count-info">
-                                        Showing <strong id="ledger-showing-count">0</strong> of <strong id="ledger-total-count">0</strong> transactions
+                                        Showing <strong id="ledger-showing-count">0</strong> of <strong
+                                            id="ledger-total-count">0</strong> transactions
                                     </div>
                                 </div>
                             </div>
@@ -629,9 +656,11 @@
 
                             <!-- Incremental Load More Action -->
                             <div class="ledger-pagination-wrap" id="ledger-pagination-wrap" style="display: none;">
-                                <button class="btn btn-secondary ledger-load-more-btn" id="ledger-load-more-btn" onclick="app.loadMoreLedger()">
+                                <button class="btn btn-secondary ledger-load-more-btn" id="ledger-load-more-btn"
+                                    onclick="app.loadMoreLedger()">
                                     <i data-lucide="chevron-down"></i>
-                                    <span>Load More Transactions (<span id="ledger-remaining-count">0</span> remaining)</span>
+                                    <span>Load More Transactions (<span id="ledger-remaining-count">0</span>
+                                        remaining)</span>
                                 </button>
                             </div>
                         </div>
@@ -658,14 +687,16 @@
                             <div class="card analytics-toolbar-card">
                                 <!-- Country Selector (JP vs IN) -->
                                 <div class="analytics-country-selector">
-                                    <button class="analytics-country-tab active" id="analytics-tab-jp" onclick="app.setAnalyticsCountry('JP')">
+                                    <button class="analytics-country-tab active" id="analytics-tab-jp"
+                                        onclick="app.setAnalyticsCountry('JP')">
                                         <span class="tab-flag">🇯🇵</span>
                                         <div class="tab-text">
                                             <span class="tab-name">Japan</span>
                                             <span class="tab-currency">JPY (¥)</span>
                                         </div>
                                     </button>
-                                    <button class="analytics-country-tab" id="analytics-tab-in" onclick="app.setAnalyticsCountry('IN')">
+                                    <button class="analytics-country-tab" id="analytics-tab-in"
+                                        onclick="app.setAnalyticsCountry('IN')">
                                         <span class="tab-flag">🇮🇳</span>
                                         <div class="tab-text">
                                             <span class="tab-name">India</span>
@@ -678,10 +709,14 @@
                                 <div class="analytics-period-selector">
                                     <span class="period-label">Period:</span>
                                     <div class="segmented-control" id="analytics-period-control">
-                                        <button class="segment-btn active" data-period="this-month" onclick="app.setAnalyticsPeriod('this-month')">This Month</button>
-                                        <button class="segment-btn" data-period="last-month" onclick="app.setAnalyticsPeriod('last-month')">Last Month</button>
-                                        <button class="segment-btn" data-period="last-3-months" onclick="app.setAnalyticsPeriod('last-3-months')">Last 3 Months</button>
-                                        <button class="segment-btn" data-period="all-time" onclick="app.setAnalyticsPeriod('all-time')">All Time</button>
+                                        <button class="segment-btn active" data-period="this-month"
+                                            onclick="app.setAnalyticsPeriod('this-month')">This Month</button>
+                                        <button class="segment-btn" data-period="last-month"
+                                            onclick="app.setAnalyticsPeriod('last-month')">Last Month</button>
+                                        <button class="segment-btn" data-period="last-3-months"
+                                            onclick="app.setAnalyticsPeriod('last-3-months')">Last 3 Months</button>
+                                        <button class="segment-btn" data-period="all-time"
+                                            onclick="app.setAnalyticsPeriod('all-time')">All Time</button>
                                     </div>
                                 </div>
                             </div>
@@ -693,10 +728,12 @@
                                     <div class="card analytics-kpi-card">
                                         <div class="kpi-header">
                                             <span class="kpi-title">Total Income</span>
-                                            <div class="kpi-icon-wrap income"><i data-lucide="arrow-down-left"></i></div>
+                                            <div class="kpi-icon-wrap income"><i data-lucide="arrow-down-left"></i>
+                                            </div>
                                         </div>
                                         <div class="kpi-value-row">
-                                            <span class="kpi-value text-emerald privacy-blur" id="jp-kpi-income">¥0</span>
+                                            <span class="kpi-value text-emerald privacy-blur"
+                                                id="jp-kpi-income">¥0</span>
                                         </div>
                                         <div class="kpi-meta" id="jp-kpi-income-delta">
                                             <span class="delta-neutral">No prior data</span>
@@ -706,10 +743,12 @@
                                     <div class="card analytics-kpi-card">
                                         <div class="kpi-header">
                                             <span class="kpi-title">Total Expenses</span>
-                                            <div class="kpi-icon-wrap expense"><i data-lucide="arrow-up-right"></i></div>
+                                            <div class="kpi-icon-wrap expense"><i data-lucide="arrow-up-right"></i>
+                                            </div>
                                         </div>
                                         <div class="kpi-value-row">
-                                            <span class="kpi-value text-rose privacy-blur" id="jp-kpi-expenses">¥0</span>
+                                            <span class="kpi-value text-rose privacy-blur"
+                                                id="jp-kpi-expenses">¥0</span>
                                         </div>
                                         <div class="kpi-meta" id="jp-kpi-expenses-delta">
                                             <span class="delta-neutral">No prior data</span>
@@ -751,7 +790,9 @@
                                             <span class="exclusions-title">Lifestyle Spending Exclusions</span>
                                             <span class="badge badge-subtle">Analytical Only</span>
                                         </div>
-                                        <p class="exclusions-desc">Exclude non-discretionary or one-off categories (e.g. Remittance, Groceries) from lifestyle spend analysis. <em>Never affects ledger records or wallet balances.</em></p>
+                                        <p class="exclusions-desc">Exclude non-discretionary or one-off categories (e.g.
+                                            Remittance, Groceries) from lifestyle spend analysis. <em>Never affects
+                                                ledger records or wallet balances.</em></p>
                                         <div class="exclusions-chips-list" id="jp-exclusions-chips">
                                             <!-- Exclusion pill checkboxes injected here -->
                                         </div>
@@ -759,15 +800,18 @@
                                     <div class="exclusions-summary-box">
                                         <div class="stat-mini">
                                             <span class="stat-mini-label">Total Expenses:</span>
-                                            <span class="stat-mini-val privacy-blur" id="jp-stat-total-expenses">¥0</span>
+                                            <span class="stat-mini-val privacy-blur"
+                                                id="jp-stat-total-expenses">¥0</span>
                                         </div>
                                         <div class="stat-mini highlight">
                                             <span class="stat-mini-label">Analytical Spend:</span>
-                                            <span class="stat-mini-val text-primary privacy-blur" id="jp-stat-analytical-expenses">¥0</span>
+                                            <span class="stat-mini-val text-primary privacy-blur"
+                                                id="jp-stat-analytical-expenses">¥0</span>
                                         </div>
                                         <div class="stat-mini" id="jp-stat-excluded-diff-wrap" style="display: none;">
                                             <span class="stat-mini-label">Excluded:</span>
-                                            <span class="stat-mini-val text-muted privacy-blur" id="jp-stat-excluded-diff">-¥0</span>
+                                            <span class="stat-mini-val text-muted privacy-blur"
+                                                id="jp-stat-excluded-diff">-¥0</span>
                                         </div>
                                     </div>
                                 </div>
@@ -780,9 +824,12 @@
                                             <p class="text-muted text-xs">Expense trajectory across selected period</p>
                                         </div>
                                         <div class="segmented-control" id="jp-trend-granularity-control">
-                                            <button class="segment-btn active" data-granularity="daily" onclick="app.setJpTrendGranularity('daily')">Daily</button>
-                                            <button class="segment-btn" data-granularity="weekly" onclick="app.setJpTrendGranularity('weekly')">Weekly</button>
-                                            <button class="segment-btn" data-granularity="monthly" onclick="app.setJpTrendGranularity('monthly')">Monthly</button>
+                                            <button class="segment-btn active" data-granularity="daily"
+                                                onclick="app.setJpTrendGranularity('daily')">Daily</button>
+                                            <button class="segment-btn" data-granularity="weekly"
+                                                onclick="app.setJpTrendGranularity('weekly')">Weekly</button>
+                                            <button class="segment-btn" data-granularity="monthly"
+                                                onclick="app.setJpTrendGranularity('monthly')">Monthly</button>
                                         </div>
                                     </div>
                                     <div class="chart-canvas-wrap trend-canvas-wrap">
@@ -810,9 +857,11 @@
                                         <div class="chart-card-header">
                                             <div class="chart-title-group">
                                                 <h3>Categories Ranked</h3>
-                                                <p class="text-muted text-xs">Click a category to inspect transactions</p>
+                                                <p class="text-muted text-xs">Click a category to inspect transactions
+                                                </p>
                                             </div>
-                                            <span class="text-xs text-muted" id="jp-category-count-label">0 categories</span>
+                                            <span class="text-xs text-muted" id="jp-category-count-label">0
+                                                categories</span>
                                         </div>
                                         <div class="category-ranking-list" id="jp-category-ranking-list">
                                             <!-- Category rows injected dynamically -->
@@ -821,7 +870,8 @@
                                 </div>
 
                                 <!-- Category Drill-Down Transaction Drawer / Section -->
-                                <div class="card analytics-drilldown-card" id="jp-drilldown-section" style="display: none;">
+                                <div class="card analytics-drilldown-card" id="jp-drilldown-section"
+                                    style="display: none;">
                                     <div class="chart-card-header">
                                         <div class="chart-title-group">
                                             <h3 id="jp-drilldown-title">Transactions in Category</h3>
@@ -857,7 +907,8 @@
                                         <div class="chart-card-header">
                                             <div class="chart-title-group">
                                                 <h3>Financial Observations</h3>
-                                                <p class="text-muted text-xs">Data-supported insights from your ledger</p>
+                                                <p class="text-muted text-xs">Data-supported insights from your ledger
+                                                </p>
                                             </div>
                                         </div>
                                         <div class="insights-list" id="jp-insights-list">
@@ -874,10 +925,12 @@
                                     <div class="card analytics-kpi-card">
                                         <div class="kpi-header">
                                             <span class="kpi-title">Total Indian Expenses</span>
-                                            <div class="kpi-icon-wrap expense"><i data-lucide="arrow-up-right"></i></div>
+                                            <div class="kpi-icon-wrap expense"><i data-lucide="arrow-up-right"></i>
+                                            </div>
                                         </div>
                                         <div class="kpi-value-row">
-                                            <span class="kpi-value text-rose privacy-blur" id="in-kpi-expenses">₹0</span>
+                                            <span class="kpi-value text-rose privacy-blur"
+                                                id="in-kpi-expenses">₹0</span>
                                         </div>
                                         <div class="kpi-meta" id="in-kpi-expenses-meta">
                                             <span class="delta-neutral">This month</span>
@@ -890,7 +943,8 @@
                                             <div class="kpi-icon-wrap savings"><i data-lucide="calendar"></i></div>
                                         </div>
                                         <div class="kpi-value-row">
-                                            <span class="kpi-value text-primary privacy-blur" id="in-kpi-weekly-avg">₹0</span>
+                                            <span class="kpi-value text-primary privacy-blur"
+                                                id="in-kpi-weekly-avg">₹0</span>
                                         </div>
                                         <div class="kpi-meta">
                                             <span class="text-faint">Paced over active weeks</span>
@@ -942,9 +996,11 @@
                                     <div class="chart-card-header">
                                         <div class="chart-title-group">
                                             <h3>Recent Indian Transactions</h3>
-                                            <p class="text-muted text-xs">Direct financial log without artificial micro-categorization</p>
+                                            <p class="text-muted text-xs">Direct financial log without artificial
+                                                micro-categorization</p>
                                         </div>
-                                        <button class="btn btn-ghost btn-sm" onclick="app.viewTransactionsWithFilter({ region: 'IN' })">
+                                        <button class="btn btn-ghost btn-sm"
+                                            onclick="app.viewTransactionsWithFilter({ region: 'IN' })">
                                             <span>View in Ledger</span>
                                             <i data-lucide="arrow-right"></i>
                                         </button>
@@ -958,46 +1014,158 @@
                         <div style="height: 80px;"></div>
                     </section>
 
-                    <!-- Reports View -->
+                    <!-- Reports View (Phase 4: Financial Snapshots, Audit Closing & Custom Ranges) -->
                     <section id="reports-view" class="view">
                         <header class="top-bar">
-                            <h2>Reports</h2>
-                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
-                                aria-label="Reveal monetary values" title="Reveal monetary values">
-                                <i data-lucide="eye-off"></i>
-                            </button>
+                            <div class="view-header-content">
+                                <h2>Financial Reports</h2>
+                                <p class="view-header-sub">Immutable monthly snapshots, audit closing, and custom range analytics</p>
+                            </div>
+                            <div class="view-header-actions">
+                                <button class="btn btn-secondary btn-sm" id="report-print-btn" onclick="app.printCurrentReport()" title="Print report or save as PDF">
+                                    <i data-lucide="printer"></i>
+                                    <span class="btn-text">Print Report</span>
+                                </button>
+                                <button class="btn btn-secondary btn-sm" id="report-export-csv-btn" onclick="app.exportReportCsv()" title="Export report data as CSV">
+                                    <i data-lucide="download"></i>
+                                    <span class="btn-text">Export CSV</span>
+                                </button>
+                                <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
+                                    aria-label="Toggle monetary concealment" title="Toggle monetary concealment">
+                                    <i data-lucide="eye-off"></i>
+                                </button>
+                            </div>
                         </header>
-                        <div class="content-padded" id="reports-view-container">
-                            <div class="card" style="padding: 32px; text-align: center;">
-                                <div style="max-width: 440px; margin: 0 auto;">
-                                    <i data-lucide="file-text"
-                                        style="width: 48px; height: 48px; color: var(--accent); margin-bottom: 12px;"></i>
-                                    <h3 style="margin-bottom: 8px;">Financial Reports & Monthly Closing</h3>
-                                    <p class="text-muted text-sm">Refreshable monthly snapshots and guided monthly
-                                        closing workflow will be implemented in Phase 4.</p>
+
+                        <div class="reports-content-container">
+                            <!-- Reports Control & Action Toolbar -->
+                            <div class="card reports-toolbar-card">
+                                <!-- Country Selector -->
+                                <div class="segmented-control" id="report-country-selector">
+                                    <button class="segment-btn active" data-region="JP" onclick="app.setReportRegion('JP')">🇯🇵 Japan (¥)</button>
+                                    <button class="segment-btn" data-region="IN" onclick="app.setReportRegion('IN')">🇮🇳 India (₹)</button>
+                                </div>
+
+                                <!-- Month / Period Selector -->
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span class="text-sm text-muted">Snapshot Month:</span>
+                                    <select id="report-month-select" class="filter-select" onchange="app.onReportMonthChange(event)" style="min-width: 140px;">
+                                        <!-- Populated dynamically with available month options -->
+                                    </select>
+                                </div>
+
+                                <!-- Main Actions: Refresh Snapshot & Monthly Closing -->
+                                <div class="reports-actions-group">
+                                    <button class="btn btn-secondary btn-sm" onclick="app.refreshReportSnapshot()" title="Recompute snapshot from continuous ledger transactions">
+                                        <i data-lucide="rotate-cw"></i>
+                                        <span>Refresh Snapshot</span>
+                                    </button>
+                                    <button class="btn btn-primary btn-sm" id="btn-open-closing-wizard" onclick="app.openClosingWizard()">
+                                        <i data-lucide="check-circle-2"></i>
+                                        <span>Run Monthly Closing</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Monthly Snapshot Hero Card -->
+                            <div class="card reports-snapshot-hero" id="report-snapshot-hero">
+                                <!-- Populated dynamically by app.renderReportsPage() -->
+                            </div>
+
+                            <!-- Category Breakdown Table Card -->
+                            <div class="card reports-data-table-card" id="report-category-breakdown-card">
+                                <!-- Populated dynamically by app.renderReportsPage() -->
+                            </div>
+
+                            <!-- Custom Date-Range Report Panel -->
+                            <div class="card custom-report-panel">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                    <div>
+                                        <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 700;">Custom Date-Range Report</h3>
+                                        <p class="text-muted text-xs" style="margin: 0;">Generate instantaneous, read-only financial analysis for arbitrary calendar intervals from the continuous ledger</p>
+                                    </div>
+                                    <button class="btn btn-secondary btn-sm" onclick="app.generateCustomRangeReport()">
+                                        <i data-lucide="sparkles"></i>
+                                        <span>Generate Custom Report</span>
+                                    </button>
+                                </div>
+                                <div class="custom-range-row" style="margin-top: 10px;">
+                                    <div class="custom-date-field">
+                                        <label class="filter-label">From:</label>
+                                        <input type="date" id="report-custom-start" class="filter-date-input" />
+                                    </div>
+                                    <div class="custom-date-field">
+                                        <label class="filter-label">To:</label>
+                                        <input type="date" id="report-custom-end" class="filter-date-input" />
+                                    </div>
+                                </div>
+                                <div id="report-custom-results" style="display: none; margin-top: 14px;">
+                                    <!-- Populated dynamically when generated -->
+                                </div>
+                            </div>
+
+                            <!-- Historical Closed Months Archive -->
+                            <div class="card" style="padding: 20px 24px;">
+                                <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 700;">Closed Months & Historical Snapshots</h3>
+                                <p class="text-muted text-xs" style="margin: 0 0 16px 0;">Permanent historical audit trail stored in <code>closedMonths</code></p>
+                                <div class="history-snapshots-list" id="report-closed-months-list">
+                                    <!-- Injected dynamically -->
                                 </div>
                             </div>
                         </div>
                         <div style="height: 80px;"></div>
                     </section>
 
-                    <!-- Budgets View -->
+                    <!-- Budgets View (Phase 4: Budget & Category Management Centre) -->
                     <section id="budgets-view" class="view">
                         <header class="top-bar">
-                            <h2>Budgets</h2>
-                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
-                                aria-label="Reveal monetary values" title="Reveal monetary values">
-                                <i data-lucide="eye-off"></i>
-                            </button>
+                            <div class="view-header-content">
+                                <h2>Budgets & Categories</h2>
+                                <p class="view-header-sub">Unified monthly budget limits, category configurations, and icon assignments</p>
+                            </div>
+                            <div class="view-header-actions">
+                                <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
+                                    aria-label="Toggle monetary concealment" title="Toggle monetary concealment">
+                                    <i data-lucide="eye-off"></i>
+                                </button>
+                            </div>
                         </header>
-                        <div class="content-padded" id="budgets-view-container">
-                            <div class="card" style="padding: 32px; text-align: center;">
-                                <div style="max-width: 440px; margin: 0 auto;">
-                                    <i data-lucide="pie-chart"
-                                        style="width: 48px; height: 48px; color: var(--accent); margin-bottom: 12px;"></i>
-                                    <h3 style="margin-bottom: 8px;">Budget & Category Management</h3>
-                                    <p class="text-muted text-sm">Unified budget allocations and custom category icon
-                                        picker will be implemented in Phase 4.</p>
+
+                        <div class="budgets-content-container">
+                            <!-- Budgets Toolbar -->
+                            <div class="card budgets-toolbar-card">
+                                <!-- Country Selector -->
+                                <div class="segmented-control" id="budgets-country-selector">
+                                    <button class="segment-btn active" data-region="JP" onclick="app.setBudgetsRegion('JP')">🇯🇵 Japan (¥)</button>
+                                    <button class="segment-btn" data-region="IN" onclick="app.setBudgetsRegion('IN')">🇮🇳 India (₹)</button>
+                                </div>
+
+                                <!-- Month Display -->
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span class="text-sm text-muted">Active Month:</span>
+                                    <span id="budgets-month-label" class="font-bold text-primary" style="font-size: 0.95rem;"></span>
+                                </div>
+
+                                <!-- Add Category Action -->
+                                <button class="btn btn-primary btn-sm" onclick="app.openCategoryManageModal(null)">
+                                    <i data-lucide="plus-circle"></i>
+                                    <span>Add Category</span>
+                                </button>
+                            </div>
+
+                            <!-- Overall Budget Summary Banner -->
+                            <div class="card budgets-summary-banner" id="budgets-summary-banner">
+                                <!-- Populated dynamically by app.renderBudgetsPage() -->
+                            </div>
+
+                            <!-- Category Budgets Grid -->
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px;">
+                                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Category Budget Allocations</h3>
+                                    <span class="text-xs text-muted" id="budgets-category-count">0 categories</span>
+                                </div>
+                                <div class="budgets-categories-grid" id="budgets-categories-grid">
+                                    <!-- Populated dynamically -->
                                 </div>
                             </div>
                         </div>
@@ -1514,13 +1682,15 @@
                 </div>
 
                 <div class="tx-detail-actions">
-                    <button class="btn btn-danger btn-sm" id="tx-detail-delete-btn" onclick="app.deleteCurrentDetailTransaction()">
+                    <button class="btn btn-danger btn-sm" id="tx-detail-delete-btn"
+                        onclick="app.deleteCurrentDetailTransaction()">
                         <i data-lucide="trash-2"></i>
                         <span>Delete</span>
                     </button>
                     <div class="tx-detail-actions-right">
                         <button class="btn btn-secondary btn-sm" onclick="app.closeTransactionDetail()">Close</button>
-                        <button class="btn btn-primary btn-sm" id="tx-detail-edit-btn" onclick="app.editCurrentDetailTransaction()">
+                        <button class="btn btn-primary btn-sm" id="tx-detail-edit-btn"
+                            onclick="app.editCurrentDetailTransaction()">
                             <i data-lucide="edit-3"></i>
                             <span>Edit Transaction</span>
                         </button>
@@ -1619,6 +1789,145 @@
                     onclick="document.getElementById('pdf-modal').classList.remove('active')">Cancel</button>
                 <button class="btn btn-primary" style="flex:1;background:var(--accent);color:white;border:none;"
                     onclick="app.generatePdf()">Generate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guided Monthly Closing Modal -->
+    <div class="closing-modal-backdrop" id="closing-wizard-modal" onclick="if(event.target===this) app.closeClosingWizard()">
+        <div class="closing-modal-sheet" onclick="event.stopPropagation()">
+            <div class="closing-modal-header">
+                <div>
+                    <h3 style="margin:0; font-size: 1.15rem; font-weight: 700;">Monthly Financial Closing</h3>
+                    <p class="text-xs text-muted" id="closing-wizard-subtitle" style="margin: 4px 0 0 0;">Guided monthly balance reconciliation and budget rollover</p>
+                </div>
+                <button class="icon-btn" onclick="app.closeClosingWizard()" title="Close wizard">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            
+            <div class="closing-steps-nav" id="closing-steps-nav">
+                <div class="closing-step-pill active" id="closing-pill-1" onclick="app.setClosingStep(1)">
+                    <span>1</span> Summary
+                </div>
+                <div class="closing-step-pill" id="closing-pill-2" onclick="app.setClosingStep(2)">
+                    <span>2</span> Balances
+                </div>
+                <div class="closing-step-pill" id="closing-pill-3" onclick="app.setClosingStep(3)">
+                    <span>3</span> Next Budgets
+                </div>
+                <div class="closing-step-pill" id="closing-pill-4" onclick="app.setClosingStep(4)">
+                    <span>4</span> Opening Preview
+                </div>
+                <div class="closing-step-pill" id="closing-pill-5" onclick="app.setClosingStep(5)">
+                    <span>5</span> Confirm
+                </div>
+            </div>
+
+            <div class="closing-modal-body" id="closing-step-content">
+                <!-- Dynamically rendered step content -->
+            </div>
+
+            <div class="closing-modal-footer">
+                <button class="btn btn-secondary" id="closing-btn-prev" onclick="app.setClosingStep(app.closingWizardState.step - 1)">
+                    <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i>
+                    <span>Back</span>
+                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" onclick="app.closeClosingWizard()">Cancel</button>
+                    <button class="btn btn-primary" id="closing-btn-next" onclick="app.setClosingStep(app.closingWizardState.step + 1)">
+                        <span>Continue</span>
+                        <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i>
+                    </button>
+                    <button class="btn btn-primary" id="closing-btn-confirm" style="display:none; background: #10b981; border-color: #059669;" onclick="app.executeMonthlyClosing()">
+                        <i data-lucide="lock" style="width: 14px; height: 14px;"></i>
+                        <span>Confirm & Close Month</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Management Modal -->
+    <div class="modal-overlay" id="category-manage-modal" onclick="if(event.target===this) app.closeCategoryManageModal()">
+        <div class="category-manage-sheet" onclick="event.stopPropagation()">
+            <div style="padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="margin:0; font-size: 1.1rem; font-weight: 700;" id="cat-modal-title">Configure Category</h3>
+                    <p class="text-xs text-muted" style="margin: 4px 0 0 0;">Manage category properties, icon, and budget allocation</p>
+                </div>
+                <button class="icon-btn" onclick="app.closeCategoryManageModal()" title="Close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div style="padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+                <input type="hidden" id="cat-edit-id" value="">
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group">
+                        <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Category Name</label>
+                        <input type="text" id="cat-edit-name" placeholder="e.g. Groceries & Essentials" style="width: 100%; padding: 10px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Region Availability</label>
+                        <select id="cat-edit-country" style="width: 100%; padding: 10px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
+                            <option value="JP">🇯🇵 Japan Only (JPY)</option>
+                            <option value="IN">🇮🇳 India Only (INR)</option>
+                            <option value="ALL">🌐 Both Regions</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Monthly Budget Allocation (<span id="cat-edit-curr-label">¥</span>)</label>
+                    <input type="number" id="cat-edit-budget" min="0" step="100" placeholder="0" style="width: 100%; padding: 10px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem; font-family: monospace;">
+                </div>
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin: 0;">Category Monochrome Icon</label>
+                        <span class="text-xs" style="display: flex; align-items: center; gap: 6px; color: var(--accent);">
+                            Selected: <i id="cat-selected-icon-preview" data-lucide="tag" style="width: 14px; height: 14px;"></i>
+                            <span id="cat-selected-icon-name" style="font-family: monospace;">tag</span>
+                        </span>
+                    </div>
+                    <div class="icon-picker-container">
+                        <input type="text" class="icon-picker-search-input" id="cat-icon-search-input" placeholder="Search ~150+ monochrome icons (e.g. food, car, shopping, health...)" oninput="app.filterCategoryIcons(this.value)">
+                        <div class="icon-picker-grid" id="cat-icons-picker-grid">
+                            <!-- Populated with ~150 monochrome Lucide icons -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cat-config-toggles">
+                    <label class="cat-toggle-item">
+                        <span><strong>Active Status:</strong> Allow new transactions in this category</span>
+                        <input type="checkbox" id="cat-toggle-active" checked style="accent-color: var(--accent); width: 16px; height: 16px;">
+                    </label>
+                    <label class="cat-toggle-item">
+                        <span><strong>Dashboard Overview:</strong> Show card in Monthly Budget Overview</span>
+                        <input type="checkbox" id="cat-toggle-overview" checked style="accent-color: var(--accent); width: 16px; height: 16px;">
+                    </label>
+                    <label class="cat-toggle-item">
+                        <span><strong>Contribute to Total:</strong> Include allocation in overall monthly budget</span>
+                        <input type="checkbox" id="cat-toggle-contribute" checked style="accent-color: var(--accent); width: 16px; height: 16px;">
+                    </label>
+                </div>
+            </div>
+
+            <div style="padding: 16px 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.15);">
+                <button class="btn btn-secondary" id="cat-btn-archive" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.2);" onclick="app.toggleCategoryArchive()">
+                    <i data-lucide="archive" style="width: 14px; height: 14px;"></i>
+                    <span id="cat-btn-archive-text">Archive Category</span>
+                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" onclick="app.closeCategoryManageModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="app.saveCategoryConfig()">
+                        <i data-lucide="check" style="width: 14px; height: 14px;"></i>
+                        <span>Save Category</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>

@@ -62,6 +62,24 @@ class App {
                 : ['jp-misc']
         );
         this.selectedDrilldownCategoryId = null;
+
+        // Phase 4: Reports, Budgets & Closing Wizard state
+        this.reportRegion = 'JP';
+        this.reportMonthKey = (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
+        this.reportSnapshotsCache = {};
+        this.budgetsRegion = 'JP';
+        this.budgetsMonthKey = (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
+        this.selectedCatIcon = 'tag';
+        this.editingCatId = null;
+        this.closingWizardState = {
+            step: 1,
+            monthKey: (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7),
+            nextMonthKey: '',
+            budgetOption: 'copy',
+            adjustmentPercent: 0,
+            customJpBudget: 0,
+            customCatBudgets: {}
+        };
     }
 
     init() {
@@ -186,14 +204,13 @@ class App {
     updatePrivacyUI() {
         const btns = document.querySelectorAll('.global-privacy-btn');
         btns.forEach(btn => {
-            const isDesktop = btn.classList.contains('desktop-privacy-btn');
             if (this.isPrivacyHidden) {
-                btn.innerHTML = `<i data-lucide="eye-off"></i>${isDesktop ? '<span class="privacy-btn-label">Concealed</span>' : ''}`;
+                btn.innerHTML = `<i data-lucide="eye-off"></i>`;
                 btn.setAttribute('aria-label', 'Reveal monetary values');
                 btn.setAttribute('title', 'Reveal monetary values');
                 btn.classList.remove('revealed');
             } else {
-                btn.innerHTML = `<i data-lucide="eye"></i>${isDesktop ? '<span class="privacy-btn-label">Revealed</span>' : ''}`;
+                btn.innerHTML = `<i data-lucide="eye"></i>`;
                 btn.setAttribute('aria-label', 'Conceal monetary values');
                 btn.setAttribute('title', 'Conceal monetary values');
                 btn.classList.add('revealed');
@@ -371,6 +388,10 @@ class App {
             this.renderTransactionsPage();
         } else if (resolvedId === 'analytics-view') {
             this.renderAnalyticsPage();
+        } else if (resolvedId === 'reports-view') {
+            this.renderReportsPage();
+        } else if (resolvedId === 'budgets-view') {
+            this.renderBudgetsPage();
         } else if (resolvedId === 'history-view') {
             this.renderHistory();
         } else if (resolvedId === 'home-view') {
@@ -1030,8 +1051,9 @@ class App {
 
         let html = '';
         if (region === 'JP') {
-            const utils = storage.state.categories.JP.filter(c => c.id.startsWith('jp-utility-'));
-            const others = storage.state.categories.JP.filter(c => !c.id.startsWith('jp-utility-'));
+            const activeJP = (storage.state.categories.JP || []).filter(c => c.isActive !== false);
+            const utils = activeJP.filter(c => c.id.startsWith('jp-utility-'));
+            const others = activeJP.filter(c => !c.id.startsWith('jp-utility-'));
 
             html = others.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
             if (utils.length > 0) {
@@ -1041,7 +1063,8 @@ class App {
                 }
             }
         } else {
-            html = storage.state.categories[region].map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            const activeIN = (storage.state.categories[region] || []).filter(c => c.isActive !== false);
+            html = activeIN.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         }
 
         catSelect.innerHTML = html;
@@ -1690,13 +1713,13 @@ class App {
         const desktopDisp = document.getElementById('desktop-current-month-display');
         if (desktopDisp) desktopDisp.innerHTML = headerStr;
 
-        // Change layout of category grids to 2-columns
+        // Clear inline overrides so CSS responsive 3-column desktop layout applies
         ['jp-categories-grid', 'in-categories-grid'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                el.style.display = 'grid';
-                el.style.gridTemplateColumns = '1fr 1fr';
-                el.style.gap = '12px';
+                el.style.display = '';
+                el.style.gridTemplateColumns = '';
+                el.style.gap = '';
             }
         });
 
@@ -1704,27 +1727,37 @@ class App {
         const jpRem = Math.max(0, storage.state.jpTotalBudget - jpTotalSpent);
         const pct = storage.state.jpTotalBudget > 0 ? Math.min((jpTotalSpent / storage.state.jpTotalBudget) * 100, 100) : 0;
 
-        // Cushion = overall budget minus sum of individual category budgets
-        const sumCatBudgets = storage.state.categories.JP.reduce((s, c) => s + (c.budget || 0), 0);
+        // Cushion = overall budget minus sum of individual category budgets (excluding those configured not to contribute)
+        const sumCatBudgets = (storage.state.categories.JP || [])
+            .filter(c => c.contributesToTotalBudget !== false && c.isActive !== false)
+            .reduce((s, c) => s + (c.budget || 0), 0);
         const cushion = Math.max(0, storage.state.jpTotalBudget - sumCatBudgets);
 
         const card = document.getElementById('budget-overview-card');
         if (card) {
+            const barClass = pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe';
             card.innerHTML = `
-                <div class="card" style="margin: 0; padding: 16px; background: transparent; border: none;">
-                    <div style="display:flex; flex-direction:column; gap:4px;">
-                        <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                            <span class="text-sm text-muted">Japan Budget</span>
-                            <span class="font-bold privacy-blur">${this.formatMoney(jpRem, '¥')} left</span>
-                        </div>
-                        <div class="neon-bar-bg" style="margin-top: 6px;">
-                            <div class="neon-bar-fill ${pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${pct}%"></div>
-                        </div>
-                        <div style="margin-top: 8px; display:flex; justify-content:space-between; align-items:center;">
-                            <span class="text-muted text-xs privacy-blur">Spent ${this.formatMoney(jpTotalSpent, '¥')} of ${this.formatMoney(storage.state.jpTotalBudget, '¥')}</span>
-                            ${cushion > 0 ? `<span style="font-size:0.72rem; background:rgba(16,185,129,0.12); color:#10b981; padding:2px 8px; border-radius:10px; font-weight:600;">+${this.formatMoney(cushion, '¥')} cushion</span>` : ''}
-                        </div>
+                <div class="budget-central-header">
+                    <div class="budget-central-title-group">
+                        <span style="font-size: 1.15rem;">🇯🇵</span>
+                        <h3>Monthly Budget</h3>
+                        <span class="text-xs text-muted">(${this.activeMonthKey})</span>
+                        ${cushion > 0 ? `<span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, '¥')} cushion</span>` : ''}
                     </div>
+                    <div class="budget-remaining-hero">
+                        <span class="remaining-val privacy-blur ${jpRem < 0 ? 'text-danger' : ''}">${this.formatMoney(jpRem, '¥')}</span>
+                        <span class="remaining-label">${jpRem < 0 ? 'over budget' : 'remaining'}</span>
+                    </div>
+                </div>
+                <div class="budget-central-progress-wrap">
+                    <div class="neon-bar-bg" style="height: 10px; border-radius: 9999px;">
+                        <div class="neon-bar-fill ${barClass}" style="width: ${pct}%; height: 100%;"></div>
+                    </div>
+                </div>
+                <div class="budget-central-stats-row">
+                    <span class="privacy-blur">Spent: <strong>${this.formatMoney(jpTotalSpent, '¥')}</strong></span>
+                    <span class="text-xs text-muted">${Math.round(pct)}% used</span>
+                    <span class="privacy-blur">Total Allocation: <strong>${this.formatMoney(storage.state.jpTotalBudget, '¥')}</strong></span>
                 </div>
             `;
         }
@@ -1745,7 +1778,10 @@ class App {
             let html = '';
             const currency = region === 'JP' ? '¥' : '₹';
 
-            storage.state.categories[region].forEach(c => {
+            // Filter out archived categories and those configured hidden from overview
+            const cats = (storage.state.categories[region] || []).filter(c => c.isActive !== false && !c.hiddenFromBudgetOverview);
+
+            cats.forEach(c => {
                 const spent = totals[c.id] || 0;
                 let progressHtml = '';
 
@@ -1771,9 +1807,9 @@ class App {
                 }
 
                 html += `
-                    <div class="neon-row" style="padding: 12px;" onclick="app.openQuickEditModal('category', '${c.id}', '${region}')">
+                    <div class="neon-row" style="padding: 14px; cursor: pointer;" onclick="app.openCategoryManageModal('${c.id}', '${region}')" title="Click to manage ${c.name}">
                         <div class="neon-header" style="margin-bottom: 8px;">
-                            <span class="neon-title"><i data-lucide="${c.icon}"></i> ${c.name}</span>
+                            <span class="neon-title"><i data-lucide="${c.icon || 'tag'}"></i> ${c.name}</span>
                         </div>
                         ${progressHtml}
                     </div>
@@ -4577,6 +4613,1131 @@ class App {
         Object.assign(this.ledgerFilters, filterObj);
         this.switchView('transactions-view');
         this.renderTransactionsPage();
+    }
+
+    // =========================================================================
+    // PHASE 4: REPORTS WORKSPACE & SNAPSHOTS
+    // =========================================================================
+
+    setReportRegion(region) {
+        if (region !== 'JP' && region !== 'IN') return;
+        this.reportRegion = region;
+        const selector = document.getElementById('report-country-selector');
+        if (selector) {
+            selector.querySelectorAll('.segment-btn').forEach(btn => {
+                if (btn.getAttribute('data-region') === region) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+        this.renderReportsPage();
+    }
+
+    onReportMonthChange(event) {
+        const val = event.target.value;
+        if (val) {
+            this.reportMonthKey = val;
+            this.renderReportsPage();
+        }
+    }
+
+    refreshReportSnapshot() {
+        const cacheKey = `${this.reportRegion}_${this.reportMonthKey}`;
+        const now = new Date().toLocaleString();
+        if (!this.reportSnapshotsCache[cacheKey]) {
+            this.reportSnapshotsCache[cacheKey] = {
+                generatedAt: now,
+                refreshedAt: now,
+                revisionsCount: 1,
+                log: [`Snapshot created: ${now}`]
+            };
+        } else {
+            const entry = this.reportSnapshotsCache[cacheKey];
+            entry.refreshedAt = now;
+            entry.revisionsCount = (entry.revisionsCount || 1) + 1;
+            entry.log = entry.log || [];
+            entry.log.unshift(`Refreshed from continuous ledger at ${now} (Rev ${entry.revisionsCount})`);
+            if (entry.log.length > 5) entry.log.pop();
+        }
+        this.renderReportsPage();
+    }
+
+    printCurrentReport() {
+        window.print();
+    }
+
+    exportReportCsv() {
+        const allTxs = storage.state.transactions || [];
+        const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
+        
+        let csv = 'Transaction ID,Date,Region,Wallet,Category,Type,Amount,Currency,Note\n';
+        reportTxs.forEach(tx => {
+            const catName = this.getCategoryName(tx.categoryId, tx.region);
+            const walletName = this.getWalletName(tx.walletId);
+            const safeNote = (tx.note || '').replace(/"/g, '""');
+            csv += `"${tx.id}","${tx.date}","${tx.region}","${walletName}","${catName}","${tx.type}","${tx.amount}","${tx.currency || ''}","${safeNote}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Expense_Report_${this.reportRegion}_${this.reportMonthKey}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    renderReportsPage() {
+        const allTxs = storage.state.transactions || [];
+        const currency = this.reportRegion === 'JP' ? '¥' : '₹';
+
+        // 1. Collect all available month keys (currentMonthKey + closedMonths + any dates present in ledger)
+        const availableMonthsSet = new Set();
+        if (storage.state.currentMonthKey) availableMonthsSet.add(storage.state.currentMonthKey);
+        if (storage.state.closedMonths) {
+            Object.keys(storage.state.closedMonths).forEach(m => availableMonthsSet.add(m));
+        }
+        allTxs.forEach(tx => {
+            if (tx.date && tx.date.length >= 7) {
+                availableMonthsSet.add(tx.date.slice(0, 7));
+            }
+        });
+        const sortedMonths = Array.from(availableMonthsSet).sort().reverse();
+
+        // Ensure this.reportMonthKey is valid
+        if (!this.reportMonthKey || !availableMonthsSet.has(this.reportMonthKey)) {
+            this.reportMonthKey = sortedMonths[0] || new Date().toISOString().slice(0, 7);
+        }
+
+        // 2. Populate Month Selector dropdown
+        const monthSelect = document.getElementById('report-month-select');
+        if (monthSelect) {
+            monthSelect.innerHTML = sortedMonths.map(m => {
+                const isClosed = storage.state.closedMonths && storage.state.closedMonths[m];
+                return `<option value="${m}" ${m === this.reportMonthKey ? 'selected' : ''}>${m}${isClosed ? ' 🔒 (Closed)' : ''}</option>`;
+            }).join('');
+        }
+
+        // 3. Filter transactions strictly by transaction date (Section 5 rule)
+        const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
+
+        // 4. Calculate Financial Aggregates
+        let totalIncome = 0;
+        let totalExpense = 0;
+        const categorySpendMap = {};
+        const categoryTxCountMap = {};
+
+        reportTxs.forEach(tx => {
+            const amt = Number(tx.amount || 0);
+            if (tx.type === 'income') {
+                totalIncome += amt;
+            } else if (tx.type === 'expense') {
+                totalExpense += amt;
+                const cId = tx.categoryId || 'misc';
+                categorySpendMap[cId] = (categorySpendMap[cId] || 0) + amt;
+                categoryTxCountMap[cId] = (categoryTxCountMap[cId] || 0) + 1;
+            }
+        });
+
+        const netSavings = totalIncome - totalExpense;
+        const savingsRate = totalIncome > 0 ? Math.max(0, ((netSavings / totalIncome) * 100)).toFixed(1) : '0.0';
+
+        // 5. Historical Budget Handling (Honoring Section 5: inspect data model without assumptions)
+        const isClosed = storage.state.closedMonths && storage.state.closedMonths[this.reportMonthKey];
+        const closedMeta = isClosed ? storage.state.closedMonths[this.reportMonthKey] : null;
+
+        let periodTotalBudget = 0;
+        let periodCatBudgets = {};
+        let historicalBudgetNote = '';
+
+        if (closedMeta) {
+            // Historical closed period
+            periodTotalBudget = closedMeta.jpTotalBudget || 0;
+            if (closedMeta.categoriesSnapshot && closedMeta.categoriesSnapshot[this.reportRegion]) {
+                closedMeta.categoriesSnapshot[this.reportRegion].forEach(c => {
+                    periodCatBudgets[c.id] = c.budget || 0;
+                });
+            } else {
+                historicalBudgetNote = `Historical category-level budgets were not preserved for closed month ${this.reportMonthKey} in the legacy schema; recorded overall budget limit: ${this.formatMoney(periodTotalBudget, currency)}. Category totals are computed from the continuous ledger.`;
+            }
+        } else if (this.reportMonthKey === storage.state.currentMonthKey) {
+            // Current active month
+            periodTotalBudget = this.reportRegion === 'JP' ? (storage.state.jpTotalBudget || 0) : 0;
+            (storage.state.categories[this.reportRegion] || []).forEach(c => {
+                periodCatBudgets[c.id] = c.budget || 0;
+            });
+        } else {
+            historicalBudgetNote = `Unclosed historical period: No archived budget record exists for month ${this.reportMonthKey}. Current spending is ledger-calculated.`;
+        }
+
+        // 6. Snapshot Timestamps & Cache
+        const cacheKey = `${this.reportRegion}_${this.reportMonthKey}`;
+        if (!this.reportSnapshotsCache[cacheKey]) {
+            const now = new Date().toLocaleString();
+            this.reportSnapshotsCache[cacheKey] = {
+                generatedAt: now,
+                refreshedAt: now,
+                revisionsCount: 1,
+                log: [`Initial calculation generated at ${now}`]
+            };
+        }
+        const snapshotMeta = this.reportSnapshotsCache[cacheKey];
+
+        // 7. Render Snapshot Hero Card
+        const heroEl = document.getElementById('report-snapshot-hero');
+        if (heroEl) {
+            const statusBadge = isClosed 
+                ? `<span class="report-status-badge closed"><i data-lucide="lock" style="width:12px;height:12px;"></i> Closed & Reconciled</span>`
+                : `<span class="report-status-badge active"><i data-lucide="activity" style="width:12px;height:12px;"></i> Active Reporting Period</span>`;
+
+            const budgetPct = periodTotalBudget > 0 ? Math.min((totalExpense / periodTotalBudget) * 100, 100) : 0;
+            const budgetRem = periodTotalBudget - totalExpense;
+
+            heroEl.innerHTML = `
+                <div class="report-snapshot-top">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                            <span style="font-size: 1.3rem;">${this.reportRegion === 'JP' ? '🇯🇵' : '🇮🇳'}</span>
+                            <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800;">${this.reportMonthKey} Financial Snapshot</h2>
+                            ${statusBadge}
+                        </div>
+                        <div class="report-meta-text">
+                            <span>Generated: <strong>${snapshotMeta.generatedAt}</strong></span>
+                            <span>•</span>
+                            <span>Last Refreshed: <strong>${snapshotMeta.refreshedAt}</strong> (Rev ${snapshotMeta.revisionsCount || 1})</span>
+                            <span>•</span>
+                            <span>Transactions: <strong>${reportTxs.length}</strong></span>
+                            <span>•</span>
+                            <span>Currency: <strong>${currency} (${this.reportRegion})</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reports-kpi-grid">
+                    <div class="card reports-kpi-card">
+                        <span class="reports-kpi-label">Total Income</span>
+                        <span class="reports-kpi-val positive privacy-blur">${this.formatMoney(totalIncome, currency)}</span>
+                        <span class="text-xs text-muted mt-1">${reportTxs.filter(t => t.type === 'income').length} income credits</span>
+                    </div>
+                    <div class="card reports-kpi-card">
+                        <span class="reports-kpi-label">Total Expenses</span>
+                        <span class="reports-kpi-val negative privacy-blur">${this.formatMoney(totalExpense, currency)}</span>
+                        <span class="text-xs text-muted mt-1">${reportTxs.filter(t => t.type === 'expense').length} expense debits</span>
+                    </div>
+                    <div class="card reports-kpi-card">
+                        <span class="reports-kpi-label">Net Savings</span>
+                        <span class="reports-kpi-val ${netSavings >= 0 ? 'positive' : 'negative'} privacy-blur">${this.formatMoney(netSavings, currency)}</span>
+                        <span class="text-xs text-muted mt-1">${netSavings >= 0 ? 'Surplus retained' : 'Deficit spent'}</span>
+                    </div>
+                    <div class="card reports-kpi-card">
+                        <span class="reports-kpi-label">Savings Rate</span>
+                        <span class="reports-kpi-val highlight">${savingsRate}%</span>
+                        <span class="text-xs text-muted mt-1">of total income</span>
+                    </div>
+                </div>
+
+                ${periodTotalBudget > 0 ? `
+                    <div style="padding: 16px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                            <span class="text-xs font-bold text-muted" style="text-transform: uppercase; letter-spacing: 0.05em;">Monthly Budget Performance</span>
+                            <span class="text-xs ${budgetRem >= 0 ? 'text-success' : 'text-danger'} font-bold privacy-blur">
+                                ${budgetRem >= 0 ? `${this.formatMoney(budgetRem, currency)} remaining cushion` : `${this.formatMoney(Math.abs(budgetRem), currency)} over allocated budget`}
+                            </span>
+                        </div>
+                        <div class="neon-bar-bg" style="height: 8px; border-radius: 9999px;">
+                            <div class="neon-bar-fill ${budgetPct > 90 ? 'neon-danger' : budgetPct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${budgetPct}%; height: 100%;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem;" class="text-muted">
+                            <span class="privacy-blur">Spent: ${this.formatMoney(totalExpense, currency)}</span>
+                            <span>${Math.round(budgetPct)}% consumed</span>
+                            <span class="privacy-blur">Allocated Limit: ${this.formatMoney(periodTotalBudget, currency)}</span>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${historicalBudgetNote ? `
+                    <div style="padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-sm); font-size: 0.78rem; color: #93c5fd; display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="info" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+                        <span>${historicalBudgetNote}</span>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        // 8. Render Category Breakdown Table
+        const breakdownCard = document.getElementById('report-category-breakdown-card');
+        if (breakdownCard) {
+            const allRegionCats = storage.state.categories[this.reportRegion] || [];
+            
+            // Collect all categories that either exist in config or have transactions
+            const catMap = new Map();
+            allRegionCats.forEach(c => catMap.set(c.id, c));
+            Object.keys(categorySpendMap).forEach(id => {
+                if (!catMap.has(id)) {
+                    catMap.set(id, { id: id, name: this.getCategoryName(id, this.reportRegion), icon: 'tag' });
+                }
+            });
+
+            const rowsHtml = Array.from(catMap.values()).map(cat => {
+                const spent = categorySpendMap[cat.id] || 0;
+                const budgetLimit = periodCatBudgets[cat.id] || 0;
+                const txCount = categoryTxCountMap[cat.id] || 0;
+                const pctOfTotal = totalExpense > 0 ? ((spent / totalExpense) * 100).toFixed(1) : '0.0';
+                const variance = budgetLimit > 0 ? (budgetLimit - spent) : null;
+
+                return `
+                    <tr>
+                        <td style="display: flex; align-items: center; gap: 10px; font-weight: 600;">
+                            <div style="width: 28px; height: 28px; border-radius: var(--radius-sm); background: rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: center; color: var(--text-primary);">
+                                <i data-lucide="${cat.icon || 'tag'}" style="width: 14px; height: 14px;"></i>
+                            </div>
+                            <span>${cat.name}</span>
+                        </td>
+                        <td class="privacy-blur">${budgetLimit > 0 ? this.formatMoney(budgetLimit, currency) : '<span class="text-muted">—</span>'}</td>
+                        <td class="font-bold privacy-blur">${this.formatMoney(spent, currency)}</td>
+                        <td class="privacy-blur">
+                            ${variance !== null 
+                                ? `<span class="${variance >= 0 ? 'text-success' : 'text-danger'}" style="font-weight: 600;">${variance >= 0 ? '+' : ''}${this.formatMoney(variance, currency)}</span>` 
+                                : '<span class="text-muted">—</span>'}
+                        </td>
+                        <td>${pctOfTotal}%</td>
+                        <td><span class="report-status-badge active" style="font-size: 0.7rem; padding: 2px 8px;">${txCount} txs</span></td>
+                    </tr>
+                `;
+            }).join('');
+
+            breakdownCard.innerHTML = `
+                <div style="padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Category Expense Breakdown</h3>
+                    <span class="text-xs text-muted">${catMap.size} categories active</span>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Allocated Budget</th>
+                                <th>Actual Spent</th>
+                                <th>Variance / Cushion</th>
+                                <th>% of Expenses</th>
+                                <th>Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // 9. Render Historical Closed Months Archive
+        const closedMonthsList = document.getElementById('report-closed-months-list');
+        if (closedMonthsList) {
+            const closedList = storage.state.closedMonths ? Object.values(storage.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey)) : [];
+            if (closedList.length === 0) {
+                closedMonthsList.innerHTML = `<p class="text-muted text-sm" style="padding: 12px 0;">No closed months recorded in audit history yet. Run Monthly Closing to create your first permanent month snapshot.</p>`;
+            } else {
+                closedMonthsList.innerHTML = closedList.map(h => {
+                    const closedTxsCount = allTxs.filter(t => (t.date || '').startsWith(h.monthKey)).length;
+                    const closedDateFormatted = h.closedAt ? new Date(h.closedAt).toLocaleDateString() : 'Recorded';
+                    return `
+                        <div class="history-snapshot-item">
+                            <div class="history-snapshot-left">
+                                <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.12); color: #34d399; display: flex; align-items: center; justify-content: center;">
+                                    <i data-lucide="shield-check" style="width: 18px; height: 18px;"></i>
+                                </div>
+                                <div class="history-snapshot-info">
+                                    <h4 style="margin: 0; font-size: 0.95rem;">${h.label || h.monthKey}</h4>
+                                    <span class="text-xs text-muted">Closed on ${closedDateFormatted} • ${closedTxsCount} transactions captured • Overall limit: ${this.formatMoney(h.jpTotalBudget || 0, '¥')}</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-secondary btn-sm" onclick="app.reportMonthKey='${h.monthKey}'; app.renderReportsPage();" title="Inspect snapshot">
+                                    <i data-lucide="eye"></i>
+                                    <span>View Snapshot</span>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    generateCustomRangeReport() {
+        const startInput = document.getElementById('report-custom-start');
+        const endInput = document.getElementById('report-custom-end');
+        const resultsEl = document.getElementById('report-custom-results');
+        if (!startInput || !endInput || !resultsEl) return;
+
+        const start = startInput.value;
+        const end = endInput.value;
+        if (!start || !end) {
+            alert('Please select both a start date and an end date for the custom report range.');
+            return;
+        }
+        if (start > end) {
+            alert('Start date cannot be after end date.');
+            return;
+        }
+
+        const allTxs = storage.state.transactions || [];
+        const customTxs = allTxs.filter(tx => tx.date >= start && tx.date <= end && tx.region === this.reportRegion);
+        const currency = this.reportRegion === 'JP' ? '¥' : '₹';
+
+        let customIncome = 0;
+        let customExpense = 0;
+        const catMap = {};
+
+        customTxs.forEach(tx => {
+            const amt = Number(tx.amount || 0);
+            if (tx.type === 'income') {
+                customIncome += amt;
+            } else if (tx.type === 'expense') {
+                customExpense += amt;
+                const cId = tx.categoryId || 'misc';
+                catMap[cId] = (catMap[cId] || 0) + amt;
+            }
+        });
+
+        const customNet = customIncome - customExpense;
+
+        resultsEl.style.display = 'block';
+        resultsEl.innerHTML = `
+            <div style="padding: 16px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Report: ${start} to ${end} (${this.reportRegion})</h4>
+                        <span class="text-xs text-muted">Continuous ledger summary • Read-only snapshot</span>
+                    </div>
+                    <span class="report-status-badge active" style="font-size: 0.72rem;">${customTxs.length} transactions included</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div style="background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: var(--radius-sm);">
+                        <span class="text-xs text-muted">Total Income</span>
+                        <div class="font-bold text-success privacy-blur" style="font-size: 1.05rem;">${this.formatMoney(customIncome, currency)}</div>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: var(--radius-sm);">
+                        <span class="text-xs text-muted">Total Expense</span>
+                        <div class="font-bold text-danger privacy-blur" style="font-size: 1.05rem;">${this.formatMoney(customExpense, currency)}</div>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: var(--radius-sm);">
+                        <span class="text-xs text-muted">Net Surplus / Deficit</span>
+                        <div class="font-bold ${customNet >= 0 ? 'text-success' : 'text-danger'} privacy-blur" style="font-size: 1.05rem;">${this.formatMoney(customNet, currency)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    // =========================================================================
+    // PHASE 4: GUIDED MONTHLY CLOSING WORKFLOW (5-STEP SEQUENCE)
+    // =========================================================================
+
+    openClosingWizard() {
+        const curMonth = (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
+        const [y, m] = curMonth.split('-').map(Number);
+        const nextDate = new Date(Date.UTC(y, m, 1));
+        const nextMonthKey = nextDate.toISOString().slice(0, 7);
+
+        this.closingWizardState = {
+            step: 1,
+            monthKey: curMonth,
+            nextMonthKey: nextMonthKey,
+            budgetOption: 'copy',
+            adjustmentPercent: 0,
+            customJpBudget: storage.state.jpTotalBudget || 0,
+            customCatBudgets: {}
+        };
+
+        const modal = document.getElementById('closing-wizard-modal');
+        if (modal) {
+            modal.classList.add('active');
+            this.setClosingStep(1);
+        }
+    }
+
+    closeClosingWizard() {
+        const modal = document.getElementById('closing-wizard-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    setClosingStep(step) {
+        if (step < 1 || step > 5) return;
+        this.closingWizardState.step = step;
+
+        // Update pills
+        for (let i = 1; i <= 5; i++) {
+            const pill = document.getElementById(`closing-pill-${i}`);
+            if (pill) {
+                pill.className = 'closing-step-pill';
+                if (i === step) {
+                    pill.classList.add('active');
+                } else if (i < step) {
+                    pill.classList.add('completed');
+                }
+            }
+        }
+
+        // Update navigation buttons
+        const prevBtn = document.getElementById('closing-btn-prev');
+        const nextBtn = document.getElementById('closing-btn-next');
+        const confirmBtn = document.getElementById('closing-btn-confirm');
+
+        if (prevBtn) prevBtn.style.display = (step === 1) ? 'none' : 'inline-flex';
+        if (nextBtn) nextBtn.style.display = (step === 5) ? 'none' : 'inline-flex';
+        if (confirmBtn) confirmBtn.style.display = (step === 5) ? 'inline-flex' : 'none';
+
+        // Render step content
+        const contentEl = document.getElementById('closing-step-content');
+        if (!contentEl) return;
+
+        const curMonth = this.closingWizardState.monthKey;
+        const nextMonth = this.closingWizardState.nextMonthKey;
+        const allTxs = storage.state.transactions || [];
+        const monthTxs = allTxs.filter(t => (t.date || '').startsWith(curMonth));
+
+        let monthIncome = 0;
+        let monthExpense = 0;
+        monthTxs.forEach(t => {
+            const amt = Number(t.amount || 0);
+            if (t.type === 'income') monthIncome += amt;
+            else if (t.type === 'expense') monthExpense += amt;
+        });
+
+        if (step === 1) {
+            // STEP 1: Review Monthly Financial Summary
+            contentEl.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="padding: 14px 18px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-md);">
+                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #93c5fd;">Step 1: Review Closing Period Summary (${curMonth})</h4>
+                        <p class="text-xs text-muted" style="margin: 0;">Review financial performance before proceeding with the closing reconciliation.</p>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
+                            <span class="text-xs text-muted">Total Recorded Income</span>
+                            <div class="font-bold text-success privacy-blur" style="font-size: 1.1rem; margin-top: 4px;">${this.formatMoney(monthIncome, '¥')}</div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
+                            <span class="text-xs text-muted">Total Recorded Expenses</span>
+                            <div class="font-bold text-danger privacy-blur" style="font-size: 1.1rem; margin-top: 4px;">${this.formatMoney(monthExpense, '¥')}</div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
+                            <span class="text-xs text-muted">Period Net Retained</span>
+                            <div class="font-bold ${monthIncome - monthExpense >= 0 ? 'text-success' : 'text-danger'} privacy-blur" style="font-size: 1.1rem; margin-top: 4px;">${this.formatMoney(monthIncome - monthExpense, '¥')}</div>
+                        </div>
+                    </div>
+
+                    <div style="padding: 12px; background: rgba(0, 0, 0, 0.2); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-secondary);">
+                        Total <strong>${monthTxs.length}</strong> transactions recorded in month <code>${curMonth}</code> will be sealed into the audit snapshot.
+                    </div>
+                </div>
+            `;
+        } else if (step === 2) {
+            // STEP 2: Confirm Wallet Closing Balances (Continuous Carry-Forward)
+            const wallets = Object.values(storage.state.wallets || {});
+            const walletRows = wallets.map(w => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.1rem;">${w.region === 'JP' ? '🇯🇵' : '🇮🇳'}</span>
+                        <strong style="font-size: 0.88rem;">${w.id}</strong>
+                    </div>
+                    <div class="font-bold privacy-blur" style="font-size: 0.95rem;">${this.formatMoney(w.balance, w.currency || (w.region === 'JP' ? '¥' : '₹'))}</div>
+                </div>
+            `).join('');
+
+            contentEl.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="padding: 14px 18px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-md);">
+                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #34d399;">Step 2: Wallet Balance Carry-Forward Reconciliation</h4>
+                        <p class="text-xs text-muted" style="margin: 0;"><strong>Mandatory Rule 6.1 Safeguard:</strong> The closing balances of all wallets carry forward continuously into next month as opening balances. Wallets are never reset to zero and no artificial transactions or fake incomes are created.</p>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        ${walletRows}
+                    </div>
+                </div>
+            `;
+        } else if (step === 3) {
+            // STEP 3: Configure Next Month's Budgets (Section 6.2 rule: limit carried forward, NOT cushion!)
+            const opt = this.closingWizardState.budgetOption;
+            const currentJpLimit = storage.state.jpTotalBudget || 0;
+
+            contentEl.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="padding: 14px 18px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: var(--radius-md);">
+                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #fbbf24;">Step 3: Configure Budgets for Next Month (${nextMonth})</h4>
+                        <p class="text-xs text-muted" style="margin: 0;"><strong>Rule 6.2 Carry-Forward Guarantee:</strong> Carry forward the allocated budget limit, NOT the unspent budget cushion. Unspent money is never treated as an automatic budget limit increase.</p>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div class="closing-option-box ${opt === 'copy' ? 'selected' : ''}" onclick="app.onClosingBudgetOptionChange('copy')">
+                            <input type="radio" name="closing_budget_opt" ${opt === 'copy' ? 'checked' : ''} style="margin-top: 3px; accent-color: var(--accent);">
+                            <div>
+                                <strong style="font-size: 0.9rem;">1. Copy Previous Month's Limits (Recommended)</strong>
+                                <p class="text-xs text-muted" style="margin: 4px 0 0 0;">Preserves the identical Japan budget limit (${this.formatMoney(currentJpLimit, '¥')}) and all active category limits without alteration.</p>
+                            </div>
+                        </div>
+
+                        <div class="closing-option-box ${opt === 'copy-adjust' ? 'selected' : ''}" onclick="app.onClosingBudgetOptionChange('copy-adjust')">
+                            <input type="radio" name="closing_budget_opt" ${opt === 'copy-adjust' ? 'checked' : ''} style="margin-top: 3px; accent-color: var(--accent);">
+                            <div style="flex: 1;">
+                                <strong style="font-size: 0.9rem;">2. Copy & Adjust Limits (+/- %)</strong>
+                                <p class="text-xs text-muted" style="margin: 4px 0 6px 0;">Scale previous limits proportionally across all categories.</p>
+                                ${opt === 'copy-adjust' ? `
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
+                                        <label class="text-xs text-muted">Adjustment:</label>
+                                        <input type="number" id="closing-adjust-input" value="${this.closingWizardState.adjustmentPercent}" step="1" min="-50" max="100" style="width: 80px; padding: 6px 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;" onchange="app.closingWizardState.adjustmentPercent = Number(this.value); app.setClosingStep(3);">
+                                        <span class="text-xs font-bold">%</span>
+                                        <span class="text-xs text-muted">Resulting limit: <strong>${this.formatMoney(Math.round(currentJpLimit * (1 + (this.closingWizardState.adjustmentPercent / 100))), '¥')}</strong></span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <div class="closing-option-box ${opt === 'manual' ? 'selected' : ''}" onclick="app.onClosingBudgetOptionChange('manual')">
+                            <input type="radio" name="closing_budget_opt" ${opt === 'manual' ? 'checked' : ''} style="margin-top: 3px; accent-color: var(--accent);">
+                            <div style="flex: 1;">
+                                <strong style="font-size: 0.9rem;">3. Configure Next Month's Budgets Manually</strong>
+                                <p class="text-xs text-muted" style="margin: 4px 0 6px 0;">Specify custom overall Japan budget limit.</p>
+                                ${opt === 'manual' ? `
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
+                                        <label class="text-xs text-muted">Overall Japan Limit (¥):</label>
+                                        <input type="number" id="closing-manual-jp-input" value="${this.closingWizardState.customJpBudget}" step="1000" min="0" style="width: 140px; padding: 6px 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;" onchange="app.closingWizardState.customJpBudget = Number(this.value)">
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (step === 4) {
+            // STEP 4: Review Next Month's Opening State
+            let calculatedNextJpBudget = storage.state.jpTotalBudget || 0;
+            if (this.closingWizardState.budgetOption === 'copy-adjust') {
+                calculatedNextJpBudget = Math.round(calculatedNextJpBudget * (1 + (this.closingWizardState.adjustmentPercent / 100)));
+            } else if (this.closingWizardState.budgetOption === 'manual') {
+                calculatedNextJpBudget = this.closingWizardState.customJpBudget || 0;
+            }
+
+            contentEl.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="padding: 14px 18px; background: rgba(62, 99, 221, 0.08); border: 1px solid rgba(62, 99, 221, 0.2); border-radius: var(--radius-md);">
+                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #a5b4fc;">Step 4: Preview Opening State for ${nextMonth}</h4>
+                        <p class="text-xs text-muted" style="margin: 0;">Verify next month's opening state prior to final confirmation.</p>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div style="background: rgba(255, 255, 255, 0.02); padding: 14px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.06);">
+                            <span class="text-xs text-muted">Next Active Month</span>
+                            <div class="font-bold text-primary" style="font-size: 1.15rem; margin-top: 4px;">${nextMonth}</div>
+                            <span class="text-xs text-muted mt-2" style="display: block;">Continuous ledger transitions forward</span>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.02); padding: 14px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.06);">
+                            <span class="text-xs text-muted">Allocated Monthly Budget Limit</span>
+                            <div class="font-bold text-success privacy-blur" style="font-size: 1.15rem; margin-top: 4px;">${this.formatMoney(calculatedNextJpBudget, '¥')}</div>
+                            <span class="text-xs text-muted mt-2" style="display: block;">Budget carry-forward rule strictly applied</span>
+                        </div>
+                    </div>
+
+                    <div style="padding: 12px; background: rgba(0, 0, 0, 0.2); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-secondary);">
+                        All ${Object.keys(storage.state.wallets || {}).length} wallets will open with their exact continuous closing balances.
+                    </div>
+                </div>
+            `;
+        } else if (step === 5) {
+            // STEP 5: Confirm Closing
+            contentEl.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                    <div style="padding: 16px 20px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); text-align: center;">
+                        <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); color: #34d399; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
+                            <i data-lucide="lock" style="width: 22px; height: 22px;"></i>
+                        </div>
+                        <h3 style="margin: 0 0 6px 0; font-size: 1.15rem; font-weight: 700;">Final Confirmation: Close Month ${curMonth}</h3>
+                        <p class="text-xs text-muted" style="margin: 0;">
+                            Month <code>${curMonth}</code> will be frozen and permanently recorded in <code>closedMonths</code>.
+                            The application will advance to <code>${nextMonth}</code>.
+                        </p>
+                    </div>
+
+                    <div style="padding: 12px 14px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
+                        ✓ Wallet balances continue seamlessly without artificial adjustments.<br>
+                        ✓ Continuous transaction ledger remains intact.<br>
+                        ✓ Snapshots capture categories and limits for audit reconstruction.
+                    </div>
+                </div>
+            `;
+        }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    onClosingBudgetOptionChange(opt) {
+        this.closingWizardState.budgetOption = opt;
+        this.setClosingStep(3);
+    }
+
+    executeMonthlyClosing() {
+        const curMonth = this.closingWizardState.monthKey;
+        const nextMonth = this.closingWizardState.nextMonthKey;
+
+        // Calculate next budget limit
+        let nextJpBudget = storage.state.jpTotalBudget || 0;
+        if (this.closingWizardState.budgetOption === 'copy-adjust') {
+            nextJpBudget = Math.round(nextJpBudget * (1 + (this.closingWizardState.adjustmentPercent / 100)));
+        } else if (this.closingWizardState.budgetOption === 'manual') {
+            nextJpBudget = this.closingWizardState.customJpBudget || 0;
+        }
+
+        if (!storage.state.closedMonths) {
+            storage.state.closedMonths = {};
+        }
+
+        // Record permanent month snapshot in closedMonths with category configuration snapshot
+        storage.state.closedMonths[curMonth] = {
+            monthKey: curMonth,
+            label: curMonth,
+            closedAt: new Date().toISOString(),
+            walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets)),
+            categoriesSnapshot: JSON.parse(JSON.stringify(storage.state.categories)),
+            jpTotalBudget: storage.state.jpTotalBudget,
+            status: 'closed'
+        };
+
+        // Derive history view directly from closedMonths
+        storage.state.history = Object.values(storage.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+        if (typeof storage._attachHistoryGetters === 'function') {
+            storage._attachHistoryGetters(storage.state);
+        }
+
+        // Advance current month key and set next allocated budget limit
+        storage.state.currentMonthKey = nextMonth;
+        storage.state.jpTotalBudget = nextJpBudget;
+
+        // Persist safely to local and cloud
+        storage.saveData();
+
+        // Close wizard modal
+        this.closeClosingWizard();
+
+        // Refresh all application views
+        this.renderAll();
+        if (this.currentView === 'reports-view') {
+            this.reportMonthKey = nextMonth;
+            this.renderReportsPage();
+        } else if (this.currentView === 'budgets-view') {
+            this.renderBudgetsPage();
+        }
+
+        alert(`Month ${curMonth} successfully closed! Next month ${nextMonth} is now active with Japan budget limit ${this.formatMoney(nextJpBudget, '¥')}.`);
+    }
+
+    // =========================================================================
+    // PHASE 4: BUDGETS & CATEGORY MANAGEMENT CENTRE
+    // =========================================================================
+
+    setBudgetsRegion(region) {
+        if (region !== 'JP' && region !== 'IN') return;
+        this.budgetsRegion = region;
+        const selector = document.getElementById('budgets-country-selector');
+        if (selector) {
+            selector.querySelectorAll('.segment-btn').forEach(btn => {
+                if (btn.getAttribute('data-region') === region) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+        this.renderBudgetsPage();
+    }
+
+    toggleCategoryExpand(catId) {
+        const card = document.getElementById(`budget-cat-card-${catId}`);
+        if (card) {
+            card.classList.toggle('expanded');
+        }
+    }
+
+    renderBudgetsPage() {
+        const currency = this.budgetsRegion === 'JP' ? '¥' : '₹';
+        const curMonth = (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
+
+        // Update active month label
+        const monthLabel = document.getElementById('budgets-month-label');
+        if (monthLabel) {
+            monthLabel.innerText = curMonth;
+        }
+
+        // Transactions in active month
+        const allTxs = storage.state.transactions || [];
+        const monthTxs = allTxs.filter(t => (t.date || '').startsWith(curMonth) && t.region === this.budgetsRegion);
+
+        // Calculate totals spent per category
+        const totals = {};
+        const txCounts = {};
+        monthTxs.forEach(tx => {
+            if (tx.type === 'expense') {
+                totals[tx.categoryId] = (totals[tx.categoryId] || 0) + Number(tx.amount || 0);
+                txCounts[tx.categoryId] = (tx.categoryId ? (txCounts[tx.categoryId] || 0) + 1 : 0);
+            }
+        });
+
+        const totalSpent = Object.values(totals).reduce((s, v) => s + v, 0);
+        const cats = storage.state.categories[this.budgetsRegion] || [];
+
+        // Sum of category allocations (only those configured to contribute)
+        const allocatedBudget = this.budgetsRegion === 'JP'
+            ? (storage.state.jpTotalBudget || 0)
+            : cats.reduce((s, c) => s + (c.budget || 0), 0);
+
+        const sumCatLimits = cats.filter(c => c.contributesToTotalBudget !== false && c.isActive !== false).reduce((s, c) => s + (c.budget || 0), 0);
+        const cushion = Math.max(0, allocatedBudget - sumCatLimits);
+        const remaining = allocatedBudget - totalSpent;
+
+        // Render Summary Banner
+        const bannerEl = document.getElementById('budgets-summary-banner');
+        if (bannerEl) {
+            bannerEl.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <h3 style="margin: 0 0 2px 0; font-size: 1.15rem; font-weight: 800;">${this.budgetsRegion === 'JP' ? 'Japan (JPY)' : 'India (INR)'} Budget Overview</h3>
+                        <span class="text-xs text-muted">Continuous monthly limits across ${cats.length} registered categories</span>
+                    </div>
+                    ${cushion > 0 ? `<span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, currency)} unallocated cushion</span>` : ''}
+                </div>
+                <div class="budgets-summary-grid">
+                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
+                        <span class="text-xs text-muted">Allocated Budget</span>
+                        <div class="font-bold text-primary privacy-blur" style="font-size: 1.15rem; margin-top: 4px;">${this.formatMoney(allocatedBudget, currency)}</div>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
+                        <span class="text-xs text-muted">Total Spent</span>
+                        <div class="font-bold text-danger privacy-blur" style="font-size: 1.15rem; margin-top: 4px;">${this.formatMoney(totalSpent, currency)}</div>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
+                        <span class="text-xs text-muted">Remaining Balance</span>
+                        <div class="font-bold ${remaining >= 0 ? 'text-success' : 'text-danger'} privacy-blur" style="font-size: 1.15rem; margin-top: 4px;">${this.formatMoney(remaining, currency)}</div>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
+                        <span class="text-xs text-muted">Budget Utilization</span>
+                        <div class="font-bold highlight" style="font-size: 1.15rem; margin-top: 4px;">${allocatedBudget > 0 ? Math.round((totalSpent / allocatedBudget) * 100) : 0}%</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render Category Cards Grid
+        const gridEl = document.getElementById('budgets-categories-grid');
+        const countEl = document.getElementById('budgets-category-count');
+        if (countEl) countEl.innerText = `${cats.length} categories`;
+
+        if (gridEl) {
+            gridEl.innerHTML = cats.map(c => {
+                const spent = totals[c.id] || 0;
+                const budgetLimit = c.budget || 0;
+                const rem = budgetLimit - spent;
+                const pct = budgetLimit > 0 ? Math.min((spent / budgetLimit) * 100, 100) : 0;
+                const count = txCounts[c.id] || 0;
+                const avgSpend = count > 0 ? Math.round(spent / count) : 0;
+
+                let statusClass = 'safe';
+                let statusLabel = 'Safe';
+                if (c.isActive === false) {
+                    statusClass = 'archived';
+                    statusLabel = 'Archived';
+                } else if (budgetLimit > 0 && pct > 100) {
+                    statusClass = 'danger';
+                    statusLabel = 'Over Budget';
+                } else if (budgetLimit > 0 && pct >= 75) {
+                    statusClass = 'warn';
+                    statusLabel = `${Math.round(pct)}% Used`;
+                } else if (budgetLimit === 0) {
+                    statusClass = 'safe';
+                    statusLabel = 'Uncapped';
+                }
+
+                let barClass = 'neon-safe';
+                if (pct > 90) barClass = 'neon-danger';
+                else if (pct > 75) barClass = 'neon-warn';
+
+                return `
+                    <div class="card budget-cat-card" id="budget-cat-card-${c.id}" onclick="app.toggleCategoryExpand('${c.id}')">
+                        <div class="budget-cat-top">
+                            <div class="budget-cat-info">
+                                <div class="budget-cat-icon">
+                                    <i data-lucide="${c.icon || 'tag'}" style="width: 18px; height: 18px;"></i>
+                                </div>
+                                <div>
+                                    <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">${c.name}</h4>
+                                    <span class="text-xs text-muted">${c.region || this.budgetsRegion}</span>
+                                </div>
+                            </div>
+                            <span class="budget-status-tag ${statusClass}">${statusLabel}</span>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 0.85rem; margin-top: 4px;">
+                            <span class="text-muted">Spent: <strong class="text-primary privacy-blur">${this.formatMoney(spent, currency)}</strong></span>
+                            <span class="text-muted">Limit: <strong class="privacy-blur">${budgetLimit > 0 ? this.formatMoney(budgetLimit, currency) : 'No limit'}</strong></span>
+                        </div>
+
+                        ${budgetLimit > 0 ? `
+                            <div class="neon-bar-bg" style="height: 6px; border-radius: 9999px;">
+                                <div class="neon-bar-fill ${barClass}" style="width: ${pct}%; height: 100%;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem;" class="text-muted">
+                                <span>${Math.round(pct)}% used</span>
+                                <span class="privacy-blur ${rem < 0 ? 'text-danger' : 'text-success'}">${rem >= 0 ? `${this.formatMoney(rem, currency)} left` : `${this.formatMoney(Math.abs(rem), currency)} over`}</span>
+                            </div>
+                        ` : ''}
+
+                        <!-- Expandable Details Section -->
+                        <div class="budget-cat-expand" onclick="event.stopPropagation()">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem;">
+                                <div>Transactions: <strong>${count}</strong></div>
+                                <div>Avg / Tx: <strong class="privacy-blur">${this.formatMoney(avgSpend, currency)}</strong></div>
+                                <div>In Overview: <strong>${c.hiddenFromBudgetOverview ? 'Hidden' : 'Visible'}</strong></div>
+                                <div>In Total Budget: <strong>${c.contributesToTotalBudget === false ? 'Excluded' : 'Included'}</strong></div>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
+                                <button class="btn btn-secondary btn-sm" onclick="app.openCategoryManageModal('${c.id}', '${this.budgetsRegion}')">
+                                    <i data-lucide="edit" style="width: 12px; height: 12px;"></i>
+                                    <span>Configure Category</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    // Lucide Icons Collection (~160 Monochrome SVG Icons)
+    static get LucideIcons() {
+        return [
+            'shopping-basket', 'shopping-bag', 'shopping-cart', 'utensils', 'coffee', 'beer', 'wine', 'pizza',
+            'train-front', 'car', 'bus', 'fuel', 'plane', 'bike', 'zap', 'flame', 'droplet', 'wifi',
+            'tv', 'radio', 'phone', 'smartphone', 'laptop', 'monitor', 'tablet', 'camera', 'headphones',
+            'gamepad-2', 'heart-pulse', 'pill', 'stethoscope', 'activity', 'dumbbell', 'sparkles', 'scissors',
+            'shirt', 'watch', 'gem', 'glasses', 'home', 'building', 'hotel', 'warehouse', 'key',
+            'wrench', 'hammer', 'shield', 'shield-check', 'lock', 'unlock', 'credit-card', 'landmark',
+            'banknote', 'coins', 'wallet', 'piggy-bank', 'badge-percent', 'receipt', 'file-text', 'file-check',
+            'briefcase', 'graduation-cap', 'book-open', 'book', 'newspaper', 'music', 'video', 'clapperboard',
+            'ticket', 'gift', 'tag', 'package', 'truck', 'box', 'send', 'mail', 'inbox',
+            'calendar', 'clock', 'alarm-clock', 'bell', 'compass', 'map-pin', 'map', 'navigation',
+            'globe', 'sun', 'moon', 'cloud', 'umbrella', 'thermometer', 'cake', 'apple',
+            'croissant', 'flower-2', 'tree-pine', 'trees', 'paw-print', 'dog', 'cat', 'baby',
+            'user', 'users', 'user-check', 'smile', 'heart', 'star', 'award', 'flag',
+            'bookmark', 'lightbulb', 'cpu', 'database', 'server', 'hard-drive', 'cloud-rain', 'flame-kindling',
+            'plug', 'battery-charging', 'printer', 'scale', 'calculator', 'trending-up', 'trending-down', 'pie-chart',
+            'bar-chart-3', 'dollar-sign', 'help-circle', 'alert-circle', 'info', 'archive', 'trash-2', 'check-circle-2',
+            'x-circle', 'refresh-cw', 'layers', 'sliders', 'settings', 'layout-grid', 'grid', 'list',
+            'folder', 'folder-open', 'paperclip', 'external-link', 'crosshair', 'target', 'life-buoy', 'anchor',
+            'power', 'zap-off', 'rss', 'search', 'filter', 'check', 'x', 'edit', 'pencil', 'plus'
+        ];
+    }
+
+    openCategoryManageModal(catId = null, region = null) {
+        this.editingCatId = catId;
+        const targetRegion = region || this.budgetsRegion || 'JP';
+
+        const titleEl = document.getElementById('cat-modal-title');
+        const idInput = document.getElementById('cat-edit-id');
+        const nameInput = document.getElementById('cat-edit-name');
+        const countrySelect = document.getElementById('cat-edit-country');
+        const budgetInput = document.getElementById('cat-edit-budget');
+        const currLabel = document.getElementById('cat-edit-curr-label');
+        const activeToggle = document.getElementById('cat-toggle-active');
+        const overviewToggle = document.getElementById('cat-toggle-overview');
+        const contributeToggle = document.getElementById('cat-toggle-contribute');
+        const archiveBtn = document.getElementById('cat-btn-archive');
+        const archiveText = document.getElementById('cat-btn-archive-text');
+
+        if (currLabel) currLabel.innerText = targetRegion === 'JP' ? '¥' : '₹';
+
+        let category = null;
+        if (catId) {
+            category = (storage.state.categories[targetRegion] || []).find(c => c.id === catId);
+        }
+
+        if (category) {
+            if (titleEl) titleEl.innerText = `Edit ${category.name}`;
+            if (idInput) idInput.value = category.id;
+            if (nameInput) nameInput.value = category.name;
+            if (countrySelect) countrySelect.value = targetRegion;
+            if (budgetInput) budgetInput.value = category.budget || 0;
+            this.selectedCatIcon = category.icon || 'tag';
+            if (activeToggle) activeToggle.checked = (category.isActive !== false);
+            if (overviewToggle) overviewToggle.checked = !category.hiddenFromBudgetOverview;
+            if (contributeToggle) contributeToggle.checked = (category.contributesToTotalBudget !== false);
+            if (archiveBtn) {
+                archiveBtn.style.display = 'inline-flex';
+                if (archiveText) archiveText.innerText = (category.isActive === false) ? 'Unarchive Category' : 'Archive Category';
+            }
+        } else {
+            if (titleEl) titleEl.innerText = 'Create New Category';
+            if (idInput) idInput.value = '';
+            if (nameInput) nameInput.value = '';
+            if (countrySelect) countrySelect.value = targetRegion;
+            if (budgetInput) budgetInput.value = 0;
+            this.selectedCatIcon = 'tag';
+            if (activeToggle) activeToggle.checked = true;
+            if (overviewToggle) overviewToggle.checked = true;
+            if (contributeToggle) contributeToggle.checked = true;
+            if (archiveBtn) archiveBtn.style.display = 'none';
+        }
+
+        // Update selected icon preview
+        this.selectCategoryIcon(this.selectedCatIcon);
+
+        // Render Lucide Icon Picker Grid
+        this.filterCategoryIcons('');
+
+        const modal = document.getElementById('category-manage-modal');
+        if (modal) modal.classList.add('active');
+    }
+
+    closeCategoryManageModal() {
+        const modal = document.getElementById('category-manage-modal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    filterCategoryIcons(query = '') {
+        const grid = document.getElementById('cat-icons-picker-grid');
+        if (!grid) return;
+
+        const q = (query || '').toLowerCase().trim();
+        const icons = App.LucideIcons.filter(name => !q || name.includes(q));
+
+        grid.innerHTML = icons.map(icon => `
+            <div class="icon-picker-cell ${icon === this.selectedCatIcon ? 'selected' : ''}" onclick="app.selectCategoryIcon('${icon}')" title="${icon}">
+                <i data-lucide="${icon}" style="width: 16px; height: 16px;"></i>
+            </div>
+        `).join('');
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    selectCategoryIcon(iconName) {
+        this.selectedCatIcon = iconName;
+        const nameEl = document.getElementById('cat-selected-icon-name');
+        const prevEl = document.getElementById('cat-selected-icon-preview');
+        if (nameEl) nameEl.innerText = iconName;
+        if (prevEl) {
+            prevEl.setAttribute('data-lucide', iconName);
+        }
+
+        // Highlight selected cell
+        const cells = document.querySelectorAll('.icon-picker-cell');
+        cells.forEach(cell => {
+            if (cell.getAttribute('title') === iconName) {
+                cell.classList.add('selected');
+            } else {
+                cell.classList.remove('selected');
+            }
+        });
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    saveCategoryConfig() {
+        const idInput = document.getElementById('cat-edit-id');
+        const nameInput = document.getElementById('cat-edit-name');
+        const countrySelect = document.getElementById('cat-edit-country');
+        const budgetInput = document.getElementById('cat-edit-budget');
+        const activeToggle = document.getElementById('cat-toggle-active');
+        const overviewToggle = document.getElementById('cat-toggle-overview');
+        const contributeToggle = document.getElementById('cat-toggle-contribute');
+
+        const catName = (nameInput?.value || '').trim();
+        if (!catName) {
+            alert('Please enter a valid category name.');
+            return;
+        }
+
+        const catId = idInput?.value || '';
+        const region = countrySelect?.value || 'JP';
+        const budgetAmt = Math.max(0, Number(budgetInput?.value || 0));
+        const isActive = activeToggle ? activeToggle.checked : true;
+        const hiddenFromOverview = overviewToggle ? !overviewToggle.checked : false;
+        const contributesToTotal = contributeToggle ? contributeToggle.checked : true;
+
+        if (!storage.state.categories[region]) {
+            storage.state.categories[region] = [];
+        }
+
+        if (catId) {
+            // Edit existing category
+            const cat = storage.state.categories[region].find(c => c.id === catId);
+            if (cat) {
+                cat.name = catName;
+                cat.icon = this.selectedCatIcon;
+                cat.budget = budgetAmt;
+                cat.isActive = isActive;
+                cat.hiddenFromBudgetOverview = hiddenFromOverview;
+                cat.contributesToTotalBudget = contributesToTotal;
+            }
+        } else {
+            // Create new category
+            const newId = `${region.toLowerCase()}-${catName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString().slice(-4)}`;
+            storage.state.categories[region].push({
+                id: newId,
+                name: catName,
+                icon: this.selectedCatIcon,
+                budget: budgetAmt,
+                isActive: isActive,
+                hiddenFromBudgetOverview: hiddenFromOverview,
+                contributesToTotalBudget: contributesToTotal
+            });
+        }
+
+        storage.saveData();
+        this.closeCategoryManageModal();
+        this.renderAll();
+        if (this.currentView === 'budgets-view') {
+            this.renderBudgetsPage();
+        }
+        this.updateExpenseCategories();
+    }
+
+    toggleCategoryArchive() {
+        if (!this.editingCatId) return;
+        const region = document.getElementById('cat-edit-country')?.value || 'JP';
+        const cat = (storage.state.categories[region] || []).find(c => c.id === this.editingCatId);
+        if (!cat) return;
+
+        cat.isActive = !(cat.isActive !== false);
+        storage.saveData();
+        this.closeCategoryManageModal();
+        this.renderAll();
+        if (this.currentView === 'budgets-view') {
+            this.renderBudgetsPage();
+        }
+        this.updateExpenseCategories();
     }
 }
 const app = new App();
