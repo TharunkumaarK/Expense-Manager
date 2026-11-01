@@ -1,5 +1,5 @@
 class WalletManager {
-    
+
     // Return all transactions from continuous ledger
     getAllTransactions() {
         return (storage.state && Array.isArray(storage.state.transactions))
@@ -40,8 +40,8 @@ class WalletManager {
         }
 
         if (filters.excludeCategoryIds) {
-            const excludeSet = filters.excludeCategoryIds instanceof Set 
-                ? filters.excludeCategoryIds 
+            const excludeSet = filters.excludeCategoryIds instanceof Set
+                ? filters.excludeCategoryIds
                 : new Set(filters.excludeCategoryIds);
             if (excludeSet.size > 0) {
                 txs = txs.filter(tx => !tx.categoryId || !excludeSet.has(tx.categoryId));
@@ -74,8 +74,8 @@ class WalletManager {
                 const sc = (tx.sourceCurrency || '').toUpperCase();
                 const dc = (tx.destCurrency || '').toUpperCase();
                 return c === cur || sc === cur || dc === cur ||
-                       (cur === 'JPY' && (c === '¥' || sc === '¥')) ||
-                       (cur === 'INR' && (c === '₹' || dc === '₹'));
+                    (cur === 'JPY' && (c === '¥' || sc === '¥')) ||
+                    (cur === 'INR' && (c === '₹' || dc === '₹'));
             });
         }
 
@@ -183,7 +183,7 @@ class WalletManager {
         if (!wallet) return false;
 
         wallet.balance -= Number(amount);
-        
+
         const tx = {
             id: Date.now().toString(),
             type: 'expense',
@@ -195,7 +195,7 @@ class WalletManager {
             note,
             date
         };
-        
+
         storage.state.transactions.unshift(tx);
         this._sortContinuousTransactions();
         storage.saveData();
@@ -214,7 +214,7 @@ class WalletManager {
         if (!wallet) return false;
 
         wallet.balance += Number(amount);
-        
+
         const tx = {
             id: Date.now().toString(),
             type: 'income',
@@ -225,7 +225,7 @@ class WalletManager {
             note,
             date
         };
-        
+
         storage.state.transactions.unshift(tx);
         this._sortContinuousTransactions();
         storage.saveData();
@@ -242,7 +242,7 @@ class WalletManager {
 
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
-        
+
         if (!source || !dest) return false;
 
         source.balance -= Number(amount);
@@ -275,7 +275,7 @@ class WalletManager {
 
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
-        
+
         if (!source || !dest) return false;
 
         source.balance -= Number(sourceAmount);
@@ -300,7 +300,7 @@ class WalletManager {
         storage.saveData();
         return true;
     }
-    
+
     // Find transaction anywhere in continuous ledger (with legacy fallback)
     findTransaction(txId) {
         if (!storage.state) return null;
@@ -517,7 +517,7 @@ class WalletManager {
         if (storage.state?.categories?.[region]) {
             storage.state.categories[region].forEach(c => totals[c.id] = 0);
         }
-        
+
         const txs = this.getTransactions({
             region,
             type: 'expense',
@@ -569,11 +569,11 @@ class WalletManager {
         const today = new Date();
         const drawDay = config.emiDrawDate || 7;
         let nextEmiDate = new Date(today.getFullYear(), today.getMonth(), drawDay);
-        
+
         if (today.getDate() >= drawDay) {
             nextEmiDate.setMonth(nextEmiDate.getMonth() + 1);
         }
-        
+
         const diffTime = nextEmiDate - today;
         const daysUntilNextEmi = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         const nextEmiDateStr = nextEmiDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
