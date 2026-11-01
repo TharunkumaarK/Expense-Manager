@@ -1,25 +1,25 @@
 :root {
     /* ==========================================================================
-       Background & Surface Elevations
+       Background & Surface Elevations (Neutral Black Specification)
        ========================================================================== */
-    --bg-app: #08080c;
-    --bg-workspace: #08080c;
-    --bg-sidebar: #0e0e15;
-    --bg-surface-1: #0e0e15;
-    --bg-surface-2: #14141e;
-    --bg-surface-3: #1b1b28;
+    --bg-app: #000000;
+    --bg-workspace: #000000;
+    --bg-sidebar: #0a0a0a;
+    --bg-surface-1: #0a0a0a;
+    --bg-surface-2: #121212;
+    --bg-surface-3: #181818;
     --bg-card: var(--bg-surface-2);
     --bg-elevated: var(--bg-surface-3);
-    --bg-modal: #161622;
-    --bg-overlay: rgba(6, 6, 10, 0.78);
-    --bg-glass: rgba(14, 14, 21, 0.82);
-    --bg-glass-card: rgba(20, 20, 30, 0.65);
+    --bg-modal: #161616;
+    --bg-overlay: rgba(0, 0, 0, 0.78);
+    --bg-glass: rgba(10, 10, 10, 0.85);
+    --bg-glass-card: rgba(18, 18, 18, 0.70);
     --bg-surface-hover: rgba(255, 255, 255, 0.04);
     --bg-surface-active: rgba(255, 255, 255, 0.08);
 
     /* Legacy aliases for backward compatibility */
     --bg-main: var(--bg-app);
-    --gradient-primary: linear-gradient(135deg, #3e63dd, #bf5af2);
+    --gradient-primary: linear-gradient(135deg, #3e63dd, #222222);
 
     /* ==========================================================================
        Borders & Dividers
@@ -4701,21 +4701,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 /* ==========================================================================
-   PHASE 4: LIQUID GLASS DESIGN SYSTEM
+   PHASE 4 & 5: LIQUID GLASS DESIGN SYSTEM (NEUTRAL BLACK SPECIFICATION)
    ========================================================================== */
 :root {
-    --glass-bg: rgba(18, 20, 29, 0.70);
-    --glass-bg-subtle: rgba(22, 25, 36, 0.55);
-    --glass-bg-card: rgba(24, 27, 40, 0.65);
-    --glass-bg-elevated: rgba(30, 34, 52, 0.85);
+    --glass-bg: rgba(14, 14, 14, 0.75);
+    --glass-bg-subtle: rgba(18, 18, 18, 0.60);
+    --glass-bg-card: rgba(18, 18, 18, 0.70);
+    --glass-bg-elevated: rgba(26, 26, 26, 0.88);
     --glass-border: 1px solid rgba(255, 255, 255, 0.08);
     --glass-border-highlight: 1px solid rgba(255, 255, 255, 0.14);
     --glass-border-subtle: 1px solid rgba(255, 255, 255, 0.05);
-    --glass-blur: blur(16px) saturate(140%);
-    --glass-blur-heavy: blur(24px) saturate(160%);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
-    --glass-shadow-elevated: 0 16px 48px 0 rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
-    --glass-reflection: radial-gradient(circle at top left, rgba(255, 255, 255, 0.04) 0%, transparent 60%);
+    --glass-blur: blur(16px) saturate(120%);
+    --glass-blur-heavy: blur(24px) saturate(130%);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.65), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    --glass-shadow-elevated: 0 16px 48px 0 rgba(0, 0, 0, 0.80), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+    --glass-reflection: radial-gradient(circle at top left, rgba(255, 255, 255, 0.035) 0%, transparent 60%);
 }
 
 .liquid-glass {
@@ -4740,7 +4740,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 @supports not (backdrop-filter: blur(1px)) {
     .liquid-glass {
-        background: #141622 !important;
+        background: #141414 !important;
     }
 }
 
@@ -5389,6 +5389,406 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     align-items: center;
     font-size: 0.82rem;
     color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   PHASE 5: ACCOUNT POPOVER MENU (SIDEBAR FOOTER)
+   ========================================================================== */
+.sidebar-footer {
+    position: relative;
+}
+
+#sidebar-account-card {
+    cursor: pointer;
+    transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+#sidebar-account-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.account-popover-menu {
+    position: absolute;
+    bottom: 74px;
+    left: 12px;
+    width: 236px;
+    background: var(--glass-bg-elevated);
+    backdrop-filter: var(--glass-blur-heavy);
+    -webkit-backdrop-filter: var(--glass-blur-heavy);
+    border: var(--glass-border-highlight);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--glass-shadow-elevated);
+    padding: 8px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 100;
+}
+
+.account-popover-menu.active {
+    display: flex;
+}
+
+.desktop-sidebar.collapsed .account-popover-menu {
+    bottom: 12px;
+    left: 76px;
+}
+
+.account-popover-header {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.account-popover-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.account-popover-email {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-popover-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 4px 0;
+}
+
+.account-popover-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--duration-fast) var(--ease-out);
+    width: 100%;
+}
+
+.account-popover-item:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.account-popover-item.text-danger:hover {
+    color: var(--red);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.account-popover-status {
+    padding: 6px 10px;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ==========================================================================
+   PHASE 5: SETTINGS WORKSPACE (TWO-COLUMN NEUTRAL BLACK GLASS LAYOUT)
+   ========================================================================== */
+.settings-workspace-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 24px;
+    align-items: start;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 8px 0 40px 0;
+}
+
+.settings-nav-rail {
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--glass-shadow);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: sticky;
+    top: calc(var(--header-height) + 16px);
+}
+
+.settings-nav-header {
+    padding: 4px 8px 10px 8px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-nav-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.settings-nav-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.settings-tab-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+    width: 100%;
+}
+
+.settings-tab-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.settings-tab-btn.active {
+    color: #ffffff;
+    background: rgba(62, 99, 221, 0.16);
+    border: 1px solid rgba(62, 99, 221, 0.35);
+    font-weight: 600;
+}
+
+.settings-tab-btn.active svg {
+    color: var(--accent);
+}
+
+.settings-tab-btn svg {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+.settings-main-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+}
+
+.settings-section-card {
+    display: none;
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--glass-shadow);
+    padding: 24px;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.settings-section-card.active {
+    display: flex;
+}
+
+.settings-sec-header {
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 14px;
+}
+
+.settings-sec-header h2 {
+    margin: 0 0 4px 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.settings-sec-header p {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.settings-group-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: -4px;
+}
+
+.settings-form-row {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 20px;
+    align-items: start;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.settings-form-row:last-child {
+    border-bottom: none;
+}
+
+.settings-row-label {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+}
+
+.settings-row-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.settings-control-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 440px;
+}
+
+.settings-input,
+.settings-select {
+    width: 100%;
+    padding: 9px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.88rem;
+    transition: all var(--duration-fast) var(--ease-out);
+}
+
+.settings-input:focus,
+.settings-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.2);
+}
+
+.settings-input[readonly] {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.settings-info-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-callout {
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.settings-theme-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+}
+
+.theme-swatches {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.theme-swatch {
+    width: 60px;
+    height: 56px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 6px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.settings-backup-preview-box {
+    margin-top: 10px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+@media (max-width: 900px) {
+    .settings-workspace-layout {
+        grid-template-columns: 1fr;
+    }
+    .settings-nav-rail {
+        position: static;
+    }
+    .settings-tab-list {
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 4px;
+    }
+    .settings-tab-btn {
+        white-space: nowrap;
+    }
+    .settings-form-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
 }
 
 /* Accessibility: prefers-reduced-motion */

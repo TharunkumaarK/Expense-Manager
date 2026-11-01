@@ -212,13 +212,47 @@
                 </nav>
 
                 <!-- Footer: Sync Status & Account -->
-                <div class="sidebar-footer">
+                <div class="sidebar-footer" style="position: relative;">
+                    <!-- Account Popover Menu -->
+                    <div class="account-popover-menu" id="sidebar-account-menu">
+                        <div class="account-popover-header">
+                            <span class="account-popover-name" id="popover-account-name">Account</span>
+                            <span class="account-popover-email" id="popover-account-email">user@example.com</span>
+                        </div>
+                        <div class="account-popover-status">
+                            <span class="sync-dot" style="width: 7px; height: 7px; background: #22c55e; border-radius: 50%;"></span>
+                            <span id="popover-sync-label">Cloud Synced (nyetklojxqnawdtrrhma)</span>
+                        </div>
+                        <div class="account-popover-divider"></div>
+                        <button class="account-popover-item" onclick="app.navigateToSettingsSection('profile')">
+                            <i data-lucide="user"></i>
+                            <span>Profile & Account</span>
+                        </button>
+                        <button class="account-popover-item" onclick="app.navigateToSettingsSection('regional')">
+                            <i data-lucide="globe"></i>
+                            <span>Regional Preferences</span>
+                        </button>
+                        <button class="account-popover-item" onclick="app.navigateToSettingsSection('security')">
+                            <i data-lucide="shield"></i>
+                            <span>Security & Auth</span>
+                        </button>
+                        <button class="account-popover-item" onclick="app.switchView('settings-view')">
+                            <i data-lucide="settings"></i>
+                            <span>All Settings</span>
+                        </button>
+                        <div class="account-popover-divider"></div>
+                        <button class="account-popover-item text-danger" onclick="supabaseClient.handleLogout()">
+                            <i data-lucide="log-out"></i>
+                            <span>Sign Out</span>
+                        </button>
+                    </div>
+
                     <div class="sync-status-indicator" id="sidebar-sync-indicator"
                         title="Cloud Sync Active (Development)">
                         <span class="sync-dot" id="sync-status-dot"></span>
                         <span class="sync-text sidebar-text" id="sync-status-text">Cloud Synced</span>
                     </div>
-                    <div class="account-card" id="sidebar-account-card">
+                    <div class="account-card" id="sidebar-account-card" onclick="app.toggleAccountMenu(event)" style="cursor: pointer;" title="Account menu">
                         <div class="account-avatar">
                             <span id="account-avatar-initials">TK</span>
                         </div>
@@ -226,7 +260,7 @@
                             <span class="account-name" id="desktop-account-name">Account</span>
                             <span class="account-email" id="desktop-account-email">user@example.com</span>
                         </div>
-                        <button class="account-logout-btn" onclick="supabaseClient.handleLogout()" title="Sign Out"
+                        <button class="account-logout-btn" onclick="event.stopPropagation(); supabaseClient.handleLogout()" title="Sign Out"
                             aria-label="Sign Out">
                             <i data-lucide="log-out"></i>
                         </button>
@@ -1257,195 +1291,459 @@
                         <div style="height: 80px;"></div>
                     </section>
 
-                    <!-- Settings View -->
+                    <!-- Settings View (Phase 5 Desktop Two-Column Layout) -->
                     <section id="settings-view" class="view">
                         <header class="top-bar">
-                            <h2>Settings</h2>
-                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
-                                aria-label="Reveal monetary values" title="Reveal monetary values">
-                                <i data-lucide="eye-off"></i>
-                            </button>
+                            <div class="view-header-content">
+                                <h2>Settings</h2>
+                                <p class="view-header-sub">Manage profile, regional formats, privacy, security and data</p>
+                            </div>
+                            <div class="view-header-actions">
+                                <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                                    aria-label="Reveal monetary values" title="Reveal monetary values">
+                                    <i data-lucide="eye-off"></i>
+                                </button>
+                            </div>
                         </header>
-                        <div class="content-padded" id="settings-content">
-                            <!-- Settings Content -->
-                            <div class="card mt-3" style="padding:0;">
-                                <div class="section-header-toggle"
-                                    onclick="app.toggleCollapse('settings-wallets-wrap', null)" style="padding: 16px;">
-                                    <div class="section-title"
-                                        style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main);">
-                                        <i data-lucide="wallet"
-                                            style="width:18px;height:18px;color:var(--text-muted);"></i> EDIT
-                                        WALLETS
+
+                        <div class="content-padded">
+                            <div class="settings-workspace-layout">
+                                <!-- Navigation Rail -->
+                                <aside class="settings-nav-rail">
+                                    <div class="settings-nav-title">Settings Navigation</div>
+                                    <div class="settings-tab-list">
+                                        <button class="settings-tab-btn active" data-section="profile" onclick="app.switchSettingsSection('profile')">
+                                            <i data-lucide="user"></i>
+                                            <span>Profile</span>
+                                        </button>
+                                        <button class="settings-tab-btn" data-section="regional" onclick="app.switchSettingsSection('regional')">
+                                            <i data-lucide="globe"></i>
+                                            <span>Regional Preferences</span>
+                                        </button>
+                                        <button class="settings-tab-btn" data-section="appearance" onclick="app.switchSettingsSection('appearance')">
+                                            <i data-lucide="palette"></i>
+                                            <span>Appearance</span>
+                                        </button>
+                                        <button class="settings-tab-btn" data-section="privacy" onclick="app.switchSettingsSection('privacy')">
+                                            <i data-lucide="eye-off"></i>
+                                            <span>Privacy</span>
+                                        </button>
+                                        <button class="settings-tab-btn" data-section="security" onclick="app.switchSettingsSection('security')">
+                                            <i data-lucide="shield"></i>
+                                            <span>Security</span>
+                                        </button>
+                                        <button class="settings-tab-btn" data-section="data" onclick="app.switchSettingsSection('data')">
+                                            <i data-lucide="database"></i>
+                                            <span>Data Management</span>
+                                        </button>
+                                        <button class="settings-tab-btn" data-section="about" onclick="app.switchSettingsSection('about')">
+                                            <i data-lucide="info"></i>
+                                            <span>About</span>
+                                        </button>
                                     </div>
-                                    <i data-lucide="edit-3" style="width:18px;height:18px;color:var(--text-muted);"></i>
-                                </div>
-                                <div id="settings-wallets-wrap" class="collapsible-wrapper collapsed">
-                                    <div>
-                                        <div style="padding: 0 16px 16px;">
-                                            <p class="help-text text-sm text-muted" style="margin: 0 0 12px 0;">Adjust
-                                                your current
-                                                wallet balances directly.</p>
-                                            <div id="settings-wallets-list">
-                                                <!-- Populated by JS -->
+                                </aside>
+
+                                <!-- Main Content Panel -->
+                                <div class="settings-main-panel">
+                                    <!-- 1. Profile Section -->
+                                    <div class="settings-section-card active" id="settings-sec-profile">
+                                        <div class="settings-sec-header">
+                                            <h2>Profile</h2>
+                                            <p>Manage your account identity and Supabase authentication details.</p>
+                                        </div>
+                                        <div class="settings-group">
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Display Name</div>
+                                                    <div class="settings-row-desc">Your personal name shown in the sidebar and reports.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <input type="text" id="setting-profile-name" class="settings-input" placeholder="Enter your display name" onchange="app.updateUserProfile('displayName', this.value)">
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Account Email</div>
+                                                    <div class="settings-row-desc">The primary email associated with your authenticated session.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <input type="email" id="setting-profile-email" class="settings-input" readonly>
+                                                    <span class="settings-info-badge"><i data-lucide="check-circle" style="width:13px;height:13px;color:#22c55e;"></i> Authenticated Supabase User</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Change Account Email</div>
+                                                    <div class="settings-row-desc">Request an email update through Supabase Auth. A confirmation link will be sent to the new address.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <div style="display:flex; gap:8px;">
+                                                        <input type="email" id="setting-new-email" class="settings-input" placeholder="new.email@example.com">
+                                                        <button class="btn btn-secondary btn-sm" onclick="app.handleUpdateEmail()">Request Change</button>
+                                                    </div>
+                                                    <div id="email-change-status" style="font-size:0.75rem; color:var(--text-muted); display:none;"></div>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Account Session</div>
+                                                    <div class="settings-row-desc">Terminate your active session on this device.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <button class="btn btn-danger btn-sm" onclick="supabaseClient.handleLogout()" style="width:fit-content;">
+                                                        <i data-lucide="log-out"></i>
+                                                        <span>Sign Out</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 2. Regional Preferences Section -->
+                                    <div class="settings-section-card" id="settings-sec-regional">
+                                        <div class="settings-sec-header">
+                                            <h2>Regional Preferences</h2>
+                                            <p>Configure regional presentation formats for currencies, numbers, and dates.</p>
+                                        </div>
+                                        <div class="settings-callout">
+                                            <strong style="color:var(--text-primary);">Financial Integrity Safeguard:</strong> Display preferences modify UI formatting only. They will never convert, rewrite, or mutate historical transaction amounts or wallet currency assignments.
+                                        </div>
+                                        <div class="settings-group">
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Default Region / Country</div>
+                                                    <div class="settings-row-desc">Primary geographic region for default view filters.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <select id="setting-default-country" class="settings-select" onchange="app.updateRegionalPreference('defaultCountry', this.value)">
+                                                        <option value="JP">🇯🇵 Japan (JPY ¥)</option>
+                                                        <option value="IN">🇮🇳 India (INR ₹)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Default Currency</div>
+                                                    <div class="settings-row-desc">Standard default currency for new wallets or quick filters.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <select id="setting-default-currency" class="settings-select" onchange="app.updateRegionalPreference('defaultCurrency', this.value)">
+                                                        <option value="JPY">JPY — Japanese Yen (¥)</option>
+                                                        <option value="INR">INR — Indian Rupee (₹)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Date Format</div>
+                                                    <div class="settings-row-desc">How dates are presented across the ledger and tables.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <select id="setting-date-format" class="settings-select" onchange="app.updateRegionalPreference('dateFormat', this.value)">
+                                                        <option value="YYYY-MM-DD">YYYY-MM-DD (2026-11-01)</option>
+                                                        <option value="DD/MM/YYYY">DD/MM/YYYY (01/11/2026)</option>
+                                                        <option value="MM/DD/YYYY">MM/DD/YYYY (11/01/2026)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Week Start Day</div>
+                                                    <div class="settings-row-desc">First day of the week for weekly analytics and filters.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <select id="setting-week-start" class="settings-select" onchange="app.updateRegionalPreference('weekStart', this.value)">
+                                                        <option value="monday">Monday (ISO 8601)</option>
+                                                        <option value="sunday">Sunday</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Number Formatting</div>
+                                                    <div class="settings-row-desc">Grouping system for large monetary quantities.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <select id="setting-number-format" class="settings-select" onchange="app.updateRegionalPreference('numberFormat', this.value)">
+                                                        <option value="standard">Standard Western (1,234,567.00)</option>
+                                                        <option value="lakhs">Indian System (12,34,567.00)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Timezone</div>
+                                                    <div class="settings-row-desc">Timezone for monthly closing calculations and report dates.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <select id="setting-timezone" class="settings-select" onchange="app.updateRegionalPreference('timezone', this.value)">
+                                                        <option value="Asia/Tokyo">Asia/Tokyo (JST, UTC+9)</option>
+                                                        <option value="Asia/Kolkata">Asia/Kolkata (IST, UTC+5:30)</option>
+                                                        <option value="UTC">UTC (Universal Coordinated Time)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 3. Appearance Section -->
+                                    <div class="settings-section-card" id="settings-sec-appearance">
+                                        <div class="settings-sec-header">
+                                            <h2>Appearance</h2>
+                                            <p>Visual theme and surface hierarchy settings.</p>
+                                        </div>
+                                        <div class="settings-callout">
+                                            <strong style="color:var(--text-primary);">Neutral Black System:</strong> Phase 5 enforces a pure neutral black financial dashboard aesthetic. All violet, blue, and purple background undertones have been removed. Light mode is not supported.
+                                        </div>
+                                        <div class="settings-group">
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Active Surface Theme</div>
+                                                    <div class="settings-row-desc">Currently applied color scheme across desktop and mobile.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <div class="settings-theme-preview">
+                                                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                                                            <span style="font-weight:700; font-size:0.9rem; color:#fff;">Neutral Obsidian Black (Phase 5)</span>
+                                                            <span class="settings-info-badge" style="color:var(--accent); border-color:rgba(62,99,221,0.3);">Active</span>
+                                                        </div>
+                                                        <div class="theme-swatches">
+                                                            <div class="theme-swatch" style="background:#000000;">#000000<br><span style="font-size:0.6rem;color:#888;">App BG</span></div>
+                                                            <div class="theme-swatch" style="background:#0a0a0a;">#0a0a0a<br><span style="font-size:0.6rem;color:#888;">Sidebar</span></div>
+                                                            <div class="theme-swatch" style="background:#121212;">#121212<br><span style="font-size:0.6rem;color:#888;">Surface</span></div>
+                                                            <div class="theme-swatch" style="background:#181818;">#181818<br><span style="font-size:0.6rem;color:#888;">Elevated</span></div>
+                                                            <div class="theme-swatch" style="background:#3e63dd;">#3e63dd<br><span style="font-size:0.6rem;color:#ddd;">Accent</span></div>
+                                                        </div>
+                                                        <p style="margin:0; font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
+                                                            Liquid Glass effects use neutral grey/white reflections with no color tints. Country badges preserve authentic Japan (Crimson) and India (Saffron/Green) identity colors.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 4. Privacy Section -->
+                                    <div class="settings-section-card" id="settings-sec-privacy">
+                                        <div class="settings-sec-header">
+                                            <h2>Privacy</h2>
+                                            <p>Configure screen monetary concealment and auto-masking behavior.</p>
+                                        </div>
+                                        <div class="settings-callout">
+                                            <strong style="color:var(--text-primary);">Concealment Behavior:</strong> When privacy mode is active, wallet balances, KPI values, report totals, and chart numbers are masked with a subtle frosted glass blur. Interactive toggles remain accessible via the header eye icon at all times.
+                                        </div>
+                                        <div class="settings-group">
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Default Monetary Concealment</div>
+                                                    <div class="settings-row-desc">Automatically conceal monetary amounts whenever the application loads.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                                                        <input type="checkbox" id="setting-privacy-default" onchange="app.updatePrivacyPreference('defaultConcealed', this.checked)" style="width:18px; height:18px; accent-color:var(--accent);">
+                                                        <span style="font-size:0.88rem; color:var(--text-primary);">Conceal monetary values on startup</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Inactivity Auto-Concealment</div>
+                                                    <div class="settings-row-desc">Automatically re-enable monetary masking after a period of user inactivity.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <select id="setting-privacy-timeout" class="settings-select" onchange="app.updatePrivacyPreference('timeoutMinutes', parseInt(this.value, 10))">
+                                                        <option value="1">1 minute of inactivity</option>
+                                                        <option value="3">3 minutes of inactivity</option>
+                                                        <option value="5">5 minutes of inactivity</option>
+                                                        <option value="10">10 minutes of inactivity</option>
+                                                        <option value="0">Never auto-conceal</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 5. Security Section -->
+                                    <div class="settings-section-card" id="settings-sec-security">
+                                        <div class="settings-sec-header">
+                                            <h2>Security</h2>
+                                            <p>Manage credentials, password changes, and active session safety.</p>
+                                        </div>
+                                        <div class="settings-group">
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Change Password</div>
+                                                    <div class="settings-row-desc">Update your login password using Supabase Auth encryption.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <input type="password" id="setting-new-password" class="settings-input" placeholder="New Password (min 6 chars)">
+                                                    <input type="password" id="setting-confirm-password" class="settings-input" placeholder="Confirm New Password">
+                                                    <button class="btn btn-secondary btn-sm" onclick="app.handleUpdatePassword()" style="width:fit-content;">Update Password</button>
+                                                    <div id="password-change-status" style="font-size:0.75rem; color:var(--text-muted); display:none;"></div>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Authentication Session</div>
+                                                    <div class="settings-row-desc">Session state verified by Supabase token management.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <div style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">
+                                                        Provider: <strong>Supabase Email Auth</strong><br>
+                                                        Encryption: <strong>TLS 1.3 / AES-256 Cloud Store</strong><br>
+                                                        Auto-Refresh: <strong>Enabled</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Session Termination</div>
+                                                    <div class="settings-row-desc">Securely clear cached session tokens and sign out.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <button class="btn btn-danger btn-sm" onclick="supabaseClient.handleLogout()" style="width:fit-content;">
+                                                        <i data-lucide="log-out"></i>
+                                                        <span>Sign Out Current Session</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 6. Data Management Section -->
+                                    <div class="settings-section-card" id="settings-sec-data">
+                                        <div class="settings-sec-header">
+                                            <h2>Data Management</h2>
+                                            <p>Export records, create complete JSON backups, or safely restore state.</p>
+                                        </div>
+                                        <div class="settings-callout">
+                                            <strong style="color:var(--text-primary);">Export Integrity Safeguard:</strong> All CSV and PDF exports preserve raw monetary values even when screen privacy concealment is enabled.
+                                        </div>
+                                        <div class="settings-group">
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Ledger Export (CSV)</div>
+                                                    <div class="settings-row-desc">Export the continuous financial ledger as an unmasked CSV spreadsheet.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <button class="btn btn-secondary btn-sm" onclick="app.exportTransactionsCsv()" style="width:fit-content;">
+                                                        <i data-lucide="download"></i>
+                                                        <span>Export Transactions CSV</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Statement Report (PDF)</div>
+                                                    <div class="settings-row-desc">Generate a clean, printable PDF statement of account balances and activity.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <button class="btn btn-secondary btn-sm" onclick="app.openPdfModal()" style="width:fit-content;">
+                                                        <i data-lucide="file-text"></i>
+                                                        <span>Download PDF Statement</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Full State Backup (JSON)</div>
+                                                    <div class="settings-row-desc">Download an encrypted, full snapshot containing wallets, transactions, monthly closings, report snapshots, and preferences.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <button class="btn btn-secondary btn-sm" onclick="storage.exportJSON()" style="width:fit-content;">
+                                                        <i data-lucide="hard-drive"></i>
+                                                        <span>Download Full Backup (JSON)</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Restore Data from Backup</div>
+                                                    <div class="settings-row-desc">Safely restore application state from a verified JSON backup file. Validates schema before applying changes.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <input type="file" id="setting-restore-file" accept=".json" style="display:none;" onchange="app.handleRestoreFileSelect(event)">
+                                                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('setting-restore-file').click()" style="width:fit-content;">
+                                                        <i data-lucide="upload"></i>
+                                                        <span>Select Backup File...</span>
+                                                    </button>
+
+                                                    <div id="restore-preview-container" class="settings-backup-preview-box" style="display:none;">
+                                                        <div style="font-size:0.82rem; font-weight:700; color:#fff;" id="restore-preview-title">Backup File Validated</div>
+                                                        <div style="font-size:0.75rem; color:var(--text-muted);" id="restore-preview-details"></div>
+                                                        <div style="display:flex; gap:8px; margin-top:4px;">
+                                                            <button class="btn btn-danger btn-sm" onclick="app.confirmRestore()">Confirm & Restore State</button>
+                                                            <button class="btn btn-secondary btn-sm" onclick="app.cancelRestore()">Cancel</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 7. About Section -->
+                                    <div class="settings-section-card" id="settings-sec-about">
+                                        <div class="settings-sec-header">
+                                            <h2>About</h2>
+                                            <p>System information, architecture version, and cloud synchronization.</p>
+                                        </div>
+                                        <div class="settings-group">
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Application</div>
+                                                    <div class="settings-row-desc">Expense Manager Desktop</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <div style="font-size:0.88rem; font-weight:600; color:#fff;">Expense Manager</div>
+                                                    <div style="font-size:0.78rem; color:var(--text-muted);">Version 4.5.0 (Phase 5 Desktop Obsidian)</div>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Cloud Synchronization</div>
+                                                    <div class="settings-row-desc">Current database target and cloud connectivity.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <div style="display:flex; align-items:center; gap:8px; font-size:0.82rem;">
+                                                        <span class="sync-dot" style="width:8px; height:8px; background:#22c55e; border-radius:50%;"></span>
+                                                        <span style="color:#fff; font-weight:600;" id="about-sync-status">Connected</span>
+                                                    </div>
+                                                    <div style="font-size:0.75rem; color:var(--text-muted);">
+                                                        Environment: <code>Development (nyetklojxqnawdtrrhma)</code><br>
+                                                        Last Synced: <span id="about-last-synced">Just now</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-form-row">
+                                                <div>
+                                                    <div class="settings-row-label">Privacy Architecture</div>
+                                                    <div class="settings-row-desc">Data residency and privacy implementation.</div>
+                                                </div>
+                                                <div class="settings-control-wrap">
+                                                    <p style="margin:0; font-size:0.78rem; color:var(--text-secondary); line-height:1.5;">
+                                                        Expense Manager operates on a consolidated local-first JSON document architecture with real-time Supabase cloud synchronization. Monetary concealment runs client-side without data loss.
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="card mt-3" style="padding:0;">
-                                <div class="section-header-toggle"
-                                    style="padding: 16px; display: flex; justify-content: space-between; align-items: center;">
-                                    <div onclick="app.toggleCollapse('settings-loan-wrap', this.querySelector('.chevron'))"
-                                        style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main); flex: 1; cursor: pointer;">
-                                        <i data-lucide="landmark"
-                                            style="width:18px;height:18px;color:var(--text-muted);"></i> LOAN
-                                        TRACKER
-                                        <i data-lucide="chevron-down" class="chevron"
-                                            style="width:18px;height:18px;color:var(--text-muted); transition: transform 0.3s;"></i>
-                                    </div>
-                                    <button class="icon-btn" onclick="app.toggleLoanVisibility()"
-                                        id="loan-visibility-btn"
-                                        style="color: var(--text-muted); padding: 5px; margin-left: 10px;"
-                                        title="Toggle Dashboard Visibility">
-                                        <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
-                                    </button>
-                                </div>
-                                <div id="settings-loan-wrap" class="collapsible-wrapper collapsed">
-                                    <div>
-                                        <div style="padding: 0 16px 16px;">
-                                            <p class="help-text text-sm text-muted mb-2">Update manually once a month
-                                                from your bank
-                                                app to stay in sync.</p>
-                                            <div class="form-group mt-2">
-                                                <label>Total Loan Amount (₹)</label>
-                                                <input type="number" id="setting-loan-total-principal"
-                                                    onblur="app.updateLoanSetting('totalPrincipal', this.value)">
-                                            </div>
-                                            <div class="form-group">
-                                                <label>Principal Left (₹)</label>
-                                                <input type="number" id="setting-loan-principal"
-                                                    onblur="app.updateLoanSetting('principalLeft', this.value)">
-                                            </div>
-                                            <div class="form-group">
-                                                <label>Total EMIs (Months)</label>
-                                                <input type="number" id="setting-loan-total-dues"
-                                                    onblur="app.updateLoanSetting('totalDues', this.value)">
-                                            </div>
-                                            <div class="form-group">
-                                                <label>EMIs Paid (Months)</label>
-                                                <input type="number" id="setting-loan-dues"
-                                                    onblur="app.updateLoanSetting('duesPaid', this.value)">
-                                            </div>
-                                            <div class="form-group">
-                                                <label>EMI Draw Date (Day of Month)</label>
-                                                <input type="number" id="setting-loan-date"
-                                                    onblur="app.updateLoanSetting('emiDrawDate', this.value)" min="1"
-                                                    max="31">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="card mt-3">
-                                <h3>Japan Total Budget</h3>
-                                <div class="form-group">
-                                    <label>Monthly Budget (¥)</label>
-                                    <input type="number" id="setting-jp-budget"
-                                        onblur="app.updateSetting('jpTotalBudget', this.value)">
-                                </div>
-                            </div>
-
-                            <div class="card mt-3" style="padding:0;">
-                                <div class="section-header-toggle"
-                                    onclick="app.toggleCollapse('settings-jp-cat-wrap', null)" style="padding: 16px;">
-                                    <div class="section-title"
-                                        style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main);">
-                                        <svg width="18" height="18" viewBox="0 0 36 36"
-                                            xmlns="http://www.w3.org/2000/svg">
-                                            <circle fill="#EEEEEE" cx="18" cy="18" r="18" />
-                                            <circle fill="#D80027" cx="18" cy="18" r="7" />
-                                        </svg>
-                                        EDIT JAPAN CATEGORIES
-                                    </div>
-                                    <i data-lucide="edit-3" style="width:18px;height:18px;color:var(--text-muted);"></i>
-                                </div>
-                                <div id="settings-jp-cat-wrap" class="collapsible-wrapper collapsed">
-                                    <div>
-                                        <div style="padding: 0 16px 16px;">
-                                            <p class="help-text text-sm text-muted" style="margin: 0 0 12px 0;">Set
-                                                budgets and
-                                                manage Japan categories.</p>
-                                            <div id="settings-categories-list"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="card mt-3" style="padding:0;">
-                                <div class="section-header-toggle"
-                                    onclick="app.toggleCollapse('settings-in-cat-wrap', null)" style="padding: 16px;">
-                                    <div class="section-title"
-                                        style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main);">
-                                        <svg width="18" height="18" viewBox="0 0 36 36"
-                                            xmlns="http://www.w3.org/2000/svg">
-                                            <clipPath id="circleViewINSettings">
-                                                <circle cx="18" cy="18" r="18" />
-                                            </clipPath>
-                                            <g clip-path="url(#circleViewINSettings)">
-                                                <rect x="0" y="0" width="36" height="12" fill="#FF9933" />
-                                                <rect x="0" y="12" width="36" height="12" fill="#FFFFFF" />
-                                                <rect x="0" y="24" width="36" height="12" fill="#138808" />
-                                                <circle cx="18" cy="18" r="3.5" fill="none" stroke="#000080"
-                                                    stroke-width="1.5" />
-                                                <circle cx="18" cy="18" r="0.8" fill="#000080" />
-                                            </g>
-                                        </svg>
-                                        EDIT INDIA CATEGORIES
-                                    </div>
-                                    <i data-lucide="edit-3" style="width:18px;height:18px;color:var(--text-muted);"></i>
-                                </div>
-                                <div id="settings-in-cat-wrap" class="collapsible-wrapper collapsed">
-                                    <div>
-                                        <div style="padding: 0 16px 16px;">
-                                            <p class="help-text text-sm text-muted" style="margin: 0 0 12px 0;">Manage
-                                                your India
-                                                spending categories.</p>
-                                            <div id="settings-in-categories-list"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="card mt-3">
-                                <h3>Close Month</h3>
-                                <button class="btn btn-danger" onclick="app.closeMonth()">Close Current Month</button>
-                                <p class="help-text">Archives current transactions and creates a snapshot.</p>
-                            </div>
-
-                            <div class="card mt-3">
-                                <h3>App Updates</h3>
-                                <p class="help-text text-sm text-muted mb-2">Force the app to fetch the latest version
-                                    of the code
-                                    if you are stuck on an old layout.</p>
-                                <button class="btn"
-                                    style="background:var(--card-bg-light);color:var(--text-main);border:1px solid var(--border);width:100%;"
-                                    onclick="app.forceUpdate()">Fetch Latest Version</button>
-                            </div>
-
-                            <div class="card mt-3">
-                                <h3>Statement Export</h3>
-                                <button class="btn mt-2" style="background:var(--accent);color:white;"
-                                    onclick="app.openPdfModal()">Download PDF Statement</button>
-                            </div>
-
-                            <div class="card mt-3">
-                                <h3>Account</h3>
-                                <p class="help-text text-sm text-muted mb-2" id="account-email-display">Logged in</p>
-                                <button class="btn"
-                                    style="background:rgba(239, 68, 68, 0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);width:100%;"
-                                    onclick="supabaseClient.handleLogout()">Log Out</button>
                             </div>
                         </div>
                         <div style="height: 80px;"></div>

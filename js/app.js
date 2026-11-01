@@ -293,6 +293,11 @@ class App {
         // Keyboard shortcuts (Escape key dismisses focus overlay and modals)
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                const menu = document.getElementById('sidebar-account-menu');
+                if (menu && menu.classList.contains('active')) {
+                    menu.classList.remove('active');
+                    return;
+                }
                 const overlay = document.getElementById('focus-overlay');
                 if (overlay && overlay.style.display !== 'none') {
                     this.closeFocusOverlay();
@@ -304,6 +309,17 @@ class App {
                         this.closeModal(mId);
                     }
                 });
+            }
+        });
+
+        // Close sidebar account popover on outside click
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('sidebar-account-menu');
+            const card = document.getElementById('sidebar-account-card');
+            if (menu && menu.classList.contains('active')) {
+                if (!menu.contains(e.target) && !card?.contains(e.target)) {
+                    menu.classList.remove('active');
+                }
             }
         });
     }
@@ -441,12 +457,18 @@ class App {
         const nameEl = document.getElementById('desktop-account-name');
         const emailEl = document.getElementById('desktop-account-email');
         const initialsEl = document.getElementById('account-avatar-initials');
+        const popoverNameEl = document.getElementById('popover-account-name');
+        const popoverEmailEl = document.getElementById('popover-account-email');
+
+        const customName = storage.state?.userProfile?.displayName;
 
         if (user) {
             const email = user.email || '';
-            const displayName = user.user_metadata?.full_name || email.split('@')[0] || 'User';
+            const displayName = customName || user.user_metadata?.full_name || email.split('@')[0] || 'User';
             if (nameEl) nameEl.innerText = displayName;
             if (emailEl) emailEl.innerText = email;
+            if (popoverNameEl) popoverNameEl.innerText = displayName;
+            if (popoverEmailEl) popoverEmailEl.innerText = email;
             if (initialsEl) {
                 const parts = displayName.trim().split(/\s+/);
                 const initials = parts.length > 1
@@ -455,8 +477,11 @@ class App {
                 initialsEl.innerText = initials || 'TK';
             }
         } else {
-            if (nameEl) nameEl.innerText = 'Personal';
+            const displayName = customName || 'Personal';
+            if (nameEl) nameEl.innerText = displayName;
             if (emailEl) emailEl.innerText = 'Connected';
+            if (popoverNameEl) popoverNameEl.innerText = displayName;
+            if (popoverEmailEl) popoverEmailEl.innerText = 'Connected (nyetklojxqnawdtrrhma)';
             if (initialsEl) initialsEl.innerText = 'TK';
         }
     }
@@ -1159,6 +1184,9 @@ class App {
 
     renderSettings() {
         if (this.currentView === 'settings-view') {
+            this.renderSettingsPage();
+
+            // Legacy mobile settings compatibility checks if elements are present
             const jpBudEl = document.getElementById('setting-jp-budget');
             if (jpBudEl) {
                 jpBudEl.value = storage.state.jpTotalBudget;
@@ -1166,114 +1194,328 @@ class App {
 
             if (storage.state.loanConfig) {
                 const loanTotalEl = document.getElementById('setting-loan-total-principal');
-                if (loanTotalEl) {
-                    loanTotalEl.value = storage.state.loanConfig.totalPrincipal;
-                }
-
+                if (loanTotalEl) loanTotalEl.value = storage.state.loanConfig.totalPrincipal;
                 const loanPrinEl = document.getElementById('setting-loan-principal');
-                if (loanPrinEl) {
-                    loanPrinEl.value = storage.state.loanConfig.principalLeft;
-                }
-
-                document.getElementById('setting-loan-total-dues').value = storage.state.loanConfig.totalDues;
-                document.getElementById('setting-loan-dues').value = storage.state.loanConfig.duesPaid;
+                if (loanPrinEl) loanPrinEl.value = storage.state.loanConfig.principalLeft;
+                const duesEl = document.getElementById('setting-loan-total-dues');
+                if (duesEl) duesEl.value = storage.state.loanConfig.totalDues;
+                const duesPaidEl = document.getElementById('setting-loan-dues');
+                if (duesPaidEl) duesPaidEl.value = storage.state.loanConfig.duesPaid;
                 const dateEl = document.getElementById('setting-loan-date');
                 if (dateEl) dateEl.value = storage.state.loanConfig.emiDrawDate || 7;
-
-                const btn = document.getElementById('loan-visibility-btn');
-                if (btn) {
-                    const isEnabled = storage.state.loanConfig.enabled !== false;
-                    btn.innerHTML = `<i data-lucide="${isEnabled ? 'eye' : 'eye-off'}" style="width: 18px; height: 18px;"></i>`;
-                    if (isEnabled) {
-                        btn.style.color = 'var(--text-muted)';
-                        btn.style.background = 'transparent';
-                    } else {
-                        btn.style.color = 'var(--red)';
-                        btn.style.background = 'rgba(239, 68, 68, 0.1)';
-                        btn.style.borderRadius = '5px';
-                    }
-                }
             }
 
-            // Render wallet balances
-            let walletHtml = '';
-            Object.values(storage.state.wallets).forEach(w => {
-                const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
-                walletHtml += `
-                    <div class="draggable-item" data-id="${w.id}" data-type="wallet" draggable="true" ondragstart="app.handleDragStart(event)" ondragover="app.handleDragOver(event)" ondrop="app.handleDrop(event, 'wallet')" ondragenter="app.handleDragEnter(event)" ondragleave="app.handleDragLeave(event)" ondragend="app.handleDragEnd(event)" style="padding:12px 0; border-bottom:1px solid var(--border); transition: all 0.2s ease;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="display:flex; align-items:center; gap:8px; font-size:0.9rem;">
-                                <i data-lucide="grip-vertical" style="color:var(--text-muted); cursor:grab; width:16px; height:16px;"></i>
-                                <span style="width:10px;height:10px;border-radius:50%;background:${w.color};flex-shrink:0;"></span>
-                                <i data-lucide="${icon}"></i> ${w.id} <small class="text-muted">(${w.currency})</small>
-                            </span>
-                            <div style="display:flex; align-items:center; gap:6px;">
+            const sWallets = document.getElementById('settings-wallets-list');
+            if (sWallets) {
+                let walletHtml = '';
+                Object.values(storage.state.wallets).forEach(w => {
+                    const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
+                    walletHtml += `
+                        <div class="draggable-item" data-id="${w.id}" data-type="wallet" draggable="true" style="padding:12px 0; border-bottom:1px solid var(--border);">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="display:flex; align-items:center; gap:8px; font-size:0.9rem;">
+                                    <span style="width:10px;height:10px;border-radius:50%;background:${w.color};flex-shrink:0;"></span>
+                                    <i data-lucide="${icon}"></i> ${w.id} <small class="text-muted">(${w.currency})</small>
+                                </span>
                                 <input type="number" value="${w.balance}" onblur="app.updateWalletBalance('${w.id}', this.value)" style="width:100px;">
-                                <button onclick="app.openColorPicker('${w.id}')" style="background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;padding:5px 8px;border-radius:6px;font-size:0.75rem;font-family:inherit;display:flex;align-items:center;gap:4px;"><i data-lucide="palette" style="width:13px;height:13px;"></i> Color</button>
-                                <button onclick="app.removeWallet('${w.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;padding:4px;display:flex;align-items:center;"><i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            const inputStyle = 'width:100%;padding:10px;background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-main);font-family:inherit;font-size:0.9rem;';
-            walletHtml += `
-                <div style="margin-top:16px;">
-                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Add New Wallet</div>
-                    <input type="text" id="new-wallet-name" placeholder="Wallet name (e.g. Rakuten Bank)" style="${inputStyle} margin-bottom:8px;">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-                        <select id="new-wallet-type" style="${inputStyle}">
-                            <option value="bank">🏦 Bank</option>
-                            <option value="digital">📱 Digital</option>
-                            <option value="cash">💵 Cash</option>
-                            <option value="card">💳 Card</option>
-                        </select>
-                        <select id="new-wallet-region" style="${inputStyle}">
-                            <option value="JP">🇯🇵 Japan (¥)</option>
-                            <option value="IN">🇮🇳 India (₹)</option>
-                        </select>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                        <div id="new-wallet-color-preview" style="width:38px;height:38px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,rgba(16,185,129,0.22),rgba(16,185,129,0.06));border:1px solid rgba(16,185,129,0.45);"></div>
-                        <button onclick="app.openColorPicker(null)" style="flex:1;padding:9px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-main);border-radius:var(--radius-sm);font-family:inherit;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><i data-lucide="palette" style="width:15px;height:15px;"></i> Pick Color</button>
-                        <input type="hidden" id="new-wallet-color" value="${WALLET_COLORS[0]}">
-                    </div>
-                    <button onclick="app.addWallet()" style="padding:10px;background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);font-weight:600;cursor:pointer;font-family:inherit;width:100%;">+ Add Wallet</button>
-                </div>
-            `;
-            document.getElementById('settings-wallets-list').innerHTML = walletHtml;
-
-            // Render JP category budgets with delete and add-new
-            const renderCats = (region, elId) => {
-                let catHtml = '';
-                storage.state.categories[region].forEach(c => {
-                    catHtml += `
-                        <div class="setting-row draggable-item" data-id="${c.id}" data-type="category" data-region="${region}" draggable="true" ondragstart="app.handleDragStart(event)" ondragover="app.handleDragOver(event)" ondrop="app.handleDrop(event, 'category', '${region}')" ondragenter="app.handleDragEnter(event)" ondragleave="app.handleDragLeave(event)" ondragend="app.handleDragEnd(event)" style="transition: all 0.2s ease;">
-                            <span style="display:flex; align-items:center; gap:8px;">
-                                <i data-lucide="grip-vertical" style="color:var(--text-muted); cursor:grab; width:16px; height:16px;"></i>
-                                <i data-lucide="${c.icon || 'tag'}"></i> ${c.name}
-                            </span>
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                ${region === 'JP' ? `<input type="number" value="${c.budget || 0}" onblur="app.updateCategoryBudget('${c.id}', this.value)" style="width:90px;">` : ''}
-                                <button onclick="app.removeCategory('${region}','${c.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;padding:4px;display:flex;align-items:center;"><i data-lucide="trash-2" style="width:16px;height:16px;"></i></button>
                             </div>
                         </div>
                     `;
                 });
-                catHtml += `
-                    <div class="add-category-form" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
-                        <div style="font-size:0.8rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Add New Category</div>
-                        <input type="text" id="new-cat-name-${region}" placeholder="Category name (e.g. Car / Parking)" style="width:100%;padding:10px;background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-main);font-family:inherit;font-size:0.9rem;">
-                        ${region === 'JP' ? `<input type="number" id="new-cat-budget-${region}" placeholder="Budget (¥, optional)" style="width:100%;padding:10px;background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-main);font-family:inherit;font-size:0.9rem;">` : ''}
-                        <button onclick="app.addCategory('${region}')" style="padding:10px;background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);font-weight:600;cursor:pointer;font-family:inherit;">+ Add Category</button>
-                    </div>
-                `;
-                document.getElementById(elId).innerHTML = catHtml;
-            };
+                sWallets.innerHTML = walletHtml;
+            }
+        }
+    }
 
-            renderCats('JP', 'settings-categories-list');
-            renderCats('IN', 'settings-in-categories-list');
+    renderSettingsPage() {
+        if (!storage.state.userProfile) {
+            storage.state.userProfile = { ...defaultState.userProfile };
+        }
+        if (!storage.state.regionalPreferences) {
+            storage.state.regionalPreferences = { ...defaultState.regionalPreferences };
+        }
+        if (!storage.state.privacyPreferences) {
+            storage.state.privacyPreferences = { ...defaultState.privacyPreferences };
+        }
+
+        const user = (typeof supabaseClient !== 'undefined' && supabaseClient.session) ? supabaseClient.session.user : null;
+        const profileNameInput = document.getElementById('setting-profile-name');
+        const profileEmailInput = document.getElementById('setting-profile-email');
+
+        if (profileNameInput) {
+            profileNameInput.value = storage.state.userProfile.displayName || (user ? (user.user_metadata?.full_name || '') : '');
+        }
+        if (profileEmailInput) {
+            profileEmailInput.value = user ? user.email : 'user@example.com (Connected)';
+        }
+
+        // Regional preferences
+        const reg = storage.state.regionalPreferences;
+        const countryEl = document.getElementById('setting-default-country');
+        if (countryEl) countryEl.value = reg.defaultCountry || 'JP';
+
+        const currEl = document.getElementById('setting-default-currency');
+        if (currEl) currEl.value = reg.defaultCurrency || 'JPY';
+
+        const dateEl = document.getElementById('setting-date-format');
+        if (dateEl) dateEl.value = reg.dateFormat || 'YYYY-MM-DD';
+
+        const weekEl = document.getElementById('setting-week-start');
+        if (weekEl) weekEl.value = reg.weekStart || 'monday';
+
+        const numEl = document.getElementById('setting-number-format');
+        if (numEl) numEl.value = reg.numberFormat || 'standard';
+
+        const tzEl = document.getElementById('setting-timezone');
+        if (tzEl) tzEl.value = reg.timezone || 'Asia/Tokyo';
+
+        // Privacy preferences
+        const priv = storage.state.privacyPreferences;
+        const privDefEl = document.getElementById('setting-privacy-default');
+        if (privDefEl) privDefEl.checked = priv.defaultConcealed !== false;
+
+        const privTimeoutEl = document.getElementById('setting-privacy-timeout');
+        if (privTimeoutEl) privTimeoutEl.value = String(priv.timeoutMinutes ?? 3);
+
+        // About section
+        const syncStatusEl = document.getElementById('about-sync-status');
+        if (syncStatusEl) {
+            syncStatusEl.innerText = (typeof supabaseClient !== 'undefined' && supabaseClient.session) ? 'Connected & Synced' : 'Connected (nyetklojxqnawdtrrhma)';
+        }
+        const lastSyncedEl = document.getElementById('about-last-synced');
+        if (lastSyncedEl) {
+            lastSyncedEl.innerText = this.lastSyncTime ? new Date(this.lastSyncTime).toLocaleTimeString() : 'Just now';
+        }
+    }
+
+    switchSettingsSection(sectionId) {
+        this.currentSettingsSection = sectionId;
+        const tabs = document.querySelectorAll('.settings-tab-btn');
+        tabs.forEach(tab => {
+            if (tab.getAttribute('data-section') === sectionId) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+
+        const cards = document.querySelectorAll('.settings-section-card');
+        cards.forEach(card => {
+            if (card.id === `settings-sec-${sectionId}`) {
+                card.classList.add('active');
+            } else {
+                card.classList.remove('active');
+            }
+        });
+
+        this.renderSettingsPage();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    }
+
+    navigateToSettingsSection(sectionId) {
+        this.closeAccountMenu();
+        this.switchView('settings-view');
+        this.switchSettingsSection(sectionId);
+    }
+
+    toggleAccountMenu(event) {
+        if (event) event.stopPropagation();
+        const menu = document.getElementById('sidebar-account-menu');
+        if (!menu) return;
+        menu.classList.toggle('active');
+    }
+
+    closeAccountMenu() {
+        const menu = document.getElementById('sidebar-account-menu');
+        if (menu) menu.classList.remove('active');
+    }
+
+    updateUserProfile(field, value) {
+        if (!storage.state.userProfile) storage.state.userProfile = {};
+        storage.state.userProfile[field] = value.trim();
+        storage.saveData();
+        this.updateDesktopAccountInfo();
+    }
+
+    updateRegionalPreference(field, value) {
+        if (!storage.state.regionalPreferences) {
+            storage.state.regionalPreferences = { ...defaultState.regionalPreferences };
+        }
+        storage.state.regionalPreferences[field] = value;
+        storage.saveData();
+        // Changing regional presentation does NOT rewrite historical ledger amounts or wallet currencies
+        this.renderAll();
+    }
+
+    updatePrivacyPreference(field, value) {
+        if (!storage.state.privacyPreferences) {
+            storage.state.privacyPreferences = { ...defaultState.privacyPreferences };
+        }
+        storage.state.privacyPreferences[field] = value;
+        storage.saveData();
+
+        if (field === 'timeoutMinutes') {
+            const mins = Number(value);
+            this.inactivityTimeoutMs = mins > 0 ? mins * 60 * 1000 : 0;
+            if (this.inactivityTimeoutMs === 0) {
+                this.clearInactivityTimer();
+            } else {
+                this.resetInactivityTimer();
+            }
+        }
+    }
+
+    async handleUpdateEmail() {
+        const input = document.getElementById('setting-new-email');
+        const statusEl = document.getElementById('email-change-status');
+        if (!input || !statusEl) return;
+        const newEmail = input.value.trim();
+        if (!newEmail || !newEmail.includes('@')) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--red)';
+            statusEl.innerText = 'Please enter a valid email address.';
+            return;
+        }
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--text-muted)';
+        statusEl.innerText = 'Requesting email update via Supabase Auth...';
+        try {
+            if (typeof supabaseClient !== 'undefined' && supabaseClient.client?.auth) {
+                const { error } = await supabaseClient.client.auth.updateUser({ email: newEmail });
+                if (error) {
+                    statusEl.style.color = 'var(--red)';
+                    statusEl.innerText = 'Error: ' + error.message;
+                } else {
+                    statusEl.style.color = '#22c55e';
+                    statusEl.innerText = 'Verification email sent to ' + newEmail + '. Please confirm via your inbox.';
+                    input.value = '';
+                }
+            } else {
+                statusEl.style.color = 'var(--red)';
+                statusEl.innerText = 'Supabase Auth client not initialized.';
+            }
+        } catch (err) {
+            statusEl.style.color = 'var(--red)';
+            statusEl.innerText = 'Request failed: ' + err.message;
+        }
+    }
+
+    async handleUpdatePassword() {
+        const passInput = document.getElementById('setting-new-password');
+        const confirmInput = document.getElementById('setting-confirm-password');
+        const statusEl = document.getElementById('password-change-status');
+        if (!passInput || !confirmInput || !statusEl) return;
+        const newPass = passInput.value;
+        const confirmPass = confirmInput.value;
+        if (!newPass || newPass.length < 6) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--red)';
+            statusEl.innerText = 'Password must be at least 6 characters.';
+            return;
+        }
+        if (newPass !== confirmPass) {
+            statusEl.style.display = 'block';
+            statusEl.style.color = 'var(--red)';
+            statusEl.innerText = 'Passwords do not match.';
+            return;
+        }
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--text-muted)';
+        statusEl.innerText = 'Updating password via Supabase Auth...';
+        try {
+            if (typeof supabaseClient !== 'undefined' && supabaseClient.client?.auth) {
+                const { error } = await supabaseClient.client.auth.updateUser({ password: newPass });
+                if (error) {
+                    statusEl.style.color = 'var(--red)';
+                    statusEl.innerText = 'Error: ' + error.message;
+                } else {
+                    statusEl.style.color = '#22c55e';
+                    statusEl.innerText = 'Password updated successfully!';
+                    passInput.value = '';
+                    confirmInput.value = '';
+                }
+            } else {
+                statusEl.style.color = 'var(--red)';
+                statusEl.innerText = 'Supabase Auth client not initialized.';
+            }
+        } catch (err) {
+            statusEl.style.color = 'var(--red)';
+            statusEl.innerText = 'Update failed: ' + err.message;
+        }
+    }
+
+    handleRestoreFileSelect(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const previewContainer = document.getElementById('restore-preview-container');
+        const previewTitle = document.getElementById('restore-preview-title');
+        const previewDetails = document.getElementById('restore-preview-details');
+        if (!previewContainer) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                const validation = storage.validateBackupData(parsed);
+                if (!validation.valid) {
+                    previewContainer.style.display = 'flex';
+                    previewTitle.innerText = 'Invalid Backup File';
+                    previewTitle.style.color = 'var(--red)';
+                    previewDetails.innerText = validation.error;
+                    this._pendingRestoreData = null;
+                } else {
+                    previewContainer.style.display = 'flex';
+                    previewTitle.innerText = 'Backup File Validated';
+                    previewTitle.style.color = '#22c55e';
+                    previewDetails.innerHTML = `
+                        Wallets: <strong>${validation.walletsCount}</strong> &bull;
+                        Transactions: <strong>${validation.txCount}</strong> &bull;
+                        Closed Months: <strong>${validation.closedMonthsCount}</strong><br>
+                        <span style="color:var(--text-secondary);font-size:0.72rem;">Click confirm below to restore state safely.</span>
+                    `;
+                    this._pendingRestoreData = parsed;
+                }
+            } catch (err) {
+                previewContainer.style.display = 'flex';
+                previewTitle.innerText = 'Malformed Backup File';
+                previewTitle.style.color = 'var(--red)';
+                previewDetails.innerText = 'File is not valid JSON: ' + err.message;
+                this._pendingRestoreData = null;
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    cancelRestore() {
+        this._pendingRestoreData = null;
+        const fileInput = document.getElementById('setting-restore-file');
+        if (fileInput) fileInput.value = '';
+        const previewContainer = document.getElementById('restore-preview-container');
+        if (previewContainer) previewContainer.style.display = 'none';
+    }
+
+    confirmRestore() {
+        if (!this._pendingRestoreData) {
+            alert('No valid backup data selected.');
+            return;
+        }
+        const confirmed = confirm('WARNING: Restoring will overwrite all current wallets, transactions, and report snapshots with this backup. This cannot be undone. Are you sure you want to proceed?');
+        if (!confirmed) return;
+
+        try {
+            const migrated = storage.migrateToContinuousLedger(this._pendingRestoreData);
+            storage._attachHistoryGetters(migrated);
+            storage.state = migrated;
+            storage.saveData();
+            this._pendingRestoreData = null;
+            this.cancelRestore();
+            alert('Backup successfully restored! Refreshing workspace...');
+            this.init();
+            this.renderAll();
+        } catch (err) {
+            alert('Restoration error: ' + err.message);
         }
     }
 
@@ -5377,6 +5619,10 @@ class App {
     onClosingBudgetOptionChange(opt) {
         this.closingWizardState.budgetOption = opt;
         this.setClosingStep(3);
+    }
+
+    isMonthClosed(monthKey) {
+        return typeof walletManager !== 'undefined' ? walletManager.isMonthClosed(monthKey) : false;
     }
 
     executeMonthlyClosing() {

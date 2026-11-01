@@ -56,6 +56,21 @@ const defaultState = {
     transactions: [],
     closedMonths: {},
     reportSnapshots: {},
+    userProfile: {
+        displayName: ''
+    },
+    regionalPreferences: {
+        defaultCountry: 'JP',
+        defaultCurrency: 'JPY',
+        dateFormat: 'YYYY-MM-DD',
+        weekStart: 'monday',
+        numberFormat: 'standard',
+        timezone: 'Asia/Tokyo'
+    },
+    privacyPreferences: {
+        defaultConcealed: true,
+        timeoutMinutes: 3
+    },
     history: []
 };
 
@@ -936,20 +951,44 @@ class StorageManager {
         anchor.remove();
     }
 
+    validateBackupData(data) {
+        if (!data || typeof data !== 'object') {
+            return { valid: false, error: 'File content is not a valid JSON object.' };
+        }
+        if (!data.wallets || typeof data.wallets !== 'object' || Object.keys(data.wallets).length === 0) {
+            return { valid: false, error: 'Backup is missing a valid "wallets" collection.' };
+        }
+        if (!Array.isArray(data.transactions)) {
+            return { valid: false, error: 'Backup is missing the required "transactions" ledger array.' };
+        }
+        return {
+            valid: true,
+            walletsCount: Object.keys(data.wallets).length,
+            txCount: data.transactions.length,
+            schemaVersion: data.schemaVersion || 1,
+            closedMonthsCount: data.closedMonths ? Object.keys(data.closedMonths).length : 0
+        };
+    }
+
     importJSON(file, callback) {
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
                 const parsed = JSON.parse(e.target.result);
-                if (parsed.wallets && parsed.transactions) {
-                    this.state = parsed;
-                    this.saveData();
-                    callback(true);
-                } else {
-                    callback(false);
+                const validation = this.validateBackupData(parsed);
+                if (!validation.valid) {
+                    callback(false, validation.error);
+                    return;
                 }
+
+                // Migrate to continuous ledger if needed and attach getters
+                let migrated = this.migrateToContinuousLedger(parsed);
+                this._attachHistoryGetters(migrated);
+                this.state = migrated;
+                this.saveData();
+                callback(true, null, validation);
             } catch (err) {
-                callback(false);
+                callback(false, 'Malformed JSON file: ' + err.message);
             }
         };
         reader.readAsText(file);
