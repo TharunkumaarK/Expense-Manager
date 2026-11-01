@@ -92,6 +92,55 @@ class App {
         this.renderAll();
     }
 
+    getCountryFlagSvg(region, width = 18, height = 13.5) {
+        if (region === 'JP') {
+            return `<svg class="country-flag-svg flag-jp" viewBox="0 0 640 480" width="${width}" height="${height}" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);vertical-align:middle;display:inline-block;flex-shrink:0;" aria-label="Japan"><rect width="640" height="480" fill="#ffffff"/><circle cx="320" cy="240" r="120" fill="#bc002d"/></svg>`;
+        } else if (region === 'IN') {
+            return `<svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="${width}" height="${height}" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);vertical-align:middle;display:inline-block;flex-shrink:0;" aria-label="India"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>`;
+        }
+        return '';
+    }
+
+    getCardChipSvg() {
+        return `<svg class="card-chip-svg" width="30" height="22" viewBox="0 0 34 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));">
+            <rect width="34" height="26" rx="4" fill="url(#chip-metallic-grad)" stroke="#d4af37" stroke-width="0.75"/>
+            <path d="M0 9h12v8H0M34 9H22v8h12M12 9V0M22 9V0M12 17v9M22 17v9M12 13h10" stroke="#997a15" stroke-width="0.75"/>
+            <defs>
+                <linearGradient id="chip-metallic-grad" x1="0" y1="0" x2="34" y2="26" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#ffe259"/>
+                    <stop offset="0.5" stop-color="#ffa751"/>
+                    <stop offset="1" stop-color="#b8860b"/>
+                </linearGradient>
+            </defs>
+        </svg>`;
+    }
+
+    getContactlessSvg() {
+        return `<svg class="card-contactless-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.65;" aria-hidden="true">
+            <path d="M8.5 16.5a5 5 0 0 1 0-9"/>
+            <path d="M12 19a9 9 0 0 0 0-14"/>
+            <path d="M15.5 21.5a13 13 0 0 0 0-19"/>
+        </svg>`;
+    }
+
+    toggleWalletsSection(regionKey) {
+        if (!this.collapsedWalletSections) this.collapsedWalletSections = new Set();
+        const rKey = regionKey.toLowerCase();
+        const isCollapsed = this.collapsedWalletSections.has(rKey);
+        const container = document.getElementById(`wallets-container-${rKey}`);
+        const chevron = document.getElementById(`wallets-chevron-${rKey}`);
+
+        if (isCollapsed) {
+            this.collapsedWalletSections.delete(rKey);
+            if (container) container.classList.remove('collapsed');
+            if (chevron) chevron.style.transform = 'rotate(0deg)';
+        } else {
+            this.collapsedWalletSections.add(rKey);
+            if (container) container.classList.add('collapsed');
+            if (chevron) chevron.style.transform = 'rotate(-90deg)';
+        }
+    }
+
     formatMoney(amount, currency = '', options = {}) {
         if (this.isPrivacyHidden) {
             return '******';
@@ -2006,7 +2055,7 @@ class App {
             card.innerHTML = `
                 <div class="budget-central-header">
                     <div class="budget-central-title-group">
-                        <span style="font-size: 1.15rem;">🇯🇵</span>
+                        ${this.getCountryFlagSvg('JP', 20, 15)}
                         <h3>Monthly Budget</h3>
                         <span class="text-xs text-muted">(${this.activeMonthKey})</span>
                         ${cushion > 0 ? `<span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, '¥')} cushion</span>` : ''}
@@ -2138,7 +2187,7 @@ class App {
                 ? (this.isPrivacyHidden ? '******' : `¥${tx.sourceAmount?.toLocaleString()} → ₹${tx.destAmount?.toLocaleString()}`)
                 : this.formatMoney(tx.amount, tx.currency, { prefix: sign });
 
-            const flag = tx.region === 'JP' ? '🇯🇵' : (tx.region === 'IN' ? '🇮🇳' : '');
+            const flag = tx.region ? this.getCountryFlagSvg(tx.region, 16, 12) : '';
             const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
             let metaString = `${date} • ${tx.walletId || 'Wallet'}`;
@@ -2270,31 +2319,45 @@ class App {
         let jpTotal = 0;
         let inTotal = 0;
 
+        const chipSvg = this.getCardChipSvg();
+        const contactlessSvg = this.getContactlessSvg();
+
         Object.values(storage.state.wallets).forEach(w => {
             const theme = this.getThemeForWallet(w);
-            const flag = w.region === 'JP' ? '🇯🇵' : '🇮🇳';
+            const flagSvg = this.getCountryFlagSvg(w.region, 20, 15);
+            const typeLabel = (w.type || 'account').toUpperCase();
+            const typeIcon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
 
             const cardHtml = `
-                <div class="wallet-card ${theme.cls}" onclick="app.openWalletFocus('${w.id}')" title="Click to inspect ${w.id}">
+                <div class="wallet-card ${theme.cls}" onclick="app.openWalletFocus('${w.id}')" title="Click to inspect ${w.id}" role="button" tabindex="0">
+                    <div class="wallet-card-overlay-sheen"></div>
                     <div class="wallet-card-header">
-                        <div class="wallet-card-chip"></div>
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <span class="wallet-type-badge">${(w.type || 'account').toUpperCase()}</span>
-                            <button class="wallet-menu-btn" onclick="event.stopPropagation(); app.openEditWalletModal('${w.id}')" title="Edit wallet settings">
+                        <div class="wallet-card-chip-group">
+                            ${chipSvg}
+                            ${contactlessSvg}
+                        </div>
+                        <div class="wallet-card-top-right">
+                            <span class="wallet-type-badge">
+                                <i data-lucide="${typeIcon}" style="width: 12px; height: 12px;"></i>
+                                <span>${typeLabel}</span>
+                            </span>
+                            <button class="wallet-menu-btn" onclick="event.stopPropagation(); app.openEditWalletModal('${w.id}')" title="Edit wallet settings" aria-label="Edit wallet ${w.id}">
                                 <i data-lucide="more-vertical" style="width: 14px; height: 14px;"></i>
                             </button>
                         </div>
                     </div>
                     <div class="wallet-balance-wrap">
-                        <span class="wallet-balance-label">Balance</span>
+                        <span class="wallet-balance-label">Current Balance</span>
                         <div class="wallet-balance-val privacy-blur">${this.formatMoney(w.balance, w.currency)}</div>
                     </div>
                     <div class="wallet-card-footer">
-                        <div>
+                        <div class="wallet-card-identity">
                             <div class="wallet-name">${w.id}</div>
-                            <div class="wallet-number">${theme.name}</div>
+                            <div class="wallet-theme-tag">${theme.name} • ${w.currency}</div>
                         </div>
-                        <div style="font-size: 1.1rem; opacity: 0.9;">${flag}</div>
+                        <div class="wallet-card-flag-badge">
+                            ${flagSvg}
+                        </div>
                     </div>
                 </div>
             `;
@@ -2310,20 +2373,32 @@ class App {
             }
         });
 
-        jpGrid.innerHTML = jpHtml || '<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 24px; text-align: center;">No Japan wallets created yet.</p>';
-        inGrid.innerHTML = inHtml || '<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 24px; text-align: center;">No India wallets created yet.</p>';
+        jpGrid.innerHTML = jpHtml || '<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 32px 16px; text-align: center;">No Japan wallets created yet.</p>';
+        inGrid.innerHTML = inHtml || '<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 32px 16px; text-align: center;">No India wallets created yet.</p>';
 
         const jpCountEl = document.getElementById('wallets-page-jp-count');
-        if (jpCountEl) jpCountEl.innerText = `${jpCount} ${jpCount === 1 ? 'wallet' : 'wallets'}`;
+        if (jpCountEl) jpCountEl.innerText = `${jpCount} ${jpCount === 1 ? 'account' : 'accounts'}`;
 
         const inCountEl = document.getElementById('wallets-page-in-count');
-        if (inCountEl) inCountEl.innerText = `${inCount} ${inCount === 1 ? 'wallet' : 'wallets'}`;
+        if (inCountEl) inCountEl.innerText = `${inCount} ${inCount === 1 ? 'account' : 'accounts'}`;
+
+        const jpSectionCount = document.getElementById('wallets-section-jp-count');
+        if (jpSectionCount) jpSectionCount.innerText = `${jpCount} ${jpCount === 1 ? 'account' : 'accounts'}`;
+
+        const inSectionCount = document.getElementById('wallets-section-in-count');
+        if (inSectionCount) inSectionCount.innerText = `${inCount} ${inCount === 1 ? 'account' : 'accounts'}`;
 
         const jpTotalEl = document.getElementById('wallets-page-jp-total');
         if (jpTotalEl) jpTotalEl.innerText = this.formatMoney(jpTotal, '¥');
 
         const inTotalEl = document.getElementById('wallets-page-in-total');
         if (inTotalEl) inTotalEl.innerText = this.formatMoney(inTotal, '₹');
+
+        const jpSectionTotal = document.getElementById('wallets-section-jp-total');
+        if (jpSectionTotal) jpSectionTotal.innerText = this.formatMoney(jpTotal, '¥');
+
+        const inSectionTotal = document.getElementById('wallets-section-in-total');
+        if (inSectionTotal) inSectionTotal.innerText = this.formatMoney(inTotal, '₹');
 
         lucide.createIcons();
     }
@@ -2385,7 +2460,7 @@ class App {
     openCountryExpansion(region) {
         const isJp = region === 'JP';
         const currency = isJp ? '¥' : '₹';
-        const flag = isJp ? '🇯🇵' : '🇮🇳';
+        const flagSvg = this.getCountryFlagSvg(region, 22, 16.5);
         const countryName = isJp ? 'Japan' : 'India';
         const cardThemeCls = isJp ? 'country-card-jp' : 'country-card-in';
 
@@ -2406,30 +2481,31 @@ class App {
 
         if (!overlay || !primaryPanel || !secondaryPanel) return;
 
-        typeBadge.innerText = 'Country View';
-        modalTitle.innerText = `${countryName} Portfolio`;
+        typeBadge.innerText = 'Country Portfolio';
+        modalTitle.innerText = `${countryName} Overview`;
 
         primaryPanel.innerHTML = `
-            <div class="country-card ${cardThemeCls} expanded" style="padding: 28px; cursor: default; transform: none; min-height: 260px; display: flex; flex-direction: column; justify-content: space-between;">
-                <div class="country-card-header">
-                    <div class="country-badge">
-                        <span class="country-flag-icon" style="font-size: 1.25rem;">${flag}</span>
-                        <span class="country-name">${countryName}</span>
-                        <span class="currency-code">${isJp ? 'JPY' : 'INR'}</span>
+            <div class="country-card ${cardThemeCls} expanded" style="padding: 26px; cursor: default; transform: none; min-height: 250px; display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); position: relative; overflow: hidden; box-shadow: 0 16px 36px -10px rgba(0,0,0,0.6);">
+                <div class="wallet-card-overlay-sheen"></div>
+                <div class="country-card-header" style="display: flex; justify-content: space-between; align-items: center; z-index: 2;">
+                    <div class="country-badge" style="display: flex; align-items: center; gap: 8px;">
+                        ${flagSvg}
+                        <span class="country-name" style="font-weight: 700; font-size: 1.1rem; color: #fff;">${countryName}</span>
+                        <span class="currency-code" style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.15); font-weight: 600; color: #fff; letter-spacing: 0.5px;">${isJp ? 'JPY' : 'INR'}</span>
                     </div>
-                    <span class="wallet-count-pill">${regionWallets.length} ${regionWallets.length === 1 ? 'Account' : 'Accounts'}</span>
+                    <span class="wallet-count-pill" style="font-size: 0.75rem; padding: 4px 10px; border-radius: 9999px; background: rgba(0,0,0,0.35); color: #fff; font-weight: 500; border: 1px solid rgba(255,255,255,0.12);">${regionWallets.length} ${regionWallets.length === 1 ? 'Account' : 'Accounts'}</span>
                 </div>
-                <div class="country-balance-body" style="margin: 24px 0;">
-                    <span class="balance-label">Total Portfolio Balance</span>
-                    <div class="country-total-amount financial-amount privacy-blur" style="font-size: 2.25rem;">
+                <div class="country-balance-body" style="margin: 22px 0; z-index: 2;">
+                    <span class="balance-label" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; color: #fff; display: block; margin-bottom: 4px;">Total Portfolio Balance</span>
+                    <div class="country-total-amount financial-amount privacy-blur" style="font-size: 2.3rem; font-weight: 800; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
                         ${this.formatMoney(total, currency)}
                     </div>
                 </div>
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn btn-secondary" style="background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.2); color: #fff; font-size: 0.8rem; padding: 6px 12px;" onclick="app.closeFocusOverlay(); app.openTransactionModal('expense');">
+                <div style="display: flex; gap: 10px; z-index: 2;">
+                    <button class="btn btn-secondary" style="flex: 1; background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.22); color: #fff; font-size: 0.82rem; padding: 8px 14px;" onclick="app.closeFocusOverlay(); app.openTransactionModal('expense');">
                         <i data-lucide="plus" style="width:14px; height:14px; margin-right:4px;"></i> Log Expense
                     </button>
-                    <button class="btn btn-secondary" style="background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.2); color: #fff; font-size: 0.8rem; padding: 6px 12px;" onclick="app.closeFocusOverlay(); app.openTransactionModal('income');">
+                    <button class="btn btn-secondary" style="flex: 1; background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.22); color: #fff; font-size: 0.82rem; padding: 8px 14px;" onclick="app.closeFocusOverlay(); app.openTransactionModal('income');">
                         <i data-lucide="arrow-down-left" style="width:14px; height:14px; margin-right:4px;"></i> Log Income
                     </button>
                 </div>
@@ -2451,7 +2527,7 @@ class App {
                 const theme = this.getThemeForWallet(w);
                 const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
                 walletsListHtml += `
-                    <div class="wallet-item-compact ${theme.cls}" onclick="app.openWalletFocus('${w.id}')" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-radius: var(--radius-md); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border: 1px solid rgba(255,255,255,0.1);">
+                    <div class="wallet-item-compact ${theme.cls}" onclick="app.openWalletFocus('${w.id}')" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-radius: var(--radius-md); cursor: pointer; transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out); border: 1px solid rgba(255,255,255,0.1);">
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center;">
                                 <i data-lucide="${icon}" style="width: 16px; height: 16px; color: #fff;"></i>
@@ -2465,7 +2541,7 @@ class App {
                             <div class="privacy-blur" style="font-family: var(--font-numeric); font-weight: 700; color: #fff; font-size: 1.05rem;">
                                 ${this.formatMoney(w.balance, w.currency)}
                             </div>
-                            <span style="font-size: 0.72rem; color: rgba(255,255,255,0.65); text-decoration: underline;">View details →</span>
+                            <span style="font-size: 0.72rem; color: rgba(255,255,255,0.65);">View details →</span>
                         </div>
                     </div>
                 `;
@@ -2475,6 +2551,7 @@ class App {
         secondaryPanel.innerHTML = walletsListHtml;
 
         overlay.style.display = 'flex';
+        void overlay.offsetWidth;
         overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
         lucide.createIcons();
@@ -2485,7 +2562,9 @@ class App {
         if (!w) return;
 
         const theme = this.getThemeForWallet(w);
-        const flag = w.region === 'JP' ? '🇯🇵' : '🇮🇳';
+        const flagSvg = this.getCountryFlagSvg(w.region, 20, 15);
+        const chipSvg = this.getCardChipSvg();
+        const contactlessSvg = this.getContactlessSvg();
 
         const overlay = document.getElementById('focus-overlay');
         const typeBadge = document.getElementById('focus-type-badge');
@@ -2499,33 +2578,42 @@ class App {
         modalTitle.innerText = `${w.id}`;
 
         primaryPanel.innerHTML = `
-            <div class="wallet-card ${theme.cls}" style="padding: 26px; cursor: default; transform: none; min-height: 260px; display: flex; flex-direction: column; justify-content: space-between;">
-                <div class="wallet-card-header">
-                    <div class="wallet-card-chip"></div>
+            <div class="wallet-card ${theme.cls}" style="padding: 24px; cursor: default; transform: none; min-height: 240px; display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); position: relative; overflow: hidden; box-shadow: 0 16px 36px -10px rgba(0,0,0,0.6);">
+                <div class="wallet-card-overlay-sheen"></div>
+                <div class="wallet-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; z-index: 2;">
+                    <div class="wallet-card-chip-group" style="display: flex; align-items: center; gap: 8px;">
+                        ${chipSvg}
+                        ${contactlessSvg}
+                    </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 1rem;">${flag}</span>
-                        <span class="wallet-type-badge">${(w.type || 'ACCOUNT').toUpperCase()}</span>
+                        ${flagSvg}
+                        <span class="wallet-type-badge" style="background: rgba(0,0,0,0.35); color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px; border: 1px solid rgba(255,255,255,0.15);">${(w.type || 'ACCOUNT').toUpperCase()}</span>
                     </div>
                 </div>
-                <div class="wallet-balance-wrap" style="margin: 20px 0;">
-                    <span class="wallet-balance-label">Current Balance</span>
-                    <div class="wallet-balance-val privacy-blur" style="font-size: 2.2rem;">
+                <div class="wallet-balance-wrap" style="margin: 20px 0; z-index: 2;">
+                    <span class="wallet-balance-label" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.75); display: block; margin-bottom: 4px;">Current Balance</span>
+                    <div class="wallet-balance-val financial-amount privacy-blur" style="font-size: 2.25rem; font-weight: 800; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
                         ${this.formatMoney(w.balance, w.currency)}
                     </div>
                 </div>
-                <div class="wallet-card-footer" style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <div class="wallet-card-footer" style="display: flex; justify-content: space-between; align-items: flex-end; z-index: 2;">
                     <div>
-                        <div class="wallet-name" style="font-size: 1.15rem; font-weight: 700;">${w.id}</div>
-                        <div class="wallet-number" style="font-size: 0.75rem; opacity: 0.8;">${theme.name} • ${w.currency}</div>
+                        <div class="wallet-name" style="font-size: 1.15rem; font-weight: 700; color: #fff; letter-spacing: 0.2px;">${w.id}</div>
+                        <div class="wallet-number" style="font-size: 0.75rem; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px;">${theme.name} • ${w.currency}</div>
                     </div>
                 </div>
             </div>
-            <div style="display: flex; gap: 10px; margin-top: 16px;">
-                <button class="btn btn-primary" style="flex: 1;" onclick="app.openAddTxForWallet('${w.id}')">
-                    <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 6px;"></i> Add Transaction
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">
+                <button class="btn btn-primary" onclick="app.openAddTxForWallet('${w.id}')">
+                    <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 6px;"></i> Log Expense
                 </button>
-                <button class="btn btn-secondary" style="flex: 1;" onclick="app.openEditWalletModal('${w.id}')">
-                    <i data-lucide="edit-2" style="width: 14px; height: 14px; margin-right: 6px;"></i> Edit Wallet
+                <button class="btn btn-secondary" onclick="app.openTransferForWallet('${w.id}')">
+                    <i data-lucide="arrow-left-right" style="width: 14px; height: 14px; margin-right: 6px;"></i> Transfer
+                </button>
+            </div>
+            <div style="margin-top: 8px;">
+                <button class="btn btn-secondary" style="width: 100%; font-size: 0.82rem;" onclick="app.openEditWalletModal('${w.id}')">
+                    <i data-lucide="edit-2" style="width: 14px; height: 14px; margin-right: 6px;"></i> Edit Account Details
                 </button>
             </div>
         `;
@@ -2578,7 +2666,7 @@ class App {
 
                 const formattedDate = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
                 txHtml += `
-                    <div class="tx-row" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+                    <div class="tx-row" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; transition: background 120ms ease;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center;">
                                 <i data-lucide="${icon}" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
@@ -2600,6 +2688,7 @@ class App {
         secondaryPanel.innerHTML = txHtml;
 
         overlay.style.display = 'flex';
+        void overlay.offsetWidth;
         overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
         lucide.createIcons();
@@ -2609,7 +2698,11 @@ class App {
         const overlay = document.getElementById('focus-overlay');
         if (overlay) {
             overlay.classList.remove('active');
-            overlay.style.display = 'none';
+            setTimeout(() => {
+                if (!overlay.classList.contains('active')) {
+                    overlay.style.display = 'none';
+                }
+            }, 240);
         }
         document.body.style.overflow = '';
     }
@@ -2622,6 +2715,17 @@ class App {
         if (select && w) {
             select.value = walletId;
             this.updateExpenseCategories();
+        }
+    }
+
+    openTransferForWallet(walletId) {
+        this.closeFocusOverlay();
+        const w = storage.state.wallets[walletId];
+        this.openTransactionModal('transfer');
+        const select = document.getElementById('transfer-source-wallet');
+        if (select && w) {
+            select.value = walletId;
+            this.onTransferSourceChange();
         }
     }
 
@@ -2938,8 +3042,9 @@ class App {
 
                 catsHtml += `
                     <div style="margin-top:16px;">
-                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
-                            ${region === 'JP' ? '🇯🇵 Japan' : '🇮🇳 India'} Analytics
+                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:8px;">
+                            ${this.getCountryFlagSvg(region, 16, 12)}
+                            <span>${region === 'JP' ? 'Japan' : 'India'} Analytics</span>
                         </h4>
 
                         <div style="height: 180px; margin-bottom: 16px; position: relative;">
@@ -3413,8 +3518,9 @@ class App {
                 const canvasId = `print-donut-${index}-${region}`;
                 catsHtml += `
                     <div style="margin-top:16px; break-inside: avoid;">
-                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">
-                            ${region === 'JP' ? '🇯🇵 Japan' : '🇮🇳 India'} Analytics
+                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:8px;">
+                            ${this.getCountryFlagSvg(region, 16, 12)}
+                            <span>${region === 'JP' ? 'Japan' : 'India'} Analytics</span>
                         </h4>
 
                         <div style="height: 180px; margin-bottom: 16px; position: relative;">
@@ -3575,14 +3681,14 @@ class App {
             let catOptions = '<option value="all">All Categories</option>';
             if (storage.state?.categories) {
                 if (storage.state.categories.JP && storage.state.categories.JP.length > 0) {
-                    catOptions += '<optgroup label="🇯🇵 Japan Categories">';
+                    catOptions += '<optgroup label="Japan Categories">';
                     storage.state.categories.JP.forEach(c => {
                         catOptions += `<option value="${c.id}">${c.name}</option>`;
                     });
                     catOptions += '</optgroup>';
                 }
                 if (storage.state.categories.IN && storage.state.categories.IN.length > 0) {
-                    catOptions += '<optgroup label="🇮🇳 India Categories">';
+                    catOptions += '<optgroup label="India Categories">';
                     storage.state.categories.IN.forEach(c => {
                         catOptions += `<option value="${c.id}">${c.name}</option>`;
                     });
@@ -3599,8 +3705,8 @@ class App {
             let walletOptions = '<option value="all">All Wallets</option>';
             if (storage.state?.wallets) {
                 Object.values(storage.state.wallets).forEach(w => {
-                    const flag = w.region === 'JP' ? '🇯🇵' : '🇮🇳';
-                    walletOptions += `<option value="${w.id}">${flag} ${w.name || w.id}</option>`;
+                    const countryTag = w.region === 'JP' ? '[JP]' : '[IN]';
+                    walletOptions += `<option value="${w.id}">${countryTag} ${w.name || w.id}</option>`;
                 });
             }
             walletSelect.innerHTML = walletOptions;
@@ -3703,7 +3809,7 @@ class App {
                 let sign = '-';
                 let title = tx.note || this.getCategoryName(tx.categoryId, tx.region);
                 let categoryName = this.getCategoryName(tx.categoryId, tx.region);
-                const flag = tx.region === 'JP' ? '🇯🇵' : (tx.region === 'IN' ? '🇮🇳' : '');
+                const flag = tx.region ? this.getCountryFlagSvg(tx.region, 14, 10.5) : '';
 
                 if (tx.type === 'income') {
                     icon = 'arrow-down-left';
@@ -3833,7 +3939,7 @@ class App {
             activeCount++;
             chipsHtml += `
                 <span class="filter-chip">
-                    <span>Country: ${this.ledgerFilters.region === 'JP' ? '🇯🇵 Japan' : '🇮🇳 India'}</span>
+                    <span style="display:inline-flex; align-items:center; gap:6px;">Country: ${this.getCountryFlagSvg(this.ledgerFilters.region, 14, 10.5)} ${this.ledgerFilters.region === 'JP' ? 'Japan' : 'India'}</span>
                     <button class="filter-chip-remove" onclick="app.removeLedgerFilter('region')" title="Remove region filter">×</button>
                 </span>
             `;
@@ -5019,7 +5125,7 @@ class App {
         if (monthSelect) {
             monthSelect.innerHTML = sortedMonths.map(m => {
                 const isClosed = storage.state.closedMonths && storage.state.closedMonths[m];
-                return `<option value="${m}" ${m === this.reportMonthKey ? 'selected' : ''}>${m}${isClosed ? ' 🔒 (Closed)' : ''}</option>`;
+                return `<option value="${m}" ${m === this.reportMonthKey ? 'selected' : ''}>${m}${isClosed ? ' [Closed]' : ''}</option>`;
             }).join('');
         }
 
@@ -5112,7 +5218,7 @@ class App {
                 <div class="report-snapshot-top">
                     <div>
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                            <span style="font-size: 1.3rem;">${this.reportRegion === 'JP' ? '🇯🇵' : '🇮🇳'}</span>
+                            ${this.getCountryFlagSvg(this.reportRegion, 24, 18)}
                             <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800;">${this.reportMonthKey} Financial Snapshot</h2>
                             ${statusBadge}
                         </div>
@@ -5254,6 +5360,16 @@ class App {
                     </table>
                 </div>
             `;
+
+            // 8b. Render Restored Expense Distribution Doughnut Chart (Section 3 Requirement)
+            if (typeof charts !== 'undefined' && charts.renderReportExpensePie) {
+                const pieBadge = document.getElementById('report-pie-period-badge');
+                if (pieBadge) {
+                    pieBadge.innerText = `${this.reportMonthKey} • ${this.reportRegion === 'JP' ? 'JPY' : 'INR'}`;
+                }
+                const categoriesForPie = Array.from(catMap.values());
+                charts.renderReportExpensePie(categoriesForPie, categorySpendMap, currency, this.reportRegion);
+            }
         }
 
         // 9. Render Historical Closed Months Archive
@@ -5481,7 +5597,7 @@ class App {
             const walletRows = wallets.map(w => `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 1.1rem;">${w.region === 'JP' ? '🇯🇵' : '🇮🇳'}</span>
+                        ${this.getCountryFlagSvg(w.region, 18, 13.5)}
                         <strong style="font-size: 0.88rem;">${w.id}</strong>
                     </div>
                     <div class="font-bold privacy-blur" style="font-size: 0.95rem;">${this.formatMoney(w.balance, w.currency || (w.region === 'JP' ? '¥' : '₹'))}</div>
@@ -5602,10 +5718,10 @@ class App {
                         </p>
                     </div>
 
-                    <div style="padding: 12px 14px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
-                        ✓ Wallet balances continue seamlessly without artificial adjustments.<br>
-                        ✓ Continuous transaction ledger remains intact.<br>
-                        ✓ Snapshots capture categories and limits for audit reconstruction.
+                    <div style="padding: 12px 14px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Wallet balances continue seamlessly without artificial adjustments.</span></div>
+                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Continuous transaction ledger remains intact.</span></div>
+                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Snapshots capture categories and limits for audit reconstruction.</span></div>
                     </div>
                 </div>
             `;

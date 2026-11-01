@@ -3,6 +3,7 @@ class ChartManager {
         this.jpTrendChart = null;
         this.jpCategoryDonut = null;
         this.inTrendChart = null;
+        this.reportExpensePie = null;
 
         // Legacy charts retained for backward compatibility
         this.jpDonut = null;
@@ -25,6 +26,7 @@ class ChartManager {
         if (this.jpTrendChart) { this.jpTrendChart.destroy(); this.jpTrendChart = null; }
         if (this.jpCategoryDonut) { this.jpCategoryDonut.destroy(); this.jpCategoryDonut = null; }
         if (this.inTrendChart) { this.inTrendChart.destroy(); this.inTrendChart = null; }
+        if (this.reportExpensePie) { this.reportExpensePie.destroy(); this.reportExpensePie = null; }
         if (this.jpDonut) { this.jpDonut.destroy(); this.jpDonut = null; }
         if (this.inDonut) { this.inDonut.destroy(); this.inDonut = null; }
         if (this.utilityLine) { this.utilityLine.destroy(); this.utilityLine = null; }
@@ -422,6 +424,15 @@ class ChartManager {
         if (this.jpTrendChart) this.jpTrendChart.update();
         if (this.jpCategoryDonut) this.jpCategoryDonut.update();
         if (this.inTrendChart) this.inTrendChart.update();
+        if (this.reportExpensePie) {
+            this.reportExpensePie.update();
+            const centerEl = document.getElementById('report-pie-center-total');
+            if (centerEl && typeof app !== 'undefined' && this.reportExpensePie.data?.datasets?.[0]?.data) {
+                const total = this.reportExpensePie.data.datasets[0].data.reduce((s, v) => s + v, 0);
+                const currency = (typeof app.reportRegion !== 'undefined' && app.reportRegion === 'IN') ? '₹' : '¥';
+                centerEl.innerText = app.formatMoney(total, currency);
+            }
+        }
         if (this.jpDonut) this.jpDonut.update();
         if (this.inDonut) this.inDonut.update();
         if (this.utilityLine) this.utilityLine.update();
@@ -432,6 +443,105 @@ class ChartManager {
                 const inChart = Chart.getChart(`history-donut-${index}-IN`);
                 if (inChart) inChart.update();
             });
+        }
+    }
+
+    /**
+     * Reports Page: Visual Expense Distribution Donut/Pie Chart
+     */
+    renderReportExpensePie(categories = [], totals = {}, currency = '¥', region = 'JP') {
+        const ctx = document.getElementById('report-expense-pie-chart');
+        if (!ctx) return;
+
+        if (this.reportExpensePie) {
+            this.reportExpensePie.destroy();
+            this.reportExpensePie = null;
+        }
+
+        const activeCategories = (categories || []).filter(c => (totals[c.id] || 0) > 0);
+        const centerEl = document.getElementById('report-pie-center-total');
+        const legendEl = document.getElementById('report-pie-legend');
+
+        if (activeCategories.length === 0) {
+            this.reportExpensePie = new Chart(ctx, this.getEmptyConfig('No expenses recorded in period'));
+            if (centerEl) centerEl.innerText = `${currency}0`;
+            if (legendEl) legendEl.innerHTML = `<p class="text-xs text-muted" style="text-align:center;padding:16px 0;width:100%;">No category expense debits recorded in this period snapshot.</p>`;
+            return;
+        }
+
+        // Sort categories descending by spend amount
+        activeCategories.sort((a, b) => (totals[b.id] || 0) - (totals[a.id] || 0));
+
+        const labels = activeCategories.map(c => c.name);
+        const data = activeCategories.map(c => totals[c.id] || 0);
+        const totalSum = data.reduce((s, v) => s + v, 0);
+
+        if (centerEl && typeof app !== 'undefined') {
+            centerEl.innerText = app.formatMoney(totalSum, currency);
+        }
+
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+
+        this.reportExpensePie = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '72%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#14141e',
+                        titleColor: '#f5f5f7',
+                        bodyColor: '#a0a0ab',
+                        borderColor: 'rgba(255, 255, 255, 0.12)',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: (ctx) => {
+                                const val = ctx.parsed || 0;
+                                const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : '0';
+                                if (typeof app !== 'undefined' && app.isPrivacyHidden) {
+                                    return ` ${ctx.label}: ****** (${pct}%)`;
+                                }
+                                return ` ${ctx.label}: ${currency}${val.toLocaleString()} (${pct}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (legendEl) {
+            legendEl.innerHTML = activeCategories.map((c, i) => {
+                const val = totals[c.id] || 0;
+                const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : '0';
+                const color = glassStyles.borders[i % glassStyles.borders.length];
+                const formattedAmt = typeof app !== 'undefined' ? app.formatMoney(val, currency) : `${currency}${val.toLocaleString()}`;
+                return `
+                    <div class="pie-legend-item" title="${c.name}: ${pct}% of total spent">
+                        <div class="legend-dot" style="background: ${color};"></div>
+                        <div class="legend-info">
+                            <span class="legend-cat-name">${c.name}</span>
+                            <div class="legend-meta">
+                                <span class="legend-pct">${pct}%</span>
+                                <span class="legend-dot-sep">•</span>
+                                <span class="legend-amt privacy-blur">${formattedAmt}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
     }
 

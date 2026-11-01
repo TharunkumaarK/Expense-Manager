@@ -553,9 +553,9 @@
                                             <button class="segment-btn active" data-region="all"
                                                 onclick="app.setLedgerRegion('all')">All</button>
                                             <button class="segment-btn" data-region="JP"
-                                                onclick="app.setLedgerRegion('JP')">🇯🇵 JP</button>
+                                                onclick="app.setLedgerRegion('JP')"><svg class="country-flag-svg flag-jp" viewBox="0 0 640 480" width="14" height="10.5" style="border-radius:2px;vertical-align:middle;margin-right:4px;" aria-hidden="true"><rect width="640" height="480" fill="#ffffff"/><circle cx="320" cy="240" r="120" fill="#bc002d"/></svg>JP</button>
                                             <button class="segment-btn" data-region="IN"
-                                                onclick="app.setLedgerRegion('IN')">🇮🇳 IN</button>
+                                                onclick="app.setLedgerRegion('IN')"><svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="14" height="10.5" style="border-radius:2px;vertical-align:middle;margin-right:4px;" aria-hidden="true"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>IN</button>
                                         </div>
 
                                         <!-- Filter Popover Trigger -->
@@ -723,7 +723,7 @@
                                 <div class="analytics-country-selector">
                                     <button class="analytics-country-tab active" id="analytics-tab-jp"
                                         onclick="app.setAnalyticsCountry('JP')">
-                                        <span class="tab-flag">🇯🇵</span>
+                                        <span class="tab-flag"><svg class="country-flag-svg flag-jp" viewBox="0 0 640 480" width="20" height="15" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);" aria-hidden="true"><rect width="640" height="480" fill="#ffffff"/><circle cx="320" cy="240" r="120" fill="#bc002d"/></svg></span>
                                         <div class="tab-text">
                                             <span class="tab-name">Japan</span>
                                             <span class="tab-currency">JPY (¥)</span>
@@ -731,7 +731,7 @@
                                     </button>
                                     <button class="analytics-country-tab" id="analytics-tab-in"
                                         onclick="app.setAnalyticsCountry('IN')">
-                                        <span class="tab-flag">🇮🇳</span>
+                                        <span class="tab-flag"><svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="20" height="15" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);" aria-hidden="true"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg></span>
                                         <div class="tab-text">
                                             <span class="tab-name">India</span>
                                             <span class="tab-currency">INR (₹)</span>
@@ -1076,8 +1076,8 @@
                             <div class="card reports-toolbar-card">
                                 <!-- Country Selector -->
                                 <div class="segmented-control" id="report-country-selector">
-                                    <button class="segment-btn active" data-region="JP" onclick="app.setReportRegion('JP')">🇯🇵 Japan (¥)</button>
-                                    <button class="segment-btn" data-region="IN" onclick="app.setReportRegion('IN')">🇮🇳 India (₹)</button>
+                                    <button class="segment-btn active" data-region="JP" onclick="app.setReportRegion('JP')"><svg class="country-flag-svg flag-jp" viewBox="0 0 640 480" width="14" height="10.5" style="border-radius:2px;vertical-align:middle;margin-right:5px;" aria-hidden="true"><rect width="640" height="480" fill="#ffffff"/><circle cx="320" cy="240" r="120" fill="#bc002d"/></svg>Japan (¥)</button>
+                                    <button class="segment-btn" data-region="IN" onclick="app.setReportRegion('IN')"><svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="14" height="10.5" style="border-radius:2px;vertical-align:middle;margin-right:5px;" aria-hidden="true"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>India (₹)</button>
                                 </div>
 
                                 <!-- Month / Period Selector -->
@@ -1106,9 +1106,37 @@
                                 <!-- Populated dynamically by app.renderReportsPage() -->
                             </div>
 
-                            <!-- Category Breakdown Table Card -->
-                            <div class="card reports-data-table-card" id="report-category-breakdown-card">
-                                <!-- Populated dynamically by app.renderReportsPage() -->
+                            <!-- Reports Expense Breakdown & Distribution Grid (Restored Visual Pie Chart + Data Table) -->
+                            <div class="reports-analytics-grid">
+                                <!-- Restored Expense Distribution Pie / Donut Chart Card -->
+                                <div class="card reports-chart-card" id="report-pie-chart-card">
+                                    <div class="reports-chart-card-header">
+                                        <div>
+                                            <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Expense Distribution</h3>
+                                            <p class="text-xs text-muted" style="margin: 4px 0 0 0;">Proportional category share for selected snapshot</p>
+                                        </div>
+                                        <span class="report-status-badge active" id="report-pie-period-badge">
+                                            <i data-lucide="pie-chart" style="width:12px;height:12px;"></i> Expense Shares
+                                        </span>
+                                    </div>
+                                    <div class="reports-chart-canvas-wrap">
+                                        <div style="position: relative; width: 100%; height: 260px;">
+                                            <canvas id="report-expense-pie-chart"></canvas>
+                                            <div class="reports-pie-center-label" id="report-pie-center-label">
+                                                <span class="center-sub">Total Spent</span>
+                                                <span class="center-val privacy-blur" id="report-pie-center-total">¥0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="reports-pie-legend" id="report-pie-legend">
+                                        <!-- Populated dynamically with category chips, % and values -->
+                                    </div>
+                                </div>
+
+                                <!-- Category Breakdown Table Card -->
+                                <div class="card reports-data-table-card" id="report-category-breakdown-card">
+                                    <!-- Populated dynamically by app.renderReportsPage() -->
+                                </div>
                             </div>
 
                             <!-- Custom Date-Range Report Panel -->
@@ -1170,8 +1198,8 @@
                             <div class="card budgets-toolbar-card">
                                 <!-- Country Selector -->
                                 <div class="segmented-control" id="budgets-country-selector">
-                                    <button class="segment-btn active" data-region="JP" onclick="app.setBudgetsRegion('JP')">🇯🇵 Japan (¥)</button>
-                                    <button class="segment-btn" data-region="IN" onclick="app.setBudgetsRegion('IN')">🇮🇳 India (₹)</button>
+                                    <button class="segment-btn active" data-region="JP" onclick="app.setBudgetsRegion('JP')"><svg class="country-flag-svg flag-jp" viewBox="0 0 640 480" width="14" height="10.5" style="border-radius:2px;vertical-align:middle;margin-right:5px;" aria-hidden="true"><rect width="640" height="480" fill="#ffffff"/><circle cx="320" cy="240" r="120" fill="#bc002d"/></svg>Japan (¥)</button>
+                                    <button class="segment-btn" data-region="IN" onclick="app.setBudgetsRegion('IN')"><svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="14" height="10.5" style="border-radius:2px;vertical-align:middle;margin-right:5px;" aria-hidden="true"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>India (₹)</button>
                                 </div>
 
                                 <!-- Month Display -->
@@ -1220,55 +1248,97 @@
                                 <div class="wallets-toolbar">
                                     <div>
                                         <h2 class="wallets-page-title">Wallets & Accounts</h2>
-                                        <p class="wallets-page-subtitle text-muted text-sm">Manage multi-currency
-                                            balances, bank accounts, cards and payment sources</p>
+                                        <p class="wallets-page-subtitle text-muted text-sm">Manage multi-currency liquid balances, bank accounts, cards and payment sources</p>
                                     </div>
                                     <div class="wallets-toolbar-actions">
-                                        <button class="btn btn-primary" onclick="app.openAddWalletModal()"
-                                            id="btn-add-wallet">
+                                        <button class="btn btn-secondary" onclick="app.openTransactionModal('transfer')" title="Transfer between wallets">
+                                            <i data-lucide="repeat" style="width: 15px; height: 15px;"></i>
+                                            <span>Transfer</span>
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="app.openTransactionModal('remittance')" title="Remittance JP to IN">
+                                            <i data-lucide="globe" style="width: 15px; height: 15px;"></i>
+                                            <span>Remittance</span>
+                                        </button>
+                                        <button class="btn btn-primary" onclick="app.openAddWalletModal()" id="btn-add-wallet">
                                             <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
                                             <span>Add Wallet</span>
                                         </button>
                                     </div>
                                 </div>
 
+                                <!-- Portfolio Liquid Position Overview KPI Cards -->
+                                <div class="wallets-portfolio-grid">
+                                    <div class="card wallets-kpi-card">
+                                        <div class="wallets-kpi-header">
+                                            <div class="wallets-kpi-flag-group">
+                                                <svg class="country-flag-svg flag-jp" viewBox="0 0 640 480" width="22" height="16.5" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);" aria-hidden="true"><rect width="640" height="480" fill="#ffffff"/><circle cx="320" cy="240" r="120" fill="#bc002d"/></svg>
+                                                <span class="wallets-kpi-title">Japan Liquid Net Position</span>
+                                            </div>
+                                            <span class="wallets-count-badge" id="wallets-page-jp-count">0 wallets</span>
+                                        </div>
+                                        <div class="wallets-kpi-val privacy-blur" id="wallets-page-jp-total">¥0</div>
+                                        <div class="wallets-kpi-sub">Calculated across active Japanese yen accounts & cash</div>
+                                    </div>
+                                    <div class="card wallets-kpi-card">
+                                        <div class="wallets-kpi-header">
+                                            <div class="wallets-kpi-flag-group">
+                                                <svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="22" height="16.5" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);" aria-hidden="true"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>
+                                                <span class="wallets-kpi-title">India Liquid Net Position</span>
+                                            </div>
+                                            <span class="wallets-count-badge" id="wallets-page-in-count">0 wallets</span>
+                                        </div>
+                                        <div class="wallets-kpi-val privacy-blur" id="wallets-page-in-total">₹0</div>
+                                        <div class="wallets-kpi-sub">Calculated across active Indian rupee accounts & deposits</div>
+                                    </div>
+                                </div>
+
                                 <!-- Japan Wallets Group -->
                                 <div class="wallets-group-section" id="wallets-group-jp">
-                                    <div class="wallets-group-header">
+                                    <div class="wallets-group-header" onclick="app.toggleWalletsSection('jp')">
                                         <div class="wallets-group-title-wrap">
-                                            <span class="country-flag-icon">🇯🇵</span>
-                                            <h3>Japan Wallets</h3>
-                                            <span class="wallets-count-badge" id="wallets-page-jp-count">0
-                                                wallets</span>
+                                            <svg class="country-flag-svg flag-jp" viewBox="0 0 640 480" width="20" height="15" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);" aria-hidden="true"><rect width="640" height="480" fill="#ffffff"/><circle cx="320" cy="240" r="120" fill="#bc002d"/></svg>
+                                            <h3>Japan Accounts</h3>
+                                            <span class="wallets-count-badge" id="wallets-section-jp-count">0 wallets</span>
                                         </div>
-                                        <div class="wallets-group-subtotal">
-                                            <span class="text-muted text-xs">Total:</span>
-                                            <span class="wallets-subtotal-val privacy-blur"
-                                                id="wallets-page-jp-total">¥0</span>
+                                        <div class="wallets-group-actions-wrap">
+                                            <div class="wallets-group-subtotal">
+                                                <span class="text-muted text-xs">Total:</span>
+                                                <span class="wallets-subtotal-val privacy-blur" id="wallets-section-jp-total">¥0</span>
+                                            </div>
+                                            <button class="wallets-collapse-btn" onclick="event.stopPropagation(); app.toggleWalletsSection('jp')" aria-label="Toggle Japan accounts" title="Toggle section">
+                                                <i data-lucide="chevron-down" id="wallets-chevron-jp"></i>
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="wallets-cards-grid" id="wallets-page-jp-grid">
-                                        <!-- Rendered by JS -->
+                                    <div class="wallets-accordion-body" id="wallets-container-jp">
+                                        <div class="wallets-cards-grid" id="wallets-page-jp-grid">
+                                            <!-- Rendered by JS -->
+                                        </div>
                                     </div>
                                 </div>
 
                                 <!-- India Wallets Group -->
                                 <div class="wallets-group-section" id="wallets-group-in" style="margin-top: 32px;">
-                                    <div class="wallets-group-header">
+                                    <div class="wallets-group-header" onclick="app.toggleWalletsSection('in')">
                                         <div class="wallets-group-title-wrap">
-                                            <span class="country-flag-icon">🇮🇳</span>
-                                            <h3>India Wallets</h3>
-                                            <span class="wallets-count-badge" id="wallets-page-in-count">0
-                                                wallets</span>
+                                            <svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="20" height="15" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);" aria-hidden="true"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>
+                                            <h3>India Accounts</h3>
+                                            <span class="wallets-count-badge" id="wallets-section-in-count">0 wallets</span>
                                         </div>
-                                        <div class="wallets-group-subtotal">
-                                            <span class="text-muted text-xs">Total:</span>
-                                            <span class="wallets-subtotal-val privacy-blur"
-                                                id="wallets-page-in-total">₹0</span>
+                                        <div class="wallets-group-actions-wrap">
+                                            <div class="wallets-group-subtotal">
+                                                <span class="text-muted text-xs">Total:</span>
+                                                <span class="wallets-subtotal-val privacy-blur" id="wallets-section-in-total">₹0</span>
+                                            </div>
+                                            <button class="wallets-collapse-btn" onclick="event.stopPropagation(); app.toggleWalletsSection('in')" aria-label="Toggle India accounts" title="Toggle section">
+                                                <i data-lucide="chevron-down" id="wallets-chevron-in"></i>
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="wallets-cards-grid" id="wallets-page-in-grid">
-                                        <!-- Rendered by JS -->
+                                    <div class="wallets-accordion-body" id="wallets-container-in">
+                                        <div class="wallets-cards-grid" id="wallets-page-in-grid">
+                                            <!-- Rendered by JS -->
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1419,8 +1489,8 @@
                                                 </div>
                                                 <div class="settings-control-wrap">
                                                     <select id="setting-default-country" class="settings-select" onchange="app.updateRegionalPreference('defaultCountry', this.value)">
-                                                        <option value="JP">🇯🇵 Japan (JPY ¥)</option>
-                                                        <option value="IN">🇮🇳 India (INR ₹)</option>
+                                                        <option value="JP">Japan (JPY ¥)</option>
+                                                        <option value="IN">India (INR ₹)</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -2170,9 +2240,9 @@
                     <div class="form-group">
                         <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Region Availability</label>
                         <select id="cat-edit-country" style="width: 100%; padding: 10px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
-                            <option value="JP">🇯🇵 Japan Only (JPY)</option>
-                            <option value="IN">🇮🇳 India Only (INR)</option>
-                            <option value="ALL">🌐 Both Regions</option>
+                            <option value="JP">Japan Only (JPY ¥)</option>
+                            <option value="IN">India Only (INR ₹)</option>
+                            <option value="ALL">Both Regions (Global)</option>
                         </select>
                     </div>
                 </div>
