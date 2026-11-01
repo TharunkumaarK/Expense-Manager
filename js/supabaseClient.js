@@ -229,6 +229,10 @@ const supabaseClient = {
             const emailDisplay = document.getElementById('account-email-display');
             if (emailDisplay) emailDisplay.innerText = `Logged in as ${this.session.user.email}`;
 
+            if (typeof app !== 'undefined' && typeof app.updateDesktopAccountInfo === 'function') {
+                app.updateDesktopAccountInfo();
+            }
+
             // Sync from Supabase — if remote is newer, fully re-initialize the app
             if (typeof storage !== 'undefined') {
                 storage.onUserLogin(this.session.user.id);

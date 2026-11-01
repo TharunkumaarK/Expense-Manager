@@ -127,340 +127,716 @@
 
     <!-- Main Content Area -->
     <main id="app-content" style="display: none;">
-        <!-- Views will be dynamically shown/hidden by JS -->
-
-        <!-- Home View -->
-        <section id="home-view" class="view active">
-            <header class="top-bar">
-                <div style="width: 36px; height: 36px;" class="top-bar-spacer"></div>
-                <div class="summary-card text-center" style="padding: 0; background: transparent; box-shadow: none;">
-                    <div style="display: flex; justify-content: center; align-items: center; gap: 16px;">
-                        <button class="icon-btn" onclick="app.changeMonth(-1)"><i
-                                data-lucide="chevron-left"></i></button>
-                        <h2 id="current-month-display"
-                            style="font-size: 1.4rem; font-weight: 700; min-width: 120px; margin: 0;">Month</h2>
-                        <button class="icon-btn" onclick="app.changeMonth(1)"><i
-                                data-lucide="chevron-right"></i></button>
-                    </div>
-                </div>
-                <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
-                    aria-label="Reveal monetary values" title="Reveal monetary values">
-                    <i data-lucide="eye-off"></i>
-                </button>
-            </header>
-
-            <div class="wallets-container">
-                <!-- Loan Tracker Widget -->
-                <div class="loan-card" id="loan-tracker-widget" style="display: none;">
-                    <!-- Populated by JS -->
-                </div>
-
-                <!-- Japan Wallets -->
-                <div class="region-card">
-                    <div class="region-header">
-                        <span class="region-title" style="display:flex; align-items:center; gap:8px;">
-                            <svg width="20" height="20" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-                                <circle fill="#EEEEEE" cx="18" cy="18" r="18" />
-                                <circle fill="#D80027" cx="18" cy="18" r="7" />
-                            </svg>
-                            Japan
-                        </span>
-                        <span class="region-total" id="jp-total-balance">******</span>
-                    </div>
-                    <div class="wallet-grid" id="jp-wallets">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-                <!-- India Wallets -->
-                <div class="region-card">
-                    <div class="region-header">
-                        <span class="region-title" style="display:flex; align-items:center; gap:8px;">
-                            <svg width="20" height="20" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-                                <clipPath id="circleViewIN">
-                                    <circle cx="18" cy="18" r="18" />
-                                </clipPath>
-                                <g clip-path="url(#circleViewIN)">
-                                    <rect x="0" y="0" width="36" height="12" fill="#FF9933" />
-                                    <rect x="0" y="12" width="36" height="12" fill="#FFFFFF" />
-                                    <rect x="0" y="24" width="36" height="12" fill="#138808" />
-                                    <circle cx="18" cy="18" r="3.5" fill="none" stroke="#000080" stroke-width="1.5" />
-                                    <circle cx="18" cy="18" r="0.8" fill="#000080" />
-                                </g>
-                            </svg>
-                            India
-                        </span>
-                        <span class="region-total" id="in-total-balance">******</span>
-                    </div>
-                    <div class="wallet-grid" id="in-wallets">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-            </div>
-
-            <div class="budget-overview" id="budget-overview-card">
-                <!-- Populated by JS -->
-            </div>
-
-            <div class="section-header-toggle" onclick="app.toggleCollapse('jp-categories-wrap', 'jp-chevron')">
-                <h3 class="section-title" style="margin:0; padding:0;">Japan Spending Categories</h3>
-                <i data-lucide="chevron-down" id="jp-chevron"></i>
-            </div>
-            <div class="collapsible-wrapper" id="jp-categories-wrap">
-                <div class="category-grid" id="jp-categories-grid">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-
-            <div class="section-header-toggle" onclick="app.toggleCollapse('in-categories-wrap', 'in-chevron')">
-                <h3 class="section-title" style="margin:0; padding:0;">India Spending Categories</h3>
-                <i data-lucide="chevron-down" id="in-chevron" class="rotated"></i>
-            </div>
-            <div class="collapsible-wrapper collapsed" id="in-categories-wrap">
-                <div class="category-grid" id="in-categories-grid">
-                    <!-- Populated by JS -->
-                </div>
-            </div>
-
-            <h3 class="section-title">Recent Transactions</h3>
-            <div class="recent-transactions" id="recent-transactions-list">
-                <!-- Populated by JS -->
-            </div>
-
-            <!-- Spacer to prevent FAB overlay issues -->
-            <div style="height: 80px;"></div>
-        </section>
-
-        <!-- Analytics View -->
-        <section id="analytics-view" class="view">
-            <header class="top-bar">
-                <h2>Analytics</h2>
-                <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
-                    aria-label="Reveal monetary values" title="Reveal monetary values">
-                    <i data-lucide="eye-off"></i>
-                </button>
-            </header>
-            <div class="content-padded">
-                <div class="chart-container card">
-                    <h3>Japan Spending Breakdown</h3>
-                    <div class="chart-canvas-wrap">
-                        <canvas id="jp-donut-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="chart-container card">
-                    <h3>India Spending Breakdown</h3>
-                    <div class="chart-canvas-wrap">
-                        <canvas id="in-donut-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="chart-container card">
-                    <h3>Utilities (This Month) 🇯🇵</h3>
-                    <div class="chart-canvas-wrap bar-wrap">
-                        <canvas id="utilities-line-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div style="height: 80px;"></div>
-        </section>
-
-        <!-- History View -->
-        <section id="history-view" class="view">
-            <header class="top-bar">
-                <h2>History</h2>
-                <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
-                    aria-label="Reveal monetary values" title="Reveal monetary values">
-                    <i data-lucide="eye-off"></i>
-                </button>
-            </header>
-            <div class="content-padded" id="history-list">
-                <!-- Populated by JS -->
-            </div>
-            <div style="height: 80px;"></div>
-        </section>
-
-        <!-- Settings View -->
-        <section id="settings-view" class="view">
-            <header class="top-bar">
-                <h2>Settings</h2>
-                <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
-                    aria-label="Reveal monetary values" title="Reveal monetary values">
-                    <i data-lucide="eye-off"></i>
-                </button>
-            </header>
-            <div class="content-padded" id="settings-content">
-                <!-- Settings Content -->
-                <div class="card mt-3" style="padding:0;">
-                    <div class="section-header-toggle" onclick="app.toggleCollapse('settings-wallets-wrap', null)"
-                        style="padding: 16px;">
-                        <div class="section-title"
-                            style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main);">
-                            <i data-lucide="wallet" style="width:18px;height:18px;color:var(--text-muted);"></i> EDIT
-                            WALLETS
+        <div class="app-layout">
+            <!-- Persistent Left Desktop Sidebar -->
+            <aside id="desktop-sidebar" class="desktop-sidebar" aria-label="Desktop Navigation">
+                <!-- Sidebar Brand Header -->
+                <div class="sidebar-header">
+                    <div class="brand-logo">
+                        <div class="logo-mark">
+                            <i data-lucide="wallet-cards"></i>
                         </div>
-                        <i data-lucide="edit-3" style="width:18px;height:18px;color:var(--text-muted);"></i>
-                    </div>
-                    <div id="settings-wallets-wrap" class="collapsible-wrapper collapsed">
-                        <div>
-                            <div style="padding: 0 16px 16px;">
-                                <p class="help-text text-sm text-muted" style="margin: 0 0 12px 0;">Adjust your current
-                                    wallet balances directly.</p>
-                                <div id="settings-wallets-list">
-                                    <!-- Populated by JS -->
-                                </div>
-                            </div>
+                        <div class="brand-info">
+                            <span class="brand-name">Expense Manager</span>
                         </div>
                     </div>
+                    <button id="sidebar-toggle-btn" class="sidebar-toggle" title="Collapse sidebar"
+                        aria-label="Collapse sidebar" onclick="app.toggleSidebarCollapse()">
+                        <i data-lucide="panel-left-close" id="sidebar-toggle-icon" class="sidebar-toggle-icon"></i>
+                    </button>
                 </div>
 
-                <div class="card mt-3" style="padding:0;">
-                    <div class="section-header-toggle"
-                        style="padding: 16px; display: flex; justify-content: space-between; align-items: center;">
-                        <div onclick="app.toggleCollapse('settings-loan-wrap', this.querySelector('.chevron'))"
-                            style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main); flex: 1; cursor: pointer;">
-                            <i data-lucide="landmark" style="width:18px;height:18px;color:var(--text-muted);"></i> LOAN
-                            TRACKER
-                            <i data-lucide="chevron-down" class="chevron"
-                                style="width:18px;height:18px;color:var(--text-muted); transition: transform 0.3s;"></i>
+                <!-- Global Action: Add Transaction -->
+                <div class="sidebar-action-wrap">
+                    <button class="btn-add-tx" onclick="app.openTransactionModal('expense')"
+                        id="desktop-sidebar-add-btn">
+                        <i data-lucide="plus-circle"></i>
+                        <span class="sidebar-text">Add Transaction</span>
+                    </button>
+                </div>
+
+                <!-- 7 Desktop Destinations -->
+                <nav class="sidebar-nav">
+                    <div class="nav-group-label sidebar-text">MAIN MENU</div>
+                    <ul class="nav-list">
+                        <li>
+                            <a href="#" class="desktop-nav-item active" data-target="home-view" data-tooltip="Dashboard"
+                                title="Dashboard">
+                                <i data-lucide="layout-dashboard"></i>
+                                <span class="sidebar-text">Dashboard</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="desktop-nav-item" data-target="transactions-view"
+                                data-tooltip="Transactions" title="Transactions">
+                                <i data-lucide="receipt"></i>
+                                <span class="sidebar-text">Transactions</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="desktop-nav-item" data-target="analytics-view" data-tooltip="Analytics"
+                                title="Analytics">
+                                <i data-lucide="line-chart"></i>
+                                <span class="sidebar-text">Analytics</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="desktop-nav-item" data-target="reports-view" data-tooltip="Reports"
+                                title="Reports">
+                                <i data-lucide="file-text"></i>
+                                <span class="sidebar-text">Reports</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="desktop-nav-item" data-target="budgets-view" data-tooltip="Budgets"
+                                title="Budgets">
+                                <i data-lucide="pie-chart"></i>
+                                <span class="sidebar-text">Budgets</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="desktop-nav-item" data-target="wallets-view" data-tooltip="Wallets"
+                                title="Wallets">
+                                <i data-lucide="wallet"></i>
+                                <span class="sidebar-text">Wallets</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="desktop-nav-item" data-target="settings-view" data-tooltip="Settings"
+                                title="Settings">
+                                <i data-lucide="settings"></i>
+                                <span class="sidebar-text">Settings</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+
+                <!-- Footer: Sync Status & Account -->
+                <div class="sidebar-footer">
+                    <div class="sync-status-indicator" id="sidebar-sync-indicator"
+                        title="Cloud Sync Active (Development)">
+                        <span class="sync-dot" id="sync-status-dot"></span>
+                        <span class="sync-text sidebar-text" id="sync-status-text">Cloud Synced</span>
+                    </div>
+                    <div class="account-card" id="sidebar-account-card">
+                        <div class="account-avatar">
+                            <span id="account-avatar-initials">TK</span>
                         </div>
-                        <button class="icon-btn" onclick="app.toggleLoanVisibility()" id="loan-visibility-btn"
-                            style="color: var(--text-muted); padding: 5px; margin-left: 10px;"
-                            title="Toggle Dashboard Visibility">
-                            <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
+                        <div class="account-details sidebar-text">
+                            <span class="account-name" id="desktop-account-name">Account</span>
+                            <span class="account-email" id="desktop-account-email">user@example.com</span>
+                        </div>
+                        <button class="account-logout-btn" onclick="supabaseClient.handleLogout()" title="Sign Out"
+                            aria-label="Sign Out">
+                            <i data-lucide="log-out"></i>
                         </button>
                     </div>
-                    <div id="settings-loan-wrap" class="collapsible-wrapper collapsed">
-                        <div>
-                            <div style="padding: 0 16px 16px;">
-                                <p class="help-text text-sm text-muted mb-2">Update manually once a month from your bank
-                                    app to stay in sync.</p>
-                                <div class="form-group mt-2">
-                                    <label>Total Loan Amount (₹)</label>
-                                    <input type="number" id="setting-loan-total-principal"
-                                        onblur="app.updateLoanSetting('totalPrincipal', this.value)">
+                </div>
+            </aside>
+
+            <!-- Main Desktop Wrapper -->
+            <div class="desktop-main-wrapper">
+                <!-- Desktop Unified Header -->
+                <header class="desktop-header" id="desktop-header">
+                    <div class="header-left">
+                        <button class="mobile-menu-toggle" onclick="app.toggleMobileSidebar()"
+                            aria-label="Open navigation menu">
+                            <i data-lucide="menu"></i>
+                        </button>
+                        <div class="header-breadcrumb">
+                            <span class="header-app-tag">Expense Manager</span>
+                            <span class="header-sep">/</span>
+                            <div class="header-titles">
+                                <h1 class="header-page-title" id="desktop-page-title">Dashboard</h1>
+                                <span class="header-page-subtitle" id="desktop-page-subtitle">Overview & Accounts</span>
+                            </div>
+                        </div>
+
+                        <!-- Month Selector in Header -->
+                        <div class="header-month-selector" id="desktop-month-selector">
+                            <button class="icon-btn-subtle" onclick="app.changeMonth(-1)" aria-label="Previous Month">
+                                <i data-lucide="chevron-left"></i>
+                            </button>
+                            <span id="desktop-current-month-display" class="header-month-label">Month</span>
+                            <button class="icon-btn-subtle" onclick="app.changeMonth(1)" aria-label="Next Month">
+                                <i data-lucide="chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="header-right">
+                        <!-- Monetary Concealment Toggle -->
+                        <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
+                            aria-label="Reveal monetary values" title="Toggle monetary concealment">
+                            <i data-lucide="eye-off"></i>
+                            <span class="privacy-btn-label">Conceal</span>
+                        </button>
+
+                        <!-- Quick Add Button -->
+                        <button class="btn btn-primary btn-sm header-action-btn"
+                            onclick="app.openTransactionModal('expense')">
+                            <i data-lucide="plus"></i>
+                            <span>Add Transaction</span>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Desktop Workspace Views Container -->
+                <div class="desktop-content-area" id="desktop-content-area">
+                    <!-- Home / Dashboard View -->
+                    <section id="home-view" class="view active">
+                        <header class="top-bar">
+                            <div style="width: 36px; height: 36px;" class="top-bar-spacer"></div>
+                            <div class="summary-card text-center"
+                                style="padding: 0; background: transparent; box-shadow: none;">
+                                <div style="display: flex; justify-content: center; align-items: center; gap: 16px;">
+                                    <button class="icon-btn" onclick="app.changeMonth(-1)"><i
+                                            data-lucide="chevron-left"></i></button>
+                                    <h2 id="current-month-display"
+                                        style="font-size: 1.4rem; font-weight: 700; min-width: 120px; margin: 0;">Month
+                                    </h2>
+                                    <button class="icon-btn" onclick="app.changeMonth(1)"><i
+                                            data-lucide="chevron-right"></i></button>
                                 </div>
-                                <div class="form-group">
-                                    <label>Principal Left (₹)</label>
-                                    <input type="number" id="setting-loan-principal"
-                                        onblur="app.updateLoanSetting('principalLeft', this.value)">
+                            </div>
+                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                                aria-label="Reveal monetary values" title="Reveal monetary values">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </header>
+
+                        <div class="workspace-grid" id="dashboard-workspace-grid">
+                            <!-- Main Central Column -->
+                            <div class="workspace-main" id="dashboard-main-column">
+                                <!-- Dashboard Greeting Bar -->
+                                <div class="dashboard-greeting-bar">
+                                    <div class="greeting-text-wrap">
+                                        <h2 class="greeting-title" id="dashboard-greeting-title">Financial Overview</h2>
+                                        <p class="greeting-subtitle">Monitor balances, active budgets, and multi-currency accounts.</p>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label>Total EMIs (Months)</label>
-                                    <input type="number" id="setting-loan-total-dues"
-                                        onblur="app.updateLoanSetting('totalDues', this.value)">
+
+                                <!-- Country Balance Cards Grid (Japan & India) -->
+                                <div class="country-balance-grid" id="country-balance-cards">
+                                    <!-- Japan Balance Card -->
+                                    <div class="country-card country-card-jp" id="jp-country-card" onclick="app.openCountryExpansion('JP')">
+                                        <div class="country-card-header">
+                                            <div class="country-badge">
+                                                <span class="country-flag-icon">
+                                                    <svg width="20" height="20" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                                                        <circle fill="#EEEEEE" cx="18" cy="18" r="18" />
+                                                        <circle fill="#D80027" cx="18" cy="18" r="7" />
+                                                    </svg>
+                                                </span>
+                                                <span class="country-name">Japan</span>
+                                                <span class="currency-code">JPY</span>
+                                            </div>
+                                            <div class="country-card-action">
+                                                <span class="wallet-count-pill" id="jp-wallet-count-badge">0 Wallets</span>
+                                                <span class="expand-indicator"><i data-lucide="arrow-up-right"></i></span>
+                                            </div>
+                                        </div>
+                                        <div class="country-balance-body">
+                                            <span class="balance-label">Total Balance</span>
+                                            <div class="country-total-amount financial-amount" id="jp-total-balance">¥0</div>
+                                        </div>
+                                        <div class="country-card-footer">
+                                            <span class="footer-hint">Click to inspect Japan wallets & accounts</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- India Balance Card -->
+                                    <div class="country-card country-card-in" id="in-country-card" onclick="app.openCountryExpansion('IN')">
+                                        <div class="country-card-header">
+                                            <div class="country-badge">
+                                                <span class="country-flag-icon">
+                                                    <svg width="20" height="20" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                                                        <clipPath id="circleViewINDash">
+                                                            <circle cx="18" cy="18" r="18" />
+                                                        </clipPath>
+                                                        <g clip-path="url(#circleViewINDash)">
+                                                            <rect x="0" y="0" width="36" height="12" fill="#FF9933" />
+                                                            <rect x="0" y="12" width="36" height="12" fill="#FFFFFF" />
+                                                            <rect x="0" y="24" width="36" height="12" fill="#138808" />
+                                                            <circle cx="18" cy="18" r="3.5" fill="none" stroke="#000080" stroke-width="1.5" />
+                                                            <circle cx="18" cy="18" r="0.8" fill="#000080" />
+                                                        </g>
+                                                    </svg>
+                                                </span>
+                                                <span class="country-name">India</span>
+                                                <span class="currency-code">INR</span>
+                                            </div>
+                                            <div class="country-card-action">
+                                                <span class="wallet-count-pill" id="in-wallet-count-badge">0 Wallets</span>
+                                                <span class="expand-indicator"><i data-lucide="arrow-up-right"></i></span>
+                                            </div>
+                                        </div>
+                                        <div class="country-balance-body">
+                                            <span class="balance-label">Total Balance</span>
+                                            <div class="country-total-amount financial-amount" id="in-total-balance">₹0</div>
+                                        </div>
+                                        <div class="country-card-footer">
+                                            <span class="footer-hint">Click to inspect India wallets & accounts</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label>EMIs Paid (Months)</label>
-                                    <input type="number" id="setting-loan-dues"
-                                        onblur="app.updateLoanSetting('duesPaid', this.value)">
+
+                                <!-- Monthly Financial Summary (Japan & India) -->
+                                <div class="monthly-summary-container" id="monthly-financial-summary">
+                                    <!-- Populated dynamically by JS -->
                                 </div>
-                                <div class="form-group">
-                                    <label>EMI Draw Date (Day of Month)</label>
-                                    <input type="number" id="setting-loan-date"
-                                        onblur="app.updateLoanSetting('emiDrawDate', this.value)" min="1" max="31">
+
+                                <!-- Hidden containers for backward compatibility with JS queries -->
+                                <div style="display: none;" id="jp-wallets"></div>
+                                <div style="display: none;" id="in-wallets"></div>
+
+                                <div class="section-header-toggle"
+                                    onclick="app.toggleCollapse('jp-categories-wrap', 'jp-chevron')">
+                                    <div class="section-title-wrap">
+                                        <span class="section-badge-dot jp-dot"></span>
+                                        <h3 class="section-title" style="margin:0; padding:0;">Japan Spending Categories</h3>
+                                    </div>
+                                    <i data-lucide="chevron-down" id="jp-chevron"></i>
+                                </div>
+                                <div class="collapsible-wrapper" id="jp-categories-wrap">
+                                    <div class="category-grid" id="jp-categories-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+
+                                <div class="section-header-toggle"
+                                    onclick="app.toggleCollapse('in-categories-wrap', 'in-chevron')">
+                                    <div class="section-title-wrap">
+                                        <span class="section-badge-dot in-dot"></span>
+                                        <h3 class="section-title" style="margin:0; padding:0;">India Spending Categories</h3>
+                                    </div>
+                                    <i data-lucide="chevron-down" id="in-chevron" class="rotated"></i>
+                                </div>
+                                <div class="collapsible-wrapper collapsed" id="in-categories-wrap">
+                                    <div class="category-grid" id="in-categories-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+
+                                <!-- Recent Transactions Section -->
+                                <div class="recent-transactions-section">
+                                    <div class="section-header-row">
+                                        <div>
+                                            <h3 class="section-title" style="margin:0;">Recent Transactions</h3>
+                                            <p class="section-subtitle">Latest movements across Japan & India</p>
+                                        </div>
+                                        <button class="btn btn-secondary btn-sm" onclick="app.switchView('transactions-view')">
+                                            <span>See All</span>
+                                            <i data-lucide="arrow-right"></i>
+                                        </button>
+                                    </div>
+                                    <div class="recent-transactions-list" id="recent-transactions-list">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right-hand Contextual Rail -->
+                            <aside class="workspace-rail" id="dashboard-rail">
+                                <!-- Budget Overview Card -->
+                                <div class="rail-card budget-rail-card" id="budget-overview-card">
+                                    <!-- Populated by JS -->
+                                </div>
+
+                                <!-- Loan Tracker Widget -->
+                                <div class="rail-card loan-card" id="loan-tracker-widget" style="display: none;">
+                                    <!-- Populated by JS -->
+                                </div>
+
+                                <!-- Quick Mini Account Breakdown in Rail -->
+                                <div class="rail-card account-summary-card" id="rail-account-summary">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </aside>
+                        </div>
+
+                        <!-- Spacer to prevent FAB overlay issues -->
+                        <div style="height: 80px;"></div>
+                    </section>
+
+                    <!-- Transactions View (Dedicated Continuous History) -->
+                    <section id="transactions-view" class="view">
+                        <header class="top-bar">
+                            <h2>Transactions</h2>
+                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                                aria-label="Reveal monetary values" title="Reveal monetary values">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </header>
+                        <div class="content-padded" id="transactions-view-container">
+                            <div class="card" style="padding: 32px; text-align: center;">
+                                <div style="max-width: 440px; margin: 0 auto;">
+                                    <i data-lucide="receipt"
+                                        style="width: 48px; height: 48px; color: var(--accent); margin-bottom: 12px;"></i>
+                                    <h3 style="margin-bottom: 8px;">Continuous Transaction Ledger</h3>
+                                    <p class="text-muted text-sm">Full transaction history with instant search,
+                                        multi-filters, and date grouping will be implemented in Phase 3.</p>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                        <div style="height: 80px;"></div>
+                    </section>
 
-                <div class="card mt-3">
-                    <h3>Japan Total Budget</h3>
-                    <div class="form-group">
-                        <label>Monthly Budget (¥)</label>
-                        <input type="number" id="setting-jp-budget"
-                            onblur="app.updateSetting('jpTotalBudget', this.value)">
-                    </div>
-                </div>
+                    <!-- Analytics View -->
+                    <section id="analytics-view" class="view">
+                        <header class="top-bar">
+                            <h2>Analytics</h2>
+                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                                aria-label="Reveal monetary values" title="Reveal monetary values">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </header>
+                        <div class="content-padded">
+                            <div class="chart-container card">
+                                <h3>Japan Spending Breakdown</h3>
+                                <div class="chart-canvas-wrap">
+                                    <canvas id="jp-donut-chart"></canvas>
+                                </div>
+                            </div>
 
-                <div class="card mt-3" style="padding:0;">
-                    <div class="section-header-toggle" onclick="app.toggleCollapse('settings-jp-cat-wrap', null)"
-                        style="padding: 16px;">
-                        <div class="section-title"
-                            style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main);">
-                            <svg width="18" height="18" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-                                <circle fill="#EEEEEE" cx="18" cy="18" r="18" />
-                                <circle fill="#D80027" cx="18" cy="18" r="7" />
-                            </svg>
-                            EDIT JAPAN CATEGORIES
-                        </div>
-                        <i data-lucide="edit-3" style="width:18px;height:18px;color:var(--text-muted);"></i>
-                    </div>
-                    <div id="settings-jp-cat-wrap" class="collapsible-wrapper collapsed">
-                        <div>
-                            <div style="padding: 0 16px 16px;">
-                                <p class="help-text text-sm text-muted" style="margin: 0 0 12px 0;">Set budgets and
-                                    manage Japan categories.</p>
-                                <div id="settings-categories-list"></div>
+                            <div class="chart-container card">
+                                <h3>India Spending Breakdown</h3>
+                                <div class="chart-canvas-wrap">
+                                    <canvas id="in-donut-chart"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="chart-container card">
+                                <h3>Utilities (This Month) 🇯🇵</h3>
+                                <div class="chart-canvas-wrap bar-wrap">
+                                    <canvas id="utilities-line-chart"></canvas>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                        <div style="height: 80px;"></div>
+                    </section>
 
-                <div class="card mt-3" style="padding:0;">
-                    <div class="section-header-toggle" onclick="app.toggleCollapse('settings-in-cat-wrap', null)"
-                        style="padding: 16px;">
-                        <div class="section-title"
-                            style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main);">
-                            <svg width="18" height="18" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-                                <clipPath id="circleViewINSettings">
-                                    <circle cx="18" cy="18" r="18" />
-                                </clipPath>
-                                <g clip-path="url(#circleViewINSettings)">
-                                    <rect x="0" y="0" width="36" height="12" fill="#FF9933" />
-                                    <rect x="0" y="12" width="36" height="12" fill="#FFFFFF" />
-                                    <rect x="0" y="24" width="36" height="12" fill="#138808" />
-                                    <circle cx="18" cy="18" r="3.5" fill="none" stroke="#000080" stroke-width="1.5" />
-                                    <circle cx="18" cy="18" r="0.8" fill="#000080" />
-                                </g>
-                            </svg>
-                            EDIT INDIA CATEGORIES
-                        </div>
-                        <i data-lucide="edit-3" style="width:18px;height:18px;color:var(--text-muted);"></i>
-                    </div>
-                    <div id="settings-in-cat-wrap" class="collapsible-wrapper collapsed">
-                        <div>
-                            <div style="padding: 0 16px 16px;">
-                                <p class="help-text text-sm text-muted" style="margin: 0 0 12px 0;">Manage your India
-                                    spending categories.</p>
-                                <div id="settings-in-categories-list"></div>
+                    <!-- Reports View -->
+                    <section id="reports-view" class="view">
+                        <header class="top-bar">
+                            <h2>Reports</h2>
+                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                                aria-label="Reveal monetary values" title="Reveal monetary values">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </header>
+                        <div class="content-padded" id="reports-view-container">
+                            <div class="card" style="padding: 32px; text-align: center;">
+                                <div style="max-width: 440px; margin: 0 auto;">
+                                    <i data-lucide="file-text"
+                                        style="width: 48px; height: 48px; color: var(--accent); margin-bottom: 12px;"></i>
+                                    <h3 style="margin-bottom: 8px;">Financial Reports & Monthly Closing</h3>
+                                    <p class="text-muted text-sm">Refreshable monthly snapshots and guided monthly
+                                        closing workflow will be implemented in Phase 4.</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                        <div style="height: 80px;"></div>
+                    </section>
 
-                <div class="card mt-3">
-                    <h3>Close Month</h3>
-                    <button class="btn btn-danger" onclick="app.closeMonth()">Close Current Month</button>
-                    <p class="help-text">Archives current transactions and creates a snapshot.</p>
-                </div>
+                    <!-- Budgets View -->
+                    <section id="budgets-view" class="view">
+                        <header class="top-bar">
+                            <h2>Budgets</h2>
+                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                                aria-label="Reveal monetary values" title="Reveal monetary values">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </header>
+                        <div class="content-padded" id="budgets-view-container">
+                            <div class="card" style="padding: 32px; text-align: center;">
+                                <div style="max-width: 440px; margin: 0 auto;">
+                                    <i data-lucide="pie-chart"
+                                        style="width: 48px; height: 48px; color: var(--accent); margin-bottom: 12px;"></i>
+                                    <h3 style="margin-bottom: 8px;">Budget & Category Management</h3>
+                                    <p class="text-muted text-sm">Unified budget allocations and custom category icon
+                                        picker will be implemented in Phase 4.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="height: 80px;"></div>
+                    </section>
 
-                <div class="card mt-3">
-                    <h3>App Updates</h3>
-                    <p class="help-text text-sm text-muted mb-2">Force the app to fetch the latest version of the code
-                        if you are stuck on an old layout.</p>
-                    <button class="btn"
-                        style="background:var(--card-bg-light);color:var(--text-main);border:1px solid var(--border);width:100%;"
-                        onclick="app.forceUpdate()">Fetch Latest Version</button>
-                </div>
+                    <!-- Wallets View -->
+                    <section id="wallets-view" class="view">
+                        <header class="top-bar">
+                            <h2>Wallets</h2>
+                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                                aria-label="Reveal monetary values" title="Reveal monetary values">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </header>
+                        <div class="content-padded" id="wallets-view-container">
+                            <div class="wallets-view-content" id="wallets-view-content">
+                                <div class="wallets-toolbar">
+                                    <div>
+                                        <h2 class="wallets-page-title">Wallets & Accounts</h2>
+                                        <p class="wallets-page-subtitle text-muted text-sm">Manage multi-currency balances, bank accounts, cards and payment sources</p>
+                                    </div>
+                                    <div class="wallets-toolbar-actions">
+                                        <button class="btn btn-primary" onclick="app.openAddWalletModal()" id="btn-add-wallet">
+                                            <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
+                                            <span>Add Wallet</span>
+                                        </button>
+                                    </div>
+                                </div>
 
-                <div class="card mt-3">
-                    <h3>Statement Export</h3>
-                    <button class="btn mt-2" style="background:var(--accent);color:white;"
-                        onclick="app.openPdfModal()">Download PDF Statement</button>
-                </div>
+                                <!-- Japan Wallets Group -->
+                                <div class="wallets-group-section" id="wallets-group-jp">
+                                    <div class="wallets-group-header">
+                                        <div class="wallets-group-title-wrap">
+                                            <span class="country-flag-icon">🇯🇵</span>
+                                            <h3>Japan Wallets</h3>
+                                            <span class="wallets-count-badge" id="wallets-page-jp-count">0 wallets</span>
+                                        </div>
+                                        <div class="wallets-group-subtotal">
+                                            <span class="text-muted text-xs">Total:</span>
+                                            <span class="wallets-subtotal-val privacy-blur" id="wallets-page-jp-total">¥0</span>
+                                        </div>
+                                    </div>
+                                    <div class="wallets-cards-grid" id="wallets-page-jp-grid">
+                                        <!-- Rendered by JS -->
+                                    </div>
+                                </div>
 
-                <div class="card mt-3">
-                    <h3>Account</h3>
-                    <p class="help-text text-sm text-muted mb-2" id="account-email-display">Logged in</p>
-                    <button class="btn"
-                        style="background:rgba(239, 68, 68, 0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);width:100%;"
-                        onclick="supabaseClient.handleLogout()">Log Out</button>
-                </div>
-            </div>
-            <div style="height: 80px;"></div>
-        </section>
+                                <!-- India Wallets Group -->
+                                <div class="wallets-group-section" id="wallets-group-in" style="margin-top: 32px;">
+                                    <div class="wallets-group-header">
+                                        <div class="wallets-group-title-wrap">
+                                            <span class="country-flag-icon">🇮🇳</span>
+                                            <h3>India Wallets</h3>
+                                            <span class="wallets-count-badge" id="wallets-page-in-count">0 wallets</span>
+                                        </div>
+                                        <div class="wallets-group-subtotal">
+                                            <span class="text-muted text-xs">Total:</span>
+                                            <span class="wallets-subtotal-val privacy-blur" id="wallets-page-in-total">₹0</span>
+                                        </div>
+                                    </div>
+                                    <div class="wallets-cards-grid" id="wallets-page-in-grid">
+                                        <!-- Rendered by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="height: 80px;"></div>
+                    </section>
+
+                    <!-- History View (Preserved for backward-compatibility) -->
+                    <section id="history-view" class="view">
+                        <header class="top-bar">
+                            <h2>History</h2>
+                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                                aria-label="Reveal monetary values" title="Reveal monetary values">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </header>
+                        <div class="content-padded" id="history-list">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div style="height: 80px;"></div>
+                    </section>
+
+                    <!-- Settings View -->
+                    <section id="settings-view" class="view">
+                        <header class="top-bar">
+                            <h2>Settings</h2>
+                            <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
+                                aria-label="Reveal monetary values" title="Reveal monetary values">
+                                <i data-lucide="eye-off"></i>
+                            </button>
+                        </header>
+                        <div class="content-padded" id="settings-content">
+                            <!-- Settings Content -->
+                            <div class="card mt-3" style="padding:0;">
+                                <div class="section-header-toggle"
+                                    onclick="app.toggleCollapse('settings-wallets-wrap', null)" style="padding: 16px;">
+                                    <div class="section-title"
+                                        style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main);">
+                                        <i data-lucide="wallet"
+                                            style="width:18px;height:18px;color:var(--text-muted);"></i> EDIT
+                                        WALLETS
+                                    </div>
+                                    <i data-lucide="edit-3" style="width:18px;height:18px;color:var(--text-muted);"></i>
+                                </div>
+                                <div id="settings-wallets-wrap" class="collapsible-wrapper collapsed">
+                                    <div>
+                                        <div style="padding: 0 16px 16px;">
+                                            <p class="help-text text-sm text-muted" style="margin: 0 0 12px 0;">Adjust
+                                                your current
+                                                wallet balances directly.</p>
+                                            <div id="settings-wallets-list">
+                                                <!-- Populated by JS -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card mt-3" style="padding:0;">
+                                <div class="section-header-toggle"
+                                    style="padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+                                    <div onclick="app.toggleCollapse('settings-loan-wrap', this.querySelector('.chevron'))"
+                                        style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main); flex: 1; cursor: pointer;">
+                                        <i data-lucide="landmark"
+                                            style="width:18px;height:18px;color:var(--text-muted);"></i> LOAN
+                                        TRACKER
+                                        <i data-lucide="chevron-down" class="chevron"
+                                            style="width:18px;height:18px;color:var(--text-muted); transition: transform 0.3s;"></i>
+                                    </div>
+                                    <button class="icon-btn" onclick="app.toggleLoanVisibility()"
+                                        id="loan-visibility-btn"
+                                        style="color: var(--text-muted); padding: 5px; margin-left: 10px;"
+                                        title="Toggle Dashboard Visibility">
+                                        <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
+                                    </button>
+                                </div>
+                                <div id="settings-loan-wrap" class="collapsible-wrapper collapsed">
+                                    <div>
+                                        <div style="padding: 0 16px 16px;">
+                                            <p class="help-text text-sm text-muted mb-2">Update manually once a month
+                                                from your bank
+                                                app to stay in sync.</p>
+                                            <div class="form-group mt-2">
+                                                <label>Total Loan Amount (₹)</label>
+                                                <input type="number" id="setting-loan-total-principal"
+                                                    onblur="app.updateLoanSetting('totalPrincipal', this.value)">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Principal Left (₹)</label>
+                                                <input type="number" id="setting-loan-principal"
+                                                    onblur="app.updateLoanSetting('principalLeft', this.value)">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Total EMIs (Months)</label>
+                                                <input type="number" id="setting-loan-total-dues"
+                                                    onblur="app.updateLoanSetting('totalDues', this.value)">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>EMIs Paid (Months)</label>
+                                                <input type="number" id="setting-loan-dues"
+                                                    onblur="app.updateLoanSetting('duesPaid', this.value)">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>EMI Draw Date (Day of Month)</label>
+                                                <input type="number" id="setting-loan-date"
+                                                    onblur="app.updateLoanSetting('emiDrawDate', this.value)" min="1"
+                                                    max="31">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card mt-3">
+                                <h3>Japan Total Budget</h3>
+                                <div class="form-group">
+                                    <label>Monthly Budget (¥)</label>
+                                    <input type="number" id="setting-jp-budget"
+                                        onblur="app.updateSetting('jpTotalBudget', this.value)">
+                                </div>
+                            </div>
+
+                            <div class="card mt-3" style="padding:0;">
+                                <div class="section-header-toggle"
+                                    onclick="app.toggleCollapse('settings-jp-cat-wrap', null)" style="padding: 16px;">
+                                    <div class="section-title"
+                                        style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main);">
+                                        <svg width="18" height="18" viewBox="0 0 36 36"
+                                            xmlns="http://www.w3.org/2000/svg">
+                                            <circle fill="#EEEEEE" cx="18" cy="18" r="18" />
+                                            <circle fill="#D80027" cx="18" cy="18" r="7" />
+                                        </svg>
+                                        EDIT JAPAN CATEGORIES
+                                    </div>
+                                    <i data-lucide="edit-3" style="width:18px;height:18px;color:var(--text-muted);"></i>
+                                </div>
+                                <div id="settings-jp-cat-wrap" class="collapsible-wrapper collapsed">
+                                    <div>
+                                        <div style="padding: 0 16px 16px;">
+                                            <p class="help-text text-sm text-muted" style="margin: 0 0 12px 0;">Set
+                                                budgets and
+                                                manage Japan categories.</p>
+                                            <div id="settings-categories-list"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card mt-3" style="padding:0;">
+                                <div class="section-header-toggle"
+                                    onclick="app.toggleCollapse('settings-in-cat-wrap', null)" style="padding: 16px;">
+                                    <div class="section-title"
+                                        style="display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0;color:var(--text-main);">
+                                        <svg width="18" height="18" viewBox="0 0 36 36"
+                                            xmlns="http://www.w3.org/2000/svg">
+                                            <clipPath id="circleViewINSettings">
+                                                <circle cx="18" cy="18" r="18" />
+                                            </clipPath>
+                                            <g clip-path="url(#circleViewINSettings)">
+                                                <rect x="0" y="0" width="36" height="12" fill="#FF9933" />
+                                                <rect x="0" y="12" width="36" height="12" fill="#FFFFFF" />
+                                                <rect x="0" y="24" width="36" height="12" fill="#138808" />
+                                                <circle cx="18" cy="18" r="3.5" fill="none" stroke="#000080"
+                                                    stroke-width="1.5" />
+                                                <circle cx="18" cy="18" r="0.8" fill="#000080" />
+                                            </g>
+                                        </svg>
+                                        EDIT INDIA CATEGORIES
+                                    </div>
+                                    <i data-lucide="edit-3" style="width:18px;height:18px;color:var(--text-muted);"></i>
+                                </div>
+                                <div id="settings-in-cat-wrap" class="collapsible-wrapper collapsed">
+                                    <div>
+                                        <div style="padding: 0 16px 16px;">
+                                            <p class="help-text text-sm text-muted" style="margin: 0 0 12px 0;">Manage
+                                                your India
+                                                spending categories.</p>
+                                            <div id="settings-in-categories-list"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card mt-3">
+                                <h3>Close Month</h3>
+                                <button class="btn btn-danger" onclick="app.closeMonth()">Close Current Month</button>
+                                <p class="help-text">Archives current transactions and creates a snapshot.</p>
+                            </div>
+
+                            <div class="card mt-3">
+                                <h3>App Updates</h3>
+                                <p class="help-text text-sm text-muted mb-2">Force the app to fetch the latest version
+                                    of the code
+                                    if you are stuck on an old layout.</p>
+                                <button class="btn"
+                                    style="background:var(--card-bg-light);color:var(--text-main);border:1px solid var(--border);width:100%;"
+                                    onclick="app.forceUpdate()">Fetch Latest Version</button>
+                            </div>
+
+                            <div class="card mt-3">
+                                <h3>Statement Export</h3>
+                                <button class="btn mt-2" style="background:var(--accent);color:white;"
+                                    onclick="app.openPdfModal()">Download PDF Statement</button>
+                            </div>
+
+                            <div class="card mt-3">
+                                <h3>Account</h3>
+                                <p class="help-text text-sm text-muted mb-2" id="account-email-display">Logged in</p>
+                                <button class="btn"
+                                    style="background:rgba(239, 68, 68, 0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);width:100%;"
+                                    onclick="supabaseClient.handleLogout()">Log Out</button>
+                            </div>
+                        </div>
+                        <div style="height: 80px;"></div>
+                    </section>
+                </div> <!-- /.desktop-content-area -->
+            </div> <!-- /.desktop-main-wrapper -->
+        </div> <!-- /.app-layout -->
     </main>
 
     <!-- Bottom Navigation -->
@@ -508,6 +884,128 @@
                 <span class="fab-label">Income</span>
                 <div class="fab-icon bg-green"><i data-lucide="arrow-down-circle"></i></div>
             </button>
+        </div>
+    </div>
+
+    <!-- Shared Focus Overlay (Country Expansion & Wallet Focus) -->
+    <div class="focus-overlay" id="focus-overlay" onclick="if(event.target === this) app.closeFocusOverlay()" style="display: none;">
+        <div class="focus-modal-card" onclick="event.stopPropagation()">
+            <div class="focus-header">
+                <div class="focus-title-group" id="focus-title-group">
+                    <span class="focus-title-badge" id="focus-type-badge">Country View</span>
+                    <h3 id="focus-modal-title">Japan Overview</h3>
+                </div>
+                <button class="focus-close-btn" onclick="app.closeFocusOverlay()" aria-label="Close focus view" title="Close (Esc)">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="focus-body-grid">
+                <!-- Left primary panel: expanded Country Card or expanded Wallet Card -->
+                <div class="focus-primary-panel" id="focus-primary-panel">
+                    <!-- Populated dynamically -->
+                </div>
+                <!-- Right secondary panel: List of country wallets OR Wallet's recent transactions -->
+                <div class="focus-secondary-panel" id="focus-secondary-panel">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Wallet Modal -->
+    <div class="modal-overlay" id="add-wallet-modal" onclick="if(event.target === this) app.closeModal('add-wallet-modal')">
+        <div class="bottom-sheet" style="max-width: 520px; margin: 0 auto;">
+            <div class="sheet-header">
+                <h3 id="add-wallet-title">Add New Wallet</h3>
+                <button class="icon-btn" onclick="app.closeModal('add-wallet-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="sheet-content">
+                <div class="form-group">
+                    <label>Wallet Name</label>
+                    <input type="text" id="add-wallet-name" placeholder="e.g. PayPay, Salary Account, Axis Bank" required>
+                </div>
+                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label>Country / Currency</label>
+                        <select id="add-wallet-region" onchange="app.onAddWalletRegionChange()">
+                            <option value="JP">Japan (¥ JPY)</option>
+                            <option value="IN">India (₹ INR)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Account Type</label>
+                        <select id="add-wallet-type">
+                            <option value="bank">Bank Account</option>
+                            <option value="digital">Digital Wallet</option>
+                            <option value="card">Credit / Debit Card</option>
+                            <option value="cash">Cash</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Initial Balance</label>
+                    <input type="number" id="add-wallet-balance" placeholder="0" step="any" required>
+                </div>
+                <div class="form-group">
+                    <label>Visual Card Theme</label>
+                    <div class="theme-picker-grid" id="add-wallet-theme-picker">
+                        <!-- Populated by JS -->
+                    </div>
+                    <input type="hidden" id="add-wallet-theme-val" value="emerald-salary">
+                </div>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn btn-secondary" style="flex:1;" onclick="app.closeModal('add-wallet-modal')">Cancel</button>
+                    <button class="btn btn-primary" style="flex:1;" onclick="app.saveAddWallet()">Create Wallet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Wallet Modal -->
+    <div class="modal-overlay" id="edit-wallet-modal" onclick="if(event.target === this) app.closeModal('edit-wallet-modal')">
+        <div class="bottom-sheet" style="max-width: 520px; margin: 0 auto;">
+            <div class="sheet-header">
+                <h3 id="edit-wallet-title">Edit Wallet</h3>
+                <button class="icon-btn" onclick="app.closeModal('edit-wallet-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="sheet-content">
+                <input type="hidden" id="edit-wallet-id">
+                <div class="form-group">
+                    <label>Wallet Name</label>
+                    <input type="text" id="edit-wallet-name" readonly style="opacity: 0.8; cursor: not-allowed;" title="Wallet identifier cannot be renamed to preserve ledger history">
+                </div>
+                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label>Account Type</label>
+                        <select id="edit-wallet-type">
+                            <option value="bank">Bank Account</option>
+                            <option value="digital">Digital Wallet</option>
+                            <option value="card">Credit / Debit Card</option>
+                            <option value="cash">Cash</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Adjust Balance</label>
+                        <input type="number" id="edit-wallet-balance" placeholder="0" step="any">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Visual Card Theme</label>
+                    <div class="theme-picker-grid" id="edit-wallet-theme-picker">
+                        <!-- Populated by JS -->
+                    </div>
+                    <input type="hidden" id="edit-wallet-theme-val" value="emerald-salary">
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--border);">
+                    <button class="btn" style="background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="app.deleteWalletFromModal()">
+                        <i data-lucide="trash-2" style="width:14px; height:14px; margin-right:4px;"></i> Delete Wallet
+                    </button>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-secondary" onclick="app.closeModal('edit-wallet-modal')">Cancel</button>
+                        <button class="btn btn-primary" onclick="app.saveEditWallet()">Save Changes</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

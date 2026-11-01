@@ -4,6 +4,23 @@ const WALLET_COLORS = [
     '#14b8a6', '#f59e0b'
 ];
 
+const WALLET_THEMES = [
+    { id: 'emerald-salary', name: 'Emerald Salary', cls: 'wallet-theme-emerald-salary', color: '#047857', region: 'JP', match: ['salary', 'bank'] },
+    { id: 'crimson-paypay', name: 'PayPay Crimson', cls: 'wallet-theme-crimson-paypay', color: '#e60012', region: 'JP', match: ['paypay', 'digital'] },
+    { id: 'amber-gold', name: 'Amber Gold (Cash)', cls: 'wallet-theme-amber-gold', color: '#d97706', region: 'JP', match: ['cash', 'gold'] },
+    { id: 'burgundy-axis', name: 'Burgundy Axis', cls: 'wallet-theme-burgundy-axis', color: '#800020', region: 'IN', match: ['axis', 'bank'] },
+    { id: 'baroda-orange', name: 'Baroda Orange', cls: 'wallet-theme-baroda-orange', color: '#ea580c', region: 'IN', match: ['baroda', 'bob'] },
+    { id: 'sapphire-sbi', name: 'Sapphire SBI', cls: 'wallet-theme-sapphire-sbi', color: '#1d4ed8', region: 'IN', match: ['sbi', 'state bank'] },
+    { id: 'hfc-navy', name: 'HDFC Navy', cls: 'wallet-theme-hfc-navy', color: '#1e3a8a', region: 'IN', match: ['hdfc', 'navy'] },
+    { id: 'icici-ruby', name: 'ICICI Ruby', cls: 'wallet-theme-icici-ruby', color: '#be123c', region: 'IN', match: ['icici', 'ruby'] },
+    { id: 'violet-suica', name: 'Violet Suica/Pasmo', cls: 'wallet-theme-violet-suica', color: '#7c3aed', region: 'JP', match: ['suica', 'pasmo', 'transit', 'metro'] },
+    { id: 'cyan-line', name: 'LINE Cyan', cls: 'wallet-theme-cyan-line', color: '#0891b2', region: 'JP', match: ['line', 'rakuten'] },
+    { id: 'slate-reserve', name: 'Slate Reserve', cls: 'wallet-theme-slate-reserve', color: '#334155', region: 'ALL', match: ['reserve', 'emergency', 'safe'] },
+    { id: 'rose-gold', name: 'Rose Gold Card', cls: 'wallet-theme-rose-gold', color: '#e11d48', region: 'ALL', match: ['card', 'credit'] },
+    { id: 'amethyst-crypto', name: 'Amethyst Vault', cls: 'wallet-theme-amethyst-crypto', color: '#9333ea', region: 'ALL', match: ['vault', 'crypto'] },
+    { id: 'aurora-nordic', name: 'Aurora Teal', cls: 'wallet-theme-aurora-nordic', color: '#0f766e', region: 'ALL', match: ['teal', 'savings'] }
+];
+
 class App {
     constructor() {
         this.currentView = 'home-view';
@@ -20,9 +37,11 @@ class App {
 
     init() {
         storage.checkRollover();
+        this.initSidebarState();
         this.setupNavigation();
         this.setupInactivityMonitoring();
         this.updatePrivacyUI();
+        this.updateDesktopAccountInfo();
         this.renderAll();
     }
 
@@ -108,6 +127,8 @@ class App {
         // Re-render the active view to reflect privacy state
         if (this.currentView === 'home-view') {
             this.renderAll();
+        } else if (this.currentView === 'wallets-view') {
+            this.renderWalletsPage();
         } else if (this.currentView === 'analytics-view') {
             if (typeof charts !== 'undefined' && typeof charts.updatePrivacy === 'function') {
                 charts.updatePrivacy();
@@ -118,18 +139,32 @@ class App {
             this.renderSettings();
         }
 
+        // If focus overlay is visible, refresh its privacy-blurred items
+        const overlay = document.getElementById('focus-overlay');
+        if (overlay && overlay.style.display !== 'none') {
+            const typeBadge = document.getElementById('focus-type-badge');
+            const titleEl = document.getElementById('focus-modal-title');
+            if (typeBadge && typeBadge.innerText === 'Country View') {
+                const reg = titleEl && titleEl.innerText.includes('India') ? 'IN' : 'JP';
+                this.openCountryExpansion(reg);
+            } else if (titleEl) {
+                this.openWalletFocus(titleEl.innerText);
+            }
+        }
+
     }
 
     updatePrivacyUI() {
         const btns = document.querySelectorAll('.global-privacy-btn');
         btns.forEach(btn => {
+            const isDesktop = btn.classList.contains('desktop-privacy-btn');
             if (this.isPrivacyHidden) {
-                btn.innerHTML = '<i data-lucide="eye-off"></i>';
+                btn.innerHTML = `<i data-lucide="eye-off"></i>${isDesktop ? '<span class="privacy-btn-label">Concealed</span>' : ''}`;
                 btn.setAttribute('aria-label', 'Reveal monetary values');
                 btn.setAttribute('title', 'Reveal monetary values');
                 btn.classList.remove('revealed');
             } else {
-                btn.innerHTML = '<i data-lucide="eye"></i>';
+                btn.innerHTML = `<i data-lucide="eye"></i>${isDesktop ? '<span class="privacy-btn-label">Revealed</span>' : ''}`;
                 btn.setAttribute('aria-label', 'Conceal monetary values');
                 btn.setAttribute('title', 'Conceal monetary values');
                 btn.classList.add('revealed');
@@ -186,32 +221,208 @@ class App {
     }
 
     setupNavigation() {
+        // Mobile bottom navigation items
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
                 const target = e.currentTarget.getAttribute('data-target');
                 this.switchView(target);
-
-                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-                e.currentTarget.classList.add('active');
             });
+        });
+
+        // Desktop sidebar navigation items
+        document.querySelectorAll('.desktop-nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = e.currentTarget.getAttribute('data-target');
+                this.switchView(target);
+                // Auto-close mobile drawer if open
+                const sidebar = document.getElementById('desktop-sidebar');
+                if (sidebar && sidebar.classList.contains('mobile-open')) {
+                    sidebar.classList.remove('mobile-open');
+                }
+            });
+        });
+
+        // Keyboard shortcuts (Escape key dismisses focus overlay and modals)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('focus-overlay');
+                if (overlay && overlay.style.display !== 'none') {
+                    this.closeFocusOverlay();
+                    return;
+                }
+                ['add-wallet-modal', 'edit-wallet-modal', 'transaction-modal', 'quick-edit-modal', 'color-picker-modal', 'pdf-modal'].forEach(mId => {
+                    const el = document.getElementById(mId);
+                    if (el && el.classList.contains('active')) {
+                        this.closeModal(mId);
+                    }
+                });
+            }
         });
     }
 
     switchView(viewId) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById(viewId).classList.add('active');
-        this.currentView = viewId;
+        if (!viewId) return;
 
-        if (viewId === 'analytics-view') {
-            charts.renderCharts();
-        } else if (viewId === 'history-view') {
+        // Approved view titles and contextual subtitles
+        const viewTitles = {
+            'home-view': 'Dashboard',
+            'dashboard-view': 'Dashboard',
+            'transactions-view': 'Transactions',
+            'analytics-view': 'Analytics',
+            'reports-view': 'Reports',
+            'budgets-view': 'Budgets',
+            'wallets-view': 'Wallets',
+            'settings-view': 'Settings',
+            'history-view': 'History'
+        };
+
+        const viewSubtitles = {
+            'home-view': 'Overview & Accounts',
+            'dashboard-view': 'Overview & Accounts',
+            'transactions-view': 'Continuous Ledger & Filters',
+            'analytics-view': 'Spending Patterns & Insights',
+            'reports-view': 'Monthly Snapshots & Closing',
+            'budgets-view': 'Budget Allocation & Categories',
+            'wallets-view': 'Account Management',
+            'settings-view': 'Preferences & Security',
+            'history-view': 'Historical Archives'
+        };
+
+        const resolvedId = (viewId === 'dashboard-view') ? 'home-view' : viewId;
+
+        // Hide all views, activate selected view
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        const targetView = document.getElementById(resolvedId);
+        if (targetView) {
+            targetView.classList.add('active');
+        }
+
+        // Synchronize active item on desktop sidebar
+        document.querySelectorAll('.desktop-nav-item').forEach(n => {
+            const t = n.getAttribute('data-target');
+            if (t === resolvedId || (resolvedId === 'home-view' && t === 'home-view')) {
+                n.classList.add('active');
+            } else {
+                n.classList.remove('active');
+            }
+        });
+
+        // Synchronize active item on mobile bottom nav
+        document.querySelectorAll('.nav-item').forEach(n => {
+            const t = n.getAttribute('data-target');
+            if (t === resolvedId || (resolvedId === 'home-view' && t === 'home-view')) {
+                n.classList.add('active');
+            } else {
+                n.classList.remove('active');
+            }
+        });
+
+        // Update Desktop Header title and subtitle
+        const pageTitleEl = document.getElementById('desktop-page-title');
+        if (pageTitleEl) {
+            pageTitleEl.innerText = viewTitles[resolvedId] || 'Dashboard';
+        }
+        const pageSubtitleEl = document.getElementById('desktop-page-subtitle');
+        if (pageSubtitleEl) {
+            pageSubtitleEl.innerText = viewSubtitles[resolvedId] || 'Overview & Accounts';
+        }
+
+        // Toggle Month Selector visibility in Desktop Header (Dashboard & Reports only)
+        const monthSelectorEl = document.getElementById('desktop-month-selector');
+        if (monthSelectorEl) {
+            monthSelectorEl.style.display = (resolvedId === 'home-view' || resolvedId === 'reports-view') ? 'inline-flex' : 'none';
+        }
+
+        this.currentView = resolvedId;
+
+        // View-specific render execution
+        if (resolvedId === 'analytics-view') {
+            if (typeof charts !== 'undefined') charts.renderCharts();
+        } else if (resolvedId === 'history-view') {
             this.renderHistory();
-        } else if (viewId === 'home-view') {
+        } else if (resolvedId === 'home-view') {
             this.renderAll();
-        } else if (viewId === 'settings-view') {
+        } else if (resolvedId === 'wallets-view') {
+            this.renderWalletsPage();
+        } else if (resolvedId === 'settings-view') {
             this.renderSettings();
-            lucide.createIcons();
+        }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    }
+
+    toggleSidebarCollapse() {
+        const sidebar = document.getElementById('desktop-sidebar');
+        if (!sidebar) return;
+        const isCollapsed = sidebar.classList.toggle('collapsed');
+        try {
+            localStorage.setItem('em_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+        } catch (e) {
+            console.warn('[UI] Failed to save sidebar collapse state:', e);
+        }
+    }
+
+    initSidebarState() {
+        try {
+            if (localStorage.getItem('em_sidebar_collapsed') === 'true') {
+                const sidebar = document.getElementById('desktop-sidebar');
+                if (sidebar) sidebar.classList.add('collapsed');
+            }
+        } catch (e) {
+            console.warn('[UI] Failed to read sidebar collapse state:', e);
+        }
+    }
+
+    toggleMobileSidebar() {
+        const sidebar = document.getElementById('desktop-sidebar');
+        if (sidebar) {
+            sidebar.classList.toggle('mobile-open');
+        }
+    }
+
+    updateDesktopAccountInfo() {
+        const user = (typeof supabaseClient !== 'undefined' && supabaseClient.session) ? supabaseClient.session.user : null;
+        const nameEl = document.getElementById('desktop-account-name');
+        const emailEl = document.getElementById('desktop-account-email');
+        const initialsEl = document.getElementById('account-avatar-initials');
+
+        if (user) {
+            const email = user.email || '';
+            const displayName = user.user_metadata?.full_name || email.split('@')[0] || 'User';
+            if (nameEl) nameEl.innerText = displayName;
+            if (emailEl) emailEl.innerText = email;
+            if (initialsEl) {
+                const parts = displayName.trim().split(/\s+/);
+                const initials = parts.length > 1
+                    ? (parts[0][0] + parts[1][0]).toUpperCase()
+                    : displayName.substring(0, 2).toUpperCase();
+                initialsEl.innerText = initials || 'TK';
+            }
+        } else {
+            if (nameEl) nameEl.innerText = 'Personal';
+            if (emailEl) emailEl.innerText = 'Connected';
+            if (initialsEl) initialsEl.innerText = 'TK';
+        }
+    }
+
+    setSyncStatus(status = 'synced') {
+        const dot = document.getElementById('sync-status-dot');
+        const text = document.getElementById('sync-status-text');
+        if (!dot || !text) return;
+
+        dot.classList.remove('syncing', 'offline');
+        if (status === 'syncing') {
+            dot.classList.add('syncing');
+            text.innerText = 'Syncing...';
+        } else if (status === 'offline') {
+            dot.classList.add('offline');
+            text.innerText = 'Offline';
+        } else {
+            text.innerText = 'Cloud Synced';
         }
     }
 
@@ -823,6 +1034,8 @@ class App {
         this.renderLoanTracker();
         this.renderCategories();
         this.renderTransactions();
+        this.renderMonthlySummary();
+        this.renderWalletsPage();
 
         this.renderSettings();
         lucide.createIcons();
@@ -1365,13 +1578,14 @@ class App {
 
     renderWallets() {
         let jpTotal = 0, inTotal = 0;
+        let jpCount = 0, inCount = 0;
         let jpHtml = '', inHtml = '';
 
         Object.values(storage.state.wallets).forEach(w => {
             const ws = this.getWalletStyle(w.color);
             const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
             const html = `
-                <div class="wallet-item" onclick="app.openQuickEditModal('wallet', '${w.id}')" style="cursor:pointer; ${ws.card}">
+                <div class="wallet-item" onclick="app.openWalletFocus('${w.id}')" style="cursor:pointer; ${ws.card}">
                     <div class="wallet-name" style="color:${ws.text};">
                         <i data-lucide="${icon}"></i>
                         ${w.id}
@@ -1381,17 +1595,49 @@ class App {
             `;
             if (w.region === 'JP') {
                 jpHtml += html;
-                jpTotal += w.balance;
+                jpTotal += (w.balance || 0);
+                jpCount++;
             } else {
                 inHtml += html;
-                inTotal += w.balance;
+                inTotal += (w.balance || 0);
+                inCount++;
             }
         });
 
-        document.getElementById('jp-wallets').innerHTML = jpHtml;
-        document.getElementById('in-wallets').innerHTML = inHtml;
-        document.getElementById('jp-total-balance').innerText = this.formatMoney(jpTotal, '¥');
-        document.getElementById('in-total-balance').innerText = this.formatMoney(inTotal, '₹');
+        const jpel = document.getElementById('jp-wallets');
+        if (jpel) jpel.innerHTML = jpHtml;
+        const inel = document.getElementById('in-wallets');
+        if (inel) inel.innerHTML = inHtml;
+
+        const jpTotalEl = document.getElementById('jp-total-balance');
+        if (jpTotalEl) jpTotalEl.innerText = this.formatMoney(jpTotal, '¥');
+        const inTotalEl = document.getElementById('in-total-balance');
+        if (inTotalEl) inTotalEl.innerText = this.formatMoney(inTotal, '₹');
+
+        const jpCountBadge = document.getElementById('jp-wallet-count-badge');
+        if (jpCountBadge) jpCountBadge.innerText = `${jpCount} ${jpCount === 1 ? 'account' : 'accounts'}`;
+        const inCountBadge = document.getElementById('in-wallet-count-badge');
+        if (inCountBadge) inCountBadge.innerText = `${inCount} ${inCount === 1 ? 'account' : 'accounts'}`;
+
+        // Populate Rail mini account breakdown
+        const railAccSummary = document.getElementById('rail-account-summary');
+        if (railAccSummary) {
+            let railHtml = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+            Object.values(storage.state.wallets).forEach(w => {
+                const theme = this.getThemeForWallet(w);
+                railHtml += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); cursor: pointer;" onclick="app.openWalletFocus('${w.id}')" title="Inspect ${w.id}">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${theme.color}; flex-shrink: 0;"></span>
+                            <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-primary);">${w.id}</span>
+                        </div>
+                        <span class="privacy-blur" style="font-size: 0.8rem; font-family: var(--font-numeric); font-weight: 600; color: var(--text-secondary);">${this.formatMoney(w.balance, w.currency)}</span>
+                    </div>
+                `;
+            });
+            railHtml += '</div>';
+            railAccSummary.innerHTML = railHtml;
+        }
 
         // Update Month Header
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -1406,6 +1652,8 @@ class App {
         }
         const disp = document.getElementById('current-month-display');
         if (disp) disp.innerHTML = headerStr;
+        const desktopDisp = document.getElementById('desktop-current-month-display');
+        if (desktopDisp) desktopDisp.innerHTML = headerStr;
 
         // Change layout of category grids to 2-columns
         ['jp-categories-grid', 'in-categories-grid'].forEach(id => {
@@ -1419,7 +1667,7 @@ class App {
 
         const jpTotalSpent = walletManager.getTotalSpent('JP', this.getActiveTransactions());
         const jpRem = Math.max(0, storage.state.jpTotalBudget - jpTotalSpent);
-        const pct = Math.min((jpTotalSpent / storage.state.jpTotalBudget) * 100, 100);
+        const pct = storage.state.jpTotalBudget > 0 ? Math.min((jpTotalSpent / storage.state.jpTotalBudget) * 100, 100) : 0;
 
         // Cushion = overall budget minus sum of individual category budgets
         const sumCatBudgets = storage.state.categories.JP.reduce((s, c) => s + (c.budget || 0), 0);
@@ -1428,23 +1676,25 @@ class App {
         const card = document.getElementById('budget-overview-card');
         if (card) {
             card.innerHTML = `
-                <div class="card" style="margin: 0 16px;">
+                <div class="card" style="margin: 0; padding: 16px; background: transparent; border: none;">
                     <div style="display:flex; flex-direction:column; gap:4px;">
                         <div style="display:flex; justify-content:space-between; align-items:baseline;">
                             <span class="text-sm text-muted">Japan Budget</span>
-                            <span class="font-bold">${this.formatMoney(jpRem, '¥')} left</span>
+                            <span class="font-bold privacy-blur">${this.formatMoney(jpRem, '¥')} left</span>
                         </div>
-                        <div class="neon-bar-bg">
+                        <div class="neon-bar-bg" style="margin-top: 6px;">
                             <div class="neon-bar-fill ${pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${pct}%"></div>
                         </div>
-                        <div style="margin-top: 6px; display:flex; justify-content:space-between; align-items:center;">
-                            <span class="text-muted text-sm">Spent ${this.formatMoney(jpTotalSpent, '¥')} of ${this.formatMoney(storage.state.jpTotalBudget, '¥')}</span>
+                        <div style="margin-top: 8px; display:flex; justify-content:space-between; align-items:center;">
+                            <span class="text-muted text-xs privacy-blur">Spent ${this.formatMoney(jpTotalSpent, '¥')} of ${this.formatMoney(storage.state.jpTotalBudget, '¥')}</span>
                             ${cushion > 0 ? `<span style="font-size:0.72rem; background:rgba(16,185,129,0.12); color:#10b981; padding:2px 8px; border-radius:10px; font-weight:600;">+${this.formatMoney(cushion, '¥')} cushion</span>` : ''}
                         </div>
                     </div>
                 </div>
             `;
         }
+
+        this.renderWalletsPage();
     }
 
     renderCategories() {
@@ -1477,12 +1727,12 @@ class App {
                             <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                         </div>
                         <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
-                            <span>${this.formatMoney(spent, currency)}</span>
-                            <span>${this.formatMoney(activeBudget, currency)}</span>
+                            <span class="privacy-blur">${this.formatMoney(spent, currency)}</span>
+                            <span class="privacy-blur">${this.formatMoney(activeBudget, currency)}</span>
                         </div>
                     `;
                 } else {
-                    progressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${this.formatMoney(spent, currency)}</div>`;
+                    progressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: <span class="privacy-blur">${this.formatMoney(spent, currency)}</span></div>`;
                 }
 
                 html += `
@@ -1504,72 +1754,662 @@ class App {
 
     renderTransactions() {
         const activeTxs = this.getActiveTransactions();
-        const txs = activeTxs.slice(0, 5); // Last 5 for home
+        const txs = activeTxs.slice(0, 6); // Latest 6 for dashboard
         const container = document.getElementById('recent-transactions-list');
 
+        if (!container) return;
+
         if (txs.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center" style="padding: 20px;">No transactions yet.</p>';
+            container.innerHTML = '<p class="text-muted text-center" style="padding: 24px;">No transactions recorded this month.</p>';
             return;
         }
 
         let html = '';
         txs.forEach(tx => {
             let icon = 'arrow-up-right';
-            let colorCls = 'debit';
+            let colorCls = 'text-rose';
+            let sign = '-';
             let title = tx.note || tx.categoryId || 'Expense';
-            let amt = this.formatMoney(tx.amount, tx.currency, { prefix: '-' });
+            let categoryName = '';
 
             if (tx.type === 'income') {
                 icon = 'arrow-down-left';
-                colorCls = 'credit';
+                colorCls = 'text-emerald';
+                sign = '+';
                 title = tx.note || 'Income';
-                amt = this.formatMoney(tx.amount, tx.currency, { prefix: '+' });
             } else if (tx.type === 'transfer') {
                 icon = 'repeat';
                 colorCls = 'text-muted';
+                sign = '';
                 title = `Transfer: ${tx.sourceId} → ${tx.destId}`;
-                amt = this.formatMoney(tx.amount, tx.currency);
             } else if (tx.type === 'remittance') {
                 icon = 'globe';
                 colorCls = 'text-muted';
+                sign = '';
                 title = `Remittance: JP → IN`;
-                amt = this.isPrivacyHidden ? '******' : `¥${tx.sourceAmount.toLocaleString()} → ₹${tx.destAmount.toLocaleString()}`;
             } else {
                 const regionCats = storage.state.categories[tx.region];
-                const cat = regionCats.find(c => c.id === tx.categoryId);
+                const cat = regionCats?.find(c => c.id === tx.categoryId);
                 if (cat) {
+                    categoryName = cat.name;
                     title = cat.name;
                 }
             }
 
+            const amt = (tx.type === 'remittance')
+                ? (this.isPrivacyHidden ? '******' : `¥${tx.sourceAmount?.toLocaleString()} → ₹${tx.destAmount?.toLocaleString()}`)
+                : this.formatMoney(tx.amount, tx.currency, { prefix: sign });
+
+            const flag = tx.region === 'JP' ? '🇯🇵' : (tx.region === 'IN' ? '🇮🇳' : '');
             const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
-            // For Income, title is currently set to tx.note if it exists. 
-            // For other types, we'll just append it to the meta line if it exists.
             let metaString = `${date} • ${tx.walletId || 'Wallet'}`;
-            if (tx.note && tx.type !== 'income') {
+            if (tx.note && tx.type !== 'income' && categoryName) {
                 metaString += ` • ${tx.note}`;
-            } else if (tx.type === 'transfer' || tx.type === 'remittance') {
-                metaString = `${date} • ${tx.note ? tx.note : 'Transfer'}`;
             }
 
             html += `
-                <div class="tx-item" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer;">
+                <div class="tx-row" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer;">
                     <div class="tx-left">
-                        <div class="tx-icon"><i data-lucide="${icon}"></i></div>
-                        <div class="tx-details">
-                            <span class="tx-title">${title}</span>
+                        <div class="tx-icon-wrap ${tx.type === 'income' ? 'income' : tx.type === 'transfer' ? 'transfer' : 'expense'}">
+                            <i data-lucide="${icon}"></i>
+                        </div>
+                        <div class="tx-info">
+                            <div class="tx-title-line">
+                                <span class="tx-title">${title}</span>
+                                ${flag ? `<span class="tx-country-pill">${flag}</span>` : ''}
+                            </div>
                             <span class="tx-meta">${metaString}</span>
                         </div>
                     </div>
                     <div class="tx-right">
-                        <span class="tx-amount ${colorCls}">${amt}</span>
+                        <span class="tx-amount privacy-blur ${colorCls}">${amt}</span>
                     </div>
                 </div>
             `;
         });
 
         container.innerHTML = html;
+        lucide.createIcons();
+    }
+
+    renderMonthlySummary() {
+        const summaryEl = document.getElementById('monthly-financial-summary');
+        if (!summaryEl) return;
+
+        const activeTxs = this.getActiveTransactions();
+        let jpIncome = 0;
+        let jpExpenses = 0;
+        let inExpenses = 0;
+        let inIncome = 0;
+
+        activeTxs.forEach(tx => {
+            const amt = Number(tx.amount) || 0;
+            if (tx.region === 'JP') {
+                if (tx.type === 'income') jpIncome += amt;
+                else if (tx.type === 'expense') jpExpenses += amt;
+            } else if (tx.region === 'IN') {
+                if (tx.type === 'income') inIncome += amt;
+                else if (tx.type === 'expense') inExpenses += amt;
+            }
+        });
+
+        const jpNet = jpIncome - jpExpenses;
+        const jpSavingsRate = jpIncome > 0 ? Math.max(0, Math.round((jpNet / jpIncome) * 100)) : 0;
+        const netSavingsClass = jpNet >= 0 ? 'stat-positive' : 'stat-negative';
+        const netSavingsSign = jpNet > 0 ? '+' : '';
+        const savingsRateColor = jpSavingsRate >= 20 ? 'var(--emerald)' : jpSavingsRate >= 10 ? 'var(--amber)' : 'var(--text-muted)';
+
+        summaryEl.innerHTML = `
+            <div class="monthly-stat-card">
+                <div class="monthly-stat-header">
+                    <span class="monthly-stat-label">Monthly Income</span>
+                    <span class="monthly-stat-trend trend-positive">
+                        <i data-lucide="trending-up"></i> JP Inflow
+                    </span>
+                </div>
+                <div class="monthly-stat-value privacy-blur" style="color: var(--emerald);">
+                    ${this.formatMoney(jpIncome, '¥', { prefix: '+' })}
+                </div>
+                <div class="monthly-stat-sub">Japan inflows this month</div>
+            </div>
+
+            <div class="monthly-stat-card">
+                <div class="monthly-stat-header">
+                    <span class="monthly-stat-label">Total Outflows</span>
+                    <span class="monthly-stat-trend trend-negative">
+                        <i data-lucide="trending-down"></i> JP Outflow
+                    </span>
+                </div>
+                <div class="monthly-stat-value privacy-blur" style="color: var(--rose);">
+                    ${this.formatMoney(jpExpenses, '¥', { prefix: '-' })}
+                </div>
+                <div class="monthly-stat-sub">Japan expenses this month</div>
+            </div>
+
+            <div class="monthly-stat-card">
+                <div class="monthly-stat-header">
+                    <span class="monthly-stat-label">Net Savings</span>
+                    <span class="monthly-stat-trend ${jpNet >= 0 ? 'trend-positive' : 'trend-negative'}">
+                        <i data-lucide="${jpNet >= 0 ? 'sparkles' : 'alert-circle'}"></i> JP Net
+                    </span>
+                </div>
+                <div class="monthly-stat-value privacy-blur ${netSavingsClass}">
+                    ${this.formatMoney(jpNet, '¥', { prefix: netSavingsSign })}
+                </div>
+                <div class="monthly-stat-sub">Inflows minus outflows</div>
+            </div>
+
+            <div class="monthly-stat-card">
+                <div class="monthly-stat-header">
+                    <span class="monthly-stat-label">Savings Rate</span>
+                    <span class="monthly-stat-trend" style="color: ${savingsRateColor}; background: rgba(255,255,255,0.05);">
+                        <i data-lucide="pie-chart"></i> Target 20%
+                    </span>
+                </div>
+                <div class="monthly-stat-value privacy-blur" style="color: ${savingsRateColor};">
+                    ${this.isPrivacyHidden ? '******' : `${jpSavingsRate}%`}
+                </div>
+                <div class="monthly-stat-sub">
+                    <div class="savings-rate-bar" style="height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 6px; overflow: hidden;">
+                        <div style="height: 100%; width: ${Math.min(jpSavingsRate, 100)}%; background: ${savingsRateColor}; border-radius: 2px;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        lucide.createIcons();
+    }
+
+    renderWalletsPage() {
+        const jpGrid = document.getElementById('wallets-page-jp-grid');
+        const inGrid = document.getElementById('wallets-page-in-grid');
+        if (!jpGrid || !inGrid) return;
+
+        let jpHtml = '';
+        let inHtml = '';
+        let jpCount = 0;
+        let inCount = 0;
+        let jpTotal = 0;
+        let inTotal = 0;
+
+        Object.values(storage.state.wallets).forEach(w => {
+            const theme = this.getThemeForWallet(w);
+            const flag = w.region === 'JP' ? '🇯🇵' : '🇮🇳';
+
+            const cardHtml = `
+                <div class="wallet-card ${theme.cls}" onclick="app.openWalletFocus('${w.id}')" title="Click to inspect ${w.id}">
+                    <div class="wallet-card-header">
+                        <div class="wallet-card-chip"></div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span class="wallet-type-badge">${(w.type || 'account').toUpperCase()}</span>
+                            <button class="wallet-menu-btn" onclick="event.stopPropagation(); app.openEditWalletModal('${w.id}')" title="Edit wallet settings">
+                                <i data-lucide="more-vertical" style="width: 14px; height: 14px;"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="wallet-balance-wrap">
+                        <span class="wallet-balance-label">Balance</span>
+                        <div class="wallet-balance-val privacy-blur">${this.formatMoney(w.balance, w.currency)}</div>
+                    </div>
+                    <div class="wallet-card-footer">
+                        <div>
+                            <div class="wallet-name">${w.id}</div>
+                            <div class="wallet-number">${theme.name}</div>
+                        </div>
+                        <div style="font-size: 1.1rem; opacity: 0.9;">${flag}</div>
+                    </div>
+                </div>
+            `;
+
+            if (w.region === 'JP') {
+                jpHtml += cardHtml;
+                jpCount++;
+                jpTotal += (w.balance || 0);
+            } else {
+                inHtml += cardHtml;
+                inCount++;
+                inTotal += (w.balance || 0);
+            }
+        });
+
+        jpGrid.innerHTML = jpHtml || '<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 24px; text-align: center;">No Japan wallets created yet.</p>';
+        inGrid.innerHTML = inHtml || '<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 24px; text-align: center;">No India wallets created yet.</p>';
+
+        const jpCountEl = document.getElementById('wallets-page-jp-count');
+        if (jpCountEl) jpCountEl.innerText = `${jpCount} ${jpCount === 1 ? 'wallet' : 'wallets'}`;
+
+        const inCountEl = document.getElementById('wallets-page-in-count');
+        if (inCountEl) inCountEl.innerText = `${inCount} ${inCount === 1 ? 'wallet' : 'wallets'}`;
+
+        const jpTotalEl = document.getElementById('wallets-page-jp-total');
+        if (jpTotalEl) jpTotalEl.innerText = this.formatMoney(jpTotal, '¥');
+
+        const inTotalEl = document.getElementById('wallets-page-in-total');
+        if (inTotalEl) inTotalEl.innerText = this.formatMoney(inTotal, '₹');
+
+        lucide.createIcons();
+    }
+
+    getThemeForWallet(w) {
+        if (!w) return WALLET_THEMES[0];
+        if (w.theme) {
+            const found = WALLET_THEMES.find(t => t.id === w.theme);
+            if (found) return found;
+        }
+        const nameLower = (w.id || '').toLowerCase();
+        const typeLower = (w.type || '').toLowerCase();
+
+        for (const t of WALLET_THEMES) {
+            if (t.match && t.match.some(k => nameLower.includes(k))) {
+                return t;
+            }
+        }
+        if (typeLower === 'cash') return WALLET_THEMES.find(t => t.id === 'amber-gold') || WALLET_THEMES[2];
+        if (typeLower === 'card') return WALLET_THEMES.find(t => t.id === 'rose-gold') || WALLET_THEMES[11];
+        if (w.region === 'IN') return WALLET_THEMES.find(t => t.id === 'burgundy-axis') || WALLET_THEMES[3];
+        return WALLET_THEMES[0];
+    }
+
+    populateThemePicker(containerId, activeThemeId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const isEdit = containerId.startsWith('edit');
+        const inputId = isEdit ? 'edit-wallet-theme-val' : 'add-wallet-theme-val';
+
+        let html = '';
+        WALLET_THEMES.forEach(t => {
+            const isActive = t.id === activeThemeId ? ' active' : '';
+            html += `
+                <div class="theme-swatch${isActive}" data-theme-id="${t.id}" onclick="app.selectThemeSwatch('${inputId}', '${t.id}', '${containerId}')" title="${t.name}">
+                    <div class="theme-swatch-circle ${t.cls}" style="background: ${t.color};"></div>
+                    <span class="theme-swatch-label">${t.name}</span>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    selectThemeSwatch(inputId, themeId, containerId) {
+        const input = document.getElementById(inputId);
+        if (input) input.value = themeId;
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.querySelectorAll('.theme-swatch').forEach(s => {
+                if (s.getAttribute('data-theme-id') === themeId) {
+                    s.classList.add('active');
+                } else {
+                    s.classList.remove('active');
+                }
+            });
+        }
+    }
+
+    openCountryExpansion(region) {
+        const isJp = region === 'JP';
+        const currency = isJp ? '¥' : '₹';
+        const flag = isJp ? '🇯🇵' : '🇮🇳';
+        const countryName = isJp ? 'Japan' : 'India';
+        const cardThemeCls = isJp ? 'country-card-jp' : 'country-card-in';
+
+        let total = 0;
+        const regionWallets = [];
+        Object.values(storage.state.wallets).forEach(w => {
+            if (w.region === region) {
+                regionWallets.push(w);
+                total += (w.balance || 0);
+            }
+        });
+
+        const overlay = document.getElementById('focus-overlay');
+        const typeBadge = document.getElementById('focus-type-badge');
+        const modalTitle = document.getElementById('focus-modal-title');
+        const primaryPanel = document.getElementById('focus-primary-panel');
+        const secondaryPanel = document.getElementById('focus-secondary-panel');
+
+        if (!overlay || !primaryPanel || !secondaryPanel) return;
+
+        typeBadge.innerText = 'Country View';
+        modalTitle.innerText = `${countryName} Portfolio`;
+
+        primaryPanel.innerHTML = `
+            <div class="country-card ${cardThemeCls} expanded" style="padding: 28px; cursor: default; transform: none; min-height: 260px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div class="country-card-header">
+                    <div class="country-badge">
+                        <span class="country-flag-icon" style="font-size: 1.25rem;">${flag}</span>
+                        <span class="country-name">${countryName}</span>
+                        <span class="currency-code">${isJp ? 'JPY' : 'INR'}</span>
+                    </div>
+                    <span class="wallet-count-pill">${regionWallets.length} ${regionWallets.length === 1 ? 'Account' : 'Accounts'}</span>
+                </div>
+                <div class="country-balance-body" style="margin: 24px 0;">
+                    <span class="balance-label">Total Portfolio Balance</span>
+                    <div class="country-total-amount financial-amount privacy-blur" style="font-size: 2.25rem;">
+                        ${this.formatMoney(total, currency)}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" style="background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.2); color: #fff; font-size: 0.8rem; padding: 6px 12px;" onclick="app.closeFocusOverlay(); app.openTransactionModal('expense');">
+                        <i data-lucide="plus" style="width:14px; height:14px; margin-right:4px;"></i> Log Expense
+                    </button>
+                    <button class="btn btn-secondary" style="background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.2); color: #fff; font-size: 0.8rem; padding: 6px 12px;" onclick="app.closeFocusOverlay(); app.openTransactionModal('income');">
+                        <i data-lucide="arrow-down-left" style="width:14px; height:14px; margin-right:4px;"></i> Log Income
+                    </button>
+                </div>
+            </div>
+        `;
+
+        let walletsListHtml = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin: 0;">Associated Accounts (${regionWallets.length})</h4>
+                <span class="text-muted text-xs">Click any wallet to focus</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
+        `;
+
+        if (regionWallets.length === 0) {
+            walletsListHtml += `<p class="text-muted text-sm" style="text-align: center; padding: 32px 0;">No accounts found for ${countryName}.</p>`;
+        } else {
+            regionWallets.forEach(w => {
+                const theme = this.getThemeForWallet(w);
+                const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
+                walletsListHtml += `
+                    <div class="wallet-item-compact ${theme.cls}" onclick="app.openWalletFocus('${w.id}')" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-radius: var(--radius-md); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border: 1px solid rgba(255,255,255,0.1);">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center;">
+                                <i data-lucide="${icon}" style="width: 16px; height: 16px; color: #fff;"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; color: #fff; font-size: 0.9rem;">${w.id}</div>
+                                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px;">${w.type || 'Account'} • ${w.currency}</div>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="privacy-blur" style="font-family: var(--font-numeric); font-weight: 700; color: #fff; font-size: 1.05rem;">
+                                ${this.formatMoney(w.balance, w.currency)}
+                            </div>
+                            <span style="font-size: 0.72rem; color: rgba(255,255,255,0.65); text-decoration: underline;">View details →</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        walletsListHtml += `</div>`;
+        secondaryPanel.innerHTML = walletsListHtml;
+
+        overlay.style.display = 'flex';
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        lucide.createIcons();
+    }
+
+    openWalletFocus(walletId) {
+        const w = storage.state.wallets[walletId];
+        if (!w) return;
+
+        const theme = this.getThemeForWallet(w);
+        const flag = w.region === 'JP' ? '🇯🇵' : '🇮🇳';
+
+        const overlay = document.getElementById('focus-overlay');
+        const typeBadge = document.getElementById('focus-type-badge');
+        const modalTitle = document.getElementById('focus-modal-title');
+        const primaryPanel = document.getElementById('focus-primary-panel');
+        const secondaryPanel = document.getElementById('focus-secondary-panel');
+
+        if (!overlay || !primaryPanel || !secondaryPanel) return;
+
+        typeBadge.innerText = 'Account Focus';
+        modalTitle.innerText = `${w.id}`;
+
+        primaryPanel.innerHTML = `
+            <div class="wallet-card ${theme.cls}" style="padding: 26px; cursor: default; transform: none; min-height: 260px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div class="wallet-card-header">
+                    <div class="wallet-card-chip"></div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1rem;">${flag}</span>
+                        <span class="wallet-type-badge">${(w.type || 'ACCOUNT').toUpperCase()}</span>
+                    </div>
+                </div>
+                <div class="wallet-balance-wrap" style="margin: 20px 0;">
+                    <span class="wallet-balance-label">Current Balance</span>
+                    <div class="wallet-balance-val privacy-blur" style="font-size: 2.2rem;">
+                        ${this.formatMoney(w.balance, w.currency)}
+                    </div>
+                </div>
+                <div class="wallet-card-footer" style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div>
+                        <div class="wallet-name" style="font-size: 1.15rem; font-weight: 700;">${w.id}</div>
+                        <div class="wallet-number" style="font-size: 0.75rem; opacity: 0.8;">${theme.name} • ${w.currency}</div>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 16px;">
+                <button class="btn btn-primary" style="flex: 1;" onclick="app.openAddTxForWallet('${w.id}')">
+                    <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 6px;"></i> Add Transaction
+                </button>
+                <button class="btn btn-secondary" style="flex: 1;" onclick="app.openEditWalletModal('${w.id}')">
+                    <i data-lucide="edit-2" style="width: 14px; height: 14px; margin-right: 6px;"></i> Edit Wallet
+                </button>
+            </div>
+        `;
+
+        const txs = walletManager.getTransactions({ walletId: w.id });
+        const recentTxs = txs.slice(0, 15);
+
+        let txHtml = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin: 0;">Account Activity</h4>
+                <span class="text-muted text-xs">${txs.length} ${txs.length === 1 ? 'transaction' : 'transactions'}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; padding-right: 4px;">
+        `;
+
+        if (recentTxs.length === 0) {
+            txHtml += `
+                <div style="text-align: center; padding: 48px 16px; color: var(--text-muted);">
+                    <i data-lucide="receipt" style="width: 36px; height: 36px; opacity: 0.4; margin-bottom: 10px;"></i>
+                    <div style="font-weight: 500; font-size: 0.9rem;">No transactions found</div>
+                    <div style="font-size: 0.78rem; opacity: 0.8; margin-top: 4px;">New expenses, income or transfers logged to ${w.id} will appear here.</div>
+                </div>
+            `;
+        } else {
+            recentTxs.forEach(tx => {
+                let icon = 'arrow-up-right';
+                let colorCls = 'text-rose';
+                let sign = '-';
+                let label = tx.note || tx.categoryId || 'Expense';
+
+                if (tx.type === 'income') {
+                    icon = 'arrow-down-left';
+                    colorCls = 'text-emerald';
+                    sign = '+';
+                    label = tx.note || 'Income';
+                } else if (tx.type === 'transfer') {
+                    icon = 'repeat';
+                    colorCls = 'text-muted';
+                    sign = (tx.destId === w.id) ? '+' : '-';
+                    label = `Transfer: ${tx.sourceId} → ${tx.destId}`;
+                } else if (tx.type === 'remittance') {
+                    icon = 'globe';
+                    colorCls = 'text-muted';
+                    sign = '-';
+                    label = 'Remittance JP → IN';
+                } else if (tx.categoryId && storage.state.categories?.[tx.region]) {
+                    const cat = storage.state.categories[tx.region].find(c => c.id === tx.categoryId);
+                    if (cat) label = cat.name;
+                }
+
+                const formattedDate = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                txHtml += `
+                    <div class="tx-row" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center;">
+                                <i data-lucide="${icon}" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight: 500; font-size: 0.85rem; color: var(--text-primary);">${label}</div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted);">${formattedDate} ${tx.note ? `• ${tx.note}` : ''}</div>
+                            </div>
+                        </div>
+                        <div class="privacy-blur" style="font-family: var(--font-numeric); font-weight: 600; font-size: 0.95rem; color: ${colorCls === 'text-emerald' ? 'var(--emerald)' : colorCls === 'text-rose' ? 'var(--rose)' : 'var(--text-secondary)'};">
+                            ${this.formatMoney(tx.amount || tx.sourceAmount, w.currency, { prefix: sign })}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        txHtml += `</div>`;
+        secondaryPanel.innerHTML = txHtml;
+
+        overlay.style.display = 'flex';
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        lucide.createIcons();
+    }
+
+    closeFocusOverlay() {
+        const overlay = document.getElementById('focus-overlay');
+        if (overlay) {
+            overlay.classList.remove('active');
+            overlay.style.display = 'none';
+        }
+        document.body.style.overflow = '';
+    }
+
+    openAddTxForWallet(walletId) {
+        this.closeFocusOverlay();
+        const w = storage.state.wallets[walletId];
+        this.openTransactionModal('expense');
+        const select = document.getElementById('tx-wallet');
+        if (select && w) {
+            select.value = walletId;
+            this.updateExpenseCategories();
+        }
+    }
+
+    openAddWalletModal() {
+        document.getElementById('add-wallet-name').value = '';
+        document.getElementById('add-wallet-balance').value = '0';
+        document.getElementById('add-wallet-region').value = 'JP';
+        document.getElementById('add-wallet-type').value = 'bank';
+        document.getElementById('add-wallet-theme-val').value = 'emerald-salary';
+        this.populateThemePicker('add-wallet-theme-picker', 'emerald-salary');
+        document.getElementById('add-wallet-modal').classList.add('active');
+        lucide.createIcons();
+    }
+
+    onAddWalletRegionChange() {
+        const reg = document.getElementById('add-wallet-region').value;
+        const defaultTheme = reg === 'IN' ? 'burgundy-axis' : 'emerald-salary';
+        document.getElementById('add-wallet-theme-val').value = defaultTheme;
+        this.populateThemePicker('add-wallet-theme-picker', defaultTheme);
+    }
+
+    saveAddWallet() {
+        const name = document.getElementById('add-wallet-name').value.trim();
+        const region = document.getElementById('add-wallet-region').value;
+        const type = document.getElementById('add-wallet-type').value;
+        const balInput = document.getElementById('add-wallet-balance').value;
+        const theme = document.getElementById('add-wallet-theme-val').value;
+
+        if (!name) {
+            alert('Please enter a wallet name.');
+            return;
+        }
+
+        if (storage.state.wallets[name]) {
+            alert('A wallet with this name already exists.');
+            return;
+        }
+
+        const balance = Number(balInput) || 0;
+        const currency = region === 'JP' ? '¥' : '₹';
+        const chosenTheme = WALLET_THEMES.find(t => t.id === theme) || WALLET_THEMES[0];
+
+        storage.state.wallets[name] = {
+            id: name,
+            type: type,
+            region: region,
+            balance: balance,
+            currency: currency,
+            color: chosenTheme.color,
+            theme: chosenTheme.id
+        };
+
+        storage.saveData();
+        this.renderAll();
+        this.closeModal('add-wallet-modal');
+    }
+
+    openEditWalletModal(walletId) {
+        const w = storage.state.wallets[walletId];
+        if (!w) return;
+
+        document.getElementById('edit-wallet-id').value = w.id;
+        document.getElementById('edit-wallet-name').value = w.id;
+        document.getElementById('edit-wallet-type').value = w.type || 'bank';
+        document.getElementById('edit-wallet-balance').value = w.balance || 0;
+
+        const theme = this.getThemeForWallet(w);
+        document.getElementById('edit-wallet-theme-val').value = theme.id;
+        this.populateThemePicker('edit-wallet-theme-picker', theme.id);
+
+        document.getElementById('edit-wallet-modal').classList.add('active');
+        lucide.createIcons();
+    }
+
+    saveEditWallet() {
+        const id = document.getElementById('edit-wallet-id').value;
+        const type = document.getElementById('edit-wallet-type').value;
+        const balance = Number(document.getElementById('edit-wallet-balance').value);
+        const themeId = document.getElementById('edit-wallet-theme-val').value;
+
+        const w = storage.state.wallets[id];
+        if (!w) return;
+
+        if (!isNaN(balance)) {
+            w.balance = balance;
+        }
+        w.type = type;
+        w.theme = themeId;
+        const chosenTheme = WALLET_THEMES.find(t => t.id === themeId);
+        if (chosenTheme) {
+            w.color = chosenTheme.color;
+        }
+
+        storage.saveData();
+        this.renderAll();
+        this.closeModal('edit-wallet-modal');
+
+        const overlay = document.getElementById('focus-overlay');
+        if (overlay && overlay.style.display !== 'none') {
+            const title = document.getElementById('focus-modal-title');
+            if (title && title.innerText === id) {
+                this.openWalletFocus(id);
+            }
+        }
+    }
+
+    deleteWalletFromModal() {
+        const id = document.getElementById('edit-wallet-id').value;
+        if (!id || !storage.state.wallets[id]) return;
+
+        const txs = walletManager.getTransactions({ walletId: id });
+        if (txs.length > 0) {
+            if (!confirm(`Wallet "${id}" has ${txs.length} recorded transactions in the ledger. Deleting it will keep the transaction ledger history, but remove the account from your wallet list. Are you sure you want to proceed?`)) {
+                return;
+            }
+        } else {
+            if (!confirm(`Are you sure you want to delete the wallet "${id}"?`)) {
+                return;
+            }
+        }
+
+        delete storage.state.wallets[id];
+        storage.saveData();
+        this.renderAll();
+        this.closeModal('edit-wallet-modal');
+        this.closeFocusOverlay();
     }
 
     getTransactionHtml(tx, editable = false, showDateInMeta = true) {
