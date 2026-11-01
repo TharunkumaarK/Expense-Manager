@@ -1,11 +1,18 @@
 class ChartManager {
     constructor() {
+        this.jpTrendChart = null;
+        this.jpCategoryDonut = null;
+        this.inTrendChart = null;
+
+        // Legacy charts retained for backward compatibility
         this.jpDonut = null;
         this.inDonut = null;
         this.utilityLine = null;
 
-        Chart.defaults.color = '#8b8b99';
-        Chart.defaults.font.family = 'Inter, sans-serif';
+        if (typeof Chart !== 'undefined') {
+            Chart.defaults.color = '#8b8b99';
+            Chart.defaults.font.family = 'Inter, sans-serif';
+        }
     }
 
     renderCharts() {
@@ -15,20 +22,27 @@ class ChartManager {
     }
 
     destroyCharts() {
+        if (this.jpTrendChart) { this.jpTrendChart.destroy(); this.jpTrendChart = null; }
+        if (this.jpCategoryDonut) { this.jpCategoryDonut.destroy(); this.jpCategoryDonut = null; }
+        if (this.inTrendChart) { this.inTrendChart.destroy(); this.inTrendChart = null; }
         if (this.jpDonut) { this.jpDonut.destroy(); this.jpDonut = null; }
         if (this.inDonut) { this.inDonut.destroy(); this.inDonut = null; }
         if (this.utilityLine) { this.utilityLine.destroy(); this.utilityLine = null; }
     }
 
     getGlassStyles(canvasCtx, count, height = 300) {
-        // More saturated, vibrant versions of the previous colors
+        // SpendIQ vibrant glass palette
         const baseColors = [
-            '59, 130, 246',   // Rich Blue
-            '139, 92, 246',   // Rich Purple
-            '16, 185, 129',   // Rich Emerald
-            '249, 115, 22',   // Rich Orange
-            '6, 182, 212',    // Rich Cyan
-            '236, 72, 153',   // Rich Pink
+            '62, 99, 221',    // SpendIQ Primary Blue (#3e63dd)
+            '191, 90, 242',   // SpendIQ Purple (#bf5af2)
+            '52, 211, 153',   // Emerald (#34d399)
+            '249, 115, 22',   // Vibrant Orange (#f97316)
+            '6, 182, 212',    // Cyan (#06b6d4)
+            '251, 113, 133',  // Rose (#fb7185)
+            '234, 179, 8',    // Amber (#eab308)
+            '147, 51, 234',   // Violet (#9333ea)
+            '14, 165, 233',   // Sky (#0ea5e9)
+            '244, 63, 94'     // Rose Red (#f43f5e)
         ];
 
         const backgrounds = [];
@@ -36,156 +50,325 @@ class ChartManager {
 
         for (let i = 0; i < count; i++) {
             const rgb = baseColors[i % baseColors.length];
-
-            // Fading glass gradient matching balance cards (increased opacity for saturation)
             const grad = canvasCtx.createLinearGradient(0, 0, 0, height);
-            grad.addColorStop(0, `rgba(${rgb}, 0.75)`);
-            grad.addColorStop(1, `rgba(${rgb}, 0.3)`);
+            grad.addColorStop(0, `rgba(${rgb}, 0.85)`);
+            grad.addColorStop(1, `rgba(${rgb}, 0.35)`);
             backgrounds.push(grad);
-
-            // Solid bright stroke matching balance cards (increased to 1.0 for more pop)
             borders.push(`rgba(${rgb}, 1.0)`);
         }
 
         return { backgrounds, borders };
     }
 
-    renderJPDonut() {
-        const ctx = document.getElementById('jp-donut-chart');
+    /**
+     * Phase 3: Japan Spending Trend (Daily / Weekly / Monthly)
+     */
+    renderJpSpendingTrend(granularity = 'daily', transactions = [], startDateStr = null, endDateStr = null) {
+        const ctx = document.getElementById('jp-trend-chart');
         if (!ctx) return;
 
-        if (this.jpDonut) this.jpDonut.destroy();
-
-        const totals = walletManager.getCategoryTotals('JP');
-        const categories = storage.state.categories.JP.filter(c => totals[c.id] > 0);
-
-        if (categories.length === 0) {
-            this.jpDonut = new Chart(ctx, this.getEmptyConfig('No data yet'));
-            return;
+        if (this.jpTrendChart) {
+            this.jpTrendChart.destroy();
+            this.jpTrendChart = null;
         }
 
-        const labels = categories.map(c => c.name);
-        const data = categories.map(c => totals[c.id]);
+        const validTxs = transactions.filter(t => t.type === 'expense' && Number(t.amount || 0) > 0);
 
-        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+        // Build data points according to granularity
+        let labels = [];
+        let data = [];
 
-        this.jpDonut = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: glassStyles.backgrounds,
-                    borderColor: glassStyles.borders,
-                    borderWidth: 1.5,
-                    hoverOffset: 4
-                }]
-            },
-            options: this.getDonutOptions('JP')
-        });
-    }
+        if (granularity === 'daily') {
+            // Determine date bounds
+            let minD = startDateStr;
+            let maxD = endDateStr;
 
-    renderINDonut() {
-        const ctx = document.getElementById('in-donut-chart');
-        if (!ctx) return;
+            if (!minD || !maxD) {
+                if (validTxs.length > 0) {
+                    const sortedDates = validTxs.map(t => t.date).sort();
+                    minD = minD || sortedDates[0];
+                    maxD = maxD || sortedDates[sortedDates.length - 1];
+                } else {
+                    const now = new Date();
+                    const year = now.getFullYear();
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    minD = `${year}-${month}-01`;
+                    maxD = `${year}-${month}-${String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+                }
+            }
 
-        if (this.inDonut) this.inDonut.destroy();
+            // Group by date
+            const dayTotals = {};
+            validTxs.forEach(t => {
+                if (t.date) dayTotals[t.date] = (dayTotals[t.date] || 0) + Number(t.amount || 0);
+            });
 
-        const totals = walletManager.getCategoryTotals('IN');
-        const categories = storage.state.categories.IN.filter(c => totals[c.id] > 0);
+            // Fill all days between minD and maxD
+            const curDate = new Date(minD + 'T00:00:00');
+            const targetDate = new Date(maxD + 'T00:00:00');
 
-        if (categories.length === 0) {
-            this.inDonut = new Chart(ctx, this.getEmptyConfig('No data yet'));
-            return;
+            while (curDate <= targetDate) {
+                const yyyy = curDate.getFullYear();
+                const mm = String(curDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(curDate.getDate()).padStart(2, '0');
+                const dKey = `${yyyy}-${mm}-${dd}`;
+                labels.push(curDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
+                data.push(dayTotals[dKey] || 0);
+                curDate.setDate(curDate.getDate() + 1);
+            }
+        } else if (granularity === 'weekly') {
+            // Group by 7-day intervals
+            const weekTotals = {};
+            validTxs.forEach(t => {
+                if (t.date) {
+                    const d = new Date(t.date + 'T00:00:00');
+                    const dayNum = d.getDate();
+                    const weekNum = Math.min(Math.ceil(dayNum / 7), 5);
+                    const weekKey = `W${weekNum} (${d.toLocaleDateString('en-GB', { month: 'short' })})`;
+                    weekTotals[weekKey] = (weekTotals[weekKey] || 0) + Number(t.amount || 0);
+                }
+            });
+
+            if (Object.keys(weekTotals).length === 0) {
+                ['W1', 'W2', 'W3', 'W4'].forEach(w => {
+                    weekTotals[w] = 0;
+                });
+            }
+
+            labels = Object.keys(weekTotals);
+            data = Object.values(weekTotals);
+        } else {
+            // Monthly
+            const monthTotals = {};
+            validTxs.forEach(t => {
+                if (t.date) {
+                    const mKey = t.date.substring(0, 7);
+                    monthTotals[mKey] = (monthTotals[mKey] || 0) + Number(t.amount || 0);
+                }
+            });
+
+            const sortedKeys = Object.keys(monthTotals).sort();
+            if (sortedKeys.length === 0) {
+                const now = new Date();
+                const curM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                sortedKeys.push(curM);
+                monthTotals[curM] = 0;
+            }
+
+            sortedKeys.forEach(mk => {
+                const [y, m] = mk.split('-');
+                const d = new Date(parseInt(y), parseInt(m) - 1, 1);
+                labels.push(d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }));
+                data.push(monthTotals[mk] || 0);
+            });
         }
 
-        const labels = categories.map(c => c.name);
-        const data = categories.map(c => totals[c.id]);
+        const canvasCtx = ctx.getContext('2d');
+        const gradient = canvasCtx.createLinearGradient(0, 0, 0, 260);
+        gradient.addColorStop(0, 'rgba(62, 99, 221, 0.45)');
+        gradient.addColorStop(1, 'rgba(62, 99, 221, 0.0)');
 
-        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
-
-        this.inDonut = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: glassStyles.backgrounds,
-                    borderColor: glassStyles.borders,
-                    borderWidth: 1.5,
-                    hoverOffset: 4
-                }]
-            },
-            options: this.getDonutOptions('IN')
-        });
-    }
-
-    renderHistoryDonut(canvasId, region, totals, isPrint = false) {
-        const ctx = document.getElementById(canvasId);
-        if (!ctx) return null;
-
-        const categories = storage.state.categories[region].filter(c => totals[c.id] > 0);
-
-        if (categories.length === 0) {
-            return new Chart(ctx, this.getEmptyConfig('No expenses', isPrint));
-        }
-
-        const labels = categories.map(c => c.name);
-        const data = categories.map(c => totals[c.id]);
-
-        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
-        
-        let options = this.getDonutOptions(region);
-        if (isPrint) {
-            options.animation = false;
-        }
-
-        return new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: glassStyles.backgrounds,
-                    borderColor: glassStyles.borders,
-                    borderWidth: 1.5,
-                    hoverOffset: 4
-                }]
-            },
-            options: options
-        });
-    }
-
-    renderUtilityLine() {
-        const ctx = document.getElementById('utilities-line-chart');
-        if (!ctx) return;
-
-        if (this.utilityLine) this.utilityLine.destroy();
-
-        // Dynamically find utility categories
-        const utilityCats = storage.state.categories.JP.filter(c =>
-            c.id.includes('utility') ||
-            c.name.toLowerCase().includes('electric') ||
-            c.name.toLowerCase().includes('gas') ||
-            c.name.toLowerCase().includes('water') ||
-            c.name.toLowerCase().includes('internet')
-        );
-
-        const totals = walletManager.getCategoryTotals('JP');
-        const labels = utilityCats.map(c => c.name);
-        const data = utilityCats.map(c => totals[c.id] || 0);
-
-        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
-
-        this.utilityLine = new Chart(ctx, {
-            type: 'bar',
+        this.jpTrendChart = new Chart(ctx, {
+            type: granularity === 'weekly' ? 'bar' : 'line',
             data: {
                 labels: labels,
                 datasets: [{
                     label: 'Spent (¥)',
                     data: data,
+                    borderColor: '#3e63dd',
+                    borderWidth: 2.2,
+                    backgroundColor: granularity === 'weekly' ? 'rgba(62, 99, 221, 0.75)' : gradient,
+                    borderRadius: granularity === 'weekly' ? 6 : 0,
+                    tension: 0.35,
+                    fill: granularity !== 'weekly',
+                    pointBackgroundColor: '#3e63dd',
+                    pointBorderColor: '#08080c',
+                    pointBorderWidth: 2,
+                    pointRadius: data.length > 25 ? 2 : 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#14141e',
+                        titleColor: '#f5f5f7',
+                        bodyColor: '#a0a0ab',
+                        borderColor: 'rgba(255, 255, 255, 0.12)',
+                        borderWidth: 1,
+                        padding: 10,
+                        boxPadding: 4,
+                        callbacks: {
+                            label: (ctx) => {
+                                if (typeof app !== 'undefined' && app.isPrivacyHidden) {
+                                    return ' Spent: ******';
+                                }
+                                return ` Spent: ¥${(ctx.parsed.y || 0).toLocaleString()}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: {
+                            color: '#8b8b99',
+                            font: { size: 11 },
+                            callback: (val) => {
+                                if (typeof app !== 'undefined' && app.isPrivacyHidden) return '';
+                                if (val >= 1000000) return `¥${(val / 1000000).toFixed(1)}M`;
+                                if (val >= 1000) return `¥${(val / 1000).toFixed(0)}k`;
+                                return `¥${val}`;
+                            }
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            color: '#8b8b99',
+                            font: { size: 11 },
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 10
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Phase 3: Japan Category Donut Chart with Drilldown
+     */
+    renderJpCategoryDonut(categories = [], totals = {}, onCategoryClick = null) {
+        const ctx = document.getElementById('jp-category-donut-chart');
+        if (!ctx) return;
+
+        if (this.jpCategoryDonut) {
+            this.jpCategoryDonut.destroy();
+            this.jpCategoryDonut = null;
+        }
+
+        const activeCategories = categories.filter(c => (totals[c.id] || 0) > 0);
+
+        if (activeCategories.length === 0) {
+            this.jpCategoryDonut = new Chart(ctx, this.getEmptyConfig('No expenses in period'));
+            return;
+        }
+
+        const labels = activeCategories.map(c => c.name);
+        const data = activeCategories.map(c => totals[c.id] || 0);
+        const totalSum = data.reduce((s, v) => s + v, 0);
+
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+
+        this.jpCategoryDonut = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
                     backgroundColor: glassStyles.backgrounds,
                     borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '72%',
+                onClick: (event, elements) => {
+                    if (elements.length > 0 && typeof onCategoryClick === 'function') {
+                        const index = elements[0].index;
+                        const selectedCat = activeCategories[index];
+                        if (selectedCat) onCategoryClick(selectedCat);
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#f0f0f5',
+                            boxWidth: 10,
+                            padding: 8,
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#14141e',
+                        titleColor: '#f5f5f7',
+                        bodyColor: '#a0a0ab',
+                        borderColor: 'rgba(255, 255, 255, 0.12)',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: (ctx) => {
+                                const val = ctx.parsed || 0;
+                                const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : '0';
+                                if (typeof app !== 'undefined' && app.isPrivacyHidden) {
+                                    return ` ${ctx.label}: ****** (${pct}%)`;
+                                }
+                                return ` ${ctx.label}: ¥${val.toLocaleString()} (${pct}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Phase 3: India Simplified Weekly Spending Trend
+     */
+    renderInSpendingTrend(transactions = [], period = 'this-month') {
+        const ctx = document.getElementById('in-trend-chart');
+        if (!ctx) return;
+
+        if (this.inTrendChart) {
+            this.inTrendChart.destroy();
+            this.inTrendChart = null;
+        }
+
+        const validTxs = transactions.filter(t => t.type === 'expense' && Number(t.amount || 0) > 0);
+
+        // Group into week buckets
+        const weekTotals = {};
+        validTxs.forEach(t => {
+            if (t.date) {
+                const d = new Date(t.date + 'T00:00:00');
+                const weekNum = Math.min(Math.ceil(d.getDate() / 7), 5);
+                const wKey = `Week ${weekNum}`;
+                weekTotals[wKey] = (weekTotals[wKey] || 0) + Number(t.amount || 0);
+            }
+        });
+
+        if (Object.keys(weekTotals).length === 0) {
+            ['Week 1', 'Week 2', 'Week 3', 'Week 4'].forEach(w => {
+                weekTotals[w] = 0;
+            });
+        }
+
+        const labels = Object.keys(weekTotals);
+        const data = Object.values(weekTotals);
+
+        this.inTrendChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'India Spend (₹)',
+                    data: data,
+                    backgroundColor: 'rgba(249, 115, 22, 0.75)',
+                    borderColor: 'rgba(249, 115, 22, 1.0)',
                     borderWidth: 1.5,
                     borderRadius: 6
                 }]
@@ -196,12 +379,18 @@ class ChartManager {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
+                        backgroundColor: '#14141e',
+                        titleColor: '#f5f5f7',
+                        bodyColor: '#a0a0ab',
+                        borderColor: 'rgba(255, 255, 255, 0.12)',
+                        borderWidth: 1,
+                        padding: 10,
                         callbacks: {
-                            label: ctx => {
+                            label: (ctx) => {
                                 if (typeof app !== 'undefined' && app.isPrivacyHidden) {
-                                    return ' ******';
+                                    return ' Spent: ******';
                                 }
-                                return ` ¥${ctx.parsed.y.toLocaleString()}`;
+                                return ` Spent: ₹${(ctx.parsed.y || 0).toLocaleString()}`;
                             }
                         }
                     }
@@ -209,57 +398,30 @@ class ChartManager {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: { color: '#2c2c35' },
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
                         ticks: {
                             color: '#8b8b99',
-                            callback: val => {
-                                if (typeof app !== 'undefined' && app.isPrivacyHidden) {
-                                    return '';
-                                }
-                                return `¥${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`;
+                            font: { size: 11 },
+                            callback: (val) => {
+                                if (typeof app !== 'undefined' && app.isPrivacyHidden) return '';
+                                if (val >= 1000) return `₹${(val / 1000).toFixed(0)}k`;
+                                return `₹${val}`;
                             }
                         }
                     },
                     x: {
                         grid: { display: false },
-                        ticks: { color: '#8b8b99', maxRotation: 30 }
+                        ticks: { color: '#8b8b99', font: { size: 11 } }
                     }
                 }
             }
         });
     }
 
-    getDonutOptions(region = 'JP') {
-        const currency = region === 'IN' ? '₹' : '¥';
-        return {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '65%',
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: '#f0f0f5',
-                        boxWidth: 10,
-                        padding: 8,
-                        font: { size: 11 }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: ctx => {
-                            if (typeof app !== 'undefined' && app.isPrivacyHidden) {
-                                return ` ${ctx.label}: ******`;
-                            }
-                            return ` ${ctx.label}: ${currency}${ctx.parsed.toLocaleString()}`;
-                        }
-                    }
-                }
-            }
-        };
-    }
-
     updatePrivacy() {
+        if (this.jpTrendChart) this.jpTrendChart.update();
+        if (this.jpCategoryDonut) this.jpCategoryDonut.update();
+        if (this.inTrendChart) this.inTrendChart.update();
         if (this.jpDonut) this.jpDonut.update();
         if (this.inDonut) this.inDonut.update();
         if (this.utilityLine) this.utilityLine.update();
@@ -295,6 +457,159 @@ class ChartManager {
             options: options
         };
     }
+
+    // Legacy Stubs for backward compatibility
+    renderJPDonut() {
+        const ctx = document.getElementById('jp-donut-chart');
+        if (!ctx) return;
+        if (this.jpDonut) this.jpDonut.destroy();
+        const totals = typeof walletManager !== 'undefined' ? walletManager.getCategoryTotals('JP') : {};
+        const categories = (storage.state?.categories?.JP || []).filter(c => totals[c.id] > 0);
+        if (categories.length === 0) {
+            this.jpDonut = new Chart(ctx, this.getEmptyConfig('No data yet'));
+            return;
+        }
+        const labels = categories.map(c => c.name);
+        const data = categories.map(c => totals[c.id]);
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+        this.jpDonut = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
+                    hoverOffset: 4
+                }]
+            },
+            options: this.getDonutOptions('JP')
+        });
+    }
+
+    renderINDonut() {
+        const ctx = document.getElementById('in-donut-chart');
+        if (!ctx) return;
+        if (this.inDonut) this.inDonut.destroy();
+        const totals = typeof walletManager !== 'undefined' ? walletManager.getCategoryTotals('IN') : {};
+        const categories = (storage.state?.categories?.IN || []).filter(c => totals[c.id] > 0);
+        if (categories.length === 0) {
+            this.inDonut = new Chart(ctx, this.getEmptyConfig('No data yet'));
+            return;
+        }
+        const labels = categories.map(c => c.name);
+        const data = categories.map(c => totals[c.id]);
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+        this.inDonut = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
+                    hoverOffset: 4
+                }]
+            },
+            options: this.getDonutOptions('IN')
+        });
+    }
+
+    renderUtilityLine() {
+        const ctx = document.getElementById('utilities-line-chart');
+        if (!ctx) return;
+        if (this.utilityLine) this.utilityLine.destroy();
+        const utilityCats = (storage.state?.categories?.JP || []).filter(c =>
+            c.id.includes('utility') ||
+            c.name.toLowerCase().includes('electric') ||
+            c.name.toLowerCase().includes('gas') ||
+            c.name.toLowerCase().includes('water') ||
+            c.name.toLowerCase().includes('internet')
+        );
+        const totals = typeof walletManager !== 'undefined' ? walletManager.getCategoryTotals('JP') : {};
+        const labels = utilityCats.map(c => c.name);
+        const data = utilityCats.map(c => totals[c.id] || 0);
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+        this.utilityLine = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Spent (¥)',
+                    data: data,
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#2c2c35' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    getDonutOptions(region = 'JP') {
+        const currency = region === 'IN' ? '₹' : '¥';
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#f0f0f5', boxWidth: 10, padding: 8, font: { size: 11 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            if (typeof app !== 'undefined' && app.isPrivacyHidden) {
+                                return ` ${ctx.label}: ******`;
+                            }
+                            return ` ${ctx.label}: ${currency}${ctx.parsed.toLocaleString()}`;
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    renderHistoryDonut(canvasId, region, totals, isPrint = false) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return null;
+        const categories = (storage.state?.categories?.[region] || []).filter(c => totals[c.id] > 0);
+        if (categories.length === 0) {
+            return new Chart(ctx, this.getEmptyConfig('No expenses', isPrint));
+        }
+        const labels = categories.map(c => c.name);
+        const data = categories.map(c => totals[c.id]);
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+        let options = this.getDonutOptions(region);
+        if (isPrint) options.animation = false;
+        return new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
+                    hoverOffset: 4
+                }]
+            },
+            options: options
+        });
+    }
 }
 
 const charts = new ChartManager();
+window.charts = charts;

@@ -33,6 +33,35 @@ class App {
         this.inactivityEventsRegistered = false;
         this.activityThrottleTimer = null;
         this._isSubmitting = false;
+
+        // Phase 3: Transactions Continuous Ledger state
+        this.ledgerSearchQuery = '';
+        this.ledgerSearchDebounceTimer = null;
+        this.ledgerFilters = {
+            type: 'all',
+            categoryId: 'all',
+            walletId: 'all',
+            region: 'all',
+            datePreset: 'all',
+            startDate: '',
+            endDate: '',
+            minAmount: null,
+            maxAmount: null
+        };
+        this.ledgerPageSize = 30;
+        this.ledgerVisibleCount = 30;
+        this.currentDetailTxId = null;
+
+        // Phase 3: Analytics state
+        this.analyticsCountry = 'JP';
+        this.analyticsPeriod = 'this-month';
+        this.jpTrendGranularity = 'daily';
+        this.jpExclusions = new Set(
+            (storage.state && Array.isArray(storage.state.analyticsExclusions))
+                ? storage.state.analyticsExclusions
+                : ['jp-misc']
+        );
+        this.selectedDrilldownCategoryId = null;
     }
 
     init() {
@@ -129,10 +158,10 @@ class App {
             this.renderAll();
         } else if (this.currentView === 'wallets-view') {
             this.renderWalletsPage();
+        } else if (this.currentView === 'transactions-view') {
+            this.renderTransactionsPage();
         } else if (this.currentView === 'analytics-view') {
-            if (typeof charts !== 'undefined' && typeof charts.updatePrivacy === 'function') {
-                charts.updatePrivacy();
-            }
+            this.renderAnalyticsPage();
         } else if (this.currentView === 'history-view') {
             this.renderHistory();
         } else if (this.currentView === 'settings-view') {
@@ -338,8 +367,10 @@ class App {
         this.currentView = resolvedId;
 
         // View-specific render execution
-        if (resolvedId === 'analytics-view') {
-            if (typeof charts !== 'undefined') charts.renderCharts();
+        if (resolvedId === 'transactions-view') {
+            this.renderTransactionsPage();
+        } else if (resolvedId === 'analytics-view') {
+            this.renderAnalyticsPage();
         } else if (resolvedId === 'history-view') {
             this.renderHistory();
         } else if (resolvedId === 'home-view') {
@@ -894,10 +925,12 @@ class App {
 
         this.closeModal('transaction-modal');
         this.renderAll();
-        if (this.currentView === 'history-view') {
+        if (this.currentView === 'transactions-view') {
+            this.renderTransactionsPage();
+        } else if (this.currentView === 'analytics-view') {
+            this.renderAnalyticsPage();
+        } else if (this.currentView === 'history-view') {
             this.renderHistory();
-        } else if (this.currentView === 'analytics-view' && typeof charts !== 'undefined') {
-            charts.renderCharts();
         }
     }
 
@@ -910,10 +943,12 @@ class App {
             walletManager.deleteTransaction(id);
             this.closeModal('transaction-modal');
             this.renderAll();
-            if (this.currentView === 'history-view') {
+            if (this.currentView === 'transactions-view') {
+                this.renderTransactionsPage();
+            } else if (this.currentView === 'analytics-view') {
+                this.renderAnalyticsPage();
+            } else if (this.currentView === 'history-view') {
                 this.renderHistory();
-            } else if (this.currentView === 'analytics-view' && typeof charts !== 'undefined') {
-                charts.renderCharts();
             }
         }
     }
@@ -3171,5 +3206,1379 @@ class App {
             }, 500);
         }, 500);
     }
+
+    /* ==========================================================================
+       PHASE 3: TRANSACTIONS & ANALYTICS REDESIGN IMPLEMENTATION
+       ========================================================================== */
+
+    // Helper: format dates for ledger headers
+    formatLedgerDateHeader(dateStr) {
+        if (!dateStr) return 'Unknown Date';
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return dateStr;
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const d = new Date(year, month, day);
+
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+        const formatted = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+        if (dateStr === todayStr) {
+            return `Today • ${formatted}`;
+        } else if (dateStr === yesterdayStr) {
+            return `Yesterday • ${formatted}`;
+        }
+        return formatted;
+    }
+
+    // Helper: Category Name resolution
+    getCategoryName(catId, region = null) {
+        if (!catId) return 'Uncategorized';
+        if (storage.state?.categories) {
+            if (region && storage.state.categories[region]) {
+                const found = storage.state.categories[region].find(c => c.id === catId);
+                if (found?.name) return found.name;
+            }
+            for (const reg of ['JP', 'IN']) {
+                const found = storage.state.categories[reg]?.find(c => c.id === catId);
+                if (found?.name) return found.name;
+            }
+        }
+        return catId;
+    }
+
+    // Helper: Wallet Name resolution
+    getWalletName(walletId) {
+        if (!walletId || !storage.state?.wallets) return walletId || 'Wallet';
+        return storage.state.wallets[walletId]?.name || walletId;
+    }
+
+    // --------------------------------------------------------------------------
+    // TRANSACTIONS CONTINUOUS LEDGER
+    // --------------------------------------------------------------------------
+
+    renderTransactionsPage() {
+        const timelineEl = document.getElementById('ledger-timeline-container');
+        if (!timelineEl) return;
+
+        // 1. Populate Category dropdown
+        const catSelect = document.getElementById('filter-category-select');
+        if (catSelect && catSelect.options.length <= 1) {
+            let catOptions = '<option value="all">All Categories</option>';
+            if (storage.state?.categories) {
+                if (storage.state.categories.JP && storage.state.categories.JP.length > 0) {
+                    catOptions += '<optgroup label="🇯🇵 Japan Categories">';
+                    storage.state.categories.JP.forEach(c => {
+                        catOptions += `<option value="${c.id}">${c.name}</option>`;
+                    });
+                    catOptions += '</optgroup>';
+                }
+                if (storage.state.categories.IN && storage.state.categories.IN.length > 0) {
+                    catOptions += '<optgroup label="🇮🇳 India Categories">';
+                    storage.state.categories.IN.forEach(c => {
+                        catOptions += `<option value="${c.id}">${c.name}</option>`;
+                    });
+                    catOptions += '</optgroup>';
+                }
+            }
+            catSelect.innerHTML = catOptions;
+            if (this.ledgerFilters.categoryId) catSelect.value = this.ledgerFilters.categoryId;
+        }
+
+        // 2. Populate Wallet dropdown
+        const walletSelect = document.getElementById('filter-wallet-select');
+        if (walletSelect && walletSelect.options.length <= 1) {
+            let walletOptions = '<option value="all">All Wallets</option>';
+            if (storage.state?.wallets) {
+                Object.values(storage.state.wallets).forEach(w => {
+                    const flag = w.region === 'JP' ? '🇯🇵' : '🇮🇳';
+                    walletOptions += `<option value="${w.id}">${flag} ${w.name || w.id}</option>`;
+                });
+            }
+            walletSelect.innerHTML = walletOptions;
+            if (this.ledgerFilters.walletId) walletSelect.value = this.ledgerFilters.walletId;
+        }
+
+        // 3. Build query filters for walletManager
+        const queryFilters = {};
+        if (this.ledgerSearchQuery) queryFilters.search = this.ledgerSearchQuery;
+        if (this.ledgerFilters.type !== 'all') queryFilters.type = this.ledgerFilters.type;
+        if (this.ledgerFilters.region !== 'all') queryFilters.region = this.ledgerFilters.region;
+        if (this.ledgerFilters.categoryId !== 'all') queryFilters.categoryId = this.ledgerFilters.categoryId;
+        if (this.ledgerFilters.walletId !== 'all') queryFilters.walletId = this.ledgerFilters.walletId;
+        if (this.ledgerFilters.startDate) queryFilters.startDate = this.ledgerFilters.startDate;
+        if (this.ledgerFilters.endDate) queryFilters.endDate = this.ledgerFilters.endDate;
+        if (this.ledgerFilters.minAmount !== null) queryFilters.minAmount = this.ledgerFilters.minAmount;
+        if (this.ledgerFilters.maxAmount !== null) queryFilters.maxAmount = this.ledgerFilters.maxAmount;
+
+        const allFilteredTxs = walletManager.getTransactions(queryFilters);
+        const totalCount = allFilteredTxs.length;
+        const showingCount = Math.min(this.ledgerVisibleCount, totalCount);
+
+        // Update count indicators
+        const showingEl = document.getElementById('ledger-showing-count');
+        const totalEl = document.getElementById('ledger-total-count');
+        if (showingEl) showingEl.innerText = showingCount;
+        if (totalEl) totalEl.innerText = totalCount;
+
+        // Update active filter badge & chips
+        this.renderLedgerActiveChips();
+
+        // Search clear button
+        const clearSearchBtn = document.getElementById('ledger-search-clear');
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = this.ledgerSearchQuery ? 'flex' : 'none';
+        }
+
+        // Empty state check
+        if (totalCount === 0) {
+            timelineEl.innerHTML = `
+                <div class="card ledger-empty-state">
+                    <div class="empty-icon-circle">
+                        <i data-lucide="receipt"></i>
+                    </div>
+                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">No Transactions Found</h3>
+                    <p class="text-muted text-sm" style="margin: 0; max-width: 360px;">No transactions match your search query or applied filter criteria.</p>
+                    <button class="btn btn-secondary btn-sm" onclick="app.resetAllLedgerFilters()" style="margin-top: 6px;">
+                        <i data-lucide="rotate-ccw"></i>
+                        <span>Reset All Filters</span>
+                    </button>
+                </div>
+            `;
+            const paginationWrap = document.getElementById('ledger-pagination-wrap');
+            if (paginationWrap) paginationWrap.style.display = 'none';
+            if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
+            return;
+        }
+
+        // Slice visible records for incremental loading
+        const visibleTxs = allFilteredTxs.slice(0, showingCount);
+
+        // Group transactions by date (reverse chronological)
+        const dateGroups = {};
+        visibleTxs.forEach(tx => {
+            const dKey = tx.date || 'Undated';
+            if (!dateGroups[dKey]) dateGroups[dKey] = [];
+            dateGroups[dKey].push(tx);
+        });
+
+        let html = '';
+        Object.keys(dateGroups).forEach(dateStr => {
+            const groupTxs = dateGroups[dateStr];
+            const dateHeaderLabel = this.formatLedgerDateHeader(dateStr);
+
+            // Compute day net summary
+            let dayNet = 0;
+            let dayCurrency = '¥';
+            groupTxs.forEach(t => {
+                if (t.type === 'income') dayNet += Number(t.amount || 0);
+                else if (t.type === 'expense') dayNet -= Number(t.amount || 0);
+                if (t.currency) dayCurrency = t.currency;
+            });
+
+            html += `
+                <div class="ledger-date-group">
+                    <div class="ledger-date-header">
+                        <div class="ledger-date-title">
+                            <span>${dateHeaderLabel}</span>
+                            <span class="day-pill">${groupTxs.length} ${groupTxs.length === 1 ? 'tx' : 'txs'}</span>
+                        </div>
+                        <div class="ledger-date-subtotal privacy-blur">
+                            ${dayNet !== 0 ? (dayNet > 0 ? `+${this.formatMoney(dayNet, dayCurrency)}` : `-${this.formatMoney(Math.abs(dayNet), dayCurrency)}`) : ''}
+                        </div>
+                    </div>
+            `;
+
+            groupTxs.forEach(tx => {
+                let icon = 'arrow-up-right';
+                let typeCls = 'expense';
+                let sign = '-';
+                let title = tx.note || this.getCategoryName(tx.categoryId, tx.region);
+                let categoryName = this.getCategoryName(tx.categoryId, tx.region);
+                const flag = tx.region === 'JP' ? '🇯🇵' : (tx.region === 'IN' ? '🇮🇳' : '');
+
+                if (tx.type === 'income') {
+                    icon = 'arrow-down-left';
+                    typeCls = 'income';
+                    sign = '+';
+                    title = tx.note || 'Income Deposit';
+                } else if (tx.type === 'transfer') {
+                    icon = 'repeat';
+                    typeCls = 'transfer';
+                    sign = '';
+                    title = `${this.getWalletName(tx.sourceId)} → ${this.getWalletName(tx.destId)}`;
+                } else if (tx.type === 'remittance') {
+                    icon = 'globe';
+                    typeCls = 'remittance';
+                    sign = '';
+                    title = `${this.getWalletName(tx.sourceId)} (¥) → ${this.getWalletName(tx.destId)} (₹)`;
+                }
+
+                // Amount string
+                let amountHtml = '';
+                if (tx.type === 'remittance') {
+                    if (this.isPrivacyHidden) {
+                        amountHtml = '******';
+                    } else {
+                        amountHtml = `¥${Number(tx.sourceAmount || 0).toLocaleString()} → ₹${Number(tx.destAmount || 0).toLocaleString()}`;
+                    }
+                } else {
+                    amountHtml = this.formatMoney(tx.amount, tx.currency, { prefix: sign });
+                }
+
+                // Subtitle metadata pills
+                let metaPillsHtml = '';
+                if (tx.type === 'expense') {
+                    metaPillsHtml += `<span class="tx-pill category-pill">${categoryName}</span>`;
+                    metaPillsHtml += `<span class="tx-pill">${this.getWalletName(tx.walletId)}</span>`;
+                    if (tx.note && tx.note !== title) {
+                        metaPillsHtml += `<span class="tx-pill note-pill">${tx.note}</span>`;
+                    }
+                } else if (tx.type === 'income') {
+                    metaPillsHtml += `<span class="tx-pill">${this.getWalletName(tx.walletId)}</span>`;
+                    if (tx.note && tx.note !== title) {
+                        metaPillsHtml += `<span class="tx-pill note-pill">${tx.note}</span>`;
+                    }
+                } else if (tx.type === 'transfer') {
+                    metaPillsHtml += `<span class="tx-pill">Internal Transfer</span>`;
+                    if (tx.note) metaPillsHtml += `<span class="tx-pill note-pill">${tx.note}</span>`;
+                } else if (tx.type === 'remittance') {
+                    metaPillsHtml += `<span class="tx-pill">Remittance</span>`;
+                    if (tx.exchangeRate) metaPillsHtml += `<span class="tx-rate-tag">Rate: ${tx.exchangeRate}</span>`;
+                    if (tx.note) metaPillsHtml += `<span class="tx-pill note-pill">${tx.note}</span>`;
+                }
+
+                html += `
+                    <div class="ledger-tx-row" onclick="app.openTransactionDetail('${tx.id}')" title="Inspect details and actions">
+                        <div class="ledger-tx-left">
+                            <div class="tx-type-icon ${typeCls}">
+                                <i data-lucide="${icon}"></i>
+                            </div>
+                            <div class="ledger-tx-details">
+                                <div class="ledger-tx-primary-line">
+                                    <span class="ledger-tx-title">${title}</span>
+                                    ${flag ? `<span class="tx-flag-pill">${flag}</span>` : ''}
+                                </div>
+                                <div class="tx-meta-pills">
+                                    ${metaPillsHtml}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ledger-tx-right">
+                            <span class="ledger-tx-amount ${typeCls} privacy-blur">${amountHtml}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`; // Close date group
+        });
+
+        timelineEl.innerHTML = html;
+
+        // Handle Load More
+        const paginationWrap = document.getElementById('ledger-pagination-wrap');
+        const remainingSpan = document.getElementById('ledger-remaining-count');
+        if (paginationWrap) {
+            if (totalCount > showingCount) {
+                paginationWrap.style.display = 'flex';
+                if (remainingSpan) remainingSpan.innerText = totalCount - showingCount;
+            } else {
+                paginationWrap.style.display = 'none';
+            }
+        }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    renderLedgerActiveChips() {
+        const chipsContainer = document.getElementById('ledger-active-chips');
+        const badgeEl = document.getElementById('ledger-active-filter-badge');
+        if (!chipsContainer) return;
+
+        let activeCount = 0;
+        let chipsHtml = '';
+
+        if (this.ledgerSearchQuery) {
+            activeCount++;
+            chipsHtml += `
+                <span class="filter-chip">
+                    <span>Search: "${this.ledgerSearchQuery}"</span>
+                    <button class="filter-chip-remove" onclick="app.clearLedgerSearch()" title="Remove search">×</button>
+                </span>
+            `;
+        }
+
+        if (this.ledgerFilters.type !== 'all') {
+            activeCount++;
+            chipsHtml += `
+                <span class="filter-chip">
+                    <span>Type: ${this.ledgerFilters.type}</span>
+                    <button class="filter-chip-remove" onclick="app.removeLedgerFilter('type')" title="Remove type filter">×</button>
+                </span>
+            `;
+        }
+
+        if (this.ledgerFilters.region !== 'all') {
+            activeCount++;
+            chipsHtml += `
+                <span class="filter-chip">
+                    <span>Country: ${this.ledgerFilters.region === 'JP' ? '🇯🇵 Japan' : '🇮🇳 India'}</span>
+                    <button class="filter-chip-remove" onclick="app.removeLedgerFilter('region')" title="Remove region filter">×</button>
+                </span>
+            `;
+        }
+
+        if (this.ledgerFilters.datePreset !== 'all') {
+            activeCount++;
+            let dateLabel = this.ledgerFilters.datePreset;
+            if (dateLabel === 'today') dateLabel = 'Today';
+            else if (dateLabel === 'week') dateLabel = 'This Week';
+            else if (dateLabel === 'month') dateLabel = 'This Month';
+            else if (dateLabel === 'prev_month') dateLabel = 'Previous Month';
+            else if (dateLabel === 'custom') dateLabel = `${this.ledgerFilters.startDate} to ${this.ledgerFilters.endDate}`;
+
+            chipsHtml += `
+                <span class="filter-chip">
+                    <span>Date: ${dateLabel}</span>
+                    <button class="filter-chip-remove" onclick="app.removeLedgerFilter('datePreset')" title="Remove date filter">×</button>
+                </span>
+            `;
+        }
+
+        if (this.ledgerFilters.categoryId !== 'all') {
+            activeCount++;
+            chipsHtml += `
+                <span class="filter-chip">
+                    <span>Category: ${this.getCategoryName(this.ledgerFilters.categoryId)}</span>
+                    <button class="filter-chip-remove" onclick="app.removeLedgerFilter('categoryId')" title="Remove category filter">×</button>
+                </span>
+            `;
+        }
+
+        if (this.ledgerFilters.walletId !== 'all') {
+            activeCount++;
+            chipsHtml += `
+                <span class="filter-chip">
+                    <span>Wallet: ${this.getWalletName(this.ledgerFilters.walletId)}</span>
+                    <button class="filter-chip-remove" onclick="app.removeLedgerFilter('walletId')" title="Remove wallet filter">×</button>
+                </span>
+            `;
+        }
+
+        if (this.ledgerFilters.minAmount !== null || this.ledgerFilters.maxAmount !== null) {
+            activeCount++;
+            const minStr = this.ledgerFilters.minAmount !== null ? this.ledgerFilters.minAmount : '0';
+            const maxStr = this.ledgerFilters.maxAmount !== null ? this.ledgerFilters.maxAmount : '∞';
+            chipsHtml += `
+                <span class="filter-chip">
+                    <span>Amount: ${minStr} - ${maxStr}</span>
+                    <button class="filter-chip-remove" onclick="app.removeLedgerFilter('amount')" title="Remove amount filter">×</button>
+                </span>
+            `;
+        }
+
+        if (activeCount > 0) {
+            chipsHtml += `<button class="clear-all-chip" onclick="app.resetAllLedgerFilters()">Clear All</button>`;
+        }
+
+        chipsContainer.innerHTML = chipsHtml;
+
+        if (badgeEl) {
+            if (activeCount > 0) {
+                badgeEl.innerText = activeCount;
+                badgeEl.style.display = 'inline-block';
+            } else {
+                badgeEl.style.display = 'none';
+            }
+        }
+    }
+
+    onLedgerSearchInput(event) {
+        if (this.ledgerSearchDebounceTimer) {
+            clearTimeout(this.ledgerSearchDebounceTimer);
+        }
+
+        const clearBtn = document.getElementById('ledger-search-clear');
+        const query = (event.target.value || '').trim();
+        if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
+
+        this.ledgerSearchDebounceTimer = setTimeout(() => {
+            this.ledgerSearchQuery = query;
+            this.ledgerVisibleCount = this.ledgerPageSize;
+            this.renderTransactionsPage();
+        }, 200);
+    }
+
+    clearLedgerSearch() {
+        const input = document.getElementById('ledger-search-input');
+        if (input) input.value = '';
+        this.ledgerSearchQuery = '';
+        this.ledgerVisibleCount = this.ledgerPageSize;
+        this.renderTransactionsPage();
+    }
+
+    toggleLedgerFilterPanel() {
+        const panel = document.getElementById('ledger-filter-panel');
+        if (!panel) return;
+        const isHidden = panel.style.display === 'none' || panel.style.display === '';
+        panel.style.display = isHidden ? 'block' : 'none';
+    }
+
+    onLedgerFilterChange() {
+        const typeSelect = document.getElementById('filter-type-select');
+        const catSelect = document.getElementById('filter-category-select');
+        const walletSelect = document.getElementById('filter-wallet-select');
+        const minInput = document.getElementById('filter-amount-min');
+        const maxInput = document.getElementById('filter-amount-max');
+
+        if (typeSelect) this.ledgerFilters.type = typeSelect.value;
+        if (catSelect) this.ledgerFilters.categoryId = catSelect.value;
+        if (walletSelect) this.ledgerFilters.walletId = walletSelect.value;
+
+        if (minInput && minInput.value !== '') {
+            this.ledgerFilters.minAmount = Number(minInput.value);
+        } else {
+            this.ledgerFilters.minAmount = null;
+        }
+
+        if (maxInput && maxInput.value !== '') {
+            this.ledgerFilters.maxAmount = Number(maxInput.value);
+        } else {
+            this.ledgerFilters.maxAmount = null;
+        }
+
+        if (this.ledgerFilters.datePreset === 'custom') {
+            const startInput = document.getElementById('filter-date-start');
+            const endInput = document.getElementById('filter-date-end');
+            this.ledgerFilters.startDate = startInput?.value || '';
+            this.ledgerFilters.endDate = endInput?.value || '';
+        }
+
+        this.ledgerVisibleCount = this.ledgerPageSize;
+        this.renderTransactionsPage();
+    }
+
+    onLedgerDatePresetChange() {
+        const dateSelect = document.getElementById('filter-date-preset');
+        const customWrap = document.getElementById('filter-custom-date-wrap');
+        const preset = dateSelect?.value || 'all';
+        this.ledgerFilters.datePreset = preset;
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0-11
+        const date = now.getDate();
+
+        if (preset === 'today') {
+            const todayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+            this.ledgerFilters.startDate = todayStr;
+            this.ledgerFilters.endDate = todayStr;
+            if (customWrap) customWrap.style.display = 'none';
+        } else if (preset === 'week') {
+            const dayOfWeek = now.getDay(); // 0 (Sun) - 6 (Sat)
+            const sunday = new Date(now);
+            sunday.setDate(now.getDate() - dayOfWeek);
+            const saturday = new Date(sunday);
+            saturday.setDate(sunday.getDate() + 6);
+
+            const sStr = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
+            const eStr = `${saturday.getFullYear()}-${String(saturday.getMonth() + 1).padStart(2, '0')}-${String(saturday.getDate()).padStart(2, '0')}`;
+            this.ledgerFilters.startDate = sStr;
+            this.ledgerFilters.endDate = eStr;
+            if (customWrap) customWrap.style.display = 'none';
+        } else if (preset === 'month') {
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            this.ledgerFilters.startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+            this.ledgerFilters.endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+            if (customWrap) customWrap.style.display = 'none';
+        } else if (preset === 'prev_month') {
+            const prevMonthDate = new Date(year, month - 1, 1);
+            const py = prevMonthDate.getFullYear();
+            const pm = prevMonthDate.getMonth();
+            const lastDay = new Date(py, pm + 1, 0).getDate();
+            this.ledgerFilters.startDate = `${py}-${String(pm + 1).padStart(2, '0')}-01`;
+            this.ledgerFilters.endDate = `${py}-${String(pm + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+            if (customWrap) customWrap.style.display = 'none';
+        } else if (preset === 'custom') {
+            if (customWrap) customWrap.style.display = 'grid';
+            const startInput = document.getElementById('filter-date-start');
+            const endInput = document.getElementById('filter-date-end');
+            this.ledgerFilters.startDate = startInput?.value || '';
+            this.ledgerFilters.endDate = endInput?.value || '';
+        } else {
+            this.ledgerFilters.startDate = '';
+            this.ledgerFilters.endDate = '';
+            if (customWrap) customWrap.style.display = 'none';
+        }
+
+        this.ledgerVisibleCount = this.ledgerPageSize;
+        this.renderTransactionsPage();
+    }
+
+    setLedgerRegion(region) {
+        this.ledgerFilters.region = region;
+        const segment = document.getElementById('ledger-country-filter');
+        if (segment) {
+            segment.querySelectorAll('.segment-btn').forEach(btn => {
+                if (btn.getAttribute('data-region') === region) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+        }
+        this.ledgerVisibleCount = this.ledgerPageSize;
+        this.renderTransactionsPage();
+    }
+
+    removeLedgerFilter(key) {
+        if (key === 'type') {
+            this.ledgerFilters.type = 'all';
+            const el = document.getElementById('filter-type-select');
+            if (el) el.value = 'all';
+        } else if (key === 'region') {
+            this.setLedgerRegion('all');
+            return;
+        } else if (key === 'datePreset') {
+            this.ledgerFilters.datePreset = 'all';
+            this.ledgerFilters.startDate = '';
+            this.ledgerFilters.endDate = '';
+            const el = document.getElementById('filter-date-preset');
+            if (el) el.value = 'all';
+            const customWrap = document.getElementById('filter-custom-date-wrap');
+            if (customWrap) customWrap.style.display = 'none';
+        } else if (key === 'categoryId') {
+            this.ledgerFilters.categoryId = 'all';
+            const el = document.getElementById('filter-category-select');
+            if (el) el.value = 'all';
+        } else if (key === 'walletId') {
+            this.ledgerFilters.walletId = 'all';
+            const el = document.getElementById('filter-wallet-select');
+            if (el) el.value = 'all';
+        } else if (key === 'amount') {
+            this.ledgerFilters.minAmount = null;
+            this.ledgerFilters.maxAmount = null;
+            const minEl = document.getElementById('filter-amount-min');
+            const maxEl = document.getElementById('filter-amount-max');
+            if (minEl) minEl.value = '';
+            if (maxEl) maxEl.value = '';
+        }
+
+        this.ledgerVisibleCount = this.ledgerPageSize;
+        this.renderTransactionsPage();
+    }
+
+    resetAllLedgerFilters() {
+        this.clearLedgerSearch();
+        this.ledgerFilters = {
+            type: 'all',
+            categoryId: 'all',
+            walletId: 'all',
+            region: 'all',
+            datePreset: 'all',
+            startDate: '',
+            endDate: '',
+            minAmount: null,
+            maxAmount: null
+        };
+
+        const typeSelect = document.getElementById('filter-type-select');
+        if (typeSelect) typeSelect.value = 'all';
+        const catSelect = document.getElementById('filter-category-select');
+        if (catSelect) catSelect.value = 'all';
+        const walletSelect = document.getElementById('filter-wallet-select');
+        if (walletSelect) walletSelect.value = 'all';
+        const dateSelect = document.getElementById('filter-date-preset');
+        if (dateSelect) dateSelect.value = 'all';
+        const minInput = document.getElementById('filter-amount-min');
+        if (minInput) minInput.value = '';
+        const maxInput = document.getElementById('filter-amount-max');
+        if (maxInput) maxInput.value = '';
+        const customWrap = document.getElementById('filter-custom-date-wrap');
+        if (customWrap) customWrap.style.display = 'none';
+
+        const segment = document.getElementById('ledger-country-filter');
+        if (segment) {
+            segment.querySelectorAll('.segment-btn').forEach(btn => {
+                if (btn.getAttribute('data-region') === 'all') btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+        }
+
+        const panel = document.getElementById('ledger-filter-panel');
+        if (panel) panel.style.display = 'none';
+
+        this.ledgerVisibleCount = this.ledgerPageSize;
+        this.renderTransactionsPage();
+    }
+
+    loadMoreLedger() {
+        this.ledgerVisibleCount += this.ledgerPageSize;
+        this.renderTransactionsPage();
+    }
+
+    // --------------------------------------------------------------------------
+    // TRANSACTION DETAIL MODAL
+    // --------------------------------------------------------------------------
+
+    openTransactionDetail(id) {
+        const found = walletManager.findTransaction(id);
+        if (!found) return;
+
+        const tx = found.tx;
+        this.currentDetailTxId = id;
+
+        // Elements
+        const modal = document.getElementById('transaction-detail-modal');
+        const badge = document.getElementById('tx-detail-type-badge');
+        const dateDisplay = document.getElementById('tx-detail-date-display');
+        const amountVal = document.getElementById('tx-detail-amount-val');
+        const subtitle = document.getElementById('tx-detail-subtitle');
+        const walletVal = document.getElementById('tx-detail-wallet-val');
+        const categoryVal = document.getElementById('tx-detail-category-val');
+        const categoryWrap = document.getElementById('tx-detail-category-wrap');
+        const destWrap = document.getElementById('tx-detail-transfer-dest-wrap');
+        const destVal = document.getElementById('tx-detail-transfer-dest-val');
+        const rateWrap = document.getElementById('tx-detail-rate-wrap');
+        const rateVal = document.getElementById('tx-detail-rate-val');
+        const noteVal = document.getElementById('tx-detail-note-val');
+        const idVal = document.getElementById('tx-detail-id-val');
+
+        if (!modal) return;
+
+        // Populate metadata
+        if (badge) {
+            badge.innerText = (tx.type || 'expense').toUpperCase();
+            badge.className = `badge ${tx.type === 'income' ? 'badge-success' : tx.type === 'transfer' ? 'badge-info' : tx.type === 'remittance' ? 'badge-purple' : 'badge-danger'}`;
+        }
+
+        if (dateDisplay) {
+            dateDisplay.innerText = tx.date ? this.formatLedgerDateHeader(tx.date) : '--';
+        }
+
+        if (amountVal) {
+            if (tx.type === 'remittance') {
+                amountVal.innerText = this.isPrivacyHidden
+                    ? '******'
+                    : `¥${Number(tx.sourceAmount || 0).toLocaleString()} → ₹${Number(tx.destAmount || 0).toLocaleString()}`;
+            } else {
+                const sign = tx.type === 'income' ? '+' : (tx.type === 'expense' ? '-' : '');
+                amountVal.innerText = this.formatMoney(tx.amount, tx.currency, { prefix: sign });
+            }
+        }
+
+        if (subtitle) {
+            if (tx.type === 'expense') {
+                subtitle.innerText = this.getCategoryName(tx.categoryId, tx.region);
+            } else if (tx.type === 'income') {
+                subtitle.innerText = 'Income Deposit';
+            } else if (tx.type === 'transfer') {
+                subtitle.innerText = 'Internal Wallet Transfer';
+            } else if (tx.type === 'remittance') {
+                subtitle.innerText = 'Cross-Border Remittance (Japan → India)';
+            }
+        }
+
+        if (walletVal) {
+            walletVal.innerText = this.getWalletName(tx.walletId || tx.sourceId);
+        }
+
+        if (tx.type === 'expense') {
+            if (categoryWrap) categoryWrap.style.display = 'flex';
+            if (categoryVal) categoryVal.innerText = this.getCategoryName(tx.categoryId, tx.region);
+            if (destWrap) destWrap.style.display = 'none';
+            if (rateWrap) rateWrap.style.display = 'none';
+        } else if (tx.type === 'transfer') {
+            if (categoryWrap) categoryWrap.style.display = 'none';
+            if (destWrap) {
+                destWrap.style.display = 'flex';
+                if (destVal) destVal.innerText = this.getWalletName(tx.destId);
+            }
+            if (rateWrap) rateWrap.style.display = 'none';
+        } else if (tx.type === 'remittance') {
+            if (categoryWrap) categoryWrap.style.display = 'none';
+            if (destWrap) {
+                destWrap.style.display = 'flex';
+                if (destVal) destVal.innerText = `${this.getWalletName(tx.destId)} (₹${Number(tx.destAmount || 0).toLocaleString()})`;
+            }
+            if (rateWrap) {
+                rateWrap.style.display = 'flex';
+                if (rateVal) rateVal.innerText = tx.exchangeRate ? `1 JPY = ${tx.exchangeRate} INR` : '--';
+            }
+        } else {
+            if (categoryWrap) categoryWrap.style.display = 'none';
+            if (destWrap) destWrap.style.display = 'none';
+            if (rateWrap) rateWrap.style.display = 'none';
+        }
+
+        if (noteVal) {
+            noteVal.innerText = tx.note || 'No note recorded.';
+        }
+
+        if (idVal) {
+            idVal.innerText = `#${tx.id}`;
+        }
+
+        modal.classList.add('active');
+        if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
+    }
+
+    closeTransactionDetail() {
+        const modal = document.getElementById('transaction-detail-modal');
+        if (modal) modal.classList.remove('active');
+        this.currentDetailTxId = null;
+    }
+
+    editCurrentDetailTransaction() {
+        const id = this.currentDetailTxId;
+        this.closeTransactionDetail();
+        if (id) {
+            this.editTransaction(id);
+        }
+    }
+
+    deleteCurrentDetailTransaction() {
+        const id = this.currentDetailTxId;
+        if (!id) return;
+
+        if (confirm("Are you sure you want to delete this transaction from the continuous ledger?")) {
+            walletManager.deleteTransaction(id);
+            this.closeTransactionDetail();
+            this.renderAll();
+            this.renderTransactionsPage();
+            if (this.currentView === 'analytics-view') {
+                this.renderAnalyticsPage();
+            }
+        }
+    }
+
+    exportTransactionsCsv() {
+        const queryFilters = {};
+        if (this.ledgerSearchQuery) queryFilters.search = this.ledgerSearchQuery;
+        if (this.ledgerFilters.type !== 'all') queryFilters.type = this.ledgerFilters.type;
+        if (this.ledgerFilters.region !== 'all') queryFilters.region = this.ledgerFilters.region;
+        if (this.ledgerFilters.categoryId !== 'all') queryFilters.categoryId = this.ledgerFilters.categoryId;
+        if (this.ledgerFilters.walletId !== 'all') queryFilters.walletId = this.ledgerFilters.walletId;
+        if (this.ledgerFilters.startDate) queryFilters.startDate = this.ledgerFilters.startDate;
+        if (this.ledgerFilters.endDate) queryFilters.endDate = this.ledgerFilters.endDate;
+
+        const txs = walletManager.getTransactions(queryFilters);
+        if (!txs || txs.length === 0) {
+            alert('No transactions to export.');
+            return;
+        }
+
+        let csv = 'ID,Date,Type,Region,Wallet,Category,Amount,Currency,DestWallet,DestAmount,ExchangeRate,Note\n';
+        txs.forEach(t => {
+            const row = [
+                `"${t.id || ''}"`,
+                `"${t.date || ''}"`,
+                `"${t.type || ''}"`,
+                `"${t.region || ''}"`,
+                `"${this.getWalletName(t.walletId || t.sourceId)}"`,
+                `"${this.getCategoryName(t.categoryId, t.region)}"`,
+                t.amount !== undefined ? t.amount : (t.sourceAmount || 0),
+                `"${t.currency || t.sourceCurrency || ''}"`,
+                `"${t.destId ? this.getWalletName(t.destId) : ''}"`,
+                t.destAmount || '',
+                t.exchangeRate || '',
+                `"${(t.note || '').replace(/"/g, '""')}"`
+            ];
+            csv += row.join(',') + '\n';
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `expense_manager_ledger_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // --------------------------------------------------------------------------
+    // PART C: ANALYTICS PAGE (JAPAN & INDIA SEPARATION)
+    // --------------------------------------------------------------------------
+
+    renderAnalyticsPage() {
+        const jpWorkspace = document.getElementById('analytics-jp-workspace');
+        const inWorkspace = document.getElementById('analytics-in-workspace');
+        const tabJp = document.getElementById('analytics-tab-jp');
+        const tabIn = document.getElementById('analytics-tab-in');
+
+        if (!jpWorkspace || !inWorkspace) return;
+
+        if (this.analyticsCountry === 'JP') {
+            jpWorkspace.style.display = 'flex';
+            inWorkspace.style.display = 'none';
+            if (tabJp) tabJp.classList.add('active');
+            if (tabIn) tabIn.classList.remove('active');
+            this.renderJapanAnalytics();
+        } else {
+            jpWorkspace.style.display = 'none';
+            inWorkspace.style.display = 'flex';
+            if (tabJp) tabJp.classList.remove('active');
+            if (tabIn) tabIn.classList.add('active');
+            this.renderIndiaAnalytics();
+        }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    setAnalyticsCountry(country) {
+        this.analyticsCountry = country;
+        this.renderAnalyticsPage();
+    }
+
+    setAnalyticsPeriod(period) {
+        this.analyticsPeriod = period;
+        const periodCtrl = document.getElementById('analytics-period-control');
+        if (periodCtrl) {
+            periodCtrl.querySelectorAll('.segment-btn').forEach(btn => {
+                if (btn.getAttribute('data-period') === period) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+        }
+        this.renderAnalyticsPage();
+    }
+
+    getAnalyticsPeriodRange(period) {
+        const now = new Date();
+        const curYear = now.getFullYear();
+        const curMonth = now.getMonth(); // 0-11
+
+        if (period === 'last-month') {
+            const prevMonthDate = new Date(curYear, curMonth - 1, 1);
+            const y = prevMonthDate.getFullYear();
+            const m = prevMonthDate.getMonth();
+            const lastDay = new Date(y, m + 1, 0).getDate();
+            const startDate = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+            const endDate = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+            const priorDate = new Date(y, m - 1, 1);
+            const py = priorDate.getFullYear();
+            const pm = priorDate.getMonth();
+            const plastDay = new Date(py, pm + 1, 0).getDate();
+            const prevStartDate = `${py}-${String(pm + 1).padStart(2, '0')}-01`;
+            const prevEndDate = `${py}-${String(pm + 1).padStart(2, '0')}-${String(plastDay).padStart(2, '0')}`;
+
+            return { startDate, endDate, prevStartDate, prevEndDate, label: 'Last Month' };
+        } else if (period === 'last-3-months') {
+            const start3Date = new Date(curYear, curMonth - 2, 1);
+            const y = start3Date.getFullYear();
+            const m = start3Date.getMonth();
+            const startDate = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+            const lastDay = new Date(curYear, curMonth + 1, 0).getDate();
+            const endDate = `${curYear}-${String(curMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+            const pstart = new Date(y, m - 3, 1);
+            const pend = new Date(y, m, 0);
+            const prevStartDate = `${pstart.getFullYear()}-${String(pstart.getMonth() + 1).padStart(2, '0')}-01`;
+            const prevEndDate = `${pend.getFullYear()}-${String(pend.getMonth() + 1).padStart(2, '0')}-${String(pend.getDate()).padStart(2, '0')}`;
+
+            return { startDate, endDate, prevStartDate, prevEndDate, label: 'Last 3 Months' };
+        } else if (period === 'all-time') {
+            return { startDate: null, endDate: null, prevStartDate: null, prevEndDate: null, label: 'All Time' };
+        } else {
+            // 'this-month' default
+            const lastDay = new Date(curYear, curMonth + 1, 0).getDate();
+            const startDate = `${curYear}-${String(curMonth + 1).padStart(2, '0')}-01`;
+            const endDate = `${curYear}-${String(curMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+            const prevDate = new Date(curYear, curMonth - 1, 1);
+            const py = prevDate.getFullYear();
+            const pm = prevDate.getMonth();
+            const plastDay = new Date(py, pm + 1, 0).getDate();
+            const prevStartDate = `${py}-${String(pm + 1).padStart(2, '0')}-01`;
+            const prevEndDate = `${py}-${String(pm + 1).padStart(2, '0')}-${String(plastDay).padStart(2, '0')}`;
+
+            return { startDate, endDate, prevStartDate, prevEndDate, label: 'This Month' };
+        }
+    }
+
+    renderJapanAnalytics() {
+        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod);
+        const { startDate, endDate, prevStartDate, prevEndDate } = periodRange;
+
+        // Query Japanese transactions
+        const jpTxs = walletManager.getTransactions({
+            region: 'JP',
+            startDate: startDate || undefined,
+            endDate: endDate || undefined
+        });
+
+        // 1. Calculations: Income, Expenses, Savings
+        const incomeTxs = jpTxs.filter(t => t.type === 'income');
+        const expenseTxs = jpTxs.filter(t => t.type === 'expense');
+
+        const totalIncome = incomeTxs.reduce((s, t) => s + Number(t.amount || 0), 0);
+        const totalExpenses = expenseTxs.reduce((s, t) => s + Number(t.amount || 0), 0);
+
+        // Analytical spending (excluding configured lifestyle categories)
+        const analyticalTxs = expenseTxs.filter(t => !this.jpExclusions.has(t.categoryId));
+        const analyticalExpenses = analyticalTxs.reduce((s, t) => s + Number(t.amount || 0), 0);
+        const excludedDiff = totalExpenses - analyticalExpenses;
+
+        const netSavings = totalIncome - totalExpenses;
+        const savingsRate = totalIncome > 0 ? ((netSavings / totalIncome) * 100).toFixed(1) : '0';
+
+        // 2. Previous Period Comparison
+        let deltaIncome = null;
+        let deltaExpenses = null;
+        if (prevStartDate && prevEndDate) {
+            const prevJpTxs = walletManager.getTransactions({
+                region: 'JP',
+                startDate: prevStartDate,
+                endDate: prevEndDate
+            });
+            const prevIncome = prevJpTxs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+            const prevExpenses = prevJpTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+
+            if (prevIncome > 0) deltaIncome = (((totalIncome - prevIncome) / prevIncome) * 100).toFixed(1);
+            if (prevExpenses > 0) deltaExpenses = (((totalExpenses - prevExpenses) / prevExpenses) * 100).toFixed(1);
+        }
+
+        // 3. Update KPI Elements
+        const kpiIncome = document.getElementById('jp-kpi-income');
+        const kpiIncomeDelta = document.getElementById('jp-kpi-income-delta');
+        if (kpiIncome) kpiIncome.innerText = this.formatMoney(totalIncome, '¥');
+        if (kpiIncomeDelta) {
+            if (deltaIncome !== null) {
+                const isPos = Number(deltaIncome) >= 0;
+                kpiIncomeDelta.innerHTML = `<span class="${isPos ? 'delta-positive' : 'delta-negative'}">${isPos ? '↑' : '↓'} ${Math.abs(deltaIncome)}%</span> vs prior period`;
+            } else {
+                kpiIncomeDelta.innerHTML = `<span class="delta-neutral">Baseline period</span>`;
+            }
+        }
+
+        const kpiExpenses = document.getElementById('jp-kpi-expenses');
+        const kpiExpensesDelta = document.getElementById('jp-kpi-expenses-delta');
+        if (kpiExpenses) kpiExpenses.innerText = this.formatMoney(totalExpenses, '¥');
+        if (kpiExpensesDelta) {
+            if (deltaExpenses !== null) {
+                const isLess = Number(deltaExpenses) <= 0;
+                // For expenses, going down is positive
+                kpiExpensesDelta.innerHTML = `<span class="${isLess ? 'delta-positive' : 'delta-negative'}">${Number(deltaExpenses) >= 0 ? '↑' : '↓'} ${Math.abs(deltaExpenses)}%</span> vs prior period`;
+            } else {
+                kpiExpensesDelta.innerHTML = `<span class="delta-neutral">Baseline period</span>`;
+            }
+        }
+
+        const kpiSavings = document.getElementById('jp-kpi-savings');
+        if (kpiSavings) {
+            kpiSavings.innerText = (netSavings >= 0 ? '+' : '-') + this.formatMoney(Math.abs(netSavings), '¥');
+            kpiSavings.className = `kpi-value privacy-blur ${netSavings >= 0 ? 'text-emerald' : 'text-rose'}`;
+        }
+
+        const kpiSavingsRate = document.getElementById('jp-kpi-savings-rate');
+        const kpiSavingsRateMeta = document.getElementById('jp-kpi-savings-rate-meta');
+        if (kpiSavingsRate) kpiSavingsRate.innerText = `${savingsRate}%`;
+        if (kpiSavingsRateMeta) {
+            if (Number(savingsRate) >= 20) {
+                kpiSavingsRateMeta.innerHTML = `<span class="delta-positive">Healthy</span> • Target &gt; 20%`;
+            } else if (Number(savingsRate) > 0) {
+                kpiSavingsRateMeta.innerHTML = `<span class="text-orange">Moderate</span> • Target &gt; 20%`;
+            } else {
+                kpiSavingsRateMeta.innerHTML = `<span class="delta-negative">Deficit</span> • Spending exceeds income`;
+            }
+        }
+
+        // 4. Update Lifestyle Exclusions Banner
+        const exclusionsChips = document.getElementById('jp-exclusions-chips');
+        const statTotalExpenses = document.getElementById('jp-stat-total-expenses');
+        const statAnalyticalExpenses = document.getElementById('jp-stat-analytical-expenses');
+        const statExcludedDiff = document.getElementById('jp-stat-excluded-diff');
+        const statExcludedDiffWrap = document.getElementById('jp-stat-excluded-diff-wrap');
+
+        if (statTotalExpenses) statTotalExpenses.innerText = this.formatMoney(totalExpenses, '¥');
+        if (statAnalyticalExpenses) statAnalyticalExpenses.innerText = this.formatMoney(analyticalExpenses, '¥');
+        if (statExcludedDiff) statExcludedDiff.innerText = `-${this.formatMoney(excludedDiff, '¥')}`;
+        if (statExcludedDiffWrap) statExcludedDiffWrap.style.display = excludedDiff > 0 ? 'flex' : 'none';
+
+        if (exclusionsChips) {
+            // Selectable candidate categories for lifestyle exclusion
+            const candidateCats = (storage.state?.categories?.JP || []).filter(c => {
+                return c.id === 'jp-food' || c.id === 'jp-dining' || c.id === 'jp-shopping' ||
+                       c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
+            });
+
+            let chipsHtml = '';
+            candidateCats.forEach(cat => {
+                const isExcluded = this.jpExclusions.has(cat.id);
+                chipsHtml += `
+                    <button class="exclusion-pill ${isExcluded ? 'excluded' : ''}" onclick="app.toggleCategoryExclusion('${cat.id}')">
+                        <i data-lucide="${isExcluded ? 'x' : 'check'}" style="width: 13px; height: 13px;"></i>
+                        <span>${cat.name}</span>
+                    </button>
+                `;
+            });
+            exclusionsChips.innerHTML = chipsHtml;
+        }
+
+        // 5. Render Spending Trend Chart
+        if (typeof charts !== 'undefined' && typeof charts.renderJpSpendingTrend === 'function') {
+            charts.renderJpSpendingTrend(this.jpTrendGranularity, analyticalTxs, startDate, endDate);
+        }
+
+        // 6. Category Breakdown & Ranking List
+        const categoryTotals = {};
+        analyticalTxs.forEach(t => {
+            categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + Number(t.amount || 0);
+        });
+
+        const activeCats = (storage.state?.categories?.JP || [])
+            .filter(c => (categoryTotals[c.id] || 0) > 0)
+            .sort((a, b) => (categoryTotals[b.id] || 0) - (categoryTotals[a.id] || 0));
+
+        const catRankingList = document.getElementById('jp-category-ranking-list');
+        const catCountLabel = document.getElementById('jp-category-count-label');
+        if (catCountLabel) catCountLabel.innerText = `${activeCats.length} ${activeCats.length === 1 ? 'category' : 'categories'}`;
+
+        if (catRankingList) {
+            if (activeCats.length === 0) {
+                catRankingList.innerHTML = '<p class="text-muted text-sm text-center" style="padding: 24px;">No category expenses in this period.</p>';
+            } else {
+                const baseColors = [
+                    '#3e63dd', '#bf5af2', '#34d399', '#f97316', '#06b6d4',
+                    '#fb7185', '#eab308', '#9333ea', '#0ea5e9', '#f43f5e'
+                ];
+                let rankingHtml = '';
+                activeCats.forEach((cat, idx) => {
+                    const spent = categoryTotals[cat.id] || 0;
+                    const pct = analyticalExpenses > 0 ? ((spent / analyticalExpenses) * 100).toFixed(1) : '0';
+                    const color = baseColors[idx % baseColors.length];
+
+                    rankingHtml += `
+                        <div class="category-rank-row" onclick="app.openCategoryDrilldown('${cat.id}')" title="Inspect transactions for ${cat.name}">
+                            <div class="category-rank-top">
+                                <div class="category-rank-info">
+                                    <span class="category-dot" style="background: ${color};"></span>
+                                    <span class="category-name">${cat.name}</span>
+                                </div>
+                                <div class="category-amount-wrap">
+                                    <span class="category-amount privacy-blur">${this.formatMoney(spent, '¥')}</span>
+                                    <span class="category-pct">${pct}%</span>
+                                </div>
+                            </div>
+                            <div class="category-bar-bg">
+                                <div class="category-bar-fill" style="width: ${pct}%; background: ${color};"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+                catRankingList.innerHTML = rankingHtml;
+            }
+        }
+
+        // Render Donut Chart
+        if (typeof charts !== 'undefined' && typeof charts.renderJpCategoryDonut === 'function') {
+            charts.renderJpCategoryDonut(activeCats, categoryTotals, (cat) => this.openCategoryDrilldown(cat.id));
+        }
+
+        // 7. Category Drilldown view (if active)
+        this.renderCategoryDrilldownView(analyticalTxs);
+
+        // 8. Budget Performance
+        const budgetBody = document.getElementById('jp-budget-perf-body');
+        if (budgetBody) {
+            const jpBudget = storage.state?.jpTotalBudget || 0;
+            const remainingBudget = Math.max(0, jpBudget - totalExpenses);
+            const budgetPct = jpBudget > 0 ? Math.min(100, (totalExpenses / jpBudget) * 100).toFixed(1) : 0;
+            const barClass = budgetPct > 90 ? 'neon-danger' : (budgetPct > 75 ? 'neon-warn' : 'neon-safe');
+
+            budgetBody.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <span class="text-sm text-secondary">Allocated Monthly Budget</span>
+                    <span class="text-sm font-bold text-primary privacy-blur">${this.formatMoney(jpBudget, '¥')}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px;">
+                    <span class="text-xs text-muted">Actual Spending: <strong class="privacy-blur text-primary">${this.formatMoney(totalExpenses, '¥')}</strong></span>
+                    <span class="text-xs text-muted">Remaining: <strong class="privacy-blur text-emerald">${this.formatMoney(remainingBudget, '¥')}</strong></span>
+                </div>
+                <div class="neon-bar-bg" style="margin-top: 8px;">
+                    <div class="neon-bar-fill ${barClass}" style="width: ${budgetPct}%"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-faint); margin-top: 4px;">
+                    <span>${budgetPct}% consumed</span>
+                    <span>${100 - Number(budgetPct) > 0 ? (100 - Number(budgetPct)).toFixed(1) + '% cushion' : 'Budget exhausted'}</span>
+                </div>
+            `;
+        }
+
+        // 9. Data-Supported Financial Observations / Insights
+        const insightsList = document.getElementById('jp-insights-list');
+        if (insightsList) {
+            let insightsHtml = '';
+
+            // Insight 1: Top Category
+            if (activeCats.length > 0) {
+                const topCat = activeCats[0];
+                const topSpent = categoryTotals[topCat.id] || 0;
+                const topPct = analyticalExpenses > 0 ? Math.round((topSpent / analyticalExpenses) * 100) : 0;
+                insightsHtml += `
+                    <div class="insight-item">
+                        <div class="insight-icon"><i data-lucide="pie-chart"></i></div>
+                        <div class="insight-content">
+                            <span class="insight-title">Dominant Category: ${topCat.name}</span>
+                            <p class="insight-desc">${topCat.name} accounts for ${topPct}% of your analytical spending (<span class="privacy-blur">${this.formatMoney(topSpent, '¥')}</span>).</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Insight 2: Month-over-month Trend
+            if (deltaExpenses !== null) {
+                const isDown = Number(deltaExpenses) < 0;
+                insightsHtml += `
+                    <div class="insight-item">
+                        <div class="insight-icon" style="color: ${isDown ? '#34d399' : '#fb7185'}; background: ${isDown ? 'rgba(52, 211, 153, 0.12)' : 'rgba(251, 113, 133, 0.12)'}">
+                            <i data-lucide="${isDown ? 'trending-down' : 'trending-up'}"></i>
+                        </div>
+                        <div class="insight-content">
+                            <span class="insight-title">${isDown ? 'Spending Reduced' : 'Expenditure Accelerated'}</span>
+                            <p class="insight-desc">Outflows are ${isDown ? 'down' : 'up'} ${Math.abs(deltaExpenses)}% compared to the prior period (${isDown ? 'positive trajectory' : 'monitor closely'}).</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Insight 3: Largest single outlay
+            if (expenseTxs.length > 0) {
+                const maxTx = [...expenseTxs].sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))[0];
+                if (maxTx && Number(maxTx.amount || 0) > 0) {
+                    insightsHtml += `
+                        <div class="insight-item">
+                            <div class="insight-icon"><i data-lucide="alert-circle"></i></div>
+                            <div class="insight-content">
+                                <span class="insight-title">Peak Transaction Outlay</span>
+                                <p class="insight-desc">Largest single transaction was <span class="privacy-blur">${this.formatMoney(maxTx.amount, '¥')}</span> on ${maxTx.date} (${maxTx.note || this.getCategoryName(maxTx.categoryId, 'JP')}).</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            // Insight 4: Savings Rate
+            insightsHtml += `
+                <div class="insight-item">
+                    <div class="insight-icon"><i data-lucide="piggy-bank"></i></div>
+                    <div class="insight-content">
+                        <span class="insight-title">Savings Rate Evaluation: ${savingsRate}%</span>
+                        <p class="insight-desc">${Number(savingsRate) >= 20 ? 'Your savings rate meets target SaaS wealth-accumulation standards (>20%).' : 'Savings rate is below the recommended 20% target. Review lifestyle exclusions and discretionary spending.'}</p>
+                    </div>
+                </div>
+            `;
+
+            insightsList.innerHTML = insightsHtml;
+        }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    toggleCategoryExclusion(catId) {
+        if (this.jpExclusions.has(catId)) {
+            this.jpExclusions.delete(catId);
+        } else {
+            this.jpExclusions.add(catId);
+        }
+
+        // Persist safely in state without modifying ledger or balances
+        if (storage.state) {
+            storage.state.analyticsExclusions = Array.from(this.jpExclusions);
+            storage.saveData();
+        }
+
+        this.renderJapanAnalytics();
+    }
+
+    setJpTrendGranularity(granularity) {
+        this.jpTrendGranularity = granularity;
+        const ctrl = document.getElementById('jp-trend-granularity-control');
+        if (ctrl) {
+            ctrl.querySelectorAll('.segment-btn').forEach(btn => {
+                if (btn.getAttribute('data-granularity') === granularity) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+        }
+        this.renderJapanAnalytics();
+    }
+
+    openCategoryDrilldown(catId) {
+        this.selectedDrilldownCategoryId = catId;
+        const drilldownSection = document.getElementById('jp-drilldown-section');
+        if (drilldownSection) {
+            drilldownSection.style.display = 'block';
+            this.renderJapanAnalytics();
+            drilldownSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    closeCategoryDrilldown() {
+        this.selectedDrilldownCategoryId = null;
+        const drilldownSection = document.getElementById('jp-drilldown-section');
+        if (drilldownSection) drilldownSection.style.display = 'none';
+    }
+
+    renderCategoryDrilldownView(analyticalTxs) {
+        const drilldownSection = document.getElementById('jp-drilldown-section');
+        if (!drilldownSection || !this.selectedDrilldownCategoryId) return;
+
+        const catName = this.getCategoryName(this.selectedDrilldownCategoryId, 'JP');
+        const catTxs = analyticalTxs.filter(t => t.categoryId === this.selectedDrilldownCategoryId);
+
+        const titleEl = document.getElementById('jp-drilldown-title');
+        const subtitleEl = document.getElementById('jp-drilldown-subtitle');
+        const listEl = document.getElementById('jp-drilldown-tx-list');
+
+        if (titleEl) titleEl.innerText = `${catName} Transactions`;
+        if (subtitleEl) subtitleEl.innerText = `${catTxs.length} ${catTxs.length === 1 ? 'transaction' : 'transactions'} found`;
+
+        if (listEl) {
+            if (catTxs.length === 0) {
+                listEl.innerHTML = '<p class="text-muted text-sm text-center" style="padding: 16px;">No transactions recorded in this period.</p>';
+            } else {
+                let html = '';
+                catTxs.forEach(tx => {
+                    html += `
+                        <div class="ledger-tx-row" onclick="app.openTransactionDetail('${tx.id}')">
+                            <div class="ledger-tx-left">
+                                <div class="tx-type-icon expense"><i data-lucide="arrow-up-right"></i></div>
+                                <div class="ledger-tx-details">
+                                    <div class="ledger-tx-primary-line">
+                                        <span class="ledger-tx-title">${tx.note || catName}</span>
+                                    </div>
+                                    <div class="tx-meta-pills">
+                                        <span class="tx-pill">${tx.date}</span>
+                                        <span class="tx-pill">${this.getWalletName(tx.walletId)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ledger-tx-right">
+                                <span class="ledger-tx-amount expense privacy-blur">-${this.formatMoney(tx.amount, tx.currency || '¥')}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                listEl.innerHTML = html;
+            }
+        }
+    }
+
+    renderIndiaAnalytics() {
+        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod);
+        const { startDate, endDate, prevStartDate, prevEndDate } = periodRange;
+
+        // Query Indian transactions
+        const inTxs = walletManager.getTransactions({
+            region: 'IN',
+            startDate: startDate || undefined,
+            endDate: endDate || undefined
+        });
+
+        const inExpenses = inTxs.filter(t => t.type === 'expense');
+        const totalExpenses = inExpenses.reduce((s, t) => s + Number(t.amount || 0), 0);
+        const txCount = inTxs.length;
+
+        // Weekly average (paced over active period weeks)
+        const weeklyAvg = Math.round(totalExpenses / 4);
+
+        // Previous period comparison
+        let delta = null;
+        if (prevStartDate && prevEndDate) {
+            const prevInTxs = walletManager.getTransactions({
+                region: 'IN',
+                startDate: prevStartDate,
+                endDate: prevEndDate
+            });
+            const prevTotal = prevInTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+            if (prevTotal > 0) delta = (((totalExpenses - prevTotal) / prevTotal) * 100).toFixed(1);
+        }
+
+        // Update India KPI elements
+        const kpiExpenses = document.getElementById('in-kpi-expenses');
+        const kpiWeeklyAvg = document.getElementById('in-kpi-weekly-avg');
+        const kpiComparison = document.getElementById('in-kpi-comparison');
+        const kpiComparisonMeta = document.getElementById('in-kpi-comparison-meta');
+        const kpiCount = document.getElementById('in-kpi-count');
+
+        if (kpiExpenses) kpiExpenses.innerText = this.formatMoney(totalExpenses, '₹');
+        if (kpiWeeklyAvg) kpiWeeklyAvg.innerText = this.formatMoney(weeklyAvg, '₹');
+        if (kpiCount) kpiCount.innerText = txCount;
+
+        if (kpiComparison) {
+            if (delta !== null) {
+                const isLess = Number(delta) <= 0;
+                kpiComparison.innerHTML = `<span class="${isLess ? 'delta-positive' : 'delta-negative'}">${Number(delta) >= 0 ? '↑' : '↓'} ${Math.abs(delta)}%</span>`;
+                if (kpiComparisonMeta) kpiComparisonMeta.innerText = isLess ? 'Lower than last month' : 'Higher than last month';
+            } else {
+                kpiComparison.innerText = '--';
+                if (kpiComparisonMeta) kpiComparisonMeta.innerText = 'No previous month data';
+            }
+        }
+
+        // Render India Weekly Spending Trend
+        if (typeof charts !== 'undefined' && typeof charts.renderInSpendingTrend === 'function') {
+            charts.renderInSpendingTrend(inTxs, this.analyticsPeriod);
+        }
+
+        // Render Recent India Transactions
+        const recentList = document.getElementById('in-recent-tx-list');
+        if (recentList) {
+            const latestIndian = inTxs.slice(0, 8);
+            if (latestIndian.length === 0) {
+                recentList.innerHTML = '<p class="text-muted text-sm text-center" style="padding: 24px;">No Indian transactions recorded in this period.</p>';
+            } else {
+                let html = '';
+                latestIndian.forEach(tx => {
+                    let sign = tx.type === 'income' ? '+' : '-';
+                    let typeCls = tx.type === 'income' ? 'income' : 'expense';
+                    html += `
+                        <div class="ledger-tx-row" onclick="app.openTransactionDetail('${tx.id}')">
+                            <div class="ledger-tx-left">
+                                <div class="tx-type-icon ${typeCls}"><i data-lucide="${tx.type === 'income' ? 'arrow-down-left' : 'arrow-up-right'}"></i></div>
+                                <div class="ledger-tx-details">
+                                    <div class="ledger-tx-primary-line">
+                                        <span class="ledger-tx-title">${tx.note || this.getCategoryName(tx.categoryId, 'IN')}</span>
+                                    </div>
+                                    <div class="tx-meta-pills">
+                                        <span class="tx-pill">${tx.date}</span>
+                                        <span class="tx-pill">${this.getWalletName(tx.walletId)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ledger-tx-right">
+                                <span class="ledger-tx-amount ${typeCls} privacy-blur">${this.formatMoney(tx.amount, tx.currency || '₹', { prefix: sign })}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                recentList.innerHTML = html;
+            }
+        }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    viewTransactionsWithFilter(filterObj = {}) {
+        this.resetAllLedgerFilters();
+        Object.assign(this.ledgerFilters, filterObj);
+        this.switchView('transactions-view');
+        this.renderTransactionsPage();
+    }
 }
 const app = new App();
+window.app = app;
+

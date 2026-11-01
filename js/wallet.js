@@ -27,44 +27,118 @@ class WalletManager {
             txs = txs.filter(tx => tx.date && tx.date.startsWith(filters.monthKey));
         }
 
-        if (filters.walletId) {
+        if (filters.walletIds && Array.isArray(filters.walletIds) && filters.walletIds.length > 0) {
+            txs = txs.filter(tx => filters.walletIds.includes(tx.walletId) || filters.walletIds.includes(tx.sourceId) || filters.walletIds.includes(tx.destId));
+        } else if (filters.walletId && filters.walletId !== 'all') {
             txs = txs.filter(tx => tx.walletId === filters.walletId || tx.sourceId === filters.walletId || tx.destId === filters.walletId);
         }
 
-        if (filters.categoryId) {
+        if (filters.categoryIds && Array.isArray(filters.categoryIds) && filters.categoryIds.length > 0) {
+            txs = txs.filter(tx => filters.categoryIds.includes(tx.categoryId));
+        } else if (filters.categoryId && filters.categoryId !== 'all') {
             txs = txs.filter(tx => tx.categoryId === filters.categoryId);
         }
 
-        if (filters.type) {
+        if (filters.excludeCategoryIds) {
+            const excludeSet = filters.excludeCategoryIds instanceof Set 
+                ? filters.excludeCategoryIds 
+                : new Set(filters.excludeCategoryIds);
+            if (excludeSet.size > 0) {
+                txs = txs.filter(tx => !tx.categoryId || !excludeSet.has(tx.categoryId));
+            }
+        }
+
+        if (filters.types && Array.isArray(filters.types) && filters.types.length > 0) {
+            txs = txs.filter(tx => filters.types.includes(tx.type));
+        } else if (filters.type && filters.type !== 'all') {
             txs = txs.filter(tx => tx.type === filters.type);
         }
 
-        if (filters.region) {
+        if (filters.region && filters.region !== 'all') {
             txs = txs.filter(tx => {
                 if (tx.region) return tx.region === filters.region;
                 if (tx.walletId && storage.state?.wallets?.[tx.walletId]) {
                     return storage.state.wallets[tx.walletId].region === filters.region;
                 }
+                if (tx.sourceId && storage.state?.wallets?.[tx.sourceId]) {
+                    return storage.state.wallets[tx.sourceId].region === filters.region;
+                }
                 return false;
             });
         }
 
-        const searchText = (filters.search || filters.text || filters.query || '').trim().toLowerCase();
-        if (searchText) {
+        if (filters.currency && filters.currency !== 'all') {
+            const cur = filters.currency.toUpperCase();
             txs = txs.filter(tx => {
-                if (tx.note && tx.note.toLowerCase().includes(searchText)) return true;
-                if (tx.categoryId && tx.categoryId.toLowerCase().includes(searchText)) return true;
-                if (tx.walletId && tx.walletId.toLowerCase().includes(searchText)) return true;
-                if (tx.sourceId && tx.sourceId.toLowerCase().includes(searchText)) return true;
-                if (tx.destId && tx.destId.toLowerCase().includes(searchText)) return true;
-                if (tx.amount && String(tx.amount).includes(searchText)) return true;
-                if (tx.sourceAmount && String(tx.sourceAmount).includes(searchText)) return true;
-                if (tx.destAmount && String(tx.destAmount).includes(searchText)) return true;
-                if (tx.categoryId && tx.region && storage.state?.categories?.[tx.region]) {
-                    const cat = storage.state.categories[tx.region].find(c => c.id === tx.categoryId);
-                    if (cat && cat.name && cat.name.toLowerCase().includes(searchText)) return true;
+                const c = (tx.currency || '').toUpperCase();
+                const sc = (tx.sourceCurrency || '').toUpperCase();
+                const dc = (tx.destCurrency || '').toUpperCase();
+                return c === cur || sc === cur || dc === cur ||
+                       (cur === 'JPY' && (c === '¥' || sc === '¥')) ||
+                       (cur === 'INR' && (c === '₹' || dc === '₹'));
+            });
+        }
+
+        if (typeof filters.minAmount === 'number' && !isNaN(filters.minAmount)) {
+            txs = txs.filter(tx => {
+                const amt = tx.amount !== undefined ? Number(tx.amount) : Number(tx.sourceAmount || 0);
+                return amt >= filters.minAmount;
+            });
+        }
+
+        if (typeof filters.maxAmount === 'number' && !isNaN(filters.maxAmount)) {
+            txs = txs.filter(tx => {
+                const amt = tx.amount !== undefined ? Number(tx.amount) : Number(tx.sourceAmount || 0);
+                return amt <= filters.maxAmount;
+            });
+        }
+
+        const rawSearch = (filters.search || filters.text || filters.query || '').trim();
+        if (rawSearch) {
+            const terms = rawSearch.toLowerCase().split(/\s+/).filter(Boolean);
+            txs = txs.filter(tx => {
+                // Collect searchable text for this transaction
+                let tokens = [
+                    tx.note || '',
+                    tx.categoryId || '',
+                    tx.walletId || '',
+                    tx.sourceId || '',
+                    tx.destId || '',
+                    tx.type || '',
+                    tx.date || '',
+                    tx.currency || '',
+                    tx.sourceCurrency || '',
+                    tx.destCurrency || '',
+                    tx.amount !== undefined ? String(tx.amount) : '',
+                    tx.sourceAmount !== undefined ? String(tx.sourceAmount) : '',
+                    tx.destAmount !== undefined ? String(tx.destAmount) : '',
+                    tx.region === 'JP' ? 'japan jpy ¥' : (tx.region === 'IN' ? 'india inr ₹' : '')
+                ];
+
+                // Add Category Names from storage
+                if (tx.categoryId && storage.state?.categories) {
+                    ['JP', 'IN'].forEach(reg => {
+                        const cat = storage.state.categories[reg]?.find(c => c.id === tx.categoryId);
+                        if (cat?.name) tokens.push(cat.name);
+                    });
                 }
-                return false;
+
+                // Add Wallet Names from storage
+                if (storage.state?.wallets) {
+                    if (tx.walletId && storage.state.wallets[tx.walletId]) {
+                        tokens.push(storage.state.wallets[tx.walletId].name || tx.walletId);
+                    }
+                    if (tx.sourceId && storage.state.wallets[tx.sourceId]) {
+                        tokens.push(storage.state.wallets[tx.sourceId].name || tx.sourceId);
+                    }
+                    if (tx.destId && storage.state.wallets[tx.destId]) {
+                        tokens.push(storage.state.wallets[tx.destId].name || tx.destId);
+                    }
+                }
+
+                const searchableHaystack = tokens.join(' ').toLowerCase();
+                // Every search term should match
+                return terms.every(term => searchableHaystack.includes(term));
             });
         }
 
@@ -472,3 +546,4 @@ class WalletManager {
 }
 
 const walletManager = new WalletManager();
+window.walletManager = walletManager;
