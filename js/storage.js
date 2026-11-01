@@ -55,6 +55,7 @@ const defaultState = {
     },
     transactions: [],
     closedMonths: {},
+    reportSnapshots: {},
     history: []
 };
 
@@ -159,147 +160,147 @@ class StorageManager {
 
     parseAndMergeData(parsed) {
         try {
-                // Merge top-level fields but always trust saved wallets/categories
-                let mergedState = {
-                    ...defaultState,
-                    ...parsed,
-                    // Wallets: use parsed.wallets if it exists and is populated, else fallback to defaults.
-                    // This prevents deleted default wallets from magically reappearing.
-                    wallets: parsed.wallets && Object.keys(parsed.wallets).length > 0
-                        ? parsed.wallets
-                        : JSON.parse(JSON.stringify(defaultState.wallets)),
-                    // Categories: use saved if valid arrays, else use defaults
-                    categories: {
-                        JP: Array.isArray(parsed.categories?.JP) && parsed.categories.JP.length > 0
-                            ? parsed.categories.JP
-                            : JSON.parse(JSON.stringify(defaultState.categories.JP)),
-                        IN: Array.isArray(parsed.categories?.IN) && parsed.categories.IN.length > 0
-                            ? parsed.categories.IN
-                            : JSON.parse(JSON.stringify(defaultState.categories.IN)),
-                    }
-                };
-                
-                if (mergedState.wallets && mergedState.wallets['Forex Card']) {
-                    delete mergedState.wallets['Forex Card'];
+            // Merge top-level fields but always trust saved wallets/categories
+            let mergedState = {
+                ...defaultState,
+                ...parsed,
+                // Wallets: use parsed.wallets if it exists and is populated, else fallback to defaults.
+                // This prevents deleted default wallets from magically reappearing.
+                wallets: parsed.wallets && Object.keys(parsed.wallets).length > 0
+                    ? parsed.wallets
+                    : JSON.parse(JSON.stringify(defaultState.wallets)),
+                // Categories: use saved if valid arrays, else use defaults
+                categories: {
+                    JP: Array.isArray(parsed.categories?.JP) && parsed.categories.JP.length > 0
+                        ? parsed.categories.JP
+                        : JSON.parse(JSON.stringify(defaultState.categories.JP)),
+                    IN: Array.isArray(parsed.categories?.IN) && parsed.categories.IN.length > 0
+                        ? parsed.categories.IN
+                        : JSON.parse(JSON.stringify(defaultState.categories.IN)),
                 }
+            };
 
-                // MIGRATION: Add color field to wallets that don't have one
-                const legacyColors = {
-                    'Salary Account': '#009944', 'PayPay': '#ff0033', 'Cash': '#d4af37',
-                    'Axis Bank': '#97144d', 'Bank of Baroda': '#f05a28', 'Credit Card': '#94a3b8'
+            if (mergedState.wallets && mergedState.wallets['Forex Card']) {
+                delete mergedState.wallets['Forex Card'];
+            }
+
+            // MIGRATION: Add color field to wallets that don't have one
+            const legacyColors = {
+                'Salary Account': '#009944', 'PayPay': '#ff0033', 'Cash': '#d4af37',
+                'Axis Bank': '#97144d', 'Bank of Baroda': '#f05a28', 'Credit Card': '#94a3b8'
+            };
+            Object.values(mergedState.wallets).forEach(w => {
+                if (!w.color) w.color = legacyColors[w.id] || '#3351d6';
+            });
+            // Utility Categories Reverse Migration (Undo the previous merge)
+            const hasJpUtilities = mergedState.categories.JP.some(c => c.id === 'jp-utilities');
+            if (hasJpUtilities) {
+                // Remove 'jp-utilities'
+                mergedState.categories.JP = mergedState.categories.JP.filter(c => c.id !== 'jp-utilities');
+                // Add the original 4 utilities back
+                const oldUtils = [
+                    { id: 'jp-utility-electric', name: 'Electricity', icon: 'zap', budget: 0 },
+                    { id: 'jp-utility-gas', name: 'Gas', icon: 'flame', budget: 0 },
+                    { id: 'jp-utility-water', name: 'Water', icon: 'droplet', budget: 0 },
+                    { id: 'jp-utility-internet', name: 'Internet', icon: 'wifi', budget: 0 }
+                ];
+                // Insert at index 4 (after Rent)
+                mergedState.categories.JP.splice(4, 0, ...oldUtils);
+
+                // Recover transactions
+                const revMap = {
+                    'Electricity': 'jp-utility-electric',
+                    'Gas': 'jp-utility-gas',
+                    'Water': 'jp-utility-water',
+                    'Internet': 'jp-utility-internet'
                 };
-                Object.values(mergedState.wallets).forEach(w => {
-                    if (!w.color) w.color = legacyColors[w.id] || '#3351d6';
-                });
-                // Utility Categories Reverse Migration (Undo the previous merge)
-                const hasJpUtilities = mergedState.categories.JP.some(c => c.id === 'jp-utilities');
-                if (hasJpUtilities) {
-                    // Remove 'jp-utilities'
-                    mergedState.categories.JP = mergedState.categories.JP.filter(c => c.id !== 'jp-utilities');
-                    // Add the original 4 utilities back
-                    const oldUtils = [
-                        { id: 'jp-utility-electric', name: 'Electricity', icon: 'zap', budget: 0 },
-                        { id: 'jp-utility-gas', name: 'Gas', icon: 'flame', budget: 0 },
-                        { id: 'jp-utility-water', name: 'Water', icon: 'droplet', budget: 0 },
-                        { id: 'jp-utility-internet', name: 'Internet', icon: 'wifi', budget: 0 }
-                    ];
-                    // Insert at index 4 (after Rent)
-                    mergedState.categories.JP.splice(4, 0, ...oldUtils);
-                    
-                    // Recover transactions
-                    const revMap = {
-                        'Electricity': 'jp-utility-electric',
-                        'Gas': 'jp-utility-gas',
-                        'Water': 'jp-utility-water',
-                        'Internet': 'jp-utility-internet'
-                    };
-                    
-                    if (mergedState.transactions && mergedState.transactions.length > 0) {
-                        mergedState.transactions.forEach(tx => {
-                            if (tx.categoryId === 'jp-utilities' && tx.note) {
-                                for (const [oldName, oldId] of Object.entries(revMap)) {
-                                    if (tx.note.includes(oldName)) {
-                                        tx.categoryId = oldId;
-                                        // Clean up the note
-                                        if (tx.note === oldName) {
-                                            tx.note = '';
-                                        } else if (tx.note.startsWith(`${oldName} - `)) {
-                                            tx.note = tx.note.substring(oldName.length + 3);
-                                        }
-                                        break;
+
+                if (mergedState.transactions && mergedState.transactions.length > 0) {
+                    mergedState.transactions.forEach(tx => {
+                        if (tx.categoryId === 'jp-utilities' && tx.note) {
+                            for (const [oldName, oldId] of Object.entries(revMap)) {
+                                if (tx.note.includes(oldName)) {
+                                    tx.categoryId = oldId;
+                                    // Clean up the note
+                                    if (tx.note === oldName) {
+                                        tx.note = '';
+                                    } else if (tx.note.startsWith(`${oldName} - `)) {
+                                        tx.note = tx.note.substring(oldName.length + 3);
                                     }
+                                    break;
                                 }
                             }
-                        });
-                    }
+                        }
+                    });
                 }
-                if (!mergedState.categories.IN.some(c => c.id === 'in-loan')) {
-                    mergedState.categories.IN.splice(1, 0, { id: 'in-loan', name: 'Loan EMI', icon: 'landmark' });
+            }
+            if (!mergedState.categories.IN.some(c => c.id === 'in-loan')) {
+                mergedState.categories.IN.splice(1, 0, { id: 'in-loan', name: 'Loan EMI', icon: 'landmark' });
+            }
+
+            if (!mergedState.loanConfig || Object.keys(mergedState.loanConfig).length === 0) {
+                mergedState.loanConfig = defaultState.loanConfig;
+            } else if (typeof mergedState.loanConfig.emiDrawDate === 'undefined') {
+                mergedState.loanConfig.emiDrawDate = 7;
+            }
+
+            // MIGRATION: Move Rent from JP to IN
+            const jpRentIndex = mergedState.categories.JP.findIndex(c => c.id === 'jp-rent');
+            if (jpRentIndex !== -1) {
+                const rentCat = mergedState.categories.JP.splice(jpRentIndex, 1)[0];
+                if (!mergedState.categories.IN.some(c => c.id === 'in-rent')) {
+                    mergedState.categories.IN.push({ id: 'in-rent', name: 'Rent', icon: rentCat.icon || 'home' });
                 }
-                
-                if (!mergedState.loanConfig || Object.keys(mergedState.loanConfig).length === 0) {
-                    mergedState.loanConfig = defaultState.loanConfig;
-                } else if (typeof mergedState.loanConfig.emiDrawDate === 'undefined') {
-                    mergedState.loanConfig.emiDrawDate = 7;
+
+                // Update transactions
+                if (mergedState.transactions) {
+                    mergedState.transactions.forEach(tx => {
+                        if (tx.categoryId === 'jp-rent') {
+                            tx.categoryId = 'in-rent';
+                            tx.region = 'IN';
+                        }
+                    });
                 }
-                
-                // MIGRATION: Move Rent from JP to IN
-                const jpRentIndex = mergedState.categories.JP.findIndex(c => c.id === 'jp-rent');
-                if (jpRentIndex !== -1) {
-                    const rentCat = mergedState.categories.JP.splice(jpRentIndex, 1)[0];
-                    if (!mergedState.categories.IN.some(c => c.id === 'in-rent')) {
-                        mergedState.categories.IN.push({ id: 'in-rent', name: 'Rent', icon: rentCat.icon || 'home' });
-                    }
-                    
-                    // Update transactions
-                    if (mergedState.transactions) {
-                        mergedState.transactions.forEach(tx => {
+                if (mergedState.history) {
+                    mergedState.history.forEach(h => {
+                        h.transactions.forEach(tx => {
                             if (tx.categoryId === 'jp-rent') {
                                 tx.categoryId = 'in-rent';
                                 tx.region = 'IN';
                             }
                         });
-                    }
-                    if (mergedState.history) {
-                        mergedState.history.forEach(h => {
-                            h.transactions.forEach(tx => {
-                                if (tx.categoryId === 'jp-rent') {
-                                    tx.categoryId = 'in-rent';
-                                    tx.region = 'IN';
-                                }
-                            });
-                        });
-                    }
-                }
-                
-                // MIGRATION: Merge duplicate history ledgers with the same monthKey
-                if (mergedState.history && mergedState.history.length > 0) {
-                    const uniqueHistory = [];
-                    mergedState.history.forEach(snapshot => {
-                        const existing = uniqueHistory.find(h => h.monthKey === snapshot.monthKey);
-                        if (existing) {
-                            // Merge transactions
-                            if (Array.isArray(snapshot.transactions)) {
-                                existing.transactions = (existing.transactions || []).concat(snapshot.transactions);
-                            }
-                        } else {
-                            uniqueHistory.push(snapshot);
-                        }
                     });
-                    
-                    // Sort descending by monthKey
-                    uniqueHistory.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-                    mergedState.history = uniqueHistory;
                 }
-                
-                // MIGRATION: Migrate to Continuous Ledger (v3)
-                mergedState = this.migrateToContinuousLedger(mergedState);
-                if (mergedState.closedMonths) {
-                    mergedState.history = Object.values(mergedState.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-                }
-                this._attachHistoryGetters(mergedState);
+            }
 
-                return mergedState;
+            // MIGRATION: Merge duplicate history ledgers with the same monthKey
+            if (mergedState.history && mergedState.history.length > 0) {
+                const uniqueHistory = [];
+                mergedState.history.forEach(snapshot => {
+                    const existing = uniqueHistory.find(h => h.monthKey === snapshot.monthKey);
+                    if (existing) {
+                        // Merge transactions
+                        if (Array.isArray(snapshot.transactions)) {
+                            existing.transactions = (existing.transactions || []).concat(snapshot.transactions);
+                        }
+                    } else {
+                        uniqueHistory.push(snapshot);
+                    }
+                });
+
+                // Sort descending by monthKey
+                uniqueHistory.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+                mergedState.history = uniqueHistory;
+            }
+
+            // MIGRATION: Migrate to Continuous Ledger (v3)
+            mergedState = this.migrateToContinuousLedger(mergedState);
+            if (mergedState.closedMonths) {
+                mergedState.history = Object.values(mergedState.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+            }
+            this._attachHistoryGetters(mergedState);
+
+            return mergedState;
         } catch (e) {
             console.error("Failed to parse data", e);
         }
@@ -523,11 +524,11 @@ class StorageManager {
                         monthKey: h.monthKey,
                         label: archiveMetadata.label !== undefined ? archiveMetadata.label : h.monthKey,
                         closedAt: archiveMetadata.closedAt !== undefined ? archiveMetadata.closedAt : `${h.monthKey}-28T23:59:59.000Z`,
-                        walletsSnapshot: archiveMetadata.walletsSnapshot !== undefined 
+                        walletsSnapshot: archiveMetadata.walletsSnapshot !== undefined
                             ? (archiveMetadata.walletsSnapshot ? JSON.parse(JSON.stringify(archiveMetadata.walletsSnapshot)) : null)
                             : null,
-                        jpTotalBudget: archiveMetadata.jpTotalBudget !== undefined 
-                            ? archiveMetadata.jpTotalBudget 
+                        jpTotalBudget: archiveMetadata.jpTotalBudget !== undefined
+                            ? archiveMetadata.jpTotalBudget
                             : (archiveMetadata.budget !== undefined ? archiveMetadata.budget : 0),
                         jpRolloverAdded: archiveMetadata.jpRolloverAdded !== undefined ? archiveMetadata.jpRolloverAdded : 0,
                         budgetLimits: archiveMetadata.budgetLimits !== undefined ? archiveMetadata.budgetLimits : null,
@@ -606,17 +607,17 @@ class StorageManager {
             this.initialSyncDone = true;
             return false;
         }
-        
+
         const userId = supabaseClient.session.user.id;
         this.onUserLogin(userId);
-        
+
         try {
             const { data, error } = await supabaseClient.client
                 .from('app_state')
                 .select('state, updated_at')
                 .eq('user_id', userId)
                 .single();
-                
+
             if (error) {
                 if (error.code === 'PGRST116') {
                     // No row exists yet for this user in cloud — push local state up
@@ -629,15 +630,15 @@ class StorageManager {
                 }
                 return false;
             }
-            
+
             if (data && data.state) {
                 // Validate the remote state looks real (has wallets & transactions keys)
                 const remote = data.state;
                 const remoteIsValid = remote && remote.wallets && Array.isArray(remote.transactions);
-                
+
                 const key = this.getActiveStorageKey();
                 const backupKey = `${key}_backup_pre_v3`;
-                const remoteNeedsMigration = remote && (!remote.schemaVersion || remote.schemaVersion < 3 || 
+                const remoteNeedsMigration = remote && (!remote.schemaVersion || remote.schemaVersion < 3 ||
                     (Array.isArray(remote.history) && remote.history.some(h => {
                         const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
                         return desc && Array.isArray(desc.value) && desc.value.length > 0;
@@ -714,7 +715,7 @@ class StorageManager {
 
                 if (shouldUseRemote) {
                     console.log(`[Sync] Remote state wins (${remoteTxCount} txs vs local ${localTxCount} txs). Loading...`);
-                    
+
                     // Preserve untouched authoritative pre-migration remote backup
                     if (remoteNeedsMigration && typeof localStorage !== 'undefined') {
                         try {
@@ -777,7 +778,7 @@ class StorageManager {
         if (typeof supabaseClient === 'undefined' || !supabaseClient.session || !supabaseClient.session.user) {
             return;
         }
-        
+
         const userId = supabaseClient.session.user.id;
         if (!userId) return;
 
@@ -795,7 +796,7 @@ class StorageManager {
                     state: this.state,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
-                
+
             if (error) {
                 console.error("[Sync] Failed to push to Supabase:", error);
             }
@@ -930,8 +931,8 @@ class StorageManager {
         const anchor = document.createElement('a');
         anchor.setAttribute("href", dataStr);
         anchor.setAttribute("download", `ExpenseManager_Backup_${new Date().toISOString().split('T')[0]}.json`);
-        document.body.appendChild(anchor); 
-        anchor.click(); 
+        document.body.appendChild(anchor);
+        anchor.click();
         anchor.remove();
     }
 

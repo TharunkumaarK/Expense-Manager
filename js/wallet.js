@@ -164,8 +164,21 @@ class WalletManager {
         }
     }
 
+    // Check if a month is closed/sealed
+    isMonthClosed(monthKey) {
+        if (!monthKey || !storage.state || !storage.state.closedMonths) return false;
+        const entry = storage.state.closedMonths[monthKey];
+        return !!(entry && entry.status === 'closed');
+    }
+
     // Add a standard expense (debit)
     addExpense(walletId, categoryId, amount, note, date = new Date().toISOString().split('T')[0]) {
+        const monthKey = (date || '').slice(0, 7);
+        if (this.isMonthClosed(monthKey)) {
+            console.warn(`[WalletManager] Month ${monthKey} is closed. Cannot add expense.`);
+            return false;
+        }
+
         const wallet = storage.state.wallets[walletId];
         if (!wallet) return false;
 
@@ -191,6 +204,12 @@ class WalletManager {
 
     // Add income (credit)
     addIncome(walletId, amount, note, date = new Date().toISOString().split('T')[0]) {
+        const monthKey = (date || '').slice(0, 7);
+        if (this.isMonthClosed(monthKey)) {
+            console.warn(`[WalletManager] Month ${monthKey} is closed. Cannot add income.`);
+            return false;
+        }
+
         const wallet = storage.state.wallets[walletId];
         if (!wallet) return false;
 
@@ -215,6 +234,12 @@ class WalletManager {
 
     // Transfer between wallets (same currency)
     transfer(sourceId, destId, amount, note, date = new Date().toISOString().split('T')[0]) {
+        const monthKey = (date || '').slice(0, 7);
+        if (this.isMonthClosed(monthKey)) {
+            console.warn(`[WalletManager] Month ${monthKey} is closed. Cannot create transfer.`);
+            return false;
+        }
+
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
         
@@ -242,6 +267,12 @@ class WalletManager {
 
     // Remittance (cross currency)
     remittance(sourceId, destId, sourceAmount, destAmount, note, date = new Date().toISOString().split('T')[0]) {
+        const monthKey = (date || '').slice(0, 7);
+        if (this.isMonthClosed(monthKey)) {
+            console.warn(`[WalletManager] Month ${monthKey} is closed. Cannot create remittance.`);
+            return false;
+        }
+
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
         
@@ -372,6 +403,15 @@ class WalletManager {
         if (!found) return false;
 
         const tx = found.tx;
+        const origMonth = (tx.date || '').slice(0, 7);
+        if (this.isMonthClosed(origMonth)) {
+            console.warn(`[WalletManager] Month ${origMonth} is closed. Cannot edit transaction.`);
+            return false;
+        }
+        if (updatedData.date && this.isMonthClosed(updatedData.date.slice(0, 7))) {
+            console.warn(`[WalletManager] Target month ${updatedData.date.slice(0, 7)} is closed. Cannot move transaction.`);
+            return false;
+        }
 
         // 1. Reverse old financial balance impacts
         this.reverseTransactionEffects(tx);
@@ -433,6 +473,12 @@ class WalletManager {
     deleteTransaction(txId) {
         const found = this.findTransaction(txId);
         if (!found) return false;
+
+        const origMonth = (found.tx.date || '').slice(0, 7);
+        if (this.isMonthClosed(origMonth)) {
+            console.warn(`[WalletManager] Month ${origMonth} is closed. Cannot delete transaction.`);
+            return false;
+        }
 
         this.reverseTransactionEffects(found.tx);
 

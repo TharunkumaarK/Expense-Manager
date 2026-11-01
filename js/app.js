@@ -66,7 +66,7 @@ class App {
         // Phase 4: Reports, Budgets & Closing Wizard state
         this.reportRegion = 'JP';
         this.reportMonthKey = (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
-        this.reportSnapshotsCache = {};
+        this.reportSnapshotsCache = (storage.state && storage.state.reportSnapshots) || {};
         this.budgetsRegion = 'JP';
         this.budgetsMonthKey = (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
         this.selectedCatIcon = 'tag';
@@ -699,6 +699,11 @@ class App {
         if (!found) return;
 
         const tx = found.tx;
+        const txMonth = (tx.date || '').slice(0, 7);
+        if (walletManager.isMonthClosed(txMonth)) {
+            alert(`Cannot edit transaction in closed month ${txMonth}. This historical period is permanently sealed.`);
+            return;
+        }
 
         this.openTransactionModal(tx.type);
         document.getElementById('modal-title').innerText = 'Edit Transaction';
@@ -802,6 +807,20 @@ class App {
 
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             alert('Please select a valid date.');
+            return;
+        }
+
+        if (editId) {
+            const found = walletManager.findTransaction(editId);
+            if (found && walletManager.isMonthClosed((found.tx.date || '').slice(0, 7))) {
+                alert(`Cannot edit transaction in closed month ${(found.tx.date || '').slice(0, 7)}. This historical period is permanently sealed.`);
+                return;
+            }
+        }
+
+        const txMonth = (date || '').slice(0, 7);
+        if (walletManager.isMonthClosed(txMonth)) {
+            alert(`Cannot record transactions in closed month ${txMonth}. This historical period is permanently sealed.`);
             return;
         }
 
@@ -960,6 +979,12 @@ class App {
     }
 
     deleteTx(id) {
+        const found = walletManager.findTransaction(id);
+        if (found && walletManager.isMonthClosed((found.tx.date || '').slice(0, 7))) {
+            alert(`Cannot delete transaction in closed month ${(found.tx.date || '').slice(0, 7)}. This historical period is permanently sealed.`);
+            return;
+        }
+
         if (confirm("Are you sure you want to delete this transaction?")) {
             walletManager.deleteTransaction(id);
             this.closeModal('transaction-modal');
@@ -3982,6 +4007,12 @@ class App {
         const id = this.currentDetailTxId;
         if (!id) return;
 
+        const found = walletManager.findTransaction(id);
+        if (found && walletManager.isMonthClosed((found.tx.date || '').slice(0, 7))) {
+            alert(`Cannot delete transaction in closed month ${(found.tx.date || '').slice(0, 7)}. This historical period is permanently sealed.`);
+            return;
+        }
+
         if (confirm("Are you sure you want to delete this transaction from the continuous ledger?")) {
             walletManager.deleteTransaction(id);
             this.closeTransactionDetail();
@@ -4646,21 +4677,51 @@ class App {
     refreshReportSnapshot() {
         const cacheKey = `${this.reportRegion}_${this.reportMonthKey}`;
         const now = new Date().toLocaleString();
+
+        if (!storage.state.reportSnapshots) {
+            storage.state.reportSnapshots = {};
+        }
+        this.reportSnapshotsCache = storage.state.reportSnapshots;
+
+        const allTxs = storage.state.transactions || [];
+        const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
+        let expTotal = 0;
+        let incTotal = 0;
+        reportTxs.forEach(t => {
+            if (t.type === 'expense') expTotal += Number(t.amount || 0);
+            else if (t.type === 'income') incTotal += Number(t.amount || 0);
+        });
+
         if (!this.reportSnapshotsCache[cacheKey]) {
             this.reportSnapshotsCache[cacheKey] = {
                 generatedAt: now,
                 refreshedAt: now,
                 revisionsCount: 1,
-                log: [`Snapshot created: ${now}`]
+                revisions: [
+                    { rev: 1, timestamp: now, txCount: reportTxs.length, totalExpense: expTotal, totalIncome: incTotal }
+                ],
+                log: [`Initial calculation generated at ${now} (${reportTxs.length} transactions)`]
             };
         } else {
             const entry = this.reportSnapshotsCache[cacheKey];
             entry.refreshedAt = now;
             entry.revisionsCount = (entry.revisionsCount || 1) + 1;
+            entry.revisions = entry.revisions || [];
+            entry.revisions.unshift({
+                rev: entry.revisionsCount,
+                timestamp: now,
+                txCount: reportTxs.length,
+                totalExpense: expTotal,
+                totalIncome: incTotal
+            });
+            if (entry.revisions.length > 10) entry.revisions.pop();
             entry.log = entry.log || [];
-            entry.log.unshift(`Refreshed from continuous ledger at ${now} (Rev ${entry.revisionsCount})`);
-            if (entry.log.length > 5) entry.log.pop();
+            entry.log.unshift(`Refreshed from continuous ledger at ${now} (Rev ${entry.revisionsCount}, ${reportTxs.length} txs)`);
+            if (entry.log.length > 10) entry.log.pop();
         }
+
+        storage.state.reportSnapshots = this.reportSnapshotsCache;
+        storage.saveData();
         this.renderReportsPage();
     }
 
@@ -4772,7 +4833,12 @@ class App {
             historicalBudgetNote = `Unclosed historical period: No archived budget record exists for month ${this.reportMonthKey}. Current spending is ledger-calculated.`;
         }
 
-        // 6. Snapshot Timestamps & Cache
+        // 6. Snapshot Timestamps & Persistent Cache
+        if (!storage.state.reportSnapshots) {
+            storage.state.reportSnapshots = {};
+        }
+        this.reportSnapshotsCache = storage.state.reportSnapshots;
+
         const cacheKey = `${this.reportRegion}_${this.reportMonthKey}`;
         if (!this.reportSnapshotsCache[cacheKey]) {
             const now = new Date().toLocaleString();
@@ -4780,8 +4846,13 @@ class App {
                 generatedAt: now,
                 refreshedAt: now,
                 revisionsCount: 1,
-                log: [`Initial calculation generated at ${now}`]
+                revisions: [
+                    { rev: 1, timestamp: now, txCount: reportTxs.length, totalExpense, totalIncome }
+                ],
+                log: [`Initial calculation generated at ${now} (${reportTxs.length} transactions)`]
             };
+            storage.state.reportSnapshots = this.reportSnapshotsCache;
+            storage.saveData();
         }
         const snapshotMeta = this.reportSnapshotsCache[cacheKey];
 
@@ -4812,6 +4883,16 @@ class App {
                             <span>•</span>
                             <span>Currency: <strong>${currency} (${this.reportRegion})</strong></span>
                         </div>
+                        ${snapshotMeta.revisions && snapshotMeta.revisions.length > 1 ? `
+                            <div style="margin-top: 10px; padding: 8px 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-sm); font-size: 0.78rem;">
+                                <span style="color: var(--text-muted); font-weight: 600;">Revision History (${snapshotMeta.revisions.length} retained):</span>
+                                <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 3px; color: var(--text-secondary);">
+                                    ${snapshotMeta.revisions.slice(0, 3).map(r => `
+                                        <div>• Rev ${r.rev} (${r.timestamp}): ${r.txCount} txs, Spent ${this.formatMoney(r.totalExpense, currency)}</div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
 
@@ -5047,6 +5128,11 @@ class App {
 
     openClosingWizard() {
         const curMonth = (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
+        if (walletManager.isMonthClosed(curMonth)) {
+            alert(`Month ${curMonth} is already closed and sealed. Duplicate closing operations are prevented.`);
+            return;
+        }
+
         const [y, m] = curMonth.split('-').map(Number);
         const nextDate = new Date(Date.UTC(y, m, 1));
         const nextMonthKey = nextDate.toISOString().slice(0, 7);
@@ -5296,6 +5382,12 @@ class App {
     executeMonthlyClosing() {
         const curMonth = this.closingWizardState.monthKey;
         const nextMonth = this.closingWizardState.nextMonthKey;
+
+        if (walletManager.isMonthClosed(curMonth)) {
+            alert(`Month ${curMonth} is already closed and sealed. Duplicate closing operations are prevented.`);
+            this.closeClosingWizard();
+            return;
+        }
 
         // Calculate next budget limit
         let nextJpBudget = storage.state.jpTotalBudget || 0;
