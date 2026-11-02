@@ -146,11 +146,14 @@ class App {
         if (this.isPrivacyHidden) {
             return '******';
         }
+        let sym = currency || '';
+        if (sym === 'JPY') sym = '¥';
+        else if (sym === 'INR') sym = '₹';
         const num = Number(amount) || 0;
         const prefix = options.prefix || '';
-        const locale = options.locale || (currency === '₹' ? 'en-IN' : undefined);
+        const locale = options.locale || (sym === '₹' ? 'en-IN' : undefined);
         const formatted = num.toLocaleString(locale, options.formatOptions);
-        return `${prefix}${currency}${formatted}`;
+        return `${prefix}${sym}${formatted}`;
     }
 
     setupInactivityMonitoring() {
@@ -3724,21 +3727,40 @@ class App {
         if (!catId) return 'Uncategorized';
         if (storage.state?.categories) {
             if (region && storage.state.categories[region]) {
-                const found = storage.state.categories[region].find(c => c.id === catId);
+                const found = storage.state.categories[region].find(c => c.id === catId || c.name === catId || c.id === `jp-${catId}` || c.id === `in-${catId}`);
                 if (found?.name) return found.name;
             }
             for (const reg of ['JP', 'IN']) {
-                const found = storage.state.categories[reg]?.find(c => c.id === catId);
+                const found = storage.state.categories[reg]?.find(c => c.id === catId || c.name === catId || c.id === `jp-${catId}` || c.id === `in-${catId}`);
                 if (found?.name) return found.name;
             }
+        }
+        // Humanize slugs if not found directly
+        if (typeof catId === 'string') {
+            const cleaned = catId.replace(/^(jp|in)-/, '');
+            return cleaned.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
         }
         return catId;
     }
 
     // Helper: Wallet Name resolution
     getWalletName(walletId) {
-        if (!walletId || !storage.state?.wallets) return walletId || 'Wallet';
-        return storage.state.wallets[walletId]?.name || walletId;
+        if (!walletId) return 'Wallet';
+        if (storage.state?.wallets) {
+            if (storage.state.wallets[walletId]?.name) return storage.state.wallets[walletId].name;
+            const found = Object.values(storage.state.wallets).find(w => w.id === walletId || w.name === walletId);
+            if (found?.name) return found.name;
+        }
+        // Humanize if it's an ID like "jp-wallet-1" or "in-wallet-bank"
+        if (typeof walletId === 'string') {
+            if (walletId === 'jp-wallet-1') return 'Salary Account';
+            if (walletId === 'jp-wallet-2') return 'Cash';
+            if (walletId === 'jp-wallet-3') return 'PayPay';
+            if (walletId === 'in-wallet-1') return 'Bank Account';
+            const cleaned = walletId.replace(/^(jp|in)-wallet-?/, '');
+            return cleaned.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        }
+        return walletId;
     }
 
     // --------------------------------------------------------------------------
@@ -3861,8 +3883,14 @@ class App {
             groupTxs.forEach(t => {
                 if (t.type === 'income') dayNet += Number(t.amount || 0);
                 else if (t.type === 'expense') dayNet -= Number(t.amount || 0);
-                if (t.currency) dayCurrency = t.currency;
+                if (t.currency) {
+                    dayCurrency = (t.currency === 'INR' || t.currency === '₹' || t.region === 'IN') ? '₹' : '¥';
+                } else if (t.region === 'IN') {
+                    dayCurrency = '₹';
+                }
             });
+
+            const dayCurrencySym = (dayCurrency === 'INR' || dayCurrency === '₹') ? '₹' : '¥';
 
             html += `
                 <div class="ledger-date-group">
@@ -3872,31 +3900,32 @@ class App {
                             <span class="day-pill">${groupTxs.length} ${groupTxs.length === 1 ? 'tx' : 'txs'}</span>
                         </div>
                         <div class="ledger-date-subtotal privacy-blur">
-                            ${dayNet !== 0 ? (dayNet > 0 ? `+${this.formatMoney(dayNet, dayCurrency)}` : `-${this.formatMoney(Math.abs(dayNet), dayCurrency)}`) : ''}
+                            ${dayNet !== 0 ? (dayNet > 0 ? `+${this.formatMoney(dayNet, dayCurrencySym)}` : `-${this.formatMoney(Math.abs(dayNet), dayCurrencySym)}`) : ''}
                         </div>
                     </div>
             `;
 
             groupTxs.forEach(tx => {
-                let icon = 'arrow-up-right';
+                let icon = 'arrow-down-right';
                 let typeCls = 'expense';
                 let sign = '-';
                 let title = tx.note || this.getCategoryName(tx.categoryId, tx.region);
                 let categoryName = this.getCategoryName(tx.categoryId, tx.region);
+                let walletName = this.getWalletName(tx.walletId);
                 const flag = tx.region ? this.getCountryFlagSvg(tx.region, 14, 10.5) : '';
 
                 if (tx.type === 'income') {
-                    icon = 'arrow-down-left';
+                    icon = 'arrow-up-right';
                     typeCls = 'income';
                     sign = '+';
                     title = tx.note || 'Income Deposit';
                 } else if (tx.type === 'transfer') {
-                    icon = 'repeat';
+                    icon = 'arrow-left-right';
                     typeCls = 'transfer';
                     sign = '';
                     title = `${this.getWalletName(tx.sourceId)} → ${this.getWalletName(tx.destId)}`;
                 } else if (tx.type === 'remittance') {
-                    icon = 'globe';
+                    icon = 'send';
                     typeCls = 'remittance';
                     sign = '';
                     title = `${this.getWalletName(tx.sourceId)} (¥) → ${this.getWalletName(tx.destId)} (₹)`;
@@ -3911,29 +3940,44 @@ class App {
                         amountHtml = `¥${Number(tx.sourceAmount || 0).toLocaleString()} → ₹${Number(tx.destAmount || 0).toLocaleString()}`;
                     }
                 } else {
-                    amountHtml = this.formatMoney(tx.amount, tx.currency, { prefix: sign });
+                    const cur = (tx.currency === 'INR' || tx.currency === '₹' || tx.region === 'IN') ? '₹' : '¥';
+                    amountHtml = this.formatMoney(tx.amount, cur, { prefix: sign });
                 }
 
-                // Subtitle metadata pills
-                let metaPillsHtml = '';
+                // Refined typographic metadata line
+                let metaItemsHtml = '';
                 if (tx.type === 'expense') {
-                    metaPillsHtml += `<span class="tx-pill category-pill">${categoryName}</span>`;
-                    metaPillsHtml += `<span class="tx-pill">${this.getWalletName(tx.walletId)}</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item category">${categoryName}</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item account">${walletName}</span>`;
                     if (tx.note && tx.note !== title) {
-                        metaPillsHtml += `<span class="tx-pill note-pill">${tx.note}</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
                     }
                 } else if (tx.type === 'income') {
-                    metaPillsHtml += `<span class="tx-pill">${this.getWalletName(tx.walletId)}</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item category">Income</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item account">${walletName}</span>`;
                     if (tx.note && tx.note !== title) {
-                        metaPillsHtml += `<span class="tx-pill note-pill">${tx.note}</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
                     }
                 } else if (tx.type === 'transfer') {
-                    metaPillsHtml += `<span class="tx-pill">Internal Transfer</span>`;
-                    if (tx.note) metaPillsHtml += `<span class="tx-pill note-pill">${tx.note}</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item category">Internal Transfer</span>`;
+                    if (tx.note) {
+                        metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
+                    }
                 } else if (tx.type === 'remittance') {
-                    metaPillsHtml += `<span class="tx-pill">Remittance</span>`;
-                    if (tx.exchangeRate) metaPillsHtml += `<span class="tx-rate-tag">Rate: ${tx.exchangeRate}</span>`;
-                    if (tx.note) metaPillsHtml += `<span class="tx-pill note-pill">${tx.note}</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item category">Cross-Border Remittance</span>`;
+                    if (tx.exchangeRate) {
+                        metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item rate">Rate: ${tx.exchangeRate}</span>`;
+                    }
+                    if (tx.note) {
+                        metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
+                    }
                 }
 
                 html += `
@@ -3947,8 +3991,8 @@ class App {
                                     <span class="ledger-tx-title">${title}</span>
                                     ${flag ? `<span class="tx-flag-pill">${flag}</span>` : ''}
                                 </div>
-                                <div class="tx-meta-pills">
-                                    ${metaPillsHtml}
+                                <div class="ledger-tx-meta">
+                                    ${metaItemsHtml}
                                 </div>
                             </div>
                         </div>
@@ -4351,8 +4395,10 @@ class App {
                     : `¥${Number(tx.sourceAmount || 0).toLocaleString()} → ₹${Number(tx.destAmount || 0).toLocaleString()}`;
             } else {
                 const sign = tx.type === 'income' ? '+' : (tx.type === 'expense' ? '-' : '');
-                amountVal.innerText = this.formatMoney(tx.amount, tx.currency, { prefix: sign });
+                const cur = (tx.currency === 'INR' || tx.currency === '₹' || tx.region === 'IN') ? '₹' : '¥';
+                amountVal.innerText = this.formatMoney(tx.amount, cur, { prefix: sign });
             }
+            amountVal.className = `tx-detail-amount-val privacy-blur ${tx.type || 'expense'}`;
         }
 
         if (subtitle) {

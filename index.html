@@ -597,7 +597,7 @@
                                         </div>
 
                                         <!-- Filter Popover Trigger -->
-                                        <button class="btn btn-secondary filter-trigger-btn" id="ledger-filter-btn"
+                                        <button class="btn btn-secondary btn-sm filter-trigger-btn" id="ledger-filter-btn"
                                             onclick="app.toggleLedgerFilterPanel()" title="Open filter controls">
                                             <i data-lucide="sliders-horizontal"></i>
                                             <span>Filters</span>
@@ -606,7 +606,7 @@
                                         </button>
 
                                         <!-- New Transaction Quick Trigger -->
-                                        <button class="btn btn-primary" onclick="app.openUnifiedTransactionSelector()">
+                                        <button class="btn btn-primary btn-sm" onclick="app.openUnifiedTransactionSelector()">
                                             <i data-lucide="plus"></i>
                                             <span class="btn-text">Add</span>
                                         </button>
@@ -2044,11 +2044,11 @@
     <!-- Transaction Detail Inspection Modal (Phase 3) -->
     <div class="modal-overlay" id="transaction-detail-modal"
         onclick="if(event.target === this) app.closeTransactionDetail()">
-        <div class="bottom-sheet tx-detail-sheet">
+        <div class="bottom-sheet tx-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="tx-detail-subtitle">
             <div class="sheet-header tx-detail-sheet-header">
                 <div class="tx-detail-badge-group">
                     <span class="badge" id="tx-detail-type-badge">Expense</span>
-                    <span class="text-faint" id="tx-detail-date-display">--</span>
+                    <span class="text-faint text-xs font-mono" id="tx-detail-date-display">--</span>
                 </div>
                 <button class="icon-btn" onclick="app.closeTransactionDetail()" title="Close details">
                     <i data-lucide="x"></i>
