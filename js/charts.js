@@ -433,6 +433,15 @@ class ChartManager {
                 centerEl.innerText = app.formatMoney(total, currency);
             }
         }
+        if (this.dashboardCategoryDonut) {
+            this.dashboardCategoryDonut.update();
+            const dashCenterEl = document.getElementById('dash-donut-center-total');
+            if (dashCenterEl && typeof app !== 'undefined' && this.dashboardCategoryDonut.data?.datasets?.[0]?.data) {
+                const total = this.dashboardCategoryDonut.data.datasets[0].data.reduce((s, v) => s + v, 0);
+                const currency = (typeof app.dashboardChartRegion !== 'undefined' && app.dashboardChartRegion === 'IN') ? '₹' : '¥';
+                dashCenterEl.innerText = app.formatMoney(total, currency);
+            }
+        }
         if (this.jpDonut) this.jpDonut.update();
         if (this.inDonut) this.inDonut.update();
         if (this.utilityLine) this.utilityLine.update();
@@ -443,6 +452,108 @@ class ChartManager {
                 const inChart = Chart.getChart(`history-donut-${index}-IN`);
                 if (inChart) inChart.update();
             });
+        }
+    }
+
+    /**
+     * Dashboard: Visual Category Expense Breakdown Donut Chart (Pass 1 Requirement 6.B)
+     */
+    renderDashboardExpenseDonut(categories = [], totals = {}, currency = '¥', region = 'JP') {
+        const ctx = document.getElementById('dashboard-category-donut');
+        if (!ctx) return;
+
+        if (this.dashboardCategoryDonut) {
+            this.dashboardCategoryDonut.destroy();
+            this.dashboardCategoryDonut = null;
+        }
+
+        const activeCategories = (categories || []).filter(c => (totals[c.id] || 0) > 0);
+        const centerEl = document.getElementById('dash-donut-center-total');
+        const legendEl = document.getElementById('dash-donut-legend');
+
+        if (activeCategories.length === 0) {
+            this.dashboardCategoryDonut = new Chart(ctx, this.getEmptyConfig('No expenses in this month'));
+            if (centerEl && typeof app !== 'undefined') {
+                centerEl.innerText = app.formatMoney(0, currency);
+            }
+            if (legendEl) {
+                legendEl.innerHTML = `<p class="dash-donut-empty-text">No category expenses recorded for ${region === 'JP' ? 'Japan' : 'India'} this month.</p>`;
+            }
+            return;
+        }
+
+        // Sort categories descending by spend amount
+        activeCategories.sort((a, b) => (totals[b.id] || 0) - (totals[a.id] || 0));
+
+        const labels = activeCategories.map(c => c.name);
+        const data = activeCategories.map(c => totals[c.id] || 0);
+        const totalSum = data.reduce((s, v) => s + v, 0);
+
+        if (centerEl && typeof app !== 'undefined') {
+            centerEl.innerText = app.formatMoney(totalSum, currency);
+        }
+
+        const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
+
+        this.dashboardCategoryDonut = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: glassStyles.backgrounds,
+                    borderColor: glassStyles.borders,
+                    borderWidth: 1.5,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '74%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#121218',
+                        titleColor: '#f5f5f7',
+                        bodyColor: '#a0a0ab',
+                        borderColor: 'rgba(255, 255, 255, 0.12)',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: (context) => {
+                                const val = context.parsed || 0;
+                                const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : '0';
+                                if (typeof app !== 'undefined' && app.isPrivacyHidden) {
+                                    return ` ${context.label}: ****** (${pct}%)`;
+                                }
+                                return ` ${context.label}: ${typeof app !== 'undefined' ? app.formatMoney(val, currency) : `${currency}${val.toLocaleString()}`} (${pct}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (legendEl) {
+            legendEl.innerHTML = activeCategories.map((c, i) => {
+                const val = totals[c.id] || 0;
+                const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : '0';
+                const color = glassStyles.borders[i % glassStyles.borders.length];
+                const formattedAmt = typeof app !== 'undefined' ? app.formatMoney(val, currency) : `${currency}${val.toLocaleString()}`;
+                return `
+                    <div class="dash-legend-item" onclick="app.openCategoryManageModal('${c.id}', '${region}')" title="Inspect ${c.name} (${pct}%)">
+                        <div class="dash-legend-left">
+                            <span class="dash-legend-dot" style="background: ${color};"></span>
+                            <span class="dash-legend-name">${c.name}</span>
+                        </div>
+                        <div class="dash-legend-right">
+                            <span class="dash-legend-pct">${pct}%</span>
+                            <span class="dash-legend-amt privacy-blur financial-amount">${formattedAmt}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
     }
 

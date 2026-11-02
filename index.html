@@ -148,7 +148,7 @@
 
                 <!-- Global Action: Add Transaction -->
                 <div class="sidebar-action-wrap">
-                    <button class="btn-add-tx" onclick="app.openTransactionModal('expense')"
+                    <button class="btn-add-tx" onclick="app.openUnifiedTransactionSelector()"
                         id="desktop-sidebar-add-btn">
                         <i data-lucide="plus-circle"></i>
                         <span class="sidebar-text">Add Transaction</span>
@@ -307,7 +307,7 @@
 
                         <!-- Quick Add Button -->
                         <button class="btn btn-primary btn-sm header-action-btn"
-                            onclick="app.openTransactionModal('expense')">
+                            onclick="app.openUnifiedTransactionSelector()">
                             <i data-lucide="plus"></i>
                             <span>Add Transaction</span>
                         </button>
@@ -490,14 +490,39 @@
 
                             <!-- Right-hand Contextual Rail -->
                             <aside class="workspace-rail" id="dashboard-rail">
-                                <!-- Loan Tracker Widget -->
-                                <div class="rail-card loan-card" id="loan-tracker-widget" style="display: none;">
-                                    <!-- Populated by JS -->
+                                <!-- Dashboard Expense Category Breakdown Chart Card (Pass 1 Requirement 6.B) -->
+                                <div class="rail-card dashboard-chart-card" id="dashboard-expense-chart-card">
+                                    <div class="dash-chart-header">
+                                        <div class="dash-chart-title-wrap">
+                                            <h3 class="dash-chart-title">Expense Breakdown</h3>
+                                            <span class="dash-chart-period-badge" id="dash-chart-period-badge">This Month</span>
+                                        </div>
+                                        <div class="dash-region-pills" id="dash-chart-region-pills" role="tablist" aria-label="Chart Region">
+                                            <button type="button" class="dash-region-pill active" id="dash-region-jp-btn" onclick="app.setDashboardChartRegion('JP')" role="tab" aria-selected="true">
+                                                JP (¥)
+                                            </button>
+                                            <button type="button" class="dash-region-pill" id="dash-region-in-btn" onclick="app.setDashboardChartRegion('IN')" role="tab" aria-selected="false">
+                                                IN (₹)
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="dash-chart-canvas-wrap">
+                                        <canvas id="dashboard-category-donut"></canvas>
+                                        <div class="dash-donut-center" id="dash-donut-center-wrap">
+                                            <span class="dash-donut-center-label">Total Spent</span>
+                                            <span class="dash-donut-center-val privacy-blur financial-amount" id="dash-donut-center-total">¥0</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="dash-chart-legend" id="dash-donut-legend">
+                                        <!-- Populated dynamically by JS -->
+                                    </div>
                                 </div>
 
-                                <!-- Quick Mini Account Breakdown in Rail -->
-                                <div class="rail-card account-summary-card" id="rail-account-summary">
-                                    <!-- Populated by JS -->
+                                <!-- Loan Tracker Widget (Pass 1 Requirement 6.F: Restored below expense breakdown) -->
+                                <div class="rail-card loan-card" id="loan-tracker-widget" style="display: none;">
+                                    <!-- Populated dynamically by JS -->
                                 </div>
                             </aside>
                         </div>
@@ -568,7 +593,7 @@
                                         </button>
 
                                         <!-- New Transaction Quick Trigger -->
-                                        <button class="btn btn-primary" onclick="app.openTransactionModal('expense')">
+                                        <button class="btn btn-primary" onclick="app.openUnifiedTransactionSelector()">
                                             <i data-lucide="plus"></i>
                                             <span class="btn-text">Add</span>
                                         </button>
@@ -2064,6 +2089,64 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unified Transaction Action Selector Modal (Pass 1 Requirement 6.D) -->
+    <div class="modal-overlay unified-action-overlay" id="tx-action-selector-modal"
+        onclick="if(event.target === this) app.closeUnifiedTransactionSelector()">
+        <div class="action-selector-card" role="dialog" aria-modal="true" aria-labelledby="tx-selector-title">
+            <div class="action-selector-header">
+                <div class="action-selector-titles">
+                    <h3 class="action-selector-title" id="tx-selector-title">New Transaction</h3>
+                    <p class="action-selector-sub">Select transaction type to record</p>
+                </div>
+                <button class="icon-btn-subtle" onclick="app.closeUnifiedTransactionSelector()" aria-label="Close selector">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="action-selector-grid">
+                <button type="button" class="action-type-card" onclick="app.selectTransactionType('expense')" id="btn-select-tx-expense">
+                    <div class="action-icon-wrap action-icon-expense">
+                        <i data-lucide="arrow-down-right"></i>
+                    </div>
+                    <div class="action-type-info">
+                        <span class="action-type-name">Log Expense</span>
+                        <span class="action-type-desc">Track category spending & budgets</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="action-chevron"></i>
+                </button>
+                <button type="button" class="action-type-card" onclick="app.selectTransactionType('income')" id="btn-select-tx-income">
+                    <div class="action-icon-wrap action-icon-income">
+                        <i data-lucide="arrow-up-right"></i>
+                    </div>
+                    <div class="action-type-info">
+                        <span class="action-type-name">Add Income</span>
+                        <span class="action-type-desc">Record salary, deposits & inward credit</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="action-chevron"></i>
+                </button>
+                <button type="button" class="action-type-card" onclick="app.selectTransactionType('transfer')" id="btn-select-tx-transfer">
+                    <div class="action-icon-wrap action-icon-transfer">
+                        <i data-lucide="arrow-left-right"></i>
+                    </div>
+                    <div class="action-type-info">
+                        <span class="action-type-name">Transfer Funds</span>
+                        <span class="action-type-desc">Move money between domestic accounts</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="action-chevron"></i>
+                </button>
+                <button type="button" class="action-type-card" onclick="app.selectTransactionType('remittance')" id="btn-select-tx-remittance">
+                    <div class="action-icon-wrap action-icon-remittance">
+                        <i data-lucide="send"></i>
+                    </div>
+                    <div class="action-type-info">
+                        <span class="action-type-name">Send Remittance</span>
+                        <span class="action-type-desc">Cross-border transfer from Japan to India</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="action-chevron"></i>
+                </button>
             </div>
         </div>
     </div>

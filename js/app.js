@@ -33,6 +33,7 @@ class App {
         this.inactivityEventsRegistered = false;
         this.activityThrottleTimer = null;
         this._isSubmitting = false;
+        this.dashboardChartRegion = 'JP'; // Pass 1: Dashboard Category Chart Active Region (JP or IN)
 
         // Phase 3: Transactions Continuous Ledger state
         this.ledgerSearchQuery = '';
@@ -352,7 +353,7 @@ class App {
                     this.closeFocusOverlay();
                     return;
                 }
-                ['add-wallet-modal', 'edit-wallet-modal', 'transaction-modal', 'quick-edit-modal', 'color-picker-modal', 'pdf-modal'].forEach(mId => {
+                ['add-wallet-modal', 'edit-wallet-modal', 'transaction-modal', 'tx-action-selector-modal', 'quick-edit-modal', 'color-picker-modal', 'pdf-modal'].forEach(mId => {
                     const el = document.getElementById(mId);
                     if (el && el.classList.contains('active')) {
                         this.closeModal(mId);
@@ -619,6 +620,25 @@ class App {
                 }
             });
         }
+    }
+
+    openUnifiedTransactionSelector() {
+        const modal = document.getElementById('tx-action-selector-modal');
+        if (!modal) return;
+        modal.classList.add('active');
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    closeUnifiedTransactionSelector() {
+        const modal = document.getElementById('tx-action-selector-modal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    selectTransactionType(type) {
+        this.closeUnifiedTransactionSelector();
+        this.openTransactionModal(type);
     }
 
     openTransactionModal(type) {
@@ -1192,6 +1212,7 @@ class App {
         this.renderCategories();
         this.renderTransactions();
         this.renderMonthlySummary();
+        this.renderDashboardExpenseChart();
         this.renderWalletsPage();
 
         this.renderSettings();
@@ -1993,25 +2014,8 @@ class App {
         const inCountBadge = document.getElementById('in-wallet-count-badge');
         if (inCountBadge) inCountBadge.innerText = `${inCount} ${inCount === 1 ? 'account' : 'accounts'}`;
 
-        // Populate Rail mini account breakdown
-        const railAccSummary = document.getElementById('rail-account-summary');
-        if (railAccSummary) {
-            let railHtml = '<div style="display: flex; flex-direction: column; gap: 8px;">';
-            Object.values(storage.state.wallets).forEach(w => {
-                const theme = this.getThemeForWallet(w);
-                railHtml += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); cursor: pointer;" onclick="app.openWalletFocus('${w.id}')" title="Inspect ${w.id}">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${theme.color}; flex-shrink: 0;"></span>
-                            <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-primary);">${w.id}</span>
-                        </div>
-                        <span class="privacy-blur" style="font-size: 0.8rem; font-family: var(--font-numeric); font-weight: 600; color: var(--text-secondary);">${this.formatMoney(w.balance, w.currency)}</span>
-                    </div>
-                `;
-            });
-            railHtml += '</div>';
-            railAccSummary.innerHTML = railHtml;
-        }
+        // Refresh Dashboard Category Breakdown Chart (Pass 1 Requirement 6.B)
+        this.renderDashboardExpenseChart();
 
         // Update Month Header
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -2066,8 +2070,8 @@ class App {
                     </div>
                 </div>
                 <div class="budget-central-progress-wrap">
-                    <div class="neon-bar-bg" style="height: 10px; border-radius: 9999px;">
-                        <div class="neon-bar-fill ${barClass}" style="width: ${pct}%; height: 100%;"></div>
+                    <div class="budget-streak-track">
+                        <div class="budget-streak-fill ${barClass}" style="width: ${pct}%;"></div>
                     </div>
                 </div>
                 <div class="budget-central-stats-row">
@@ -2255,7 +2259,7 @@ class App {
                         <i data-lucide="trending-up"></i> JP Inflow
                     </span>
                 </div>
-                <div class="monthly-stat-value privacy-blur" style="color: var(--emerald);">
+                <div class="monthly-stat-value privacy-blur financial-amount" style="color: var(--emerald);">
                     ${this.formatMoney(jpIncome, '¥', { prefix: '+' })}
                 </div>
                 <div class="monthly-stat-sub">Japan inflows this month</div>
@@ -2268,7 +2272,7 @@ class App {
                         <i data-lucide="trending-down"></i> JP Outflow
                     </span>
                 </div>
-                <div class="monthly-stat-value privacy-blur" style="color: var(--rose);">
+                <div class="monthly-stat-value privacy-blur financial-amount" style="color: var(--rose);">
                     ${this.formatMoney(jpExpenses, '¥', { prefix: '-' })}
                 </div>
                 <div class="monthly-stat-sub">Japan expenses this month</div>
@@ -2281,30 +2285,63 @@ class App {
                         <i data-lucide="${jpNet >= 0 ? 'sparkles' : 'alert-circle'}"></i> JP Net
                     </span>
                 </div>
-                <div class="monthly-stat-value privacy-blur ${netSavingsClass}">
+                <div class="monthly-stat-value privacy-blur financial-amount ${netSavingsClass}">
                     ${this.formatMoney(jpNet, '¥', { prefix: netSavingsSign })}
                 </div>
                 <div class="monthly-stat-sub">Inflows minus outflows</div>
             </div>
-
-            <div class="monthly-stat-card">
-                <div class="monthly-stat-header">
-                    <span class="monthly-stat-label">Savings Rate</span>
-                    <span class="monthly-stat-trend" style="color: ${savingsRateColor}; background: rgba(255,255,255,0.05);">
-                        <i data-lucide="pie-chart"></i> Target 20%
-                    </span>
-                </div>
-                <div class="monthly-stat-value privacy-blur" style="color: ${savingsRateColor};">
-                    ${this.isPrivacyHidden ? '******' : `${jpSavingsRate}%`}
-                </div>
-                <div class="monthly-stat-sub">
-                    <div class="savings-rate-bar" style="height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 6px; overflow: hidden;">
-                        <div style="height: 100%; width: ${Math.min(jpSavingsRate, 100)}%; background: ${savingsRateColor}; border-radius: 2px;"></div>
-                    </div>
-                </div>
-            </div>
         `;
         lucide.createIcons();
+    }
+
+    setDashboardChartRegion(region) {
+        if (region !== 'JP' && region !== 'IN') return;
+        this.dashboardChartRegion = region;
+        const jpBtn = document.getElementById('dash-region-jp-btn');
+        const inBtn = document.getElementById('dash-region-in-btn');
+        if (jpBtn && inBtn) {
+            jpBtn.classList.toggle('active', region === 'JP');
+            jpBtn.setAttribute('aria-selected', region === 'JP' ? 'true' : 'false');
+            inBtn.classList.toggle('active', region === 'IN');
+            inBtn.setAttribute('aria-selected', region === 'IN' ? 'true' : 'false');
+        }
+        this.renderDashboardExpenseChart();
+    }
+
+    renderDashboardExpenseChart() {
+        if (this.currentView !== 'home-view') return;
+        const canvas = document.getElementById('dashboard-category-donut');
+        if (!canvas) return;
+
+        const region = this.dashboardChartRegion || 'JP';
+        const currency = region === 'JP' ? '¥' : '₹';
+        const activeTxs = this.getActiveTransactions();
+        const totals = {};
+
+        activeTxs.forEach(tx => {
+            if (tx.type === 'expense' && tx.region === region) {
+                const amt = Number(tx.amount) || 0;
+                totals[tx.categoryId] = (totals[tx.categoryId] || 0) + amt;
+            }
+        });
+
+        const categories = (storage.state?.categories?.[region] || []).filter(c => c.isActive !== false);
+
+        const periodBadge = document.getElementById('dash-chart-period-badge');
+        if (periodBadge) {
+            const mKey = this.activeMonthKey;
+            if (mKey) {
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const [y, m] = mKey.split('-');
+                periodBadge.innerText = `${monthNames[parseInt(m) - 1]} ${y}`;
+            } else {
+                periodBadge.innerText = 'This Month';
+            }
+        }
+
+        if (typeof charts !== 'undefined' && charts.renderDashboardExpenseDonut) {
+            charts.renderDashboardExpenseDonut(categories, totals, currency, region);
+        }
     }
 
     renderWalletsPage() {
@@ -3240,40 +3277,40 @@ class App {
             widget.innerHTML = `
                 <div class="loan-header" style="flex-wrap: wrap; padding-bottom: 12px;">
                     <div style="width: 50%;">
-                        <div class="loan-value">${this.formatMoney(loanState.config.totalPrincipal, '₹', { locale: 'en-IN' })}</div>
+                        <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.totalPrincipal, '₹', { locale: 'en-IN' })}</div>
                         <div class="loan-label">Total Loan</div>
                     </div>
                     <div style="width: 50%; text-align: right;">
-                        <div class="loan-value">${this.formatMoney(loanState.config.emi, '₹', { locale: 'en-IN' })}</div>
+                        <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.emi, '₹', { locale: 'en-IN' })}</div>
                         <div class="loan-label">EMI</div>
                     </div>
-                    <div style="width: 100%; text-align: center; font-size: 0.7rem; color: var(--text-muted); margin-top: 12px;">
+                    <div style="width: 100%; text-align: center; font-size: 0.72rem; color: var(--text-muted); margin-top: 10px;">
                         Next draw in <span style="color: var(--text-main); font-weight: 600;">${loanState.daysUntilNextEmi} Days</span> (${loanState.nextEmiDateStr})
                     </div>
                 </div>
                 
                 <div class="loan-progress-box">
                     <div class="loan-progress-header">
-                        <span class="loan-percent">${loanState.percentPaid}%</span>
+                        <span class="loan-percent financial-amount">${loanState.percentPaid}%</span>
                         <div style="display:flex; flex-direction:column; line-height:1.2; text-align:left;">
                             <span class="loan-label" style="font-size:0.75rem;">Paid</span>
                             <span class="loan-label" style="font-size:0.75rem;">Till Date</span>
                         </div>
                         <span class="loan-status">ON TRACK</span>
                     </div>
-                    <div class="loan-progress-bar-bg">
-                        <div class="loan-progress-bar" style="width: ${loanState.percentPaid}%;"></div>
+                    <div class="budget-streak-track" style="margin: 8px 0 14px 0;">
+                        <div class="budget-streak-fill neon-safe" style="width: ${loanState.percentPaid}%;"></div>
                     </div>
                     
                     <div class="loan-stats-grid">
                         <span class="loan-stat-label">Amount Paid</span>
-                        <span class="loan-stat-value">${this.formatMoney(loanState.amountPaid, '₹', { locale: 'en-IN' })}</span>
+                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.amountPaid, '₹', { locale: 'en-IN' })}</span>
                         
                         <span class="loan-stat-label">Principal Paid</span>
-                        <span class="loan-stat-value">${this.formatMoney(loanState.principalPaid, '₹', { locale: 'en-IN', formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
+                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.principalPaid, '₹', { locale: 'en-IN', formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
                         
                         <span class="loan-stat-label">Principal Left</span>
-                        <span class="loan-stat-value">${this.formatMoney(loanState.principalLeft, '₹', { locale: 'en-IN', formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
+                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.principalLeft, '₹', { locale: 'en-IN', formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
                     </div>
                 </div>
             `;
