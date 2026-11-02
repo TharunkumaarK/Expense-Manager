@@ -1864,28 +1864,43 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     padding: 0 !important;
 }
 
-.section-header-toggle i {
+.section-header-toggle i,
+.section-header-toggle svg {
     width: 20px;
     height: 20px;
     color: var(--text-muted);
-    transition: transform 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
 }
 
-.section-header-toggle i.rotated {
+.section-header-toggle:hover i,
+.section-header-toggle:hover svg {
+    color: var(--text-primary);
+}
+
+.section-header-toggle:focus-visible {
+    outline: 2px solid var(--accent-subtle);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+.section-header-toggle i.rotated,
+.section-header-toggle svg.rotated {
     transform: rotate(-180deg);
 }
 
 .collapsible-wrapper {
     display: grid;
     grid-template-rows: 1fr;
-    transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: grid-template-rows 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .collapsible-wrapper.collapsed {
     grid-template-rows: 0fr;
 }
 
-.collapsible-wrapper>div {
+.collapsible-wrapper > div,
+.collapsible-inner {
+    min-height: 0;
     overflow: hidden;
 }
 

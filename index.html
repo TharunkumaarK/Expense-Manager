@@ -436,7 +436,12 @@
                                 <div style="display: none;" id="in-wallets"></div>
 
                                 <div class="section-header-toggle"
-                                    onclick="app.toggleCollapse('jp-categories-wrap', 'jp-chevron')">
+                                    role="button"
+                                    tabindex="0"
+                                    aria-expanded="true"
+                                    aria-controls="jp-categories-wrap"
+                                    onclick="app.toggleCollapse('jp-categories-wrap', 'jp-chevron')"
+                                    onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); app.toggleCollapse('jp-categories-wrap', 'jp-chevron'); }">
                                     <div class="section-title-wrap">
                                         <span class="section-badge-dot jp-dot"></span>
                                         <h3 class="section-title" style="margin:0; padding:0;">Japan Spending Categories
@@ -445,17 +450,24 @@
                                     <i data-lucide="chevron-down" id="jp-chevron"></i>
                                 </div>
                                 <div class="collapsible-wrapper" id="jp-categories-wrap">
-                                    <!-- Central Japan Budget Bar Section (4.1 Repositioned & Balanced) -->
-                                    <div class="card budget-central-card" id="budget-overview-card" style="margin: 8px 16px 16px 16px; width: calc(100% - 32px);">
-                                        <!-- Populated dynamically by app.renderBudgetOverviewCard -->
-                                    </div>
-                                    <div class="category-grid" id="jp-categories-grid">
-                                        <!-- Populated by JS -->
+                                    <div class="collapsible-inner">
+                                        <!-- Central Japan Budget Bar Section (4.1 Repositioned & Balanced) -->
+                                        <div class="card budget-central-card" id="budget-overview-card" style="margin: 8px 16px 16px 16px; width: calc(100% - 32px);">
+                                            <!-- Populated dynamically by app.renderBudgetOverviewCard -->
+                                        </div>
+                                        <div class="category-grid" id="jp-categories-grid">
+                                            <!-- Populated by JS -->
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div class="section-header-toggle"
-                                    onclick="app.toggleCollapse('in-categories-wrap', 'in-chevron')">
+                                    role="button"
+                                    tabindex="0"
+                                    aria-expanded="false"
+                                    aria-controls="in-categories-wrap"
+                                    onclick="app.toggleCollapse('in-categories-wrap', 'in-chevron')"
+                                    onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); app.toggleCollapse('in-categories-wrap', 'in-chevron'); }">
                                     <div class="section-title-wrap">
                                         <span class="section-badge-dot in-dot"></span>
                                         <h3 class="section-title" style="margin:0; padding:0;">India Spending Categories
@@ -464,8 +476,10 @@
                                     <i data-lucide="chevron-down" id="in-chevron" class="rotated"></i>
                                 </div>
                                 <div class="collapsible-wrapper collapsed" id="in-categories-wrap">
-                                    <div class="category-grid" id="in-categories-grid">
-                                        <!-- Populated by JS -->
+                                    <div class="collapsible-inner">
+                                        <div class="category-grid" id="in-categories-grid">
+                                            <!-- Populated by JS -->
+                                        </div>
                                     </div>
                                 </div>
                             </div>

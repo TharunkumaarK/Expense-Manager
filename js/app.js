@@ -564,6 +564,11 @@ class App {
         const wrap = document.getElementById(wrapId);
         if (wrap) {
             wrap.classList.toggle('collapsed');
+            const isCollapsed = wrap.classList.contains('collapsed');
+            const toggleBtn = wrap.previousElementSibling;
+            if (toggleBtn && toggleBtn.classList.contains('section-header-toggle')) {
+                toggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+            }
         }
         if (iconId) {
             const icon = document.getElementById(iconId);
