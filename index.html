@@ -1216,7 +1216,7 @@
                         <div style="height: 80px;"></div>
                     </section>
 
-                    <!-- Budgets View (Phase 4: Budget & Category Management Centre) -->
+                    <!-- Budgets View (Pass 4: Budget & Category Management Center) -->
                     <section id="budgets-view" class="view">
                         <header class="top-bar">
                             <div class="view-header-content">
@@ -1224,6 +1224,14 @@
                                 <p class="view-header-sub">Unified monthly budget limits, category configurations, and icon assignments</p>
                             </div>
                             <div class="view-header-actions">
+                                <button class="btn btn-secondary btn-sm" id="btn-header-edit-overall" onclick="app.openOverallBudgetModal()" title="Configure Overall Monthly Budget">
+                                    <i data-lucide="sliders"></i>
+                                    <span class="btn-text">Edit Overall Budget</span>
+                                </button>
+                                <button class="btn btn-primary btn-sm" id="btn-header-add-category" onclick="app.openCategoryManageModal(null)" title="Add Category">
+                                    <i data-lucide="plus-circle"></i>
+                                    <span class="btn-text">Add Category</span>
+                                </button>
                                 <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
                                     aria-label="Toggle monetary concealment" title="Toggle monetary concealment">
                                     <i data-lucide="eye-off"></i>
@@ -1240,35 +1248,45 @@
                                     <button class="segment-btn" data-region="IN" onclick="app.setBudgetsRegion('IN')"><svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="14" height="10.5" style="border-radius:2px;vertical-align:middle;margin-right:5px;" aria-hidden="true"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>India (₹)</button>
                                 </div>
 
-                                <!-- Month Display -->
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <span class="text-sm text-muted">Active Month:</span>
-                                    <span id="budgets-month-label" class="font-bold text-primary" style="font-size: 0.95rem;"></span>
+                                <!-- Month Display Badge -->
+                                <div class="budgets-toolbar-month-badge">
+                                    <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                                    <span class="text-xs text-muted">Active Month:</span>
+                                    <span id="budgets-month-label" class="font-bold text-primary font-numeric" style="font-size: 0.92rem;"></span>
                                 </div>
 
                                 <!-- Budget Action Buttons -->
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <button class="btn btn-secondary btn-sm" id="btn-edit-overall-budget" onclick="app.openOverallBudgetModal()">
+                                <div class="budgets-toolbar-actions">
+                                    <button class="btn btn-secondary btn-sm" id="btn-edit-overall-budget" onclick="app.openOverallBudgetModal()" title="Configure Overall Monthly Limit">
                                         <i data-lucide="sliders"></i>
                                         <span>Edit Overall Budget</span>
                                     </button>
-                                    <button class="btn btn-primary btn-sm" onclick="app.openCategoryManageModal(null)">
+                                    <button class="btn btn-primary btn-sm" id="btn-add-category" onclick="app.openCategoryManageModal(null)" title="Create Category">
                                         <i data-lucide="plus-circle"></i>
                                         <span>Add Category</span>
                                     </button>
                                 </div>
                             </div>
 
-                            <!-- Overall Budget Summary Banner -->
-                            <div class="card budgets-summary-banner" id="budgets-summary-banner">
+                            <!-- Budgets Overview KPI Row (No oversized wrapping card!) -->
+                            <div class="budgets-kpi-grid" id="budgets-summary-banner">
                                 <!-- Populated dynamically by app.renderBudgetsPage() -->
                             </div>
 
-                            <!-- Category Budgets Grid -->
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px;">
-                                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Category Budget Allocations</h3>
-                                    <span class="text-xs text-muted" id="budgets-category-count">0 categories</span>
+                            <!-- Category Allocations Workspace -->
+                            <div class="budgets-categories-section">
+                                <div class="budgets-section-header">
+                                    <div>
+                                        <h3 class="budgets-section-title">Category Budget Allocations</h3>
+                                        <p class="budgets-section-sub">Individual monthly limits and live expenditure tracking</p>
+                                    </div>
+                                    <div class="budgets-section-controls">
+                                        <div class="segmented-control budgets-cat-segmented" id="budgets-cat-filter">
+                                            <button type="button" class="segment-btn active" data-filter="all" onclick="app.setBudgetsCategoryFilter('all')">All (<span id="cat-count-all">0</span>)</button>
+                                            <button type="button" class="segment-btn" data-filter="active" onclick="app.setBudgetsCategoryFilter('active')">Active (<span id="cat-count-active">0</span>)</button>
+                                            <button type="button" class="segment-btn" data-filter="over" onclick="app.setBudgetsCategoryFilter('over')">Over Budget (<span id="cat-count-over">0</span>)</button>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="budgets-categories-grid" id="budgets-categories-grid">
                                     <!-- Populated dynamically -->
@@ -2354,17 +2372,28 @@
                 </div>
 
                 <div class="form-group">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin: 0;">Category Monochrome Icon</label>
-                        <span class="text-xs" style="display: flex; align-items: center; gap: 6px; color: var(--accent);">
-                            Selected: <i id="cat-selected-icon-preview" data-lucide="tag" style="width: 14px; height: 14px;"></i>
-                            <span id="cat-selected-icon-name" style="font-family: monospace;">tag</span>
-                        </span>
+                        <div class="cat-selected-preview-pill" id="cat-selected-pill">
+                            <span class="text-xs text-muted">Selected:</span>
+                            <div class="cat-preview-icon-box">
+                                <i id="cat-selected-icon-preview" data-lucide="tag" style="width: 14px; height: 14px;"></i>
+                            </div>
+                            <span id="cat-selected-icon-name" class="font-mono text-xs font-bold text-primary">tag</span>
+                        </div>
                     </div>
                     <div class="icon-picker-container">
-                        <input type="text" class="icon-picker-search-input" id="cat-icon-search-input" placeholder="Search ~150+ monochrome icons (e.g. food, car, shopping, health...)" oninput="app.filterCategoryIcons(this.value)">
-                        <div class="icon-picker-grid" id="cat-icons-picker-grid">
-                            <!-- Populated with ~150 monochrome Lucide icons -->
+                        <div class="icon-picker-header">
+                            <div class="icon-picker-search-wrap">
+                                <i data-lucide="search" style="width: 13px; height: 13px; color: var(--text-muted);"></i>
+                                <input type="text" class="icon-picker-search-input" id="cat-icon-search-input" placeholder="Search ~150+ monochrome icons (e.g. food, car, train, wifi...)" oninput="app.filterCategoryIcons(this.value)">
+                            </div>
+                            <div class="icon-group-pills" id="icon-group-pills">
+                                <!-- Populated dynamically with category groups -->
+                            </div>
+                        </div>
+                        <div class="icon-picker-scroll-area" id="cat-icons-picker-grid">
+                            <!-- Populated with grouped or filtered monochrome Lucide icons -->
                         </div>
                     </div>
                 </div>

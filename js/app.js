@@ -235,6 +235,10 @@ class App {
             this.renderAnalyticsPage();
         } else if (this.currentView === 'history-view') {
             this.renderHistory();
+        } else if (this.currentView === 'budgets-view') {
+            this.renderBudgetsPage();
+        } else if (this.currentView === 'reports-view') {
+            this.renderReportsPage();
         } else if (this.currentView === 'settings-view') {
             this.renderSettings();
         }
@@ -6114,6 +6118,23 @@ class App {
         this.renderBudgetsPage();
     }
 
+    setBudgetsCategoryFilter(filter) {
+        if (!['all', 'active', 'over'].includes(filter)) return;
+        this.budgetsCatFilter = filter;
+        const filterEl = document.getElementById('budgets-cat-filter');
+        if (filterEl) {
+            filterEl.querySelectorAll('.segment-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-filter') === filter);
+            });
+        }
+        this.renderBudgetsPage();
+    }
+
+    onBudgetsSearch(query) {
+        this.budgetsCatSearch = (query || '').toLowerCase().trim();
+        this.renderBudgetsPage();
+    }
+
     toggleCategoryExpand(catId) {
         const card = document.getElementById(`budget-cat-card-${catId}`);
         if (card) {
@@ -6122,7 +6143,9 @@ class App {
     }
 
     renderBudgetsPage() {
-        const currency = this.budgetsRegion === 'JP' ? '¥' : '₹';
+        const region = this.budgetsRegion || 'JP';
+        const isJp = region === 'JP';
+        const currency = isJp ? '¥' : '₹';
         const curMonth = (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
 
         // Update active month label
@@ -6131,9 +6154,9 @@ class App {
             monthLabel.innerText = curMonth;
         }
 
-        // Transactions in active month
+        // Transactions in active month for active region
         const allTxs = storage.state.transactions || [];
-        const monthTxs = allTxs.filter(t => (t.date || '').startsWith(curMonth) && t.region === this.budgetsRegion);
+        const monthTxs = allTxs.filter(t => (t.date || '').startsWith(curMonth) && t.region === region);
 
         // Calculate totals spent per category
         const totals = {};
@@ -6146,137 +6169,237 @@ class App {
         });
 
         const totalSpent = Object.values(totals).reduce((s, v) => s + v, 0);
-        const cats = storage.state.categories[this.budgetsRegion] || [];
+        const allCats = storage.state.categories[region] || [];
 
-        const sumCatLimits = cats.filter(c => c.contributesToTotalBudget !== false && c.isActive !== false).reduce((s, c) => s + (c.budget || 0), 0);
+        const sumCatLimits = allCats
+            .filter(c => c.contributesToTotalBudget !== false && c.isActive !== false)
+            .reduce((s, c) => s + (c.budget || 0), 0);
 
-        // Sum of category allocations or independently configured overall monthly budget
-        const allocatedBudget = this.budgetsRegion === 'JP'
+        // Overall Monthly Budget (Configurable independently of category-level limits)
+        const allocatedBudget = isJp
             ? (storage.state.jpTotalBudget !== undefined && storage.state.jpTotalBudget !== null ? storage.state.jpTotalBudget : 0)
             : (storage.state.inTotalBudget !== undefined && storage.state.inTotalBudget !== null ? storage.state.inTotalBudget : sumCatLimits);
 
         const cushion = Math.max(0, allocatedBudget - sumCatLimits);
         const remaining = allocatedBudget - totalSpent;
+        const utilizationPct = allocatedBudget > 0 ? Math.round((totalSpent / allocatedBudget) * 100) : 0;
 
-        // Render Summary Banner
+        // Days remaining in current calendar month
+        const now = new Date();
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const daysRemaining = Math.max(0, daysInMonth - now.getDate());
+
+        let streakClass = 'neon-safe';
+        let utilizationClass = 'text-success';
+        if (utilizationPct > 100) {
+            streakClass = 'neon-danger';
+            utilizationClass = 'text-danger';
+        } else if (utilizationPct >= 75) {
+            streakClass = 'neon-warn';
+            utilizationClass = 'text-warn';
+        }
+
+        // Active and Over-Budget counts for filter buttons
+        const activeCatsCount = allCats.filter(c => c.isActive !== false).length;
+        const overBudgetCatsCount = allCats.filter(c => (c.budget || 0) > 0 && (totals[c.id] || 0) > (c.budget || 0)).length;
+
+        const countAllEl = document.getElementById('cat-count-all');
+        const countActiveEl = document.getElementById('cat-count-active');
+        const countOverEl = document.getElementById('cat-count-over');
+        if (countAllEl) countAllEl.innerText = allCats.length;
+        if (countActiveEl) countActiveEl.innerText = activeCatsCount;
+        if (countOverEl) countOverEl.innerText = overBudgetCatsCount;
+
+        // 1. Render Budgets Overview KPI Row (No oversized outer card wrapper!)
         const bannerEl = document.getElementById('budgets-summary-banner');
         if (bannerEl) {
             bannerEl.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
-                    <div>
-                        <h3 style="margin: 0 0 2px 0; font-size: 1.15rem; font-weight: 800;">${this.budgetsRegion === 'JP' ? 'Japan (JPY)' : 'India (INR)'} Budget Overview</h3>
-                        <span class="text-xs text-muted">Continuous monthly limits across ${cats.length} registered categories</span>
+                <!-- KPI Card 1: Overall Monthly Budget -->
+                <div class="card budgets-kpi-card interactive-card" onclick="app.openOverallBudgetModal('${region}')" title="Click to edit overall budget">
+                    <div class="budgets-kpi-header">
+                        <span class="budgets-kpi-label">Overall Monthly Budget</span>
+                        <button class="budgets-kpi-edit-btn" onclick="event.stopPropagation(); app.openOverallBudgetModal('${region}')" title="Configure Overall Monthly Limit">
+                            <i data-lucide="sliders" style="width: 13px; height: 13px;"></i>
+                        </button>
                     </div>
-                    ${cushion > 0 ? `<span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, currency)} unallocated cushion</span>` : ''}
+                    <div class="budgets-kpi-value font-bold text-primary font-numeric privacy-blur">
+                        ${this.formatMoney(allocatedBudget, currency)}
+                    </div>
+                    <div class="budgets-kpi-footer">
+                        ${cushion > 0
+                            ? `<span class="badge-cushion privacy-blur">+${this.formatMoney(cushion, currency)} unallocated cushion</span>`
+                            : (allocatedBudget < sumCatLimits
+                                ? `<span class="badge-overspend privacy-blur">-${this.formatMoney(sumCatLimits - allocatedBudget, currency)} vs categories</span>`
+                                : `<span class="text-xs text-muted">Fully allocated across ${activeCatsCount} active categories</span>`)
+                        }
+                    </div>
                 </div>
-                <div class="budgets-summary-grid">
-                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05); position: relative;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span class="text-xs text-muted">Allocated Budget</span>
-                            <button class="icon-btn-xs" onclick="app.openOverallBudgetModal()" title="Configure Overall Monthly Budget" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; transition: color 150ms ease;">
-                                <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i>
-                            </button>
-                        </div>
-                        <div class="font-bold text-primary privacy-blur" style="font-size: 1.15rem; margin-top: 4px;">${this.formatMoney(allocatedBudget, currency)}</div>
+
+                <!-- KPI Card 2: Total Spent -->
+                <div class="card budgets-kpi-card">
+                    <div class="budgets-kpi-header">
+                        <span class="budgets-kpi-label">Total Spent This Month</span>
+                        <span class="text-xs text-muted font-numeric">${monthTxs.filter(t => t.type === 'expense').length} txs</span>
                     </div>
-                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
-                        <span class="text-xs text-muted">Total Spent</span>
-                        <div class="font-bold text-danger privacy-blur" style="font-size: 1.15rem; margin-top: 4px;">${this.formatMoney(totalSpent, currency)}</div>
+                    <div class="budgets-kpi-value font-bold text-danger font-numeric privacy-blur">
+                        ${this.formatMoney(totalSpent, currency)}
                     </div>
-                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
-                        <span class="text-xs text-muted">Remaining Balance</span>
-                        <div class="font-bold ${remaining >= 0 ? 'text-success' : 'text-danger'} privacy-blur" style="font-size: 1.15rem; margin-top: 4px;">${this.formatMoney(remaining, currency)}</div>
+                    <div class="budgets-kpi-footer">
+                        <span class="text-xs text-muted font-numeric">
+                            ${allocatedBudget > 0 ? ((totalSpent / allocatedBudget) * 100).toFixed(1) : 0}% of monthly limit
+                        </span>
                     </div>
-                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
-                        <span class="text-xs text-muted">Budget Utilization</span>
-                        <div class="font-bold highlight" style="font-size: 1.15rem; margin-top: 4px;">${allocatedBudget > 0 ? Math.round((totalSpent / allocatedBudget) * 100) : 0}%</div>
+                </div>
+
+                <!-- KPI Card 3: Remaining Balance -->
+                <div class="card budgets-kpi-card">
+                    <div class="budgets-kpi-header">
+                        <span class="budgets-kpi-label">Remaining Balance</span>
+                        <span class="budgets-status-pill ${remaining >= 0 ? 'status-positive' : 'status-negative'}">
+                            ${remaining >= 0 ? 'On Track' : 'Over Limit'}
+                        </span>
+                    </div>
+                    <div class="budgets-kpi-value font-bold ${remaining >= 0 ? 'text-success' : 'text-danger'} font-numeric privacy-blur">
+                        ${remaining < 0 ? '-' : ''}${this.formatMoney(Math.abs(remaining), currency)}
+                    </div>
+                    <div class="budgets-kpi-footer">
+                        <span class="text-xs ${remaining >= 0 ? 'text-muted' : 'text-danger'} font-numeric">
+                            ${remaining >= 0 ? `${daysRemaining} days remaining in month` : `Exceeded by ${this.formatMoney(Math.abs(remaining), currency)}`}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- KPI Card 4: Budget Utilization -->
+                <div class="card budgets-kpi-card">
+                    <div class="budgets-kpi-header">
+                        <span class="budgets-kpi-label">Budget Utilization</span>
+                        <span class="font-bold font-numeric ${utilizationClass}" style="font-size: 0.95rem;">
+                            ${utilizationPct}%
+                        </span>
+                    </div>
+                    <div class="budget-streak-track" style="margin: 8px 0 6px 0;">
+                        <div class="budget-streak-fill ${streakClass}" style="width: ${Math.min(utilizationPct, 100)}%;"></div>
+                    </div>
+                    <div class="budgets-kpi-footer">
+                        <span class="text-xs ${utilizationPct > 100 ? 'text-danger' : (utilizationPct >= 75 ? 'text-warn' : 'text-muted')}">
+                            ${utilizationPct > 100 ? 'Monthly limit exceeded' : (utilizationPct >= 75 ? 'Approaching monthly limit' : 'Velocity within budget bounds')}
+                        </span>
                     </div>
                 </div>
             `;
         }
 
-        // Render Category Cards Grid
+        // 2. Filter Category List according to active segmented control & search input
+        const currentFilter = this.budgetsCatFilter || 'all';
+        const searchQuery = this.budgetsCatSearch || '';
+
+        let displayedCats = allCats.slice();
+
+        if (currentFilter === 'active') {
+            displayedCats = displayedCats.filter(c => c.isActive !== false);
+        } else if (currentFilter === 'over') {
+            displayedCats = displayedCats.filter(c => (c.budget || 0) > 0 && (totals[c.id] || 0) > (c.budget || 0));
+        }
+
+        if (searchQuery) {
+            displayedCats = displayedCats.filter(c => (c.name || '').toLowerCase().includes(searchQuery));
+        }
+
+        // 3. Render Category Cards Grid
         const gridEl = document.getElementById('budgets-categories-grid');
-        const countEl = document.getElementById('budgets-category-count');
-        if (countEl) countEl.innerText = `${cats.length} categories`;
-
         if (gridEl) {
-            gridEl.innerHTML = cats.map(c => {
-                const spent = totals[c.id] || 0;
-                const budgetLimit = c.budget || 0;
-                const rem = budgetLimit - spent;
-                const pct = budgetLimit > 0 ? Math.min((spent / budgetLimit) * 100, 100) : 0;
-                const count = txCounts[c.id] || 0;
-                const avgSpend = count > 0 ? Math.round(spent / count) : 0;
-
-                let statusClass = 'safe';
-                let statusLabel = 'Safe';
-                if (c.isActive === false) {
-                    statusClass = 'archived';
-                    statusLabel = 'Archived';
-                } else if (budgetLimit > 0 && pct > 100) {
-                    statusClass = 'danger';
-                    statusLabel = 'Over Budget';
-                } else if (budgetLimit > 0 && pct >= 75) {
-                    statusClass = 'warn';
-                    statusLabel = `${Math.round(pct)}% Used`;
-                } else if (budgetLimit === 0) {
-                    statusClass = 'safe';
-                    statusLabel = 'Uncapped';
-                }
-
-                let barClass = 'neon-safe';
-                if (pct > 90) barClass = 'neon-danger';
-                else if (pct > 75) barClass = 'neon-warn';
-
-                return `
-                    <div class="card budget-cat-card" id="budget-cat-card-${c.id}" onclick="app.toggleCategoryExpand('${c.id}')">
-                        <div class="budget-cat-top">
-                            <div class="budget-cat-info">
-                                <div class="budget-cat-icon">
-                                    <i data-lucide="${c.icon || 'tag'}" style="width: 18px; height: 18px;"></i>
-                                </div>
-                                <div>
-                                    <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">${c.name}</h4>
-                                    <span class="text-xs text-muted">${c.region || this.budgetsRegion}</span>
-                                </div>
-                            </div>
-                            <span class="budget-status-tag ${statusClass}">${statusLabel}</span>
-                        </div>
-
-                        <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 0.85rem; margin-top: 4px;">
-                            <span class="text-muted">Spent: <strong class="text-primary privacy-blur">${this.formatMoney(spent, currency)}</strong></span>
-                            <span class="text-muted">Limit: <strong class="privacy-blur">${budgetLimit > 0 ? this.formatMoney(budgetLimit, currency) : 'No limit'}</strong></span>
-                        </div>
-
-                        ${budgetLimit > 0 ? `
-                            <div class="neon-bar-bg" style="height: 6px; border-radius: 9999px;">
-                                <div class="neon-bar-fill ${barClass}" style="width: ${pct}%; height: 100%;"></div>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem;" class="text-muted">
-                                <span>${Math.round(pct)}% used</span>
-                                <span class="privacy-blur ${rem < 0 ? 'text-danger' : 'text-success'}">${rem >= 0 ? `${this.formatMoney(rem, currency)} left` : `${this.formatMoney(Math.abs(rem), currency)} over`}</span>
-                            </div>
-                        ` : ''}
-
-                        <!-- Expandable Details Section -->
-                        <div class="budget-cat-expand" onclick="event.stopPropagation()">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem;">
-                                <div>Transactions: <strong>${count}</strong></div>
-                                <div>Avg / Tx: <strong class="privacy-blur">${this.formatMoney(avgSpend, currency)}</strong></div>
-                                <div>In Overview: <strong>${c.hiddenFromBudgetOverview ? 'Hidden' : 'Visible'}</strong></div>
-                                <div>In Total Budget: <strong>${c.contributesToTotalBudget === false ? 'Excluded' : 'Included'}</strong></div>
-                            </div>
-                            <div style="display: flex; justify-content: flex-end; margin-top: 6px;">
-                                <button class="btn btn-secondary btn-sm" onclick="app.openCategoryManageModal('${c.id}', '${this.budgetsRegion}')">
-                                    <i data-lucide="edit" style="width: 12px; height: 12px;"></i>
-                                    <span>Configure Category</span>
-                                </button>
-                            </div>
-                        </div>
+            if (displayedCats.length === 0) {
+                gridEl.innerHTML = `
+                    <div class="budgets-empty-state" style="grid-column: 1 / -1;">
+                        <i data-lucide="tag" style="width: 32px; height: 32px; color: var(--text-muted); opacity: 0.5; margin-bottom: 8px;"></i>
+                        <p class="font-bold" style="margin: 0 0 4px 0; color: var(--text-secondary);">No categories found</p>
+                        <span class="text-xs text-muted">Try adjusting your category filter or search query.</span>
                     </div>
                 `;
-            }).join('');
+            } else {
+                gridEl.innerHTML = displayedCats.map(c => {
+                    const spent = totals[c.id] || 0;
+                    const budgetLimit = c.budget || 0;
+                    const rem = budgetLimit - spent;
+                    const isOver = budgetLimit > 0 && spent > budgetLimit;
+                    const pct = budgetLimit > 0 ? (spent / budgetLimit) * 100 : 0;
+                    const count = txCounts[c.id] || 0;
+                    const avgSpend = count > 0 ? Math.round(spent / count) : 0;
+
+                    let barClass = 'neon-safe';
+                    if (pct >= 100) {
+                        barClass = 'neon-danger';
+                    } else if (pct >= 75) {
+                        barClass = 'neon-warn';
+                    }
+
+                    return `
+                        <div class="card budget-cat-card interactive-card ${isOver ? 'is-overbudget' : ''}" id="budget-cat-card-${c.id}" onclick="app.openCategoryManageModal('${c.id}', '${region}')">
+                            <!-- Card Header -->
+                            <div class="budget-cat-card-header">
+                                <div class="budget-cat-identity">
+                                    <div class="budget-cat-icon-box">
+                                        <i data-lucide="${c.icon || 'tag'}" style="width: 17px; height: 17px;"></i>
+                                    </div>
+                                    <div class="budget-cat-info">
+                                        <div class="budget-cat-title-row">
+                                            <h4 class="budget-cat-name">${c.name}</h4>
+                                            ${c.isActive === false ? '<span class="budget-badge-archived">Archived</span>' : ''}
+                                        </div>
+                                        <div class="budget-cat-meta-row">
+                                            <span>${count} tx${count === 1 ? '' : 's'}</span>
+                                            ${avgSpend > 0 ? `<span class="bullet-dot">•</span><span class="privacy-blur">avg ${this.formatMoney(avgSpend, currency)}</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="budget-cat-header-right">
+                                    ${isOver ? `<span class="budget-overspend-pill font-numeric privacy-blur">+${this.formatMoney(Math.abs(rem), currency)} over</span>` : ''}
+                                    <button class="budget-cat-config-btn" onclick="event.stopPropagation(); app.openCategoryManageModal('${c.id}', '${region}')" title="Configure Category & Limit">
+                                        <i data-lucide="sliders" style="width: 13px; height: 13px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Financial Amounts -->
+                            <div class="budget-cat-figures">
+                                <div class="budget-figure-col">
+                                    <span class="figure-label">Spent</span>
+                                    <span class="figure-value text-primary font-numeric privacy-blur">${this.formatMoney(spent, currency)}</span>
+                                </div>
+                                <div class="budget-figure-col right-align">
+                                    <span class="figure-label">Monthly Limit</span>
+                                    <span class="figure-value font-numeric privacy-blur">${budgetLimit > 0 ? this.formatMoney(budgetLimit, currency) : '<span class="text-muted" style="font-weight: 500;">No Limit</span>'}</span>
+                                </div>
+                            </div>
+
+                            <!-- Horizontal Progress Streak (Reuse Dashboard Pattern) -->
+                            ${budgetLimit > 0 ? `
+                                <div class="budget-cat-streak-section">
+                                    <div class="budget-streak-track">
+                                        <div class="budget-streak-fill ${barClass}" style="width: ${Math.min(pct, 100)}%;"></div>
+                                    </div>
+                                    <div class="budget-cat-streak-footer">
+                                        <span class="font-numeric ${pct >= 100 ? 'text-danger' : (pct >= 75 ? 'text-warn' : 'text-muted')}">${Math.round(pct)}% used</span>
+                                        <span class="font-numeric privacy-blur ${rem < 0 ? 'text-danger' : 'text-muted'}">
+                                            ${rem >= 0 ? `${this.formatMoney(rem, currency)} left` : `Exceeded`}
+                                        </span>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="budget-cat-streak-section">
+                                    <div class="budget-streak-track uncapped-track">
+                                        <div class="budget-streak-fill uncapped-fill" style="width: 0%;"></div>
+                                    </div>
+                                    <div class="budget-cat-streak-footer">
+                                        <span class="text-xs text-muted">Flexible allocation</span>
+                                        <span class="text-xs text-muted">Tracked in continuous ledger</span>
+                                    </div>
+                                </div>
+                            `}
+                        </div>
+                    `;
+                }).join('');
+            }
         }
 
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -6448,34 +6571,57 @@ class App {
         document.body.style.overflow = '';
     }
 
-    // Lucide Icons Collection (~160 Monochrome SVG Icons)
+    // =========================================================================
+    // CATEGORY MANAGEMENT & LOGICAL ICON ORGANIZATION
+    // =========================================================================
+
+    // Curated Logical Icon Groups (10 categories with distinct monochrome Lucide SVGs)
+    static get LucideIconGroups() {
+        return {
+            'Travel & Commute': [
+                'train-front', 'bus', 'plane', 'car', 'fuel', 'bike', 'navigation', 'map-pin', 'map', 'compass', 'anchor'
+            ],
+            'Food & Dining': [
+                'shopping-basket', 'utensils', 'coffee', 'pizza', 'beer', 'wine', 'cake', 'apple', 'croissant'
+            ],
+            'Housing & Utilities': [
+                'home', 'building', 'hotel', 'warehouse', 'key', 'zap', 'flame', 'droplet', 'wifi', 'tv', 'phone', 'smartphone'
+            ],
+            'Shopping & Goods': [
+                'shopping-bag', 'shopping-cart', 'tag', 'package', 'box', 'gift', 'shirt', 'watch', 'gem', 'glasses'
+            ],
+            'Health & Personal': [
+                'heart-pulse', 'pill', 'stethoscope', 'activity', 'dumbbell', 'sparkles', 'scissors', 'heart', 'smile'
+            ],
+            'Finance & Work': [
+                'credit-card', 'landmark', 'banknote', 'coins', 'wallet', 'piggy-bank', 'badge-percent', 'receipt', 'file-text', 'file-check', 'briefcase', 'calculator', 'trending-up', 'trending-down', 'pie-chart', 'bar-chart-3', 'scale'
+            ],
+            'Entertainment & Media': [
+                'gamepad-2', 'clapperboard', 'video', 'music', 'ticket', 'camera', 'headphones', 'book', 'book-open', 'newspaper'
+            ],
+            'Tech & Hardware': [
+                'laptop', 'monitor', 'tablet', 'cpu', 'database', 'server', 'hard-drive', 'plug', 'battery-charging', 'printer', 'power', 'rss'
+            ],
+            'Family, Pets & Nature': [
+                'baby', 'user', 'users', 'user-check', 'paw-print', 'dog', 'cat', 'flower-2', 'tree-pine', 'trees', 'sun', 'moon', 'cloud', 'umbrella'
+            ],
+            'General & System': [
+                'wrench', 'hammer', 'shield', 'shield-check', 'lock', 'unlock', 'archive', 'trash-2', 'check-circle-2', 'layers', 'sliders', 'settings', 'layout-grid', 'folder', 'folder-open', 'bookmark', 'lightbulb', 'target', 'life-buoy', 'flag', 'award', 'star'
+            ]
+        };
+    }
+
+    // Flat list of all available icons for search & backward compatibility
     static get LucideIcons() {
-        return [
-            'shopping-basket', 'shopping-bag', 'shopping-cart', 'utensils', 'coffee', 'beer', 'wine', 'pizza',
-            'train-front', 'car', 'bus', 'fuel', 'plane', 'bike', 'zap', 'flame', 'droplet', 'wifi',
-            'tv', 'radio', 'phone', 'smartphone', 'laptop', 'monitor', 'tablet', 'camera', 'headphones',
-            'gamepad-2', 'heart-pulse', 'pill', 'stethoscope', 'activity', 'dumbbell', 'sparkles', 'scissors',
-            'shirt', 'watch', 'gem', 'glasses', 'home', 'building', 'hotel', 'warehouse', 'key',
-            'wrench', 'hammer', 'shield', 'shield-check', 'lock', 'unlock', 'credit-card', 'landmark',
-            'banknote', 'coins', 'wallet', 'piggy-bank', 'badge-percent', 'receipt', 'file-text', 'file-check',
-            'briefcase', 'graduation-cap', 'book-open', 'book', 'newspaper', 'music', 'video', 'clapperboard',
-            'ticket', 'gift', 'tag', 'package', 'truck', 'box', 'send', 'mail', 'inbox',
-            'calendar', 'clock', 'alarm-clock', 'bell', 'compass', 'map-pin', 'map', 'navigation',
-            'globe', 'sun', 'moon', 'cloud', 'umbrella', 'thermometer', 'cake', 'apple',
-            'croissant', 'flower-2', 'tree-pine', 'trees', 'paw-print', 'dog', 'cat', 'baby',
-            'user', 'users', 'user-check', 'smile', 'heart', 'star', 'award', 'flag',
-            'bookmark', 'lightbulb', 'cpu', 'database', 'server', 'hard-drive', 'cloud-rain', 'flame-kindling',
-            'plug', 'battery-charging', 'printer', 'scale', 'calculator', 'trending-up', 'trending-down', 'pie-chart',
-            'bar-chart-3', 'dollar-sign', 'help-circle', 'alert-circle', 'info', 'archive', 'trash-2', 'check-circle-2',
-            'x-circle', 'refresh-cw', 'layers', 'sliders', 'settings', 'layout-grid', 'grid', 'list',
-            'folder', 'folder-open', 'paperclip', 'external-link', 'crosshair', 'target', 'life-buoy', 'anchor',
-            'power', 'zap-off', 'rss', 'search', 'filter', 'check', 'x', 'edit', 'pencil', 'plus'
-        ];
+        return Object.values(App.LucideIconGroups).flat();
     }
 
     openCategoryManageModal(catId = null, region = null) {
         this.editingCatId = catId;
         const targetRegion = region || this.budgetsRegion || 'JP';
+        this.editingCatRegion = targetRegion;
+        this.activeIconGroup = 'All';
+        this.catIconSearchQuery = '';
 
         const titleEl = document.getElementById('cat-modal-title');
         const idInput = document.getElementById('cat-edit-id');
@@ -6488,19 +6634,32 @@ class App {
         const contributeToggle = document.getElementById('cat-toggle-contribute');
         const archiveBtn = document.getElementById('cat-btn-archive');
         const archiveText = document.getElementById('cat-btn-archive-text');
+        const searchInput = document.getElementById('cat-icon-search-input');
 
+        if (searchInput) searchInput.value = '';
         if (currLabel) currLabel.innerText = targetRegion === 'JP' ? '¥' : '₹';
 
         let category = null;
         if (catId) {
             category = (storage.state.categories[targetRegion] || []).find(c => c.id === catId);
+            if (!category) {
+                // Check across all regions in case region was switched
+                for (const reg of ['JP', 'IN']) {
+                    const found = (storage.state.categories[reg] || []).find(c => c.id === catId);
+                    if (found) {
+                        category = found;
+                        this.editingCatRegion = reg;
+                        break;
+                    }
+                }
+            }
         }
 
         if (category) {
             if (titleEl) titleEl.innerText = `Edit ${category.name}`;
             if (idInput) idInput.value = category.id;
             if (nameInput) nameInput.value = category.name;
-            if (countrySelect) countrySelect.value = targetRegion;
+            if (countrySelect) countrySelect.value = this.editingCatRegion;
             if (budgetInput) budgetInput.value = category.budget || 0;
             this.selectedCatIcon = category.icon || 'tag';
             if (activeToggle) activeToggle.checked = (category.isActive !== false);
@@ -6523,37 +6682,120 @@ class App {
             if (archiveBtn) archiveBtn.style.display = 'none';
         }
 
-        // Update selected icon preview
+        // Render Group Pills & Icons
+        this.renderCategoryIconPicker();
         this.selectCategoryIcon(this.selectedCatIcon);
-
-        // Render Lucide Icon Picker Grid
-        this.filterCategoryIcons('');
 
         const modal = document.getElementById('category-manage-modal');
         if (modal) modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
     }
 
     closeCategoryManageModal() {
         const modal = document.getElementById('category-manage-modal');
         if (modal) modal.classList.remove('active');
+        document.body.style.overflow = '';
     }
 
-    filterCategoryIcons(query = '') {
+    renderCategoryIconPicker() {
+        const pillsContainer = document.getElementById('icon-group-pills');
         const grid = document.getElementById('cat-icons-picker-grid');
         if (!grid) return;
 
-        const q = (query || '').toLowerCase().trim();
-        const icons = App.LucideIcons.filter(name => !q || name.includes(q));
+        const groups = App.LucideIconGroups;
+        const groupNames = Object.keys(groups);
 
-        grid.innerHTML = icons.map(icon => `
-            <div class="icon-picker-cell ${icon === this.selectedCatIcon ? 'selected' : ''}" onclick="app.selectCategoryIcon('${icon}')" title="${icon}">
-                <i data-lucide="${icon}" style="width: 16px; height: 16px;"></i>
-            </div>
-        `).join('');
+        // 1. Render Group Filter Pills
+        if (pillsContainer) {
+            const allPills = ['All', ...groupNames];
+            pillsContainer.innerHTML = allPills.map(g => `
+                <button type="button" class="icon-group-pill ${g === (this.activeIconGroup || 'All') ? 'active' : ''}" onclick="app.selectCategoryIconGroup('${g}')">
+                    ${g}
+                </button>
+            `).join('');
+        }
+
+        // 2. Render Icon Grid (Grouped or Search-Filtered)
+        const q = (this.catIconSearchQuery || '').toLowerCase().trim();
+        const activeGroup = this.activeIconGroup || 'All';
+
+        let html = '';
+        if (q) {
+            // Search across all groups
+            const allIcons = App.LucideIcons;
+            const matchedIcons = allIcons.filter(name => name.includes(q));
+
+            if (matchedIcons.length === 0) {
+                html = `<div style="grid-column: 1 / -1; padding: 18px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">No icons matching "${q}"</div>`;
+            } else {
+                html = `
+                    <div class="icon-picker-grid">
+                        ${matchedIcons.map(icon => `
+                            <button type="button" class="icon-picker-cell ${icon === this.selectedCatIcon ? 'selected' : ''}" onclick="app.selectCategoryIcon('${icon}')" title="${icon}">
+                                <i data-lucide="${icon}" style="width: 16px; height: 16px;"></i>
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        } else if (activeGroup === 'All') {
+            // Show grouped sections
+            html = groupNames.map(group => {
+                const groupIcons = groups[group];
+                return `
+                    <div class="icon-picker-group">
+                        <div class="icon-picker-group-title">
+                            <span>${group}</span>
+                            <span class="icon-group-count">${groupIcons.length}</span>
+                        </div>
+                        <div class="icon-picker-grid">
+                            ${groupIcons.map(icon => `
+                                <button type="button" class="icon-picker-cell ${icon === this.selectedCatIcon ? 'selected' : ''}" onclick="app.selectCategoryIcon('${icon}')" title="${icon}">
+                                    <i data-lucide="${icon}" style="width: 16px; height: 16px;"></i>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            // Show only the selected group
+            const groupIcons = groups[activeGroup] || [];
+            html = `
+                <div class="icon-picker-group">
+                    <div class="icon-picker-group-title">
+                        <span>${activeGroup}</span>
+                        <span class="icon-group-count">${groupIcons.length}</span>
+                    </div>
+                    <div class="icon-picker-grid">
+                        ${groupIcons.map(icon => `
+                            <button type="button" class="icon-picker-cell ${icon === this.selectedCatIcon ? 'selected' : ''}" onclick="app.selectCategoryIcon('${icon}')" title="${icon}">
+                                <i data-lucide="${icon}" style="width: 16px; height: 16px;"></i>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        grid.innerHTML = html;
 
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             lucide.createIcons();
         }
+    }
+
+    selectCategoryIconGroup(groupName) {
+        this.activeIconGroup = groupName;
+        this.catIconSearchQuery = '';
+        const searchInput = document.getElementById('cat-icon-search-input');
+        if (searchInput) searchInput.value = '';
+        this.renderCategoryIconPicker();
+    }
+
+    filterCategoryIcons(query = '') {
+        this.catIconSearchQuery = (query || '').toLowerCase().trim();
+        this.renderCategoryIconPicker();
     }
 
     selectCategoryIcon(iconName) {
@@ -6596,19 +6838,21 @@ class App {
         }
 
         const catId = idInput?.value || '';
-        const region = countrySelect?.value || 'JP';
+        const targetRegion = countrySelect?.value || 'JP';
         const budgetAmt = Math.max(0, Number(budgetInput?.value || 0));
         const isActive = activeToggle ? activeToggle.checked : true;
         const hiddenFromOverview = overviewToggle ? !overviewToggle.checked : false;
         const contributesToTotal = contributeToggle ? contributeToggle.checked : true;
 
-        if (!storage.state.categories[region]) {
-            storage.state.categories[region] = [];
+        if (!storage.state.categories[targetRegion]) {
+            storage.state.categories[targetRegion] = [];
         }
 
         if (catId) {
             // Edit existing category
-            const cat = storage.state.categories[region].find(c => c.id === catId);
+            const origRegion = this.editingCatRegion || targetRegion;
+            let cat = (storage.state.categories[origRegion] || []).find(c => c.id === catId);
+
             if (cat) {
                 cat.name = catName;
                 cat.icon = this.selectedCatIcon;
@@ -6616,11 +6860,17 @@ class App {
                 cat.isActive = isActive;
                 cat.hiddenFromBudgetOverview = hiddenFromOverview;
                 cat.contributesToTotalBudget = contributesToTotal;
+
+                // Handle region migration if region changed
+                if (origRegion !== targetRegion && targetRegion !== 'ALL') {
+                    storage.state.categories[origRegion] = storage.state.categories[origRegion].filter(c => c.id !== catId);
+                    storage.state.categories[targetRegion].push(cat);
+                }
             }
         } else {
             // Create new category
-            const newId = `${region.toLowerCase()}-${catName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString().slice(-4)}`;
-            storage.state.categories[region].push({
+            const newId = `${targetRegion.toLowerCase()}-${catName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString().slice(-4)}`;
+            storage.state.categories[targetRegion].push({
                 id: newId,
                 name: catName,
                 icon: this.selectedCatIcon,
@@ -6642,8 +6892,16 @@ class App {
 
     toggleCategoryArchive() {
         if (!this.editingCatId) return;
-        const region = document.getElementById('cat-edit-country')?.value || 'JP';
-        const cat = (storage.state.categories[region] || []).find(c => c.id === this.editingCatId);
+        const targetRegion = this.editingCatRegion || document.getElementById('cat-edit-country')?.value || 'JP';
+        let cat = (storage.state.categories[targetRegion] || []).find(c => c.id === this.editingCatId);
+
+        if (!cat) {
+            for (const r of ['JP', 'IN']) {
+                const found = (storage.state.categories[r] || []).find(c => c.id === this.editingCatId);
+                if (found) { cat = found; break; }
+            }
+        }
+
         if (!cat) return;
 
         cat.isActive = !(cat.isActive !== false);
