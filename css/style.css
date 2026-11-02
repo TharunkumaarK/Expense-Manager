@@ -5280,11 +5280,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     position: relative;
 }
 
-/* Card Subtle Elevation & Hover Illumination */
-.card:hover,
-.category-card:hover,
-.analytics-kpi-card:hover,
-.budget-cat-card:hover {
+/* Card Subtle Elevation & Hover Illumination - Interactive Elements Only */
+.interactive-card:hover,
+.wallet-card:hover,
+.action-type-card:hover,
+.category-card.interactive:hover {
     border-color: rgba(255, 255, 255, 0.18) !important;
     transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.50), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
@@ -5404,11 +5404,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .reports-content-container {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
     width: 100%;
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 4px;
+    padding: 0 16px;
+    box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+    .reports-content-container {
+        padding: 0 8px;
+        gap: 16px;
+    }
 }
 
 .reports-toolbar-card {
@@ -5419,6 +5427,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     gap: 16px;
     padding: 16px 20px;
     border-radius: var(--radius-lg);
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
 }
 
 .reports-actions-group {
@@ -5433,7 +5444,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 20px;
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
 }
 
 .snapshot-hero-top {
@@ -5441,27 +5455,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     justify-content: space-between;
     align-items: flex-start;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 14px;
 }
 
-.snapshot-title-group h3 {
+.snapshot-title-group h3,
+.snapshot-title-group h2 {
     margin: 0 0 4px 0;
-    font-size: 1.3rem;
+    font-size: 1.25rem;
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--text-primary);
 }
 
-.snapshot-meta-strip {
+.snapshot-meta-strip,
+.report-meta-text {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     font-size: 0.78rem;
     color: var(--text-muted);
     flex-wrap: wrap;
 }
 
-.snapshot-status-badge {
+.snapshot-status-badge,
+.report-status-badge {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -5473,13 +5490,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     letter-spacing: 0.03em;
 }
 
-.snapshot-status-badge.closed {
+.snapshot-status-badge.closed,
+.report-status-badge.closed {
     background: rgba(99, 102, 241, 0.15);
     color: #818cf8;
     border: 1px solid rgba(99, 102, 241, 0.3);
 }
 
-.snapshot-status-badge.active {
+.snapshot-status-badge.active,
+.report-status-badge.active {
     background: rgba(16, 185, 129, 0.15);
     color: #34d399;
     border: 1px solid rgba(16, 185, 129, 0.3);
@@ -5491,45 +5510,90 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     gap: 14px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1100px) {
     .reports-kpi-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }
-@media (max-width: 640px) {
+@media (max-width: 580px) {
     .reports-kpi-grid {
         grid-template-columns: 1fr;
     }
 }
 
-/* Reports Analytics Grid & Restored Expense Distribution Doughnut Chart */
-.reports-analytics-grid {
-    display: grid;
-    grid-template-columns: 360px 1fr;
-    gap: 20px;
-    margin-bottom: 24px;
-    align-items: start;
+.reports-kpi-card {
+    padding: 16px 18px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-@media (max-width: 1100px) {
+.reports-kpi-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.reports-kpi-val {
+    font-size: 1.45rem;
+    font-weight: 700;
+    font-family: var(--font-numeric);
+    font-feature-settings: "tnum";
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+}
+
+.reports-kpi-val.positive {
+    color: #34d399;
+}
+
+.reports-kpi-val.negative {
+    color: #fb7185;
+}
+
+.reports-kpi-val.highlight {
+    color: #60a5fa;
+}
+
+/* Reports Analytics Grid & Expense Distribution Doughnut Chart */
+.reports-analytics-grid {
+    display: grid;
+    grid-template-columns: 330px 1fr;
+    gap: 24px;
+    align-items: stretch;
+    margin-bottom: 0;
+}
+
+@media (max-width: 1280px) {
     .reports-analytics-grid {
         grid-template-columns: 1fr;
+        gap: 20px;
     }
 }
 
 .reports-chart-card {
     border-radius: var(--radius-lg);
     padding: 22px;
-    background: var(--bg-surface-1);
-    border: 1px solid var(--border-subtle);
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
     box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
 }
 
+.reports-chart-card-header,
 .reports-chart-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 14px;
+    gap: 12px;
 }
 
 .reports-chart-title {
@@ -5546,11 +5610,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     display: block;
 }
 
+.reports-chart-canvas-wrap,
 .reports-pie-container {
     position: relative;
-    width: 210px;
-    height: 210px;
-    margin: 10px auto 16px;
+    width: 100%;
+    height: 220px;
+    margin: 4px auto 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .reports-pie-center-label {
@@ -5564,19 +5632,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     text-align: center;
 }
 
+.reports-pie-center-label .center-sub,
 .reports-pie-center-title {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.06em;
     color: var(--text-muted);
     font-weight: 600;
 }
 
+.reports-pie-center-label .center-val,
 .reports-pie-center-total {
-    font-size: 1.25rem;
+    font-size: 1.35rem;
     font-weight: 800;
     color: var(--text-primary);
     font-family: var(--font-numeric);
+    font-feature-settings: "tnum";
     letter-spacing: -0.02em;
     margin-top: 2px;
 }
@@ -5585,7 +5656,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-height: 210px;
+    max-height: 240px;
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -5594,23 +5665,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 6px 10px;
+    padding: 7px 10px;
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
     font-size: 0.8rem;
-    transition: background 120ms ease;
+    transition: background 150ms ease, border-color 150ms ease;
 }
 
 .pie-legend-item:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.08);
 }
 
-.pie-legend-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
+.legend-dot,
 .pie-legend-dot {
     width: 8px;
     height: 8px;
@@ -5618,67 +5686,271 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     flex-shrink: 0;
 }
 
+.legend-info,
+.pie-legend-left {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-left: 8px;
+}
+
+.legend-cat-name,
 .pie-legend-name {
     color: var(--text-secondary);
     font-weight: 500;
+    font-size: 0.8rem;
 }
 
+.legend-meta,
 .pie-legend-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
+.legend-pct,
+.pie-legend-pct {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.legend-dot-sep {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    opacity: 0.5;
+}
+
+.legend-amt,
 .pie-legend-amount {
     font-family: var(--font-numeric);
+    font-feature-settings: "tnum";
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+}
+
+/* Category Expense Breakdown Table Card */
+.reports-data-table-card {
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.category-breakdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.breakdown-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.breakdown-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.report-table-scroll {
+    overflow-x: auto;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.report-table,
+.reports-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.82rem;
+}
+
+.report-table th,
+.reports-table th {
+    padding: 9px 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+}
+
+.report-table th:nth-child(1),
+.reports-table th:nth-child(1) {
+    text-align: left;
+}
+
+.report-table th:nth-child(2),
+.reports-table th:nth-child(2),
+.report-table th:nth-child(3),
+.reports-table th:nth-child(3),
+.report-table th:nth-child(4),
+.reports-table th:nth-child(4),
+.report-table th:nth-child(5),
+.reports-table th:nth-child(5),
+.report-table th:nth-child(6),
+.reports-table th:nth-child(6) {
+    text-align: right;
+}
+
+.report-table td,
+.reports-table td {
+    padding: 11px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+    color: var(--text-secondary);
+}
+
+.report-table td:nth-child(1),
+.reports-table td:nth-child(1) {
+    text-align: left;
+}
+
+.report-table td:nth-child(2),
+.reports-table td:nth-child(2),
+.report-table td:nth-child(3),
+.reports-table td:nth-child(3),
+.report-table td:nth-child(4),
+.reports-table td:nth-child(4),
+.report-table td:nth-child(5),
+.reports-table td:nth-child(5),
+.report-table td:nth-child(6),
+.reports-table td:nth-child(6) {
+    text-align: right;
+    font-family: var(--font-numeric);
+    font-feature-settings: "tnum";
+}
+
+.report-table tr:hover td,
+.reports-table tr:hover td {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.category-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 600;
     color: var(--text-primary);
 }
 
-.pie-legend-pct {
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    min-width: 36px;
-    text-align: right;
-}
-
-.reports-data-table-card {
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    overflow-x: auto;
-}
-
-.reports-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-}
-
-.reports-table th {
-    text-align: left;
-    padding: 10px 14px;
-    color: var(--text-muted);
-    font-weight: 600;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.reports-table td {
-    padding: 12px 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+.category-icon-box {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--text-secondary);
+    flex-shrink: 0;
 }
 
-.reports-table tr:hover td {
-    background: rgba(255, 255, 255, 0.02);
+.spend-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
 }
 
-.reports-table .text-right {
-    text-align: right;
+.micro-spend-track {
+    width: 50px;
+    height: 3px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.micro-spend-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: var(--gradient-primary);
+}
+
+.badge-cushion {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.badge-overspend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(244, 63, 94, 0.12);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
+.tx-count-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.report-empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.report-empty-state .empty-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    margin-bottom: 4px;
 }
 
 .custom-report-panel {
     border-radius: var(--radius-lg);
-    padding: 20px 24px;
+    padding: 24px;
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -5687,14 +5959,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .custom-range-row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     flex-wrap: wrap;
 }
 
 .custom-date-field {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
 
 /* ==========================================================================

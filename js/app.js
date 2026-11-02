@@ -5244,6 +5244,11 @@ class App {
         }
     }
 
+    setReportCategoryFilter(filter) {
+        this.reportCategoryFilter = filter;
+        this.renderReportsPage();
+    }
+
     refreshReportSnapshot() {
         const cacheKey = `${this.reportRegion}_${this.reportMonthKey}`;
         const now = new Date().toLocaleString();
@@ -5385,7 +5390,7 @@ class App {
 
         if (closedMeta) {
             // Historical closed period
-            periodTotalBudget = closedMeta.jpTotalBudget || 0;
+            periodTotalBudget = this.reportRegion === 'JP' ? (closedMeta.jpTotalBudget || 0) : (closedMeta.inTotalBudget || 0);
             if (closedMeta.categoriesSnapshot && closedMeta.categoriesSnapshot[this.reportRegion]) {
                 closedMeta.categoriesSnapshot[this.reportRegion].forEach(c => {
                     periodCatBudgets[c.id] = c.budget || 0;
@@ -5395,7 +5400,11 @@ class App {
             }
         } else if (this.reportMonthKey === storage.state.currentMonthKey) {
             // Current active month
-            periodTotalBudget = this.reportRegion === 'JP' ? (storage.state.jpTotalBudget || 0) : 0;
+            if (this.reportRegion === 'JP') {
+                periodTotalBudget = storage.state.jpTotalBudget || 0;
+            } else {
+                periodTotalBudget = storage.state.inTotalBudget || (storage.state.categories['IN'] || []).reduce((sum, c) => sum + (c.budget || 0), 0);
+            }
             (storage.state.categories[this.reportRegion] || []).forEach(c => {
                 periodCatBudgets[c.id] = c.budget || 0;
             });
@@ -5531,40 +5540,91 @@ class App {
                 }
             });
 
-            const rowsHtml = Array.from(catMap.values()).map(cat => {
+            // Convert to array with calculated values
+            const allCategoriesList = Array.from(catMap.values()).map(cat => {
                 const spent = categorySpendMap[cat.id] || 0;
                 const budgetLimit = periodCatBudgets[cat.id] || 0;
                 const txCount = categoryTxCountMap[cat.id] || 0;
                 const pctOfTotal = totalExpense > 0 ? ((spent / totalExpense) * 100).toFixed(1) : '0.0';
                 const variance = budgetLimit > 0 ? (budgetLimit - spent) : null;
+                return {
+                    ...cat,
+                    spent,
+                    budgetLimit,
+                    txCount,
+                    pctOfTotal,
+                    variance
+                };
+            });
 
+            // Sort descending: highest spend first, then highest budget limit, then name
+            allCategoriesList.sort((a, b) => {
+                if (b.spent !== a.spent) return b.spent - a.spent;
+                if (b.budgetLimit !== a.budgetLimit) return b.budgetLimit - a.budgetLimit;
+                return a.name.localeCompare(b.name);
+            });
+
+            const activeCategoriesCount = allCategoriesList.filter(c => c.spent > 0 || c.budgetLimit > 0).length;
+            const filterMode = this.reportCategoryFilter || (activeCategoriesCount > 0 ? 'active' : 'all');
+
+            let displayedCategories = allCategoriesList;
+            if (filterMode === 'active' && activeCategoriesCount > 0) {
+                displayedCategories = allCategoriesList.filter(c => c.spent > 0 || c.budgetLimit > 0);
+            }
+
+            const rowsHtml = displayedCategories.map(cat => {
                 return `
                     <tr>
-                        <td style="display: flex; align-items: center; gap: 10px; font-weight: 600;">
-                            <div style="width: 28px; height: 28px; border-radius: var(--radius-sm); background: rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: center; color: var(--text-primary);">
-                                <i data-lucide="${cat.icon || 'tag'}" style="width: 14px; height: 14px;"></i>
+                        <td>
+                            <div class="category-cell">
+                                <div class="category-icon-box">
+                                    <i data-lucide="${cat.icon || 'tag'}" style="width: 14px; height: 14px;"></i>
+                                </div>
+                                <span>${cat.name}</span>
                             </div>
-                            <span>${cat.name}</span>
                         </td>
-                        <td class="privacy-blur">${budgetLimit > 0 ? this.formatMoney(budgetLimit, currency) : '<span class="text-muted">—</span>'}</td>
-                        <td class="font-bold privacy-blur">${this.formatMoney(spent, currency)}</td>
+                        <td class="privacy-blur">${cat.budgetLimit > 0 ? this.formatMoney(cat.budgetLimit, currency) : '<span class="text-muted">—</span>'}</td>
+                        <td>
+                            <div class="spend-cell">
+                                <span class="font-bold privacy-blur">${this.formatMoney(cat.spent, currency)}</span>
+                                ${cat.spent > 0 && totalExpense > 0 ? `
+                                    <div class="micro-spend-track" title="${cat.pctOfTotal}% of total spend">
+                                        <div class="micro-spend-fill" style="width: ${Math.min(Number(cat.pctOfTotal), 100)}%;"></div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </td>
                         <td class="privacy-blur">
-                            ${variance !== null 
-                                ? `<span class="${variance >= 0 ? 'text-success' : 'text-danger'}" style="font-weight: 600;">${variance >= 0 ? '+' : ''}${this.formatMoney(variance, currency)}</span>` 
+                            ${cat.variance !== null 
+                                ? (cat.variance >= 0 
+                                    ? `<span class="badge-cushion">+${this.formatMoney(cat.variance, currency)}</span>` 
+                                    : `<span class="badge-overspend">${this.formatMoney(cat.variance, currency)}</span>`) 
                                 : '<span class="text-muted">—</span>'}
                         </td>
-                        <td>${pctOfTotal}%</td>
-                        <td><span class="report-status-badge active" style="font-size: 0.7rem; padding: 2px 8px;">${txCount} txs</span></td>
+                        <td><span style="font-weight: 600; color: var(--text-secondary);">${cat.pctOfTotal}%</span></td>
+                        <td><span class="tx-count-pill">${cat.txCount} tx${cat.txCount === 1 ? '' : 's'}</span></td>
                     </tr>
                 `;
             }).join('');
 
             breakdownCard.innerHTML = `
-                <div style="padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Category Expense Breakdown</h3>
-                    <span class="text-xs text-muted">${catMap.size} categories active</span>
+                <div class="category-breakdown-header">
+                    <div>
+                        <h3 class="breakdown-title">Category Expense Breakdown</h3>
+                        <p class="text-xs text-muted" style="margin: 3px 0 0 0;">Budget allocation, actual debits and cushion variance</p>
+                    </div>
+                    <div class="breakdown-controls">
+                        <div class="segmented-control" id="report-cat-filter-control">
+                            <button class="segment-btn ${filterMode === 'active' ? 'active' : ''}" onclick="app.setReportCategoryFilter('active')">
+                                Active (${activeCategoriesCount})
+                            </button>
+                            <button class="segment-btn ${filterMode === 'all' ? 'active' : ''}" onclick="app.setReportCategoryFilter('all')">
+                                All (${allCategoriesList.length})
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div style="overflow-x: auto;">
+                <div class="report-table-scroll">
                     <table class="report-table">
                         <thead>
                             <tr>
@@ -5572,12 +5632,22 @@ class App {
                                 <th>Allocated Budget</th>
                                 <th>Actual Spent</th>
                                 <th>Variance / Cushion</th>
-                                <th>% of Expenses</th>
+                                <th>% of Total</th>
                                 <th>Count</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${rowsHtml}
+                            ${displayedCategories.length > 0 ? rowsHtml : `
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="report-empty-state">
+                                            <div class="empty-icon-wrap"><i data-lucide="inbox"></i></div>
+                                            <div style="font-weight: 600; font-size: 0.9rem;">No Active Category Expenses</div>
+                                            <p class="text-muted text-xs">Switch to "All" to inspect categories with zero activity.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `}
                         </tbody>
                     </table>
                 </div>
