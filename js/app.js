@@ -2145,83 +2145,115 @@ class App {
 
     renderTransactions() {
         const activeTxs = this.getActiveTransactions();
-        const txs = activeTxs.slice(0, 6); // Latest 6 for dashboard
+        const txs = activeTxs.slice(0, 5); // 5 items: compact, prevents unnecessarily tall rail card
         const container = document.getElementById('recent-transactions-list');
+        const countBadge = document.getElementById('dash-recent-count-badge');
+
+        if (countBadge) {
+            countBadge.innerText = activeTxs.length > 0 ? `${activeTxs.length} Recorded` : 'This Month';
+        }
 
         if (!container) return;
 
         if (txs.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center" style="padding: 24px;">No transactions recorded this month.</p>';
+            container.innerHTML = `
+                <div class="dash-recent-empty">
+                    <i data-lucide="receipt" class="dash-recent-empty-icon"></i>
+                    <p class="dash-recent-empty-text">No activity recorded for this period.</p>
+                </div>
+            `;
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
             return;
         }
 
         let html = '';
         txs.forEach(tx => {
-            let icon = 'arrow-up-right';
-            let colorCls = 'text-rose';
+            let icon = 'arrow-down-right';
+            let typeCls = 'expense';
+            let amountCls = 'tx-amt-expense';
             let sign = '-';
-            let title = tx.note || tx.categoryId || 'Expense';
-            let categoryName = '';
+            let title = '';
+            let meta = '';
+
+            const date = new Date(tx.date || Date.now());
+            const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
             if (tx.type === 'income') {
-                icon = 'arrow-down-left';
-                colorCls = 'text-emerald';
+                icon = 'arrow-up-right';
+                typeCls = 'income';
+                amountCls = 'tx-amt-income';
                 sign = '+';
-                title = tx.note || 'Income';
+                title = tx.note || 'Income / Credit';
+                const wallet = storage.state.wallets[tx.walletId];
+                const walletName = wallet ? wallet.name : (tx.walletId || 'Wallet');
+                meta = `${dateStr} • ${walletName}`;
             } else if (tx.type === 'transfer') {
-                icon = 'repeat';
-                colorCls = 'text-muted';
+                icon = 'arrow-left-right';
+                typeCls = 'transfer';
+                amountCls = 'tx-amt-neutral';
                 sign = '';
-                title = `Transfer: ${tx.sourceId} → ${tx.destId}`;
+                const srcWallet = storage.state.wallets[tx.sourceId];
+                const dstWallet = storage.state.wallets[tx.destId];
+                const srcName = srcWallet ? srcWallet.name : (tx.sourceId || 'Source');
+                const dstName = dstWallet ? dstWallet.name : (tx.destId || 'Dest');
+                title = tx.note || 'Transfer';
+                meta = `${dateStr} • ${srcName} → ${dstName}`;
             } else if (tx.type === 'remittance') {
-                icon = 'globe';
-                colorCls = 'text-muted';
+                icon = 'send';
+                typeCls = 'remittance';
+                amountCls = 'tx-amt-neutral';
                 sign = '';
-                title = `Remittance: JP → IN`;
+                title = tx.note || 'Remittance';
+                meta = `${dateStr} • Japan → India`;
             } else {
-                const regionCats = storage.state.categories[tx.region];
-                const cat = regionCats?.find(c => c.id === tx.categoryId);
-                if (cat) {
-                    categoryName = cat.name;
-                    title = cat.name;
+                // Expense
+                icon = 'arrow-down-right';
+                typeCls = 'expense';
+                amountCls = 'tx-amt-expense';
+                sign = '-';
+                
+                const regionCats = storage.state.categories[tx.region] || [];
+                const cat = regionCats.find(c => c.id === tx.categoryId);
+                const categoryName = cat ? cat.name : (tx.categoryId || 'Expense');
+                const wallet = storage.state.wallets[tx.walletId];
+                const walletName = wallet ? wallet.name : (tx.walletId || '');
+
+                title = tx.note || categoryName;
+                if (tx.note && categoryName && tx.note !== categoryName) {
+                    meta = `${dateStr} • ${walletName ? walletName + ' • ' : ''}${categoryName}`;
+                } else {
+                    meta = `${dateStr} • ${walletName || categoryName}`;
                 }
             }
 
             const amt = (tx.type === 'remittance')
-                ? (this.isPrivacyHidden ? '******' : `¥${tx.sourceAmount?.toLocaleString()} → ₹${tx.destAmount?.toLocaleString()}`)
+                ? (this.isPrivacyHidden ? '******' : `¥${(tx.sourceAmount || 0).toLocaleString()} → ₹${(tx.destAmount || 0).toLocaleString()}`)
                 : this.formatMoney(tx.amount, tx.currency, { prefix: sign });
 
-            const flag = tx.region ? this.getCountryFlagSvg(tx.region, 16, 12) : '';
-            const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-
-            let metaString = `${date} • ${tx.walletId || 'Wallet'}`;
-            if (tx.note && tx.type !== 'income' && categoryName) {
-                metaString += ` • ${tx.note}`;
-            }
-
             html += `
-                <div class="tx-row" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer;">
-                    <div class="tx-left">
-                        <div class="tx-icon-wrap ${tx.type === 'income' ? 'income' : tx.type === 'transfer' ? 'transfer' : 'expense'}">
+                <div class="dash-recent-row" onclick="app.editTransaction('${tx.id}')" role="button" tabindex="0" title="Click to view/edit">
+                    <div class="dash-recent-left">
+                        <div class="dash-recent-icon-wrap ${typeCls}">
                             <i data-lucide="${icon}"></i>
                         </div>
-                        <div class="tx-info">
-                            <div class="tx-title-line">
-                                <span class="tx-title">${title}</span>
-                                ${flag ? `<span class="tx-country-pill">${flag}</span>` : ''}
-                            </div>
-                            <span class="tx-meta">${metaString}</span>
+                        <div class="dash-recent-info">
+                            <span class="dash-recent-title">${title}</span>
+                            <span class="dash-recent-meta">${meta}</span>
                         </div>
                     </div>
-                    <div class="tx-right">
-                        <span class="tx-amount privacy-blur ${colorCls}">${amt}</span>
+                    <div class="dash-recent-right">
+                        <span class="dash-recent-amount ${amountCls} privacy-blur financial-amount">${amt}</span>
                     </div>
                 </div>
             `;
         });
 
         container.innerHTML = html;
-        lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
     }
 
     renderMonthlySummary() {

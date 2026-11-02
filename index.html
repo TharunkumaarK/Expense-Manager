@@ -468,24 +468,6 @@
                                         <!-- Populated by JS -->
                                     </div>
                                 </div>
-
-                                <!-- Recent Transactions Section -->
-                                <div class="recent-transactions-section">
-                                    <div class="section-header-row">
-                                        <div>
-                                            <h3 class="section-title" style="margin:0;">Recent Transactions</h3>
-                                            <p class="section-subtitle">Latest movements across Japan & India</p>
-                                        </div>
-                                        <button class="btn btn-secondary btn-sm"
-                                            onclick="app.switchView('transactions-view')">
-                                            <span>See All</span>
-                                            <i data-lucide="arrow-right"></i>
-                                        </button>
-                                    </div>
-                                    <div class="recent-transactions-list" id="recent-transactions-list">
-                                        <!-- Populated by JS -->
-                                    </div>
-                                </div>
                             </div>
 
                             <!-- Right-hand Contextual Rail -->
@@ -520,7 +502,24 @@
                                     </div>
                                 </div>
 
-                                <!-- Loan Tracker Widget (Pass 1 Requirement 6.F: Restored below expense breakdown) -->
+                                <!-- Recent Activity Widget (Relocated into rail: spending analysis → recent activity → loan progress) -->
+                                <div class="rail-card dashboard-recent-tx-card" id="dashboard-recent-tx-card">
+                                    <div class="dash-recent-header">
+                                        <div class="dash-recent-title-wrap">
+                                            <h3 class="dash-chart-title">Recent Activity</h3>
+                                            <span class="dash-chart-period-badge" id="dash-recent-count-badge">This Month</span>
+                                        </div>
+                                        <button type="button" class="dash-see-all-btn" onclick="app.switchView('transactions-view')" title="View continuous ledger">
+                                            <span>See All</span>
+                                            <i data-lucide="arrow-right"></i>
+                                        </button>
+                                    </div>
+                                    <div class="dash-recent-list" id="recent-transactions-list">
+                                        <!-- Populated dynamically by JS -->
+                                    </div>
+                                </div>
+
+                                <!-- Loan Tracker Widget (Pass 1 Requirement 6.F: Restored below recent activity) -->
                                 <div class="rail-card loan-card" id="loan-tracker-widget" style="display: none;">
                                     <!-- Populated dynamically by JS -->
                                 </div>

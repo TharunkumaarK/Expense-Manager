@@ -912,8 +912,7 @@ button {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    position: sticky;
-    top: calc(var(--header-height) + 24px);
+    position: static; /* Natural vertical scrolling flow: spending analysis → recent activity → loan progress */
 }
 
 @media (max-width: 1200px) {
@@ -2570,7 +2569,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .tx-row:hover {
     background: var(--bg-surface-hover);
-    transform: translateX(2px);
 }
 
 .tx-row-left {
@@ -6591,4 +6589,205 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .workspace-rail .loan-card {
     margin: 0;
     width: 100%;
+}
+
+/* 4. Relocated Dashboard Recent Activity Widget */
+.dashboard-recent-tx-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.dash-recent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dash-recent-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dash-see-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: var(--radius-sm);
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: background-color var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
+}
+
+.dash-see-all-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: var(--text-primary);
+}
+
+.dash-see-all-btn svg {
+    width: 12px;
+    height: 12px;
+    stroke-width: 2.2;
+}
+
+.dash-recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dash-recent-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 8px;
+    border-radius: var(--radius-md);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out);
+}
+
+.dash-recent-row:hover {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(255, 255, 255, 0.07);
+}
+
+.dash-recent-row:focus-visible {
+    outline: 2px solid var(--accent-subtle);
+    outline-offset: 1px;
+}
+
+.dash-recent-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+}
+
+.dash-recent-icon-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dash-recent-icon-wrap svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2.2;
+}
+
+.dash-recent-icon-wrap.expense {
+    background: rgba(244, 63, 94, 0.12);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.22);
+}
+
+.dash-recent-icon-wrap.income {
+    background: rgba(52, 211, 153, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.22);
+}
+
+.dash-recent-icon-wrap.transfer {
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.22);
+}
+
+.dash-recent-icon-wrap.remittance {
+    background: rgba(192, 132, 252, 0.12);
+    color: #c084fc;
+    border: 1px solid rgba(192, 132, 252, 0.22);
+}
+
+.dash-recent-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 1px;
+}
+
+.dash-recent-title {
+    font-size: 0.81rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 165px;
+    line-height: 1.25;
+}
+
+.dash-recent-meta {
+    font-size: 0.70rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 165px;
+    line-height: 1.2;
+}
+
+.dash-recent-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.dash-recent-amount {
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+.dash-recent-amount.tx-amt-expense {
+    color: #fb7185;
+}
+
+.dash-recent-amount.tx-amt-income {
+    color: #34d399;
+}
+
+.dash-recent-amount.tx-amt-neutral {
+    color: var(--text-secondary);
+}
+
+.dash-recent-empty {
+    padding: 24px 16px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.dash-recent-empty-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--text-faint);
+}
+
+.dash-recent-empty-text {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin: 0;
 }
