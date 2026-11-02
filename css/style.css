@@ -1869,7 +1869,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     width: 20px;
     height: 20px;
     color: var(--text-muted);
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+    transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms ease;
 }
 
 .section-header-toggle:hover i,
@@ -1891,7 +1891,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .collapsible-wrapper {
     display: grid;
     grid-template-rows: 1fr;
-    transition: grid-template-rows 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: grid-template-rows 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .collapsible-wrapper.collapsed {
@@ -1902,6 +1902,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .collapsible-inner {
     min-height: 0;
     overflow: hidden;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1), transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.collapsible-wrapper.collapsed > div,
+.collapsible-wrapper.collapsed .collapsible-inner {
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
 }
 
 /* Utilities */
@@ -3615,10 +3625,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .btn,
     .sidebar,
     .toast,
-    .action-selector-card {
+    .action-selector-card,
+    .collapsible-wrapper,
+    .collapsible-inner,
+    .account-popover-menu,
+    .section-header-toggle i,
+    .section-header-toggle svg {
         transform: none !important;
-        transition-property: opacity, background-color, border-color, color !important;
-        transition-duration: 150ms !important;
+        transition-property: opacity, background-color, border-color, color, grid-template-rows !important;
+        transition-duration: 0.01ms !important;
     }
 }
 
@@ -6065,14 +6080,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     border-radius: var(--radius-lg);
     box-shadow: var(--glass-shadow-elevated);
     padding: 8px;
-    display: none;
+    display: flex;
     flex-direction: column;
     gap: 2px;
     z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px) scale(0.98);
+    transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1), transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .account-popover-menu.active {
-    display: flex;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
 }
 
 .desktop-sidebar.collapsed .account-popover-menu {

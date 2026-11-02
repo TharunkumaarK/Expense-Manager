@@ -346,6 +346,16 @@ class App {
         // Keyboard shortcuts (Escape key dismisses focus overlay and modals)
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                const detailModal = document.getElementById('transaction-detail-modal');
+                if (detailModal && detailModal.classList.contains('active')) {
+                    this.closeTransactionDetail();
+                    return;
+                }
+                const overallBudgetModal = document.getElementById('overall-budget-modal');
+                if (overallBudgetModal && overallBudgetModal.classList.contains('active')) {
+                    this.closeOverallBudgetModal();
+                    return;
+                }
                 const menu = document.getElementById('sidebar-account-menu');
                 if (menu && menu.classList.contains('active')) {
                     menu.classList.remove('active');
@@ -356,7 +366,7 @@ class App {
                     this.closeFocusOverlay();
                     return;
                 }
-                ['add-wallet-modal', 'edit-wallet-modal', 'transaction-modal', 'tx-action-selector-modal', 'quick-edit-modal', 'color-picker-modal', 'pdf-modal'].forEach(mId => {
+                ['add-wallet-modal', 'edit-wallet-modal', 'transaction-modal', 'tx-action-selector-modal', 'quick-edit-modal', 'color-picker-modal', 'pdf-modal', 'category-manage-modal'].forEach(mId => {
                     const el = document.getElementById(mId);
                     if (el && el.classList.contains('active')) {
                         this.closeModal(mId);
@@ -2178,7 +2188,7 @@ class App {
 
         let html = '';
         txs.forEach(tx => {
-            let icon = 'arrow-down-right';
+            let icon = 'arrow-up-right';
             let typeCls = 'expense';
             let amountCls = 'tx-amt-expense';
             let sign = '-';
@@ -2189,7 +2199,7 @@ class App {
             const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
             if (tx.type === 'income') {
-                icon = 'arrow-up-right';
+                icon = 'arrow-down-left';
                 typeCls = 'income';
                 amountCls = 'tx-amt-income';
                 sign = '+';
@@ -2217,7 +2227,7 @@ class App {
                 meta = `${dateStr} • Japan → India`;
             } else {
                 // Expense
-                icon = 'arrow-down-right';
+                icon = 'arrow-up-right';
                 typeCls = 'expense';
                 amountCls = 'tx-amt-expense';
                 sign = '-';
@@ -2634,9 +2644,23 @@ class App {
         lucide.createIcons();
     }
 
-    openWalletFocus(walletId) {
+    openWalletFocus(walletId, sourceEl = null) {
         const w = storage.state.wallets[walletId];
         if (!w) return;
+
+        // Capture source rect for FLIP morphing transition
+        let sourceRect = null;
+        if (sourceEl && typeof sourceEl.getBoundingClientRect === 'function') {
+            sourceRect = sourceEl.getBoundingClientRect();
+        } else if (window.event) {
+            const evTarget = window.event.currentTarget || window.event.target;
+            const clickedCard = evTarget?.closest ? evTarget.closest('.wallet-item, .wallet-item-compact, .wallet-card') : null;
+            if (clickedCard) sourceRect = clickedCard.getBoundingClientRect();
+        }
+        if (!sourceRect) {
+            const candidate = document.querySelector(`[onclick*="'${walletId}'"]`);
+            if (candidate) sourceRect = candidate.getBoundingClientRect();
+        }
 
         const theme = this.getThemeForWallet(w);
         const flagSvg = this.getCountryFlagSvg(w.region, 20, 15);
@@ -2769,18 +2793,94 @@ class App {
         overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
         lucide.createIcons();
+
+        // Progressive FLIP transition from source card to focused layout
+        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (sourceRect && !prefersReduced) {
+            const targetCard = primaryPanel.querySelector('.wallet-card');
+            if (targetCard) {
+                const targetRect = targetCard.getBoundingClientRect();
+                if (targetRect.width > 0 && targetRect.height > 0) {
+                    const dx = sourceRect.left - targetRect.left;
+                    const dy = sourceRect.top - targetRect.top;
+                    const scaleX = sourceRect.width / targetRect.width;
+                    const scaleY = sourceRect.height / targetRect.height;
+
+                    targetCard.style.transformOrigin = 'top left';
+                    targetCard.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
+                    targetCard.style.transition = 'none';
+
+                    secondaryPanel.style.opacity = '0';
+                    secondaryPanel.style.transform = 'translateX(14px)';
+                    secondaryPanel.style.transition = 'none';
+
+                    this.lastWalletFocusSourceRect = sourceRect;
+
+                    void targetCard.offsetWidth;
+
+                    requestAnimationFrame(() => {
+                        targetCard.style.transition = 'transform 280ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 280ms cubic-bezier(0.16, 1, 0.3, 1)';
+                        targetCard.style.transform = 'none';
+
+                        secondaryPanel.style.transition = 'opacity 240ms cubic-bezier(0.16, 1, 0.3, 1) 40ms, transform 240ms cubic-bezier(0.16, 1, 0.3, 1) 40ms';
+                        secondaryPanel.style.opacity = '1';
+                        secondaryPanel.style.transform = 'none';
+                    });
+
+                    setTimeout(() => {
+                        if (targetCard) {
+                            targetCard.style.transformOrigin = '';
+                            targetCard.style.transform = '';
+                            targetCard.style.transition = '';
+                        }
+                        if (secondaryPanel) {
+                            secondaryPanel.style.transition = '';
+                            secondaryPanel.style.opacity = '';
+                            secondaryPanel.style.transform = '';
+                        }
+                    }, 340);
+                }
+            }
+        }
     }
 
     closeFocusOverlay() {
         const overlay = document.getElementById('focus-overlay');
-        if (overlay) {
-            overlay.classList.remove('active');
-            setTimeout(() => {
-                if (!overlay.classList.contains('active')) {
-                    overlay.style.display = 'none';
-                }
-            }, 240);
+        if (!overlay) return;
+
+        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const primaryPanel = document.getElementById('focus-primary-panel');
+        const targetCard = primaryPanel ? primaryPanel.querySelector('.wallet-card') : null;
+
+        if (targetCard && this.lastWalletFocusSourceRect && !prefersReduced) {
+            const targetRect = targetCard.getBoundingClientRect();
+            if (targetRect.width > 0 && targetRect.height > 0) {
+                const dx = this.lastWalletFocusSourceRect.left - targetRect.left;
+                const dy = this.lastWalletFocusSourceRect.top - targetRect.top;
+                const scaleX = this.lastWalletFocusSourceRect.width / targetRect.width;
+                const scaleY = this.lastWalletFocusSourceRect.height / targetRect.height;
+
+                targetCard.style.transformOrigin = 'top left';
+                targetCard.style.transition = 'transform 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease';
+                targetCard.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
+                targetCard.style.opacity = '0.3';
+            }
         }
+
+        overlay.classList.remove('active');
+        setTimeout(() => {
+            if (!overlay.classList.contains('active')) {
+                overlay.style.display = 'none';
+                if (targetCard) {
+                    targetCard.style.transformOrigin = '';
+                    targetCard.style.transform = '';
+                    targetCard.style.transition = '';
+                    targetCard.style.opacity = '';
+                }
+            }
+            this.lastWalletFocusSourceRect = null;
+        }, 240);
+
         document.body.style.overflow = '';
     }
 
@@ -3906,7 +4006,7 @@ class App {
             `;
 
             groupTxs.forEach(tx => {
-                let icon = 'arrow-down-right';
+                let icon = 'arrow-up-right';
                 let typeCls = 'expense';
                 let sign = '-';
                 let title = tx.note || this.getCategoryName(tx.categoryId, tx.region);
@@ -3915,7 +4015,7 @@ class App {
                 const flag = tx.region ? this.getCountryFlagSvg(tx.region, 14, 10.5) : '';
 
                 if (tx.type === 'income') {
-                    icon = 'arrow-up-right';
+                    icon = 'arrow-down-left';
                     typeCls = 'income';
                     sign = '+';
                     title = tx.note || 'Income Deposit';
@@ -4454,12 +4554,14 @@ class App {
         }
 
         modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
         if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
     }
 
     closeTransactionDetail() {
         const modal = document.getElementById('transaction-detail-modal');
         if (modal) modal.classList.remove('active');
+        document.body.style.overflow = '';
         this.currentDetailTxId = null;
     }
 
@@ -5976,12 +6078,13 @@ class App {
         const totalSpent = Object.values(totals).reduce((s, v) => s + v, 0);
         const cats = storage.state.categories[this.budgetsRegion] || [];
 
-        // Sum of category allocations (only those configured to contribute)
-        const allocatedBudget = this.budgetsRegion === 'JP'
-            ? (storage.state.jpTotalBudget || 0)
-            : cats.reduce((s, c) => s + (c.budget || 0), 0);
-
         const sumCatLimits = cats.filter(c => c.contributesToTotalBudget !== false && c.isActive !== false).reduce((s, c) => s + (c.budget || 0), 0);
+
+        // Sum of category allocations or independently configured overall monthly budget
+        const allocatedBudget = this.budgetsRegion === 'JP'
+            ? (storage.state.jpTotalBudget !== undefined && storage.state.jpTotalBudget !== null ? storage.state.jpTotalBudget : 0)
+            : (storage.state.inTotalBudget !== undefined && storage.state.inTotalBudget !== null ? storage.state.inTotalBudget : sumCatLimits);
+
         const cushion = Math.max(0, allocatedBudget - sumCatLimits);
         const remaining = allocatedBudget - totalSpent;
 
@@ -5997,8 +6100,13 @@ class App {
                     ${cushion > 0 ? `<span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, currency)} unallocated cushion</span>` : ''}
                 </div>
                 <div class="budgets-summary-grid">
-                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
-                        <span class="text-xs text-muted">Allocated Budget</span>
+                    <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05); position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="text-xs text-muted">Allocated Budget</span>
+                            <button class="icon-btn-xs" onclick="app.openOverallBudgetModal()" title="Configure Overall Monthly Budget" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 4px; border-radius: 4px; display: inline-flex; align-items: center; transition: color 150ms ease;">
+                                <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i>
+                            </button>
+                        </div>
                         <div class="font-bold text-primary privacy-blur" style="font-size: 1.15rem; margin-top: 4px;">${this.formatMoney(allocatedBudget, currency)}</div>
                     </div>
                     <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
@@ -6104,6 +6212,170 @@ class App {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             lucide.createIcons();
         }
+    }
+
+    // --------------------------------------------------------------------------
+    // OVERALL MONTHLY BUDGET CONFIGURATION
+    // --------------------------------------------------------------------------
+
+    openOverallBudgetModal(region = null) {
+        const targetRegion = region || this.budgetsRegion || 'JP';
+        this.overallBudgetModalRegion = targetRegion;
+
+        const modal = document.getElementById('overall-budget-modal');
+        if (!modal) return;
+
+        this.setOverallBudgetRegion(targetRegion, false);
+
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+
+        const input = document.getElementById('overall-budget-input');
+        if (input) {
+            setTimeout(() => {
+                input.focus();
+                input.select();
+            }, 60);
+        }
+    }
+
+    setOverallBudgetRegion(region, updateFocus = true) {
+        this.overallBudgetModalRegion = region;
+        const isJp = region === 'JP';
+        const currency = isJp ? '¥' : '₹';
+
+        const btnJp = document.getElementById('overall-budget-btn-jp');
+        const btnIn = document.getElementById('overall-budget-btn-in');
+        if (btnJp && btnIn) {
+            btnJp.classList.toggle('active', isJp);
+            btnIn.classList.toggle('active', !isJp);
+        }
+
+        const currLabel = document.getElementById('overall-budget-curr-label');
+        const currPrefix = document.getElementById('overall-budget-curr-prefix');
+        if (currLabel) currLabel.innerText = currency;
+        if (currPrefix) currPrefix.innerText = currency;
+
+        const cats = storage.state.categories[region] || [];
+        const sumCatLimits = cats.filter(c => c.contributesToTotalBudget !== false && c.isActive !== false).reduce((s, c) => s + (c.budget || 0), 0);
+
+        const currentVal = isJp
+            ? (storage.state.jpTotalBudget !== undefined ? storage.state.jpTotalBudget : 0)
+            : (storage.state.inTotalBudget !== undefined && storage.state.inTotalBudget !== null ? storage.state.inTotalBudget : sumCatLimits);
+
+        const input = document.getElementById('overall-budget-input');
+        if (input) {
+            input.value = currentVal;
+            input.oninput = () => this.updateOverallBudgetCushionPreview();
+        }
+
+        const err = document.getElementById('overall-budget-error');
+        if (err) {
+            err.style.display = 'none';
+            err.innerText = '';
+        }
+
+        this.updateOverallBudgetCushionPreview();
+        if (updateFocus && input) {
+            input.focus();
+            input.select();
+        }
+    }
+
+    updateOverallBudgetCushionPreview() {
+        const region = this.overallBudgetModalRegion || 'JP';
+        const isJp = region === 'JP';
+        const currency = isJp ? '¥' : '₹';
+
+        const cats = storage.state.categories[region] || [];
+        const sumCatLimits = cats.filter(c => c.contributesToTotalBudget !== false && c.isActive !== false).reduce((s, c) => s + (c.budget || 0), 0);
+
+        const input = document.getElementById('overall-budget-input');
+        const enteredVal = input ? parseFloat(input.value) : 0;
+        const validVal = isNaN(enteredVal) || enteredVal < 0 ? 0 : enteredVal;
+
+        const cushion = validVal - sumCatLimits;
+
+        const catSumEl = document.getElementById('overall-budget-cat-sum');
+        if (catSumEl) {
+            catSumEl.innerText = this.formatMoney(sumCatLimits, currency);
+        }
+
+        const cushionEl = document.getElementById('overall-budget-cushion-val');
+        if (cushionEl) {
+            if (cushion >= 0) {
+                cushionEl.innerText = `+${this.formatMoney(cushion, currency)}`;
+                cushionEl.style.color = '#34d399';
+            } else {
+                cushionEl.innerText = `-${this.formatMoney(Math.abs(cushion), currency)} (below category sum)`;
+                cushionEl.style.color = '#fb7185';
+            }
+        }
+    }
+
+    saveOverallBudget() {
+        const region = this.overallBudgetModalRegion || 'JP';
+        const isJp = region === 'JP';
+        const input = document.getElementById('overall-budget-input');
+        const err = document.getElementById('overall-budget-error');
+
+        if (!input) return;
+
+        const rawVal = input.value.trim();
+        if (rawVal === '' || isNaN(rawVal)) {
+            if (err) {
+                err.innerText = 'Please enter a valid numeric budget amount.';
+                err.style.display = 'block';
+            }
+            return;
+        }
+
+        const numVal = Math.round(Number(rawVal));
+        if (numVal < 0) {
+            if (err) {
+                err.innerText = 'Monthly budget cannot be negative.';
+                err.style.display = 'block';
+            }
+            return;
+        }
+
+        if (isJp) {
+            storage.state.jpTotalBudget = numVal;
+        } else {
+            storage.state.inTotalBudget = numVal;
+        }
+
+        // Persist via storage architecture
+        storage.saveData();
+
+        // Update settings inputs if present
+        const jpBudEl = document.getElementById('setting-jp-budget');
+        if (jpBudEl && isJp) {
+            jpBudEl.value = numVal;
+        }
+
+        this.closeOverallBudgetModal();
+
+        // Re-render relevant views
+        this.renderBudgetsPage();
+        this.renderAll();
+        if (this.currentView === 'reports-view') {
+            this.renderReportsPage();
+        }
+        if (this.currentView === 'settings-view') {
+            this.renderSettings();
+        }
+    }
+
+    closeOverallBudgetModal() {
+        const modal = document.getElementById('overall-budget-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        document.body.style.overflow = '';
     }
 
     // Lucide Icons Collection (~160 Monochrome SVG Icons)

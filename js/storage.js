@@ -8,6 +8,7 @@ const defaultState = {
     schemaVersion: 3,
     currentMonthKey: "",
     jpTotalBudget: 0,
+    inTotalBudget: 0,
     wallets: {
         'Salary Account': { id: 'Salary Account', type: 'bank', region: 'JP', balance: 0, currency: '¥', color: '#009944' },
         'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 0, currency: '¥', color: '#d4af37' },
