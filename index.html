@@ -1334,27 +1334,35 @@
 
                                 <!-- Portfolio Liquid Position Overview KPI Cards -->
                                 <div class="wallets-portfolio-grid">
-                                    <div class="card wallets-kpi-card">
+                                    <div class="card wallets-kpi-card interactive-card" onclick="app.openCountryExpansion('JP')" role="button" tabindex="0" title="Click to view Japan portfolio overview">
                                         <div class="wallets-kpi-header">
                                             <div class="wallets-kpi-flag-group">
                                                 <svg class="country-flag-svg flag-jp" viewBox="0 0 640 480" width="22" height="16.5" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);" aria-hidden="true"><rect width="640" height="480" fill="#ffffff"/><circle cx="320" cy="240" r="120" fill="#bc002d"/></svg>
                                                 <span class="wallets-kpi-title">Japan Liquid Net Position</span>
+                                                <span class="currency-code-pill">JPY</span>
                                             </div>
-                                            <span class="wallets-count-badge" id="wallets-page-jp-count">0 wallets</span>
+                                            <span class="wallets-count-badge" id="wallets-page-jp-count">0 accounts</span>
                                         </div>
-                                        <div class="wallets-kpi-val privacy-blur" id="wallets-page-jp-total">¥0</div>
-                                        <div class="wallets-kpi-sub">Calculated across active Japanese yen accounts & cash</div>
+                                        <div class="wallets-kpi-val financial-amount privacy-blur" id="wallets-page-jp-total">¥0</div>
+                                        <div class="wallets-kpi-sub">
+                                            <span>Active yen accounts &amp; cash</span>
+                                            <span class="wallets-kpi-hint">View portfolio →</span>
+                                        </div>
                                     </div>
-                                    <div class="card wallets-kpi-card">
+                                    <div class="card wallets-kpi-card interactive-card" onclick="app.openCountryExpansion('IN')" role="button" tabindex="0" title="Click to view India portfolio overview">
                                         <div class="wallets-kpi-header">
                                             <div class="wallets-kpi-flag-group">
                                                 <svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="22" height="16.5" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);" aria-hidden="true"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>
                                                 <span class="wallets-kpi-title">India Liquid Net Position</span>
+                                                <span class="currency-code-pill">INR</span>
                                             </div>
-                                            <span class="wallets-count-badge" id="wallets-page-in-count">0 wallets</span>
+                                            <span class="wallets-count-badge" id="wallets-page-in-count">0 accounts</span>
                                         </div>
-                                        <div class="wallets-kpi-val privacy-blur" id="wallets-page-in-total">₹0</div>
-                                        <div class="wallets-kpi-sub">Calculated across active Indian rupee accounts & deposits</div>
+                                        <div class="wallets-kpi-val financial-amount privacy-blur" id="wallets-page-in-total">₹0</div>
+                                        <div class="wallets-kpi-sub">
+                                            <span>Active rupee accounts &amp; deposits</span>
+                                            <span class="wallets-kpi-hint">View portfolio →</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1369,7 +1377,7 @@
                                         <div class="wallets-group-actions-wrap">
                                             <div class="wallets-group-subtotal">
                                                 <span class="text-muted text-xs">Total:</span>
-                                                <span class="wallets-subtotal-val privacy-blur" id="wallets-section-jp-total">¥0</span>
+                                                <span class="wallets-subtotal-val financial-amount privacy-blur" id="wallets-section-jp-total">¥0</span>
                                             </div>
                                             <button class="wallets-collapse-btn" onclick="event.stopPropagation(); app.toggleWalletsSection('jp')" aria-label="Toggle Japan accounts" title="Toggle section">
                                                 <i data-lucide="chevron-down" id="wallets-chevron-jp"></i>
@@ -1394,7 +1402,7 @@
                                         <div class="wallets-group-actions-wrap">
                                             <div class="wallets-group-subtotal">
                                                 <span class="text-muted text-xs">Total:</span>
-                                                <span class="wallets-subtotal-val privacy-blur" id="wallets-section-in-total">₹0</span>
+                                                <span class="wallets-subtotal-val financial-amount privacy-blur" id="wallets-section-in-total">₹0</span>
                                             </div>
                                             <button class="wallets-collapse-btn" onclick="event.stopPropagation(); app.toggleWalletsSection('in')" aria-label="Toggle India accounts" title="Toggle section">
                                                 <i data-lucide="chevron-down" id="wallets-chevron-in"></i>

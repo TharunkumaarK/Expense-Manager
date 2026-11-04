@@ -2428,18 +2428,18 @@ class App {
                             ${contactlessSvg}
                         </div>
                         <div class="wallet-card-top-right">
-                            <span class="wallet-type-badge">
+                            <span class="wallet-type-badge wallet-type-pill">
                                 <i data-lucide="${typeIcon}" style="width: 12px; height: 12px;"></i>
                                 <span>${typeLabel}</span>
                             </span>
                             <button class="wallet-menu-btn" onclick="event.stopPropagation(); app.openEditWalletModal('${w.id}')" title="Edit wallet settings" aria-label="Edit wallet ${w.id}">
-                                <i data-lucide="more-vertical" style="width: 14px; height: 14px;"></i>
+                                <i data-lucide="more-vertical" style="width: 15px; height: 15px;"></i>
                             </button>
                         </div>
                     </div>
                     <div class="wallet-balance-wrap">
                         <span class="wallet-balance-label">Current Balance</span>
-                        <div class="wallet-balance-val privacy-blur">${this.formatMoney(w.balance, w.currency)}</div>
+                        <div class="wallet-balance-val financial-amount privacy-blur">${this.formatMoney(w.balance, w.currency)}</div>
                     </div>
                     <div class="wallet-card-footer">
                         <div class="wallet-card-identity">
@@ -2522,15 +2522,27 @@ class App {
 
         let html = '';
         WALLET_THEMES.forEach(t => {
-            const isActive = t.id === activeThemeId ? ' active' : '';
+            const isSelected = t.id === activeThemeId;
+            const isActiveCls = isSelected ? ' active' : '';
+            const regionLabel = t.region === 'ALL' ? 'Multi-region' : t.region === 'JP' ? 'Japan (JPY)' : 'India (INR)';
             html += `
-                <div class="theme-swatch${isActive}" data-theme-id="${t.id}" onclick="app.selectThemeSwatch('${inputId}', '${t.id}', '${containerId}')" title="${t.name}">
-                    <div class="theme-swatch-circle ${t.cls}" style="background: ${t.color};"></div>
-                    <span class="theme-swatch-label">${t.name}</span>
+                <div class="theme-swatch theme-option${isActiveCls}" data-theme-id="${t.id}" onclick="app.selectThemeSwatch('${inputId}', '${t.id}', '${containerId}')" title="${t.name}" role="radio" aria-checked="${isSelected}">
+                    <div class="theme-option-preview ${t.cls}">
+                        <div class="theme-mini-chip"></div>
+                        <div class="theme-preview-sheen"></div>
+                    </div>
+                    <div class="theme-option-info">
+                        <span class="theme-option-name">${t.name}</span>
+                        <span class="theme-option-region">${regionLabel}</span>
+                    </div>
+                    <div class="theme-option-check">
+                        <i data-lucide="check" style="width: 13px; height: 13px;"></i>
+                    </div>
                 </div>
             `;
         });
         container.innerHTML = html;
+        lucide.createIcons();
     }
 
     selectThemeSwatch(inputId, themeId, containerId) {
@@ -2538,11 +2550,14 @@ class App {
         if (input) input.value = themeId;
         const container = document.getElementById(containerId);
         if (container) {
-            container.querySelectorAll('.theme-swatch').forEach(s => {
-                if (s.getAttribute('data-theme-id') === themeId) {
+            container.querySelectorAll('.theme-swatch, .theme-option').forEach(s => {
+                const matches = s.getAttribute('data-theme-id') === themeId;
+                if (matches) {
                     s.classList.add('active');
+                    s.setAttribute('aria-checked', 'true');
                 } else {
                     s.classList.remove('active');
+                    s.setAttribute('aria-checked', 'false');
                 }
             });
         }
@@ -2629,7 +2644,7 @@ class App {
                             </div>
                         </div>
                         <div style="text-align: right;">
-                            <div class="privacy-blur" style="font-family: var(--font-numeric); font-weight: 700; color: #fff; font-size: 1.05rem;">
+                            <div class="financial-amount privacy-blur" style="font-family: var(--font-numeric); font-weight: 700; color: #fff; font-size: 1.05rem;">
                                 ${this.formatMoney(w.balance, w.currency)}
                             </div>
                             <span style="font-size: 0.72rem; color: rgba(255,255,255,0.65);">View details →</span>
@@ -2781,7 +2796,7 @@ class App {
                                 <div style="font-size: 0.72rem; color: var(--text-muted);">${formattedDate} ${tx.note ? `• ${tx.note}` : ''}</div>
                             </div>
                         </div>
-                        <div class="privacy-blur" style="font-family: var(--font-numeric); font-weight: 600; font-size: 0.95rem; color: ${colorCls === 'text-emerald' ? 'var(--emerald)' : colorCls === 'text-rose' ? 'var(--rose)' : 'var(--text-secondary)'};">
+                        <div class="financial-amount privacy-blur" style="font-family: var(--font-numeric); font-weight: 600; font-size: 0.95rem; color: ${colorCls === 'text-emerald' ? 'var(--emerald)' : colorCls === 'text-rose' ? 'var(--rose)' : 'var(--text-secondary)'};">
                             ${this.formatMoney(tx.amount || tx.sourceAmount, w.currency, { prefix: sign })}
                         </div>
                     </div>
@@ -2968,16 +2983,20 @@ class App {
         const w = storage.state.wallets[walletId];
         if (!w) return;
 
+        // Synchronously set all form fields before revealing modal to prevent data flash
         document.getElementById('edit-wallet-id').value = w.id;
         document.getElementById('edit-wallet-name').value = w.id;
         document.getElementById('edit-wallet-type').value = w.type || 'bank';
-        document.getElementById('edit-wallet-balance').value = w.balance || 0;
+        document.getElementById('edit-wallet-balance').value = w.balance !== undefined ? w.balance : 0;
 
         const theme = this.getThemeForWallet(w);
         document.getElementById('edit-wallet-theme-val').value = theme.id;
         this.populateThemePicker('edit-wallet-theme-picker', theme.id);
 
-        document.getElementById('edit-wallet-modal').classList.add('active');
+        const modal = document.getElementById('edit-wallet-modal');
+        if (modal) {
+            modal.classList.add('active');
+        }
         lucide.createIcons();
     }
 
@@ -3002,10 +3021,11 @@ class App {
 
         storage.saveData();
         this.renderAll();
+        this.renderWalletsPage();
         this.closeModal('edit-wallet-modal');
 
         const overlay = document.getElementById('focus-overlay');
-        if (overlay && overlay.style.display !== 'none') {
+        if (overlay && (overlay.classList.contains('active') || overlay.style.display !== 'none')) {
             const title = document.getElementById('focus-modal-title');
             if (title && title.innerText === id) {
                 this.openWalletFocus(id);
