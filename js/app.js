@@ -6154,6 +6154,12 @@ class App {
             monthLabel.innerText = curMonth;
         }
 
+        // Sync search input value if present
+        const searchInput = document.getElementById('budgets-cat-search-input');
+        if (searchInput && document.activeElement !== searchInput) {
+            searchInput.value = this.budgetsCatSearch || '';
+        }
+
         // Transactions in active month for active region
         const allTxs = storage.state.transactions || [];
         const monthTxs = allTxs.filter(t => (t.date || '').startsWith(curMonth) && t.region === region);
@@ -6222,7 +6228,7 @@ class App {
                             <i data-lucide="sliders" style="width: 13px; height: 13px;"></i>
                         </button>
                     </div>
-                    <div class="budgets-kpi-value font-bold text-primary font-numeric privacy-blur">
+                    <div class="budgets-kpi-value font-bold text-primary font-numeric privacy-blur financial-amount">
                         ${this.formatMoney(allocatedBudget, currency)}
                     </div>
                     <div class="budgets-kpi-footer">
@@ -6241,7 +6247,7 @@ class App {
                         <span class="budgets-kpi-label">Total Spent This Month</span>
                         <span class="text-xs text-muted font-numeric">${monthTxs.filter(t => t.type === 'expense').length} txs</span>
                     </div>
-                    <div class="budgets-kpi-value font-bold text-danger font-numeric privacy-blur">
+                    <div class="budgets-kpi-value font-bold text-danger font-numeric privacy-blur financial-amount">
                         ${this.formatMoney(totalSpent, currency)}
                     </div>
                     <div class="budgets-kpi-footer">
@@ -6259,7 +6265,7 @@ class App {
                             ${remaining >= 0 ? 'On Track' : 'Over Limit'}
                         </span>
                     </div>
-                    <div class="budgets-kpi-value font-bold ${remaining >= 0 ? 'text-success' : 'text-danger'} font-numeric privacy-blur">
+                    <div class="budgets-kpi-value font-bold ${remaining >= 0 ? 'text-success' : 'text-danger'} font-numeric privacy-blur financial-amount">
                         ${remaining < 0 ? '-' : ''}${this.formatMoney(Math.abs(remaining), currency)}
                     </div>
                     <div class="budgets-kpi-footer">
@@ -6273,11 +6279,14 @@ class App {
                 <div class="card budgets-kpi-card">
                     <div class="budgets-kpi-header">
                         <span class="budgets-kpi-label">Budget Utilization</span>
-                        <span class="font-bold font-numeric ${utilizationClass}" style="font-size: 0.95rem;">
-                            ${utilizationPct}%
+                        <span class="budgets-status-pill ${utilizationPct > 100 ? 'status-negative' : (utilizationPct >= 75 ? 'status-warning' : 'status-positive')}">
+                            ${utilizationPct > 100 ? 'Exceeded' : (utilizationPct >= 75 ? 'Warning' : 'Normal')}
                         </span>
                     </div>
-                    <div class="budget-streak-track" style="margin: 8px 0 6px 0;">
+                    <div class="budgets-kpi-value font-bold font-numeric ${utilizationClass}">
+                        ${utilizationPct}%
+                    </div>
+                    <div class="budget-streak-track" style="margin: 4px 0 6px 0;">
                         <div class="budget-streak-fill ${streakClass}" style="width: ${Math.min(utilizationPct, 100)}%;"></div>
                     </div>
                     <div class="budgets-kpi-footer">
@@ -6339,21 +6348,21 @@ class App {
                             <div class="budget-cat-card-header">
                                 <div class="budget-cat-identity">
                                     <div class="budget-cat-icon-box">
-                                        <i data-lucide="${c.icon || 'tag'}" style="width: 17px; height: 17px;"></i>
+                                        <i data-lucide="${c.icon || 'tag'}" style="width: 18px; height: 18px;"></i>
                                     </div>
                                     <div class="budget-cat-info">
                                         <div class="budget-cat-title-row">
-                                            <h4 class="budget-cat-name">${c.name}</h4>
+                                            <h4 class="budget-cat-name" title="${c.name}">${c.name}</h4>
                                             ${c.isActive === false ? '<span class="budget-badge-archived">Archived</span>' : ''}
                                         </div>
                                         <div class="budget-cat-meta-row">
                                             <span>${count} tx${count === 1 ? '' : 's'}</span>
-                                            ${avgSpend > 0 ? `<span class="bullet-dot">•</span><span class="privacy-blur">avg ${this.formatMoney(avgSpend, currency)}</span>` : ''}
+                                            ${avgSpend > 0 ? `<span class="bullet-dot">•</span><span class="privacy-blur financial-amount">avg ${this.formatMoney(avgSpend, currency)}</span>` : ''}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="budget-cat-header-right">
-                                    ${isOver ? `<span class="budget-overspend-pill font-numeric privacy-blur">+${this.formatMoney(Math.abs(rem), currency)} over</span>` : ''}
+                                    ${isOver ? `<span class="budget-overspend-pill font-numeric privacy-blur financial-amount">+${this.formatMoney(Math.abs(rem), currency)} over</span>` : ''}
                                     <button class="budget-cat-config-btn" onclick="event.stopPropagation(); app.openCategoryManageModal('${c.id}', '${region}')" title="Configure Category & Limit">
                                         <i data-lucide="sliders" style="width: 13px; height: 13px;"></i>
                                     </button>
@@ -6364,15 +6373,15 @@ class App {
                             <div class="budget-cat-figures">
                                 <div class="budget-figure-col">
                                     <span class="figure-label">Spent</span>
-                                    <span class="figure-value text-primary font-numeric privacy-blur">${this.formatMoney(spent, currency)}</span>
+                                    <span class="figure-value text-primary font-numeric privacy-blur financial-amount">${this.formatMoney(spent, currency)}</span>
                                 </div>
                                 <div class="budget-figure-col right-align">
                                     <span class="figure-label">Monthly Limit</span>
-                                    <span class="figure-value font-numeric privacy-blur">${budgetLimit > 0 ? this.formatMoney(budgetLimit, currency) : '<span class="text-muted" style="font-weight: 500;">No Limit</span>'}</span>
+                                    <span class="figure-value font-numeric privacy-blur financial-amount">${budgetLimit > 0 ? this.formatMoney(budgetLimit, currency) : '<span class="text-muted" style="font-weight: 500;">No Limit</span>'}</span>
                                 </div>
                             </div>
 
-                            <!-- Horizontal Progress Streak (Reuse Dashboard Pattern) -->
+                            <!-- Horizontal Progress Streak (Thin Refined Bar) -->
                             ${budgetLimit > 0 ? `
                                 <div class="budget-cat-streak-section">
                                     <div class="budget-streak-track">
@@ -6380,8 +6389,8 @@ class App {
                                     </div>
                                     <div class="budget-cat-streak-footer">
                                         <span class="font-numeric ${pct >= 100 ? 'text-danger' : (pct >= 75 ? 'text-warn' : 'text-muted')}">${Math.round(pct)}% used</span>
-                                        <span class="font-numeric privacy-blur ${rem < 0 ? 'text-danger' : 'text-muted'}">
-                                            ${rem >= 0 ? `${this.formatMoney(rem, currency)} left` : `Exceeded`}
+                                        <span class="font-numeric privacy-blur financial-amount ${rem < 0 ? 'text-danger' : 'text-muted'}">
+                                            ${rem >= 0 ? `${this.formatMoney(rem, currency)} left` : `-${this.formatMoney(Math.abs(rem), currency)} over`}
                                         </span>
                                     </div>
                                 </div>

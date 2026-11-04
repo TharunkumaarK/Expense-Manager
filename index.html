@@ -1281,6 +1281,10 @@
                                         <p class="budgets-section-sub">Individual monthly limits and live expenditure tracking</p>
                                     </div>
                                     <div class="budgets-section-controls">
+                                        <div class="budgets-search-box">
+                                            <i data-lucide="search" style="width: 13px; height: 13px; color: var(--text-muted);"></i>
+                                            <input type="text" id="budgets-cat-search-input" placeholder="Search categories..." oninput="app.onBudgetsSearch(this.value)">
+                                        </div>
                                         <div class="segmented-control budgets-cat-segmented" id="budgets-cat-filter">
                                             <button type="button" class="segment-btn active" data-filter="all" onclick="app.setBudgetsCategoryFilter('all')">All (<span id="cat-count-all">0</span>)</button>
                                             <button type="button" class="segment-btn" data-filter="active" onclick="app.setBudgetsCategoryFilter('active')">Active (<span id="cat-count-active">0</span>)</button>
