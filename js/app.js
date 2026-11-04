@@ -2398,13 +2398,36 @@ class App {
         }
     }
 
+    isSecondaryWallet(w) {
+        if (!w) return false;
+        const name = (w.id || '').toLowerCase();
+        return w.type === 'card' || name.includes('credit');
+    }
+
+    getWalletSortRank(w) {
+        if (!w) return 99;
+        const name = (w.id || '').toLowerCase();
+        // Credit cards / secondary payment methods appear after primary accounts
+        if (this.isSecondaryWallet(w)) return 50;
+
+        // Frequently used primary payment methods
+        // Japan
+        if (name === 'cash' || name.includes('cash')) return 1;
+        if (name === 'paypay' || name.includes('paypay')) return 2;
+        if (name.includes('salary') || name.includes('yucho')) return 3;
+
+        // India
+        if (name.includes('axis bank') || name === 'axis bank' || name === 'bank account') return 10;
+        if (name.includes('baroda') || name.includes('bob')) return 11;
+
+        return 20;
+    }
+
     renderWalletsPage() {
         const jpGrid = document.getElementById('wallets-page-jp-grid');
         const inGrid = document.getElementById('wallets-page-in-grid');
         if (!jpGrid || !inGrid) return;
 
-        let jpHtml = '';
-        let inHtml = '';
         let jpCount = 0;
         let inCount = 0;
         let jpTotal = 0;
@@ -2413,14 +2436,18 @@ class App {
         const chipSvg = this.getCardChipSvg();
         const contactlessSvg = this.getContactlessSvg();
 
-        Object.values(storage.state.wallets).forEach(w => {
-            const theme = this.getThemeForWallet(w);
-            const flagSvg = this.getCountryFlagSvg(w.region, 20, 15);
-            const typeLabel = (w.type || 'account').toUpperCase();
-            const typeIcon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
+        const allWallets = Object.values(storage.state.wallets || {});
+        const jpWallets = allWallets.filter(w => w.region === 'JP').sort((a, b) => this.getWalletSortRank(a) - this.getWalletSortRank(b));
+        const inWallets = allWallets.filter(w => w.region !== 'JP').sort((a, b) => this.getWalletSortRank(a) - this.getWalletSortRank(b));
 
-            const cardHtml = `
-                <div class="wallet-card ${theme.cls}" onclick="app.openWalletFocus('${w.id}')" title="Click to inspect ${w.id}" role="button" tabindex="0">
+        const renderCard = (w) => {
+            const theme = this.getThemeForWallet(w);
+            const isSecondary = this.isSecondaryWallet(w);
+            const secondaryCls = isSecondary ? ' wallet-card-secondary' : '';
+            const secondaryBadge = isSecondary ? '<span class="wallet-badge-secondary">Secondary</span>' : '';
+
+            return `
+                <div class="wallet-card ${theme.cls}${secondaryCls}" onclick="app.openWalletFocus('${w.id}')" title="Click to inspect ${w.id}" role="button" tabindex="0">
                     <div class="wallet-card-overlay-sheen"></div>
                     <div class="wallet-card-header">
                         <div class="wallet-card-chip-group">
@@ -2428,10 +2455,7 @@ class App {
                             ${contactlessSvg}
                         </div>
                         <div class="wallet-card-top-right">
-                            <span class="wallet-type-badge wallet-type-pill">
-                                <i data-lucide="${typeIcon}" style="width: 12px; height: 12px;"></i>
-                                <span>${typeLabel}</span>
-                            </span>
+                            ${secondaryBadge}
                             <button class="wallet-menu-btn" onclick="event.stopPropagation(); app.openEditWalletModal('${w.id}')" title="Edit wallet settings" aria-label="Edit wallet ${w.id}">
                                 <i data-lucide="more-vertical" style="width: 15px; height: 15px;"></i>
                             </button>
@@ -2442,26 +2466,24 @@ class App {
                         <div class="wallet-balance-val financial-amount privacy-blur">${this.formatMoney(w.balance, w.currency)}</div>
                     </div>
                     <div class="wallet-card-footer">
-                        <div class="wallet-card-identity">
-                            <div class="wallet-name">${w.id}</div>
-                            <div class="wallet-theme-tag">${theme.name} • ${w.currency}</div>
-                        </div>
-                        <div class="wallet-card-flag-badge">
-                            ${flagSvg}
-                        </div>
+                        <div class="wallet-name">${w.id}</div>
                     </div>
                 </div>
             `;
+        };
 
-            if (w.region === 'JP') {
-                jpHtml += cardHtml;
-                jpCount++;
-                jpTotal += (w.balance || 0);
-            } else {
-                inHtml += cardHtml;
-                inCount++;
-                inTotal += (w.balance || 0);
-            }
+        let jpHtml = '';
+        jpWallets.forEach(w => {
+            jpHtml += renderCard(w);
+            jpCount++;
+            jpTotal += (w.balance || 0);
+        });
+
+        let inHtml = '';
+        inWallets.forEach(w => {
+            inHtml += renderCard(w);
+            inCount++;
+            inTotal += (w.balance || 0);
         });
 
         jpGrid.innerHTML = jpHtml || '<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 32px 16px; text-align: center;">No Japan wallets created yet.</p>';
@@ -2520,29 +2542,54 @@ class App {
         const isEdit = containerId.startsWith('edit');
         const inputId = isEdit ? 'edit-wallet-theme-val' : 'add-wallet-theme-val';
 
+        // 6 Curated Themes matching user's primary payment methods:
+        // Axis Bank, Bank of Baroda, Cash, PayPay, Yucho / Salary, Axis Credit Card
+        const primaryThemeIds = [
+            'burgundy-axis',     // Axis Bank
+            'baroda-orange',     // Bank of Baroda
+            'amber-gold',        // Cash
+            'crimson-paypay',    // PayPay
+            'emerald-salary',    // Yucho / Salary
+            'rose-gold'          // Axis Credit Card
+        ];
+
+        // All 14 themes preserved, ordered with frequently used accounts first
+        const sortedThemes = [
+            ...WALLET_THEMES.filter(t => primaryThemeIds.includes(t.id)),
+            ...WALLET_THEMES.filter(t => !primaryThemeIds.includes(t.id))
+        ];
+
         let html = '';
-        WALLET_THEMES.forEach(t => {
+        sortedThemes.forEach(t => {
             const isSelected = t.id === activeThemeId;
-            const isActiveCls = isSelected ? ' active' : '';
-            const regionLabel = t.region === 'ALL' ? 'Multi-region' : t.region === 'JP' ? 'Japan (JPY)' : 'India (INR)';
+            const isPrimary = primaryThemeIds.includes(t.id);
+            const activeCls = isSelected ? ' active selected' : '';
+            const frequentTag = isPrimary ? '<span class="theme-tag-frequent">Frequent</span>' : '';
+
             html += `
-                <div class="theme-swatch theme-option${isActiveCls}" data-theme-id="${t.id}" onclick="app.selectThemeSwatch('${inputId}', '${t.id}', '${containerId}')" title="${t.name}" role="radio" aria-checked="${isSelected}">
-                    <div class="theme-option-preview ${t.cls}">
+                <div class="theme-tile theme-swatch theme-option${activeCls}" data-theme-id="${t.id}" onclick="app.selectThemeSwatch('${inputId}', '${t.id}', '${containerId}')" title="${t.name}" role="radio" aria-checked="${isSelected}">
+                    <div class="theme-tile-preview ${t.cls}">
                         <div class="theme-mini-chip"></div>
-                        <div class="theme-preview-sheen"></div>
+                        <div class="theme-tile-sheen"></div>
+                        ${frequentTag}
+                        <div class="theme-tile-check">
+                            <i data-lucide="check" style="width: 12px; height: 12px;"></i>
+                        </div>
                     </div>
-                    <div class="theme-option-info">
-                        <span class="theme-option-name">${t.name}</span>
-                        <span class="theme-option-region">${regionLabel}</span>
-                    </div>
-                    <div class="theme-option-check">
-                        <i data-lucide="check" style="width: 13px; height: 13px;"></i>
-                    </div>
+                    <div class="theme-tile-name">${t.name}</div>
                 </div>
             `;
         });
         container.innerHTML = html;
         lucide.createIcons();
+
+        // Scroll active theme into view smoothly
+        setTimeout(() => {
+            const activeTile = container.querySelector(`[data-theme-id="${activeThemeId}"]`);
+            if (activeTile && typeof activeTile.scrollIntoView === 'function') {
+                activeTile.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }, 50);
     }
 
     selectThemeSwatch(inputId, themeId, containerId) {
@@ -2550,13 +2597,13 @@ class App {
         if (input) input.value = themeId;
         const container = document.getElementById(containerId);
         if (container) {
-            container.querySelectorAll('.theme-swatch, .theme-option').forEach(s => {
+            container.querySelectorAll('.theme-tile, .theme-swatch, .theme-option').forEach(s => {
                 const matches = s.getAttribute('data-theme-id') === themeId;
                 if (matches) {
-                    s.classList.add('active');
+                    s.classList.add('active', 'selected');
                     s.setAttribute('aria-checked', 'true');
                 } else {
-                    s.classList.remove('active');
+                    s.classList.remove('active', 'selected');
                     s.setAttribute('aria-checked', 'false');
                 }
             });
@@ -2682,9 +2729,11 @@ class App {
         }
 
         const theme = this.getThemeForWallet(w);
-        const flagSvg = this.getCountryFlagSvg(w.region, 20, 15);
         const chipSvg = this.getCardChipSvg();
         const contactlessSvg = this.getContactlessSvg();
+        const isSecondary = this.isSecondaryWallet(w);
+        const secondaryCls = isSecondary ? ' wallet-card-secondary' : '';
+        const secondaryBadge = isSecondary ? '<span class="wallet-badge-secondary">Secondary</span>' : '';
 
         const overlay = document.getElementById('focus-overlay');
         const typeBadge = document.getElementById('focus-type-badge');
@@ -2698,29 +2747,23 @@ class App {
         modalTitle.innerText = `${w.id}`;
 
         primaryPanel.innerHTML = `
-            <div class="wallet-card ${theme.cls}" style="padding: 24px; cursor: default; transform: none; min-height: 240px; display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); position: relative; overflow: hidden; box-shadow: 0 16px 36px -10px rgba(0,0,0,0.6);">
+            <div class="wallet-card ${theme.cls}${secondaryCls}" style="padding: 24px; cursor: default; transform: none; min-height: 220px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 18px; position: relative; overflow: hidden; box-shadow: 0 16px 36px -10px rgba(0,0,0,0.6);">
                 <div class="wallet-card-overlay-sheen"></div>
-                <div class="wallet-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; z-index: 2;">
-                    <div class="wallet-card-chip-group" style="display: flex; align-items: center; gap: 8px;">
+                <div class="wallet-card-header" style="display: flex; justify-content: space-between; align-items: center; z-index: 2;">
+                    <div class="wallet-card-chip-group" style="display: flex; align-items: center; gap: 10px;">
                         ${chipSvg}
                         ${contactlessSvg}
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        ${flagSvg}
-                        <span class="wallet-type-badge" style="background: rgba(0,0,0,0.35); color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px; border: 1px solid rgba(255,255,255,0.15);">${(w.type || 'ACCOUNT').toUpperCase()}</span>
-                    </div>
+                    ${secondaryBadge}
                 </div>
                 <div class="wallet-balance-wrap" style="margin: 20px 0; z-index: 2;">
-                    <span class="wallet-balance-label" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.75); display: block; margin-bottom: 4px;">Current Balance</span>
+                    <span class="wallet-balance-label" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.78); display: block; margin-bottom: 4px;">Current Balance</span>
                     <div class="wallet-balance-val financial-amount privacy-blur" style="font-size: 2.25rem; font-weight: 800; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
                         ${this.formatMoney(w.balance, w.currency)}
                     </div>
                 </div>
                 <div class="wallet-card-footer" style="display: flex; justify-content: space-between; align-items: flex-end; z-index: 2;">
-                    <div>
-                        <div class="wallet-name" style="font-size: 1.15rem; font-weight: 700; color: #fff; letter-spacing: 0.2px;">${w.id}</div>
-                        <div class="wallet-number" style="font-size: 0.75rem; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px;">${theme.name} • ${w.currency}</div>
-                    </div>
+                    <div class="wallet-name" style="font-size: 1.15rem; font-weight: 700; color: #fff;">${w.id}</div>
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">

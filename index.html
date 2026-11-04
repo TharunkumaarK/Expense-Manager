@@ -1312,8 +1312,8 @@
                         <div class="content-padded" id="wallets-view-container">
                             <div class="wallets-view-content" id="wallets-view-content">
                                 <div class="wallets-toolbar">
-                                    <div>
-                                        <h2 class="wallets-page-title">Wallets & Accounts</h2>
+                                    <div class="wallets-toolbar-header">
+                                        <h2 class="wallets-page-title">Wallets &amp; Accounts</h2>
                                         <p class="wallets-page-subtitle text-muted text-sm">Manage multi-currency liquid balances, bank accounts, cards and payment sources</p>
                                     </div>
                                     <div class="wallets-toolbar-actions">
@@ -1325,7 +1325,7 @@
                                             <i data-lucide="globe" style="width: 15px; height: 15px;"></i>
                                             <span>Remittance</span>
                                         </button>
-                                        <button class="btn btn-primary" onclick="app.openAddWalletModal()" id="btn-add-wallet">
+                                        <button class="btn btn-primary" onclick="app.openAddWalletModal()" id="btn-add-wallet" title="Create a new wallet">
                                             <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
                                             <span>Add Wallet</span>
                                         </button>
@@ -1975,50 +1975,66 @@
     <!-- Add Wallet Modal -->
     <div class="modal-overlay" id="add-wallet-modal"
         onclick="if(event.target === this) app.closeModal('add-wallet-modal')">
-        <div class="bottom-sheet" style="max-width: 520px; margin: 0 auto;">
+        <div class="bottom-sheet wallet-config-modal">
             <div class="sheet-header">
-                <h3 id="add-wallet-title">Add New Wallet</h3>
-                <button class="icon-btn" onclick="app.closeModal('add-wallet-modal')"><i data-lucide="x"></i></button>
+                <div>
+                    <h3 id="add-wallet-title">Add New Wallet</h3>
+                    <p class="sheet-subtitle text-muted text-xs">Configure payment method details and appearance</p>
+                </div>
+                <button class="icon-btn" onclick="app.closeModal('add-wallet-modal')" aria-label="Close modal"><i data-lucide="x"></i></button>
             </div>
-            <div class="sheet-content">
-                <div class="form-group">
-                    <label>Wallet Name</label>
-                    <input type="text" id="add-wallet-name" placeholder="e.g. PayPay, Salary Account, Axis Bank"
-                        required>
-                </div>
-                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div class="form-group">
-                        <label>Country / Currency</label>
-                        <select id="add-wallet-region" onchange="app.onAddWalletRegionChange()">
-                            <option value="JP">Japan (¥ JPY)</option>
-                            <option value="IN">India (₹ INR)</option>
-                        </select>
+            <div class="sheet-content wallet-modal-content">
+                <!-- Section A: Wallet Details -->
+                <div class="wallet-config-section">
+                    <div class="wallet-config-section-title">
+                        <span>Section A — Wallet Details</span>
                     </div>
                     <div class="form-group">
-                        <label>Account Type</label>
-                        <select id="add-wallet-type">
-                            <option value="bank">Bank Account</option>
-                            <option value="digital">Digital Wallet</option>
-                            <option value="card">Credit / Debit Card</option>
-                            <option value="cash">Cash</option>
-                        </select>
+                        <label>Wallet Name</label>
+                        <input type="text" id="add-wallet-name" placeholder="e.g. PayPay, Salary Account, Axis Bank" required>
+                    </div>
+                    <div class="form-row wallet-form-row">
+                        <div class="form-group">
+                            <label>Country / Currency</label>
+                            <select id="add-wallet-region" onchange="app.onAddWalletRegionChange()">
+                                <option value="JP">Japan (¥ JPY)</option>
+                                <option value="IN">India (₹ INR)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Account Type</label>
+                            <select id="add-wallet-type">
+                                <option value="bank">Bank Account</option>
+                                <option value="digital">Digital Wallet</option>
+                                <option value="card">Credit / Debit Card</option>
+                                <option value="cash">Cash</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label>Initial Balance</label>
+                        <input type="number" id="add-wallet-balance" placeholder="0" step="any" required>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Initial Balance</label>
-                    <input type="number" id="add-wallet-balance" placeholder="0" step="any" required>
-                </div>
-                <div class="form-group">
-                    <label>Visual Card Theme</label>
-                    <div class="theme-picker-grid" id="add-wallet-theme-picker">
-                        <!-- Populated by JS -->
+
+                <!-- Section B: Card Appearance -->
+                <div class="wallet-config-section">
+                    <div class="wallet-config-section-title">
+                        <span>Section B — Card Appearance</span>
                     </div>
-                    <input type="hidden" id="add-wallet-theme-val" value="emerald-salary">
+                    <div class="form-group">
+                        <label class="text-xs text-muted" style="margin-bottom: 6px; display: block;">Visual Card Theme</label>
+                        <div class="theme-picker-grid" id="add-wallet-theme-picker">
+                            <!-- Populated by JS -->
+                        </div>
+                        <input type="hidden" id="add-wallet-theme-val" value="emerald-salary">
+                    </div>
                 </div>
-                <div style="display:flex; gap:10px; margin-top:20px;">
-                    <button class="btn btn-secondary" style="flex:1;"
-                        onclick="app.closeModal('add-wallet-modal')">Cancel</button>
-                    <button class="btn btn-primary" style="flex:1;" onclick="app.saveAddWallet()">Create Wallet</button>
+
+                <!-- Section C: Actions -->
+                <div class="wallet-config-actions">
+                    <button class="btn btn-secondary" onclick="app.closeModal('add-wallet-modal')">Cancel</button>
+                    <button class="btn btn-primary" onclick="app.saveAddWallet()">Create Wallet</button>
                 </div>
             </div>
         </div>
@@ -2027,52 +2043,71 @@
     <!-- Edit Wallet Modal -->
     <div class="modal-overlay" id="edit-wallet-modal"
         onclick="if(event.target === this) app.closeModal('edit-wallet-modal')">
-        <div class="bottom-sheet" style="max-width: 520px; margin: 0 auto;">
+        <div class="bottom-sheet wallet-config-modal">
             <div class="sheet-header">
-                <h3 id="edit-wallet-title">Edit Wallet</h3>
-                <button class="icon-btn" onclick="app.closeModal('edit-wallet-modal')"><i data-lucide="x"></i></button>
+                <div>
+                    <h3 id="edit-wallet-title">Edit Wallet</h3>
+                    <p class="sheet-subtitle text-muted text-xs">Update account settings, adjust balance, and change card theme</p>
+                </div>
+                <button class="icon-btn" onclick="app.closeModal('edit-wallet-modal')" aria-label="Close modal"><i data-lucide="x"></i></button>
             </div>
-            <div class="sheet-content">
+            <div class="sheet-content wallet-modal-content">
                 <input type="hidden" id="edit-wallet-id">
-                <div class="form-group">
-                    <label>Wallet Name</label>
-                    <input type="text" id="edit-wallet-name" readonly style="opacity: 0.8; cursor: not-allowed;"
-                        title="Wallet identifier cannot be renamed to preserve ledger history">
-                </div>
-                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div class="form-group">
-                        <label>Account Type</label>
-                        <select id="edit-wallet-type">
-                            <option value="bank">Bank Account</option>
-                            <option value="digital">Digital Wallet</option>
-                            <option value="card">Credit / Debit Card</option>
-                            <option value="cash">Cash</option>
-                        </select>
+
+                <!-- Section A: Wallet Details -->
+                <div class="wallet-config-section">
+                    <div class="wallet-config-section-title">
+                        <span>Section A — Wallet Details</span>
                     </div>
                     <div class="form-group">
-                        <label>Adjust Balance</label>
-                        <input type="number" id="edit-wallet-balance" placeholder="0" step="any">
+                        <label>Wallet Name</label>
+                        <input type="text" id="edit-wallet-name" readonly style="opacity: 0.85; cursor: not-allowed;" title="Wallet identifier cannot be renamed to preserve ledger history">
+                        <span class="text-xs text-muted" style="display: block; margin-top: 3px;">Immutable identifier to preserve transaction ledger history</span>
+                    </div>
+                    <div class="form-row wallet-form-row">
+                        <div class="form-group">
+                            <label>Account Type</label>
+                            <select id="edit-wallet-type">
+                                <option value="bank">Bank Account</option>
+                                <option value="digital">Digital Wallet</option>
+                                <option value="card">Credit / Debit Card</option>
+                                <option value="cash">Cash</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Adjust Balance</label>
+                            <input type="number" id="edit-wallet-balance" placeholder="0" step="any">
+                        </div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Visual Card Theme</label>
-                    <div class="theme-picker-grid" id="edit-wallet-theme-picker">
-                        <!-- Populated by JS -->
+
+                <!-- Section B: Card Appearance -->
+                <div class="wallet-config-section">
+                    <div class="wallet-config-section-title">
+                        <span>Section B — Card Appearance</span>
                     </div>
-                    <input type="hidden" id="edit-wallet-theme-val" value="emerald-salary">
+                    <div class="form-group">
+                        <label class="text-xs text-muted" style="margin-bottom: 6px; display: block;">Visual Card Theme</label>
+                        <div class="theme-picker-grid" id="edit-wallet-theme-picker">
+                            <!-- Populated by JS -->
+                        </div>
+                        <input type="hidden" id="edit-wallet-theme-val" value="emerald-salary">
+                    </div>
                 </div>
-                <div
-                    style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--border);">
-                    <button class="btn"
-                        style="background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);"
-                        onclick="app.deleteWalletFromModal()">
+
+                <!-- Section C: Actions -->
+                <div class="wallet-config-actions wallet-config-actions-split">
+                    <button class="btn btn-danger-ghost" onclick="app.deleteWalletFromModal()">
                         <i data-lucide="trash-2" style="width:14px; height:14px; margin-right:4px;"></i> Delete Wallet
                     </button>
-                    <div style="display:flex; gap:10px;">
+                    <div class="wallet-action-buttons-group">
                         <button class="btn btn-secondary" onclick="app.closeModal('edit-wallet-modal')">Cancel</button>
                         <button class="btn btn-primary" onclick="app.saveEditWallet()">Save Changes</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
             </div>
         </div>
     </div>
