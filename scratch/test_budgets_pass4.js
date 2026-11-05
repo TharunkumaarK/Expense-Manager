@@ -41,13 +41,14 @@ console.assert(cssContent.includes('prefers-reduced-motion'), "Must support pref
 console.assert(cssContent.includes('.budget-streak-track'), ".budget-streak-track must exist");
 console.log("  ✓ Progress streak glimmer animation & accessibility rules verified");
 
-// 4. Check KPI Card Structure & No Oversized Outer Wrapper
-console.log("\nTEST 4: KPI Cards Structure & Privacy Concealment");
-console.assert(appJs.includes('budgets-kpi-card interactive-card'), "First KPI card must be interactive for overall budget");
-console.assert(appJs.includes('openOverallBudgetModal'), "Interactive KPI card must trigger openOverallBudgetModal");
-console.assert(appJs.includes('privacy-blur financial-amount'), "All financial amounts must have privacy-blur and financial-amount");
-console.assert(appJs.includes('badge-cushion'), "Unallocated cushion badge must be present");
-console.log("  ✓ KPI cards structure, interactivity, and privacy blur verified");
+// 4. Check Consolidated Summary Card (Reuses Dashboard Central Card)
+console.log("\nTEST 4: Consolidated Budget Summary Card Reuse");
+console.assert(appJs.includes('renderBudgetOverviewCard'), "renderBudgetOverviewCard method must exist and be reused");
+console.assert(appJs.includes("this.renderBudgetOverviewCard('budgets-summary-banner'"), "Budgets page must invoke renderBudgetOverviewCard on budgets-summary-banner");
+console.assert(cssContent.includes('.budget-central-card'), "budget-central-card CSS class must exist");
+console.assert(indexHtml.includes('id="budgets-summary-banner"'), "budgets-summary-banner container must exist");
+console.assert(!appJs.includes('<!-- KPI Card 1: Overall Monthly Budget -->'), "Four separate KPI cards must be replaced by consolidated summary card");
+console.log("  ✓ Consolidated Dashboard summary card is properly reused on Budgets page");
 
 // 5. Check Category Budget Cards Requirements
 console.log("\nTEST 5: Category Card Content & Over-Budget Distinction");

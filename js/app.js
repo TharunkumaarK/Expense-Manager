@@ -2066,45 +2066,103 @@ class App {
         });
 
         const jpTotalSpent = walletManager.getTotalSpent('JP', this.getActiveTransactions());
-        const jpRem = Math.max(0, storage.state.jpTotalBudget - jpTotalSpent);
-        const pct = storage.state.jpTotalBudget > 0 ? Math.min((jpTotalSpent / storage.state.jpTotalBudget) * 100, 100) : 0;
-
-        // Cushion = overall budget minus sum of individual category budgets (excluding those configured not to contribute)
-        const sumCatBudgets = (storage.state.categories.JP || [])
-            .filter(c => c.contributesToTotalBudget !== false && c.isActive !== false)
-            .reduce((s, c) => s + (c.budget || 0), 0);
-        const cushion = Math.max(0, storage.state.jpTotalBudget - sumCatBudgets);
-
-        const card = document.getElementById('budget-overview-card');
-        if (card) {
-            const barClass = pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe';
-            card.innerHTML = `
-                <div class="budget-central-header">
-                    <div class="budget-central-title-group">
-                        ${this.getCountryFlagSvg('JP', 20, 15)}
-                        <h3>Monthly Budget</h3>
-                        <span class="text-xs text-muted">(${this.activeMonthKey})</span>
-                        ${cushion > 0 ? `<span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, '¥')} cushion</span>` : ''}
-                    </div>
-                    <div class="budget-remaining-hero">
-                        <span class="remaining-val privacy-blur ${jpRem < 0 ? 'text-danger' : ''}">${this.formatMoney(jpRem, '¥')}</span>
-                        <span class="remaining-label">${jpRem < 0 ? 'over budget' : 'remaining'}</span>
-                    </div>
-                </div>
-                <div class="budget-central-progress-wrap">
-                    <div class="budget-streak-track">
-                        <div class="budget-streak-fill ${barClass}" style="width: ${pct}%;"></div>
-                    </div>
-                </div>
-                <div class="budget-central-stats-row">
-                    <span class="privacy-blur">Spent: <strong>${this.formatMoney(jpTotalSpent, '¥')}</strong></span>
-                    <span class="text-xs text-muted">${Math.round(pct)}% used</span>
-                    <span class="privacy-blur">Total Allocation: <strong>${this.formatMoney(storage.state.jpTotalBudget, '¥')}</strong></span>
-                </div>
-            `;
-        }
+        this.renderBudgetOverviewCard('budget-overview-card', {
+            region: 'JP',
+            monthKey: this.activeMonthKey,
+            totalSpent: jpTotalSpent,
+            allocatedBudget: storage.state.jpTotalBudget,
+            isInteractive: false,
+            showEditButton: false
+        });
 
         this.renderWalletsPage();
+    }
+
+    renderBudgetOverviewCard(target, options = {}) {
+        const el = typeof target === 'string' ? document.getElementById(target) : target;
+        if (!el) return;
+
+        const region = options.region || 'JP';
+        const isJp = region === 'JP';
+        const currency = isJp ? '¥' : '₹';
+        const monthKey = options.monthKey || this.activeMonthKey || (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
+
+        // Sum category limits for cushion calculation
+        const cats = (storage.state.categories && storage.state.categories[region]) || [];
+        const sumCatBudgets = cats
+            .filter(c => c.contributesToTotalBudget !== false && c.isActive !== false)
+            .reduce((s, c) => s + (c.budget || 0), 0);
+
+        // Overall allocated budget for region
+        let allocatedBudget;
+        if (options.allocatedBudget !== undefined && options.allocatedBudget !== null) {
+            allocatedBudget = Number(options.allocatedBudget) || 0;
+        } else {
+            allocatedBudget = isJp
+                ? (storage.state.jpTotalBudget !== undefined && storage.state.jpTotalBudget !== null ? storage.state.jpTotalBudget : 0)
+                : (storage.state.inTotalBudget !== undefined && storage.state.inTotalBudget !== null ? storage.state.inTotalBudget : sumCatBudgets);
+        }
+
+        // Total spent in region for active month
+        let totalSpent;
+        if (options.totalSpent !== undefined && options.totalSpent !== null) {
+            totalSpent = Number(options.totalSpent) || 0;
+        } else {
+            totalSpent = walletManager.getTotalSpent(region, this.getActiveTransactions());
+        }
+
+        const remaining = allocatedBudget - totalSpent;
+        const isOver = remaining < 0;
+        const pct = allocatedBudget > 0 ? Math.min((totalSpent / allocatedBudget) * 100, 100) : 0;
+        const utilizationPct = allocatedBudget > 0 ? Math.round((totalSpent / allocatedBudget) * 100) : 0;
+        const cushion = Math.max(0, allocatedBudget - sumCatBudgets);
+
+        let barClass = 'neon-safe';
+        if (pct > 90 || utilizationPct > 100) barClass = 'neon-danger';
+        else if (pct > 75 || utilizationPct >= 75) barClass = 'neon-warn';
+
+        const editButtonHtml = options.showEditButton ? `
+            <button class="budgets-kpi-edit-btn" onclick="event.stopPropagation(); app.openOverallBudgetModal('${region}')" title="Configure Overall Monthly Limit" style="margin-left: 6px; cursor: pointer;">
+                <i data-lucide="sliders" style="width: 13px; height: 13px;"></i>
+            </button>
+        ` : '';
+
+        const cardContent = `
+            <div class="budget-central-header">
+                <div class="budget-central-title-group">
+                    ${this.getCountryFlagSvg(region, 20, 15)}
+                    <h3>Monthly Budget</h3>
+                    <span class="text-xs text-muted font-numeric">(${monthKey})</span>
+                    ${cushion > 0 ? `<span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, currency)} cushion</span>` : ''}
+                    ${editButtonHtml}
+                </div>
+                <div class="budget-remaining-hero">
+                    <span class="remaining-val privacy-blur ${isOver ? 'text-danger' : ''}">${this.formatMoney(remaining, currency)}</span>
+                    <span class="remaining-label">${isOver ? 'over budget' : 'remaining'}</span>
+                </div>
+            </div>
+            <div class="budget-central-progress-wrap">
+                <div class="budget-streak-track">
+                    <div class="budget-streak-fill ${barClass}" style="width: ${pct}%;"></div>
+                </div>
+            </div>
+            <div class="budget-central-stats-row">
+                <span class="privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
+                <span class="text-xs text-muted font-numeric">${utilizationPct}% used</span>
+                <span class="privacy-blur">Total Allocation: <strong>${this.formatMoney(allocatedBudget, currency)}</strong></span>
+            </div>
+        `;
+
+        if (el.classList.contains('budget-central-card')) {
+            el.innerHTML = cardContent;
+        } else {
+            const interactiveAttr = options.isInteractive ? `onclick="app.openOverallBudgetModal('${region}')" style="cursor: pointer;" title="Configure Overall Monthly Limit"` : '';
+            el.innerHTML = `<div class="card budget-central-card" ${interactiveAttr}>${cardContent}</div>`;
+        }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
     }
 
     renderCategories() {
@@ -2564,24 +2622,26 @@ class App {
             const isSelected = t.id === activeThemeId;
             const isPrimary = primaryThemeIds.includes(t.id);
             const activeCls = isSelected ? ' active selected' : '';
-            const frequentTag = isPrimary ? '<span class="theme-tag-frequent">Frequent</span>' : '';
+            const frequentTag = isPrimary ? '<span class="theme-tag-frequent theme-tile-frequent">Frequent</span>' : '';
 
             html += `
-                <div class="theme-tile theme-swatch theme-option${activeCls}" data-theme-id="${t.id}" onclick="app.selectThemeSwatch('${inputId}', '${t.id}', '${containerId}')" title="${t.name}" role="radio" aria-checked="${isSelected}">
+                <div class="theme-picker-tile theme-tile${activeCls}" data-theme-id="${t.id}" onclick="app.selectThemeSwatch('${inputId}', '${t.id}', '${containerId}')" title="${t.name}" role="radio" aria-checked="${isSelected}">
                     <div class="theme-tile-preview ${t.cls}">
                         <div class="theme-mini-chip"></div>
                         <div class="theme-tile-sheen"></div>
-                        ${frequentTag}
                         <div class="theme-tile-check">
-                            <i data-lucide="check" style="width: 12px; height: 12px;"></i>
+                            <i data-lucide="check" style="width: 11px; height: 11px;"></i>
                         </div>
+                        ${frequentTag}
                     </div>
                     <div class="theme-tile-name">${t.name}</div>
                 </div>
             `;
         });
         container.innerHTML = html;
-        lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
 
         // Scroll active theme into view smoothly
         setTimeout(() => {
@@ -2597,7 +2657,7 @@ class App {
         if (input) input.value = themeId;
         const container = document.getElementById(containerId);
         if (container) {
-            container.querySelectorAll('.theme-tile, .theme-swatch, .theme-option').forEach(s => {
+            container.querySelectorAll('.theme-picker-tile, .theme-tile').forEach(s => {
                 const matches = s.getAttribute('data-theme-id') === themeId;
                 if (matches) {
                     s.classList.add('active', 'selected');
@@ -2757,13 +2817,13 @@ class App {
                     ${secondaryBadge}
                 </div>
                 <div class="wallet-balance-wrap" style="margin: 20px 0; z-index: 2;">
-                    <span class="wallet-balance-label" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.78); display: block; margin-bottom: 4px;">Current Balance</span>
-                    <div class="wallet-balance-val financial-amount privacy-blur" style="font-size: 2.25rem; font-weight: 800; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
+                    <span class="wallet-balance-label" style="font-size: 0.72rem; font-weight: 400; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.65); display: block; margin-bottom: 4px;">Current Balance</span>
+                    <div class="wallet-balance-val financial-amount privacy-blur" style="font-size: 2.25rem; font-weight: 700; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
                         ${this.formatMoney(w.balance, w.currency)}
                     </div>
                 </div>
                 <div class="wallet-card-footer" style="display: flex; justify-content: space-between; align-items: flex-end; z-index: 2;">
-                    <div class="wallet-name" style="font-size: 1.15rem; font-weight: 700; color: #fff;">${w.id}</div>
+                    <div class="wallet-name" style="font-size: 1.15rem; font-weight: 500; color: rgba(255, 255, 255, 0.92); letter-spacing: 0.01em;">${w.id}</div>
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">
@@ -6279,87 +6339,15 @@ class App {
         if (countActiveEl) countActiveEl.innerText = activeCatsCount;
         if (countOverEl) countOverEl.innerText = overBudgetCatsCount;
 
-        // 1. Render Budgets Overview KPI Row (No oversized outer card wrapper!)
-        const bannerEl = document.getElementById('budgets-summary-banner');
-        if (bannerEl) {
-            bannerEl.innerHTML = `
-                <!-- KPI Card 1: Overall Monthly Budget -->
-                <div class="card budgets-kpi-card interactive-card" onclick="app.openOverallBudgetModal('${region}')" title="Click to edit overall budget">
-                    <div class="budgets-kpi-header">
-                        <span class="budgets-kpi-label">Overall Monthly Budget</span>
-                        <button class="budgets-kpi-edit-btn" onclick="event.stopPropagation(); app.openOverallBudgetModal('${region}')" title="Configure Overall Monthly Limit">
-                            <i data-lucide="sliders" style="width: 13px; height: 13px;"></i>
-                        </button>
-                    </div>
-                    <div class="budgets-kpi-value font-bold text-primary font-numeric privacy-blur financial-amount">
-                        ${this.formatMoney(allocatedBudget, currency)}
-                    </div>
-                    <div class="budgets-kpi-footer">
-                        ${cushion > 0
-                            ? `<span class="badge-cushion privacy-blur">+${this.formatMoney(cushion, currency)} unallocated cushion</span>`
-                            : (allocatedBudget < sumCatLimits
-                                ? `<span class="badge-overspend privacy-blur">-${this.formatMoney(sumCatLimits - allocatedBudget, currency)} vs categories</span>`
-                                : `<span class="text-xs text-muted">Fully allocated across ${activeCatsCount} active categories</span>`)
-                        }
-                    </div>
-                </div>
-
-                <!-- KPI Card 2: Total Spent -->
-                <div class="card budgets-kpi-card">
-                    <div class="budgets-kpi-header">
-                        <span class="budgets-kpi-label">Total Spent This Month</span>
-                        <span class="text-xs text-muted font-numeric">${monthTxs.filter(t => t.type === 'expense').length} txs</span>
-                    </div>
-                    <div class="budgets-kpi-value font-bold text-danger font-numeric privacy-blur financial-amount">
-                        ${this.formatMoney(totalSpent, currency)}
-                    </div>
-                    <div class="budgets-kpi-footer">
-                        <span class="text-xs text-muted font-numeric">
-                            ${allocatedBudget > 0 ? ((totalSpent / allocatedBudget) * 100).toFixed(1) : 0}% of monthly limit
-                        </span>
-                    </div>
-                </div>
-
-                <!-- KPI Card 3: Remaining Balance -->
-                <div class="card budgets-kpi-card">
-                    <div class="budgets-kpi-header">
-                        <span class="budgets-kpi-label">Remaining Balance</span>
-                        <span class="budgets-status-pill ${remaining >= 0 ? 'status-positive' : 'status-negative'}">
-                            ${remaining >= 0 ? 'On Track' : 'Over Limit'}
-                        </span>
-                    </div>
-                    <div class="budgets-kpi-value font-bold ${remaining >= 0 ? 'text-success' : 'text-danger'} font-numeric privacy-blur financial-amount">
-                        ${remaining < 0 ? '-' : ''}${this.formatMoney(Math.abs(remaining), currency)}
-                    </div>
-                    <div class="budgets-kpi-footer">
-                        <span class="text-xs ${remaining >= 0 ? 'text-muted' : 'text-danger'} font-numeric">
-                            ${remaining >= 0 ? `${daysRemaining} days remaining in month` : `Exceeded by ${this.formatMoney(Math.abs(remaining), currency)}`}
-                        </span>
-                    </div>
-                </div>
-
-                <!-- KPI Card 4: Budget Utilization -->
-                <div class="card budgets-kpi-card">
-                    <div class="budgets-kpi-header">
-                        <span class="budgets-kpi-label">Budget Utilization</span>
-                        <span class="budgets-status-pill ${utilizationPct > 100 ? 'status-negative' : (utilizationPct >= 75 ? 'status-warning' : 'status-positive')}">
-                            ${utilizationPct > 100 ? 'Exceeded' : (utilizationPct >= 75 ? 'Warning' : 'Normal')}
-                        </span>
-                    </div>
-                    <div class="budgets-kpi-value font-bold font-numeric ${utilizationClass}">
-                        ${utilizationPct}%
-                    </div>
-                    <div class="budget-streak-track" style="margin: 4px 0 6px 0;">
-                        <div class="budget-streak-fill ${streakClass}" style="width: ${Math.min(utilizationPct, 100)}%;"></div>
-                    </div>
-                    <div class="budgets-kpi-footer">
-                        <span class="text-xs ${utilizationPct > 100 ? 'text-danger' : (utilizationPct >= 75 ? 'text-warn' : 'text-muted')}">
-                            ${utilizationPct > 100 ? 'Monthly limit exceeded' : (utilizationPct >= 75 ? 'Approaching monthly limit' : 'Velocity within budget bounds')}
-                        </span>
-                    </div>
-                </div>
-            `;
-        }
+        // 1. Render Consolidated Budgets Overview Card (Reuses Dashboard Central Card)
+        this.renderBudgetOverviewCard('budgets-summary-banner', {
+            region: region,
+            monthKey: curMonth,
+            totalSpent: totalSpent,
+            allocatedBudget: allocatedBudget,
+            isInteractive: true,
+            showEditButton: true
+        });
 
         // 2. Filter Category List according to active segmented control & search input
         const currentFilter = this.budgetsCatFilter || 'all';

@@ -61,8 +61,8 @@ testAssert(indexHtml.includes("app.openTransactionModal('remittance')"), "Remitt
 testAssert(cssContent.includes('.wallets-toolbar-actions'), ".wallets-toolbar-actions CSS exists");
 testAssert(cssContent.includes('.wallets-toolbar-actions .btn'), ".wallets-toolbar-actions .btn has width: auto !important rule");
 
-// 3. Simplified Wallet Cards (No redundant badges/flags)
-console.log("\nTEST 3: Simplified Wallet Cards Layout & Anatomy");
+// 3. Simplified Wallet Cards Layout & Anatomy & Typography Hierarchy
+console.log("\nTEST 3: Simplified Wallet Cards Layout & Anatomy & Typography");
 testAssert(cssContent.includes('aspect-ratio: 1.586 / 1;'), "Debit card maintains 1.586 / 1 physical ratio");
 testAssert(appJs.includes('getCardChipSvg()'), "EMV Metallic Chip SVG generator invoked");
 testAssert(appJs.includes('getContactlessSvg()'), "Contactless wave SVG generator invoked");
@@ -72,6 +72,16 @@ testAssert(!appJs.includes('wallet-card-flag') && !appJs.includes('wallet-type-b
 testAssert(appJs.includes('Current Balance'), "Understated Current Balance label present");
 testAssert(appJs.includes('class="wallet-name"'), "Wallet name element present");
 testAssert(appJs.includes('wallet-card-secondary'), "Secondary wallet class applied to credit cards");
+
+// Typographic Contrast & Hierarchy
+const labelWeight = cssContent.match(/\.wallet-balance-label\s*\{[^}]*font-weight:\s*(\d+)/s);
+testAssert(labelWeight && labelWeight[1] === '400', "wallet-balance-label has regular weight 400");
+const valWeight = cssContent.match(/\.wallet-balance-val\s*\{[^}]*font-weight:\s*(\d+)/s);
+testAssert(valWeight && valWeight[1] === '700', "wallet-balance-val has prominent semibold/bold weight 700");
+const nameWeight = cssContent.match(/\.wallet-card\s+\.wallet-name\s*\{[^}]*font-weight:\s*(\d+)/s);
+testAssert(nameWeight && nameWeight[1] === '500', "wallet-name has medium weight 500");
+const badgeWeight = cssContent.match(/\.wallet-badge-secondary\s*\{[^}]*font-weight:\s*(\d+)/s);
+testAssert(badgeWeight && badgeWeight[1] === '400', "wallet-badge-secondary has regular weight 400");
 
 // 4. Three-Dot Management Trigger
 console.log("\nTEST 4: Three-Dot Menu Trigger Isolation & Styling");
@@ -87,12 +97,14 @@ console.log("\nTEST 5: Modal Configuration Sections & 3-Column Theme Grid");
 testAssert(indexHtml.includes('Section A: Wallet Details'), "Section A Wallet Details present");
 testAssert(indexHtml.includes('Section B: Card Appearance'), "Section B Card Appearance present");
 testAssert(indexHtml.includes('class="wallet-config-actions'), "Section C wallet-config-actions present with distinct styling");
-testAssert(cssContent.includes('.theme-picker-grid') && cssContent.includes('repeat(3, 1fr)'), "3-column responsive theme grid class exists with repeat(3, 1fr)");
+testAssert(cssContent.includes('.theme-picker-grid') && cssContent.includes('repeat(3, minmax(0, 1fr))'), "3-column responsive theme grid class exists with repeat(3, minmax(0, 1fr))");
+testAssert(appJs.includes('theme-picker-tile'), "Theme picker tile class rendered");
+testAssert(!appJs.includes('theme-swatch') && !appJs.includes('theme-option'), "Theme picker tile does not conflict with theme-swatch or theme-option");
 testAssert(appJs.includes('theme-tile-preview'), "Theme tile preview rendered");
 testAssert(appJs.includes('theme-mini-chip'), "Theme preview includes mini chip");
 testAssert(appJs.includes('theme-tile-check'), "Theme tile includes check indicator");
 testAssert(appJs.includes('theme-tag-frequent'), "Frequent theme badges rendered for user's primary methods");
-testAssert(cssContent.includes('.theme-tile.selected'), "Selected theme has visual focus / ring styling");
+testAssert(cssContent.includes('.theme-picker-tile.selected'), "Selected theme has visual focus / ring styling");
 
 // 6. User Payment Methods Sorting & Prioritization
 console.log("\nTEST 6: Payment Methods Prioritization");
