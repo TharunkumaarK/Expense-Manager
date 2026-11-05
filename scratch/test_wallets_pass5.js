@@ -120,8 +120,8 @@ testAssert(modalZ >= 1100, `modal-overlay z-index (${modalZ}) is >= 1100`);
 
 // 8. Liquid Net Position & Portfolio Separation
 console.log("\nTEST 8: Liquid Net Position Separation & Privacy Concealment");
-testAssert(indexHtml.includes('Japan Liquid Net Position'), "Japan Liquid Net Position exists");
-testAssert(indexHtml.includes('India Liquid Net Position'), "India Liquid Net Position exists");
+testAssert(indexHtml.includes('Japan Balances'), "Japan Balances heading exists");
+testAssert(indexHtml.includes('India Balances'), "India Balances heading exists");
 testAssert(indexHtml.includes('financial-amount privacy-blur" id="wallets-page-jp-total"'), "Japan total has financial-amount privacy-blur");
 testAssert(indexHtml.includes('financial-amount privacy-blur" id="wallets-page-in-total"'), "India total has financial-amount privacy-blur");
 testAssert(appJs.includes('financial-amount privacy-blur">${this.formatMoney(w.balance, w.currency)}'), "Card balance has financial-amount privacy-blur");

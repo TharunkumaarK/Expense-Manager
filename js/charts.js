@@ -641,14 +641,13 @@ class ChartManager {
                 const formattedAmt = typeof app !== 'undefined' ? app.formatMoney(val, currency) : `${currency}${val.toLocaleString()}`;
                 return `
                     <div class="pie-legend-item" title="${c.name}: ${pct}% of total spent">
-                        <div class="legend-dot" style="background: ${color};"></div>
-                        <div class="legend-info">
+                        <div class="pie-legend-left">
+                            <span class="legend-dot" style="background: ${color};"></span>
                             <span class="legend-cat-name">${c.name}</span>
-                            <div class="legend-meta">
-                                <span class="legend-pct">${pct}%</span>
-                                <span class="legend-dot-sep">•</span>
-                                <span class="legend-amt privacy-blur">${formattedAmt}</span>
-                            </div>
+                        </div>
+                        <div class="pie-legend-right">
+                            <span class="legend-pct">${pct}%</span>
+                            <span class="legend-amt privacy-blur">${formattedAmt}</span>
                         </div>
                     </div>
                 `;

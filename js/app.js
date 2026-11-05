@@ -5618,11 +5618,6 @@ class App {
                         <span class="reports-kpi-val ${netSavings >= 0 ? 'positive' : 'negative'} privacy-blur">${this.formatMoney(netSavings, currency)}</span>
                         <span class="text-xs text-muted mt-1">${netSavings >= 0 ? 'Surplus retained' : 'Deficit spent'}</span>
                     </div>
-                    <div class="card reports-kpi-card">
-                        <span class="reports-kpi-label">Savings Rate</span>
-                        <span class="reports-kpi-val highlight">${savingsRate}%</span>
-                        <span class="text-xs text-muted mt-1">of total income</span>
-                    </div>
                 </div>
 
                 ${periodTotalBudget > 0 ? `
