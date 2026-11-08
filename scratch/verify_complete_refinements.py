@@ -223,6 +223,10 @@ async def main():
         print(f"  Navbar: '{dash_checks['navTitle']}' - '{dash_checks['navSub']}'")
         print(f"  Japan Card Radius: {dash_checks['jpBorderRadius']} | India Card Radius: {dash_checks['inBorderRadius']}")
         print(f"  Budget Card Backdrop Filter: {dash_checks['budgetBackdropBlur']}")
+        has_dash_jp_grad = '225, 29, 72' in dash_checks['jpBackground'] or '225,29,72' in dash_checks['jpBackground']
+        has_dash_in_grad = '245, 158, 11' in dash_checks['inBackground'] or '245,158,11' in dash_checks['inBackground']
+        print(f"  Dashboard Japan Multicolour Gradient (Crimson/Rose): {has_dash_jp_grad}")
+        print(f"  Dashboard India Multicolour Gradient (Saffron/Emerald): {has_dash_in_grad}")
         await capture_screenshot('dashboard_1440x900.png')
 
         # Hover state test on Dashboard Budget Card & Country Card
@@ -278,7 +282,10 @@ async def main():
         print(f"  Wallets Header: '{wallets_checks['title']}' - '{wallets_checks['subtitle']}'")
         print(f"  Japan Summary Label: '{wallets_checks['jpText']}' | India Summary Label: '{wallets_checks['inText']}'")
         print(f"  Matching Dimensions/Radius: JP {wallets_checks['jpRadius']} == IN {wallets_checks['inRadius']}")
-        print(f"  Consistent Gradient Applied: {wallets_checks['jpSummaryBg'] == wallets_checks['inSummaryBg']}")
+        has_wallets_jp_grad = '225, 29, 72' in wallets_checks['jpSummaryBg'] or '225,29,72' in wallets_checks['jpSummaryBg']
+        has_wallets_in_grad = '245, 158, 11' in wallets_checks['inSummaryBg'] or '245,158,11' in wallets_checks['inSummaryBg']
+        print(f"  Wallets Japan Multicolour Gradient (Crimson/Rose): {has_wallets_jp_grad}")
+        print(f"  Wallets India Multicolour Gradient (Saffron/Emerald): {has_wallets_in_grad}")
         await capture_screenshot('wallets_page_1440x900.png')
 
         # ---------------------------------------------------------------------
