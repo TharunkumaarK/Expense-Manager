@@ -1,4 +1,4 @@
-const CACHE_NAME = 'em-v85';
+const CACHE_NAME = 'em-v87';
 const ASSETS = [
     './',
     './index.html',
@@ -9,7 +9,10 @@ const ASSETS = [
     './js/app.js',
     './icons/icon.svg',
     './manifest.json',
-    'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',
+    './fonts/SF-Pro-Text-Regular.otf',
+    './fonts/SF-Pro-Text-Medium.otf',
+    './fonts/SF-Pro-Text-Semibold.otf',
+    './fonts/SF-Pro-Display-Semibold.otf',
     'https://unpkg.com/lucide@latest',
     'https://cdn.jsdelivr.net/npm/chart.js'
 ];

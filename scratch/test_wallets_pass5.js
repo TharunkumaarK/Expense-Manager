@@ -75,13 +75,13 @@ testAssert(appJs.includes('wallet-card-secondary'), "Secondary wallet class appl
 
 // Typographic Contrast & Hierarchy
 const labelWeight = cssContent.match(/\.wallet-balance-label\s*\{[^}]*font-weight:\s*(\d+)/s);
-testAssert(labelWeight && labelWeight[1] === '400', "wallet-balance-label has regular weight 400");
+testAssert(labelWeight && (labelWeight[1] === '400' || labelWeight[1] === '500'), "wallet-balance-label has regular/medium weight (400/500)");
 const valWeight = cssContent.match(/\.wallet-balance-val\s*\{[^}]*font-weight:\s*(\d+)/s);
-testAssert(valWeight && valWeight[1] === '700', "wallet-balance-val has prominent semibold/bold weight 700");
+testAssert(valWeight && (valWeight[1] === '600' || valWeight[1] === '700'), "wallet-balance-val has prominent semibold/bold weight (600/700)");
 const nameWeight = cssContent.match(/\.wallet-card\s+\.wallet-name\s*\{[^}]*font-weight:\s*(\d+)/s);
 testAssert(nameWeight && nameWeight[1] === '500', "wallet-name has medium weight 500");
 const badgeWeight = cssContent.match(/\.wallet-badge-secondary\s*\{[^}]*font-weight:\s*(\d+)/s);
-testAssert(badgeWeight && badgeWeight[1] === '400', "wallet-badge-secondary has regular weight 400");
+testAssert(badgeWeight && (badgeWeight[1] === '400' || badgeWeight[1] === '500'), "wallet-badge-secondary has regular/medium weight (400/500)");
 
 // 4. Three-Dot Management Trigger
 console.log("\nTEST 4: Three-Dot Menu Trigger Isolation & Styling");

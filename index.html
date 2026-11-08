@@ -7,12 +7,12 @@
     <meta name="theme-color" content="#0a0a0f">
     <title>TK Expense Manager</title>
 
-    <!-- PWA -->
+    <!-- PWA & Favicon -->
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
     <link rel="apple-touch-icon" href="icons/icon.svg">
 
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Local Typography: SF Pro font family integrated via css/style.css -->
 
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -33,10 +33,9 @@
     <div id="auth-screen"
         style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; padding: 20px;">
         <div class="card" style="width: 100%; max-width: 400px; text-align: center;">
-            <h2
-                style="margin-bottom: 24px; font-weight: 800; font-size: 1.8rem; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            <h2 style="margin-bottom: 8px; font-weight: 600; font-size: 1.65rem; color: var(--text-primary); font-family: var(--font-display);">
                 Expense Manager</h2>
-            <p class="text-muted mb-4">Log in to sync your data securely.</p>
+            <p class="text-muted mb-4" style="font-size: 0.88rem;">Sign in to sync your data</p>
             <div id="auth-error" class="text-sm mb-3" style="color: var(--red); display: none;"></div>
             <form id="auth-form" onsubmit="event.preventDefault(); supabaseClient.handleLogin();">
                 <div class="form-group text-left mb-3">
@@ -66,9 +65,9 @@
                     </div>
                 </div>
                 <button type="submit" id="auth-btn" class="btn btn-primary"
-                    style="width: 100%; padding: 12px; font-weight: 700;">Sign In / Sign Up</button>
+                    style="width: 100%; padding: 12px; font-weight: 600;">Sign In</button>
             </form>
-            <p class="text-sm text-muted mt-4">If the account does not exist, it will be created automatically.</p>
+            <p class="text-sm text-muted mt-4">New accounts are created automatically</p>
         </div>
     </div>
 
@@ -118,7 +117,7 @@
                     </div>
                 </div>
                 <button type="submit" id="reset-btn" class="btn btn-primary"
-                    style="width: 100%; padding: 12px; font-weight: 700;">Update Password</button>
+                    style="width: 100%; padding: 12px; font-weight: 600;">Update Password</button>
             </form>
 
             <span class="resend-link" onclick="supabaseClient.handleRequestNewLink()">Request a new recovery link</span>
@@ -133,8 +132,14 @@
                 <!-- Sidebar Brand Header -->
                 <div class="sidebar-header">
                     <div class="brand-logo">
-                        <div class="logo-mark">
-                            <i data-lucide="wallet-cards"></i>
+                        <div class="logo-mark" title="Expense Manager">
+                            <svg width="20" height="20" viewBox="0 0 512 512" fill="none" aria-hidden="true">
+                                <rect width="512" height="512" rx="128" fill="#1d4ed8"/>
+                                <rect x="156" y="148" width="236" height="152" rx="20" transform="rotate(8 274 224)" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.3)" stroke-width="6"/>
+                                <rect x="120" y="200" width="248" height="158" rx="22" fill="#3b82f6" stroke="rgba(255,255,255,0.4)" stroke-width="6"/>
+                                <rect x="152" y="234" width="44" height="34" rx="6" fill="#fbbf24"/>
+                                <circle cx="330" cy="252" r="14" fill="rgba(255,255,255,0.2)"/>
+                            </svg>
                         </div>
                         <div class="brand-info">
                             <span class="brand-name">Expense Manager</span>
@@ -326,7 +331,7 @@
                                     <button class="icon-btn" onclick="app.changeMonth(-1)"><i
                                             data-lucide="chevron-left"></i></button>
                                     <h2 id="current-month-display"
-                                        style="font-size: 1.4rem; font-weight: 700; min-width: 120px; margin: 0;">Month
+                                        style="font-size: 1.4rem; font-weight: 600; font-family: var(--font-display); min-width: 120px; margin: 0;">Month
                                     </h2>
                                     <button class="icon-btn" onclick="app.changeMonth(1)"><i
                                             data-lucide="chevron-right"></i></button>
@@ -549,8 +554,7 @@
                         <header class="top-bar">
                             <div class="view-header-content">
                                 <h2>Transactions</h2>
-                                <p class="view-header-sub">Continuous financial ledger across all accounts & currencies
-                                </p>
+                                <p class="view-header-sub">All account transactions and activity</p>
                             </div>
                             <div class="view-header-actions">
                                 <button class="btn btn-secondary btn-sm" id="ledger-export-btn"
@@ -744,7 +748,7 @@
                         <header class="top-bar">
                             <div class="view-header-content">
                                 <h2>Analytics</h2>
-                                <p class="view-header-sub">Financial patterns, category breakdowns & insights</p>
+                                <p class="view-header-sub">Spending patterns and insights</p>
                             </div>
                             <div class="view-header-actions">
                                 <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
@@ -1090,13 +1094,13 @@
                     <section id="reports-view" class="view">
                         <header class="top-bar">
                             <div class="view-header-content">
-                                <h2>Financial Reports</h2>
-                                <p class="view-header-sub">Immutable monthly snapshots, audit closing, and custom range analytics</p>
+                                <h2>Reports</h2>
+                                <p class="view-header-sub">Monthly summaries and financial statements</p>
                             </div>
                             <div class="view-header-actions">
                                 <button class="btn btn-secondary btn-sm" id="report-print-btn" onclick="app.printCurrentReport()" title="Print report or save as PDF">
                                     <i data-lucide="printer"></i>
-                                    <span class="btn-text">Print Report</span>
+                                    <span class="btn-text">Print</span>
                                 </button>
                                 <button class="btn btn-secondary btn-sm" id="report-export-csv-btn" onclick="app.exportReportCsv()" title="Export report data as CSV">
                                     <i data-lucide="download"></i>
@@ -1181,22 +1185,48 @@
                             <div class="card custom-report-panel">
                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                                     <div>
-                                        <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 700;">Custom Date-Range Report</h3>
+                                        <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 600;">Custom Date-Range Report</h3>
                                         <p class="text-muted text-xs" style="margin: 0;">Generate instantaneous, read-only financial analysis for arbitrary calendar intervals from the continuous ledger</p>
                                     </div>
-                                    <button class="btn btn-secondary btn-sm" onclick="app.generateCustomRangeReport()">
-                                        <i data-lucide="sparkles"></i>
-                                        <span>Generate Custom Report</span>
-                                    </button>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="btn btn-secondary btn-sm" id="btn-custom-report-reset" onclick="app.resetCustomRangeReport()" title="Reset report filters">
+                                            <i data-lucide="rotate-ccw"></i>
+                                            <span>Reset</span>
+                                        </button>
+                                        <button class="btn btn-primary btn-sm" id="btn-custom-report-generate" onclick="app.generateCustomRangeReport()">
+                                            <i data-lucide="calendar-range"></i>
+                                            <span>Generate Report</span>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="custom-range-row" style="margin-top: 10px;">
-                                    <div class="custom-date-field">
-                                        <label class="filter-label">From:</label>
+                                <div class="custom-range-controls-grid">
+                                    <div class="custom-field-group">
+                                        <label class="filter-label">From Date:</label>
                                         <input type="date" id="report-custom-start" class="filter-date-input" />
                                     </div>
-                                    <div class="custom-date-field">
-                                        <label class="filter-label">To:</label>
+                                    <div class="custom-field-group">
+                                        <label class="filter-label">To Date:</label>
                                         <input type="date" id="report-custom-end" class="filter-date-input" />
+                                    </div>
+                                    <div class="custom-field-group">
+                                        <label class="filter-label">Country:</label>
+                                        <select id="report-custom-region" class="filter-select" onchange="app.onCustomReportRegionChange()">
+                                            <option value="ALL">All Regions (JP &amp; IN)</option>
+                                            <option value="JP">Japan (¥ JPY)</option>
+                                            <option value="IN">India (₹ INR)</option>
+                                        </select>
+                                    </div>
+                                    <div class="custom-field-group">
+                                        <label class="filter-label">Wallet:</label>
+                                        <select id="report-custom-wallet" class="filter-select">
+                                            <option value="ALL">All Wallets</option>
+                                        </select>
+                                    </div>
+                                    <div class="custom-field-group">
+                                        <label class="filter-label">Category:</label>
+                                        <select id="report-custom-category" class="filter-select">
+                                            <option value="ALL">All Categories</option>
+                                        </select>
                                     </div>
                                 </div>
                                 <div id="report-custom-results" style="display: none; margin-top: 14px;">
@@ -1206,7 +1236,7 @@
 
                             <!-- Historical Closed Months Archive -->
                             <div class="card" style="padding: 20px 24px;">
-                                <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 700;">Closed Months & Historical Snapshots</h3>
+                                <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 600;">Closed Months & Historical Snapshots</h3>
                                 <p class="text-muted text-xs" style="margin: 0 0 16px 0;">Permanent historical audit trail stored in <code>closedMonths</code></p>
                                 <div class="history-snapshots-list" id="report-closed-months-list">
                                     <!-- Injected dynamically -->
@@ -1220,13 +1250,13 @@
                     <section id="budgets-view" class="view">
                         <header class="top-bar">
                             <div class="view-header-content">
-                                <h2>Budgets & Categories</h2>
-                                <p class="view-header-sub">Unified monthly budget limits, category configurations, and icon assignments</p>
+                                <h2>Budgets</h2>
+                                <p class="view-header-sub">Monthly limits and category targets</p>
                             </div>
                             <div class="view-header-actions">
                                 <button class="btn btn-secondary btn-sm" id="btn-header-edit-overall" onclick="app.openOverallBudgetModal()" title="Configure Overall Monthly Budget">
                                     <i data-lucide="sliders"></i>
-                                    <span class="btn-text">Edit Overall Budget</span>
+                                    <span class="btn-text">Overall Budget</span>
                                 </button>
                                 <button class="btn btn-primary btn-sm" id="btn-header-add-category" onclick="app.openCategoryManageModal(null)" title="Add Category">
                                     <i data-lucide="plus-circle"></i>
@@ -1313,8 +1343,8 @@
                             <div class="wallets-view-content" id="wallets-view-content">
                                 <div class="wallets-toolbar">
                                     <div class="wallets-toolbar-header">
-                                        <h2 class="wallets-page-title">Wallets &amp; Accounts</h2>
-                                        <p class="wallets-page-subtitle text-muted text-sm">Manage multi-currency liquid balances, bank accounts, cards and payment sources</p>
+                                        <h2 class="wallets-page-title">Wallets</h2>
+                                        <p class="wallets-page-subtitle text-muted text-sm">Multi-currency accounts and cards</p>
                                     </div>
                                     <div class="wallets-toolbar-actions">
                                         <button class="btn btn-secondary" onclick="app.openTransactionModal('transfer')" title="Transfer between wallets">
@@ -1440,7 +1470,7 @@
                         <header class="top-bar">
                             <div class="view-header-content">
                                 <h2>Settings</h2>
-                                <p class="view-header-sub">Manage profile, regional formats, privacy, security and data</p>
+                                <p class="view-header-sub">Preferences, backup and security</p>
                             </div>
                             <div class="view-header-actions">
                                 <button class="icon-btn global-privacy-btn" onclick="app.togglePrivacy()"
@@ -1656,7 +1686,7 @@
                                                 <div class="settings-control-wrap">
                                                     <div class="settings-theme-preview">
                                                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                                                            <span style="font-weight:700; font-size:0.9rem; color:#fff;">Neutral Obsidian Black (Phase 5)</span>
+                                                            <span style="font-weight:600; font-size:0.9rem; color:#fff;">Neutral Obsidian Black (Phase 5)</span>
                                                             <span class="settings-info-badge" style="color:var(--accent); border-color:rgba(62,99,221,0.3);">Active</span>
                                                         </div>
                                                         <div class="theme-swatches">
@@ -1827,7 +1857,7 @@
                                                     </button>
 
                                                     <div id="restore-preview-container" class="settings-backup-preview-box" style="display:none;">
-                                                        <div style="font-size:0.82rem; font-weight:700; color:#fff;" id="restore-preview-title">Backup File Validated</div>
+                                                        <div style="font-size:0.82rem; font-weight:600; color:#fff;" id="restore-preview-title">Backup File Validated</div>
                                                         <div style="font-size:0.75rem; color:var(--text-muted);" id="restore-preview-details"></div>
                                                         <div style="display:flex; gap:8px; margin-top:4px;">
                                                             <button class="btn btn-danger btn-sm" onclick="app.confirmRestore()">Confirm & Restore State</button>
@@ -2279,7 +2309,7 @@
                     style="width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#000 50%,#fff 50%);flex-shrink:0;">
                 </div>
                 <input id="cp-hex-input" type="text" maxlength="7"
-                    style="background:none;border:none;color:var(--text-main);font-size:1rem;font-weight:700;letter-spacing:2px;width:80px;outline:none;font-family:inherit;text-align:center;"
+                    style="background:none;border:none;color:var(--text-main);font-size:1rem;font-weight:600;letter-spacing:1px;width:80px;outline:none;font-family:var(--font-numeric);text-align:center;"
                     oninput="app.cpHexInput(this.value)">
             </div>
             <div style="display:flex;padding:16px;gap:12px;height:240px;">
@@ -2332,7 +2362,7 @@
         <div class="closing-modal-sheet" onclick="event.stopPropagation()">
             <div class="closing-modal-header">
                 <div>
-                    <h3 style="margin:0; font-size: 1.15rem; font-weight: 700;">Monthly Financial Closing</h3>
+                    <h3 style="margin:0; font-size: 1.15rem; font-weight: 600;">Monthly Financial Closing</h3>
                     <p class="text-xs text-muted" id="closing-wizard-subtitle" style="margin: 4px 0 0 0;">Guided monthly balance reconciliation and budget rollover</p>
                 </div>
                 <button class="icon-btn" onclick="app.closeClosingWizard()" title="Close wizard">
@@ -2387,7 +2417,7 @@
         <div class="category-manage-sheet" onclick="event.stopPropagation()">
             <div style="padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h3 style="margin:0; font-size: 1.1rem; font-weight: 700;" id="cat-modal-title">Configure Category</h3>
+                    <h3 style="margin:0; font-size: 1.1rem; font-weight: 600;" id="cat-modal-title">Configure Category</h3>
                     <p class="text-xs text-muted" style="margin: 4px 0 0 0;">Manage category properties, icon, and budget allocation</p>
                 </div>
                 <button class="icon-btn" onclick="app.closeCategoryManageModal()" title="Close">
@@ -2482,7 +2512,7 @@
         <div class="category-manage-sheet overall-budget-sheet" onclick="event.stopPropagation()" style="max-width: 520px;">
             <div style="padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h3 style="margin:0; font-size: 1.1rem; font-weight: 700;" id="overall-budget-modal-title">Configure Overall Monthly Budget</h3>
+                    <h3 style="margin:0; font-size: 1.1rem; font-weight: 600;" id="overall-budget-modal-title">Configure Overall Monthly Budget</h3>
                     <p class="text-xs text-muted" style="margin: 4px 0 0 0;" id="overall-budget-modal-subtitle">Set monthly spending limit independently of category budgets</p>
                 </div>
                 <button class="icon-btn" onclick="app.closeOverallBudgetModal()" title="Close">
@@ -2508,9 +2538,9 @@
                         Overall Monthly Limit (<span id="overall-budget-curr-label">¥</span>)
                     </label>
                     <div style="position: relative; display: flex; align-items: center;">
-                        <span id="overall-budget-curr-prefix" style="position: absolute; left: 14px; font-weight: 700; color: var(--text-muted); font-size: 1rem; pointer-events: none;">¥</span>
+                        <span id="overall-budget-curr-prefix" style="position: absolute; left: 14px; font-weight: 500; color: var(--text-muted); font-size: 1rem; pointer-events: none;">¥</span>
                         <input type="number" id="overall-budget-input" min="0" step="500" placeholder="0"
-                            style="width: 100%; padding: 12px 14px 12px 34px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 1.1rem; font-weight: 700; font-family: var(--font-numeric); outline: none;">
+                            style="width: 100%; padding: 12px 14px 12px 34px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 1.1rem; font-weight: 600; font-family: var(--font-numeric); outline: none;">
                     </div>
                     <span id="overall-budget-error" style="display: none; color: #fb7185; font-size: 0.78rem; margin-top: 6px;"></span>
                 </div>

@@ -408,14 +408,14 @@ class App {
         };
 
         const viewSubtitles = {
-            'home-view': 'Overview & Accounts',
-            'dashboard-view': 'Overview & Accounts',
-            'transactions-view': 'Continuous Ledger & Filters',
+            'home-view': 'Overview & Balances',
+            'dashboard-view': 'Overview & Balances',
+            'transactions-view': 'Activity & Ledger',
             'analytics-view': 'Spending Patterns & Insights',
-            'reports-view': 'Monthly Snapshots & Closing',
-            'budgets-view': 'Budget Allocation & Categories',
-            'wallets-view': 'Account Management',
-            'settings-view': 'Preferences & Security',
+            'reports-view': 'Statements & Snapshots',
+            'budgets-view': 'Limits & Targets',
+            'wallets-view': 'Accounts & Cards',
+            'settings-view': 'Preferences & Backup',
             'history-view': 'Historical Archives'
         };
 
@@ -2703,14 +2703,14 @@ class App {
                 <div class="country-card-header" style="display: flex; justify-content: space-between; align-items: center; z-index: 2;">
                     <div class="country-badge" style="display: flex; align-items: center; gap: 8px;">
                         ${flagSvg}
-                        <span class="country-name" style="font-weight: 700; font-size: 1.1rem; color: #fff;">${countryName}</span>
-                        <span class="currency-code" style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.15); font-weight: 600; color: #fff; letter-spacing: 0.5px;">${isJp ? 'JPY' : 'INR'}</span>
+                        <span class="country-name" style="font-weight: 600; font-size: 1.1rem; color: #fff;">${countryName}</span>
+                        <span class="currency-code" style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.15); font-weight: 500; color: #fff;">${isJp ? 'JPY' : 'INR'}</span>
                     </div>
                     <span class="wallet-count-pill" style="font-size: 0.75rem; padding: 4px 10px; border-radius: 9999px; background: rgba(0,0,0,0.35); color: #fff; font-weight: 500; border: 1px solid rgba(255,255,255,0.12);">${regionWallets.length} ${regionWallets.length === 1 ? 'Account' : 'Accounts'}</span>
                 </div>
                 <div class="country-balance-body" style="margin: 22px 0; z-index: 2;">
-                    <span class="balance-label" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; color: #fff; display: block; margin-bottom: 4px;">Total Portfolio Balance</span>
-                    <div class="country-total-amount financial-amount privacy-blur" style="font-size: 2.3rem; font-weight: 800; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
+                    <span class="balance-label" style="font-size: 0.74rem; font-weight: 500; opacity: 0.8; color: #fff; display: block; margin-bottom: 4px;">Total Portfolio Balance</span>
+                    <div class="country-total-amount financial-amount privacy-blur" style="font-size: 2.3rem; font-weight: 600; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
                         ${this.formatMoney(total, currency)}
                     </div>
                 </div>
@@ -2747,11 +2747,11 @@ class App {
                             </div>
                             <div>
                                 <div style="font-weight: 600; color: #fff; font-size: 0.9rem;">${w.id}</div>
-                                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px;">${w.type || 'Account'} • ${w.currency}</div>
+                                <div style="font-size: 0.74rem; color: rgba(255,255,255,0.7);">${w.type || 'Account'} • ${w.currency}</div>
                             </div>
                         </div>
                         <div style="text-align: right;">
-                            <div class="financial-amount privacy-blur" style="font-family: var(--font-numeric); font-weight: 700; color: #fff; font-size: 1.05rem;">
+                            <div class="financial-amount privacy-blur" style="font-family: var(--font-numeric); font-weight: 600; color: #fff; font-size: 1.05rem;">
                                 ${this.formatMoney(w.balance, w.currency)}
                             </div>
                             <span style="font-size: 0.72rem; color: rgba(255,255,255,0.65);">View details →</span>
@@ -2817,8 +2817,8 @@ class App {
                     ${secondaryBadge}
                 </div>
                 <div class="wallet-balance-wrap" style="margin: 20px 0; z-index: 2;">
-                    <span class="wallet-balance-label" style="font-size: 0.72rem; font-weight: 400; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.65); display: block; margin-bottom: 4px;">Current Balance</span>
-                    <div class="wallet-balance-val financial-amount privacy-blur" style="font-size: 2.25rem; font-weight: 700; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
+                    <span class="wallet-balance-label" style="font-size: 0.74rem; font-weight: 500; color: rgba(255,255,255,0.65); display: block; margin-bottom: 4px;">Current Balance</span>
+                    <div class="wallet-balance-val financial-amount privacy-blur" style="font-size: 2.25rem; font-weight: 600; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
                         ${this.formatMoney(w.balance, w.currency)}
                     </div>
                 </div>
@@ -3346,7 +3346,7 @@ class App {
 
                 catsHtml += `
                     <div style="margin-top:16px;">
-                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:8px;">
+                        <h4 style="color:var(--text-muted); font-size:0.85rem; font-weight: 500; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
                             ${this.getCountryFlagSvg(region, 16, 12)}
                             <span>${region === 'JP' ? 'Japan' : 'India'} Analytics</span>
                         </h4>
@@ -3358,7 +3358,7 @@ class App {
                         ${overallHtml}
 
                         ${catCardsHtml ? `
-                            <h5 style="color:var(--text-muted); font-size:0.72rem; margin: 12px 0 10px; text-transform:uppercase; letter-spacing:0.5px;">By Category</h5>
+                            <h5 style="color:var(--text-muted); font-size:0.75rem; font-weight: 500; margin: 12px 0 10px;">By Category</h5>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
                                 ${catCardsHtml}
                             </div>
@@ -3368,7 +3368,7 @@ class App {
             });
 
             // Build grouped transactions list for this history snapshot
-            let txsHtml = '<div style="margin-top: 24px;"><h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">Transactions</h4>';
+            let txsHtml = '<div style="margin-top: 24px;"><h4 style="color:var(--text-muted); font-size:0.85rem; font-weight: 500; margin-bottom:12px;">Transactions</h4>';
 
             if (h.transactions && h.transactions.length > 0) {
                 // Group by date (same logic as renderTransactions)
@@ -3822,7 +3822,7 @@ class App {
                 const canvasId = `print-donut-${index}-${region}`;
                 catsHtml += `
                     <div style="margin-top:16px; break-inside: avoid;">
-                        <h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:8px;">
+                        <h4 style="color:var(--text-muted); font-size:0.85rem; font-weight: 500; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
                             ${this.getCountryFlagSvg(region, 16, 12)}
                             <span>${region === 'JP' ? 'Japan' : 'India'} Analytics</span>
                         </h4>
@@ -3834,7 +3834,7 @@ class App {
                         ${overallHtml}
 
                         ${catCardsHtml ? `
-                            <h5 style="color:var(--text-muted); font-size:0.72rem; margin: 12px 0 10px; text-transform:uppercase; letter-spacing:0.5px;">By Category</h5>
+                            <h5 style="color:var(--text-muted); font-size:0.75rem; font-weight: 500; margin: 12px 0 10px;">By Category</h5>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
                                 ${catCardsHtml}
                             </div>
@@ -3845,7 +3845,7 @@ class App {
                 chartDataToRender.push({ id: canvasId, region: region, totals: totals[region] });
             });
 
-            let txsHtml = '<div style="margin-top: 24px; break-inside: avoid;"><h4 style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">Transactions</h4>';
+            let txsHtml = '<div style="margin-top: 24px; break-inside: avoid;"><h4 style="color:var(--text-muted); font-size:0.85rem; font-weight: 500; margin-bottom:12px;">Transactions</h4>';
 
             if (h.transactions && h.transactions.length > 0) {
                 const groupedTxs = {};
@@ -4074,7 +4074,7 @@ class App {
                     <div class="empty-icon-circle">
                         <i data-lucide="receipt"></i>
                     </div>
-                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">No Transactions Found</h3>
+                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 600;">No Transactions Found</h3>
                     <p class="text-muted text-sm" style="margin: 0; max-width: 360px;">No transactions match your search query or applied filter criteria.</p>
                     <button class="btn btn-secondary btn-sm" onclick="app.resetAllLedgerFilters()" style="margin-top: 6px;">
                         <i data-lucide="rotate-ccw"></i>
@@ -5577,7 +5577,7 @@ class App {
                     <div>
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
                             ${this.getCountryFlagSvg(this.reportRegion, 24, 18)}
-                            <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800;">${this.reportMonthKey} Financial Snapshot</h2>
+                            <h2 style="margin: 0; font-size: 1.35rem; font-weight: 600;">${this.reportMonthKey} Financial Snapshot</h2>
                             ${statusBadge}
                         </div>
                         <div class="report-meta-text">
@@ -5623,13 +5623,13 @@ class App {
                 ${periodTotalBudget > 0 ? `
                     <div style="padding: 16px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; gap: 8px;">
                         <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                            <span class="text-xs font-bold text-muted" style="text-transform: uppercase; letter-spacing: 0.05em;">Monthly Budget Performance</span>
-                            <span class="text-xs ${budgetRem >= 0 ? 'text-success' : 'text-danger'} font-bold privacy-blur">
+                            <span class="text-xs text-muted" style="font-weight: 500;">Monthly Budget Performance</span>
+                            <span class="text-xs ${budgetRem >= 0 ? 'text-success' : 'text-danger'} privacy-blur" style="font-weight: 500;">
                                 ${budgetRem >= 0 ? `${this.formatMoney(budgetRem, currency)} remaining cushion` : `${this.formatMoney(Math.abs(budgetRem), currency)} over allocated budget`}
                             </span>
                         </div>
-                        <div class="neon-bar-bg" style="height: 8px; border-radius: 9999px;">
-                            <div class="neon-bar-fill ${budgetPct > 90 ? 'neon-danger' : budgetPct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${budgetPct}%; height: 100%;"></div>
+                        <div class="budget-streak-track">
+                            <div class="budget-streak-fill ${budgetPct > 90 ? 'neon-danger' : budgetPct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${budgetPct}%;"></div>
                         </div>
                         <div style="display: flex; justify-content: space-between; font-size: 0.78rem;" class="text-muted">
                             <span class="privacy-blur">Spent: ${this.formatMoney(totalExpense, currency)}</span>
@@ -5822,11 +5822,77 @@ class App {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             lucide.createIcons();
         }
+        this.populateCustomReportFilters();
+    }
+
+    populateCustomReportFilters() {
+        const regSelect = document.getElementById('report-custom-region');
+        const walletSelect = document.getElementById('report-custom-wallet');
+        const catSelect = document.getElementById('report-custom-category');
+        if (!walletSelect || !catSelect) return;
+
+        const selectedRegion = regSelect ? regSelect.value : 'ALL';
+        const currentWallet = walletSelect.value || 'ALL';
+        const currentCat = catSelect.value || 'ALL';
+
+        // Wallets
+        const wallets = Object.values(storage.state.wallets || {});
+        const filteredWallets = selectedRegion === 'ALL' 
+            ? wallets 
+            : wallets.filter(w => w.region === selectedRegion);
+
+        walletSelect.innerHTML = '<option value="ALL">All Wallets</option>' +
+            filteredWallets.map(w => `<option value="${w.id}" ${w.id === currentWallet ? 'selected' : ''}>${w.id} (${w.currency || (w.region === 'JP' ? '¥' : '₹')})</option>`).join('');
+
+        // Categories
+        let cats = [];
+        if (selectedRegion === 'ALL') {
+            const jpCats = storage.state.categories?.JP || [];
+            const inCats = storage.state.categories?.IN || [];
+            const seen = new Set();
+            [...jpCats, ...inCats].forEach(c => {
+                if (!seen.has(c.id)) {
+                    seen.add(c.id);
+                    cats.push(c);
+                }
+            });
+        } else {
+            cats = storage.state.categories?.[selectedRegion] || [];
+        }
+
+        catSelect.innerHTML = '<option value="ALL">All Categories</option>' +
+            cats.map(c => `<option value="${c.id}" ${c.id === currentCat ? 'selected' : ''}>${c.name}</option>`).join('');
+    }
+
+    onCustomReportRegionChange() {
+        this.populateCustomReportFilters();
+    }
+
+    resetCustomRangeReport() {
+        const startInput = document.getElementById('report-custom-start');
+        const endInput = document.getElementById('report-custom-end');
+        const regSelect = document.getElementById('report-custom-region');
+        const resultsEl = document.getElementById('report-custom-results');
+
+        if (startInput) startInput.value = '';
+        if (endInput) endInput.value = '';
+        if (regSelect) regSelect.value = 'ALL';
+
+        this.populateCustomReportFilters();
+
+        if (resultsEl) {
+            resultsEl.style.display = 'none';
+            resultsEl.innerHTML = '';
+        }
+        this.lastCustomReportData = null;
     }
 
     generateCustomRangeReport() {
         const startInput = document.getElementById('report-custom-start');
         const endInput = document.getElementById('report-custom-end');
+        const regSelect = document.getElementById('report-custom-region');
+        const walletSelect = document.getElementById('report-custom-wallet');
+        const catSelect = document.getElementById('report-custom-category');
         const resultsEl = document.getElementById('report-custom-results');
         if (!startInput || !endInput || !resultsEl) return;
 
@@ -5841,57 +5907,318 @@ class App {
             return;
         }
 
-        const allTxs = storage.state.transactions || [];
-        const customTxs = allTxs.filter(tx => tx.date >= start && tx.date <= end && tx.region === this.reportRegion);
-        const currency = this.reportRegion === 'JP' ? '¥' : '₹';
+        const selRegion = regSelect ? regSelect.value : 'ALL';
+        const selWallet = walletSelect ? walletSelect.value : 'ALL';
+        const selCategory = catSelect ? catSelect.value : 'ALL';
 
-        let customIncome = 0;
-        let customExpense = 0;
+        const allTxs = storage.state.transactions || [];
+        const customTxs = allTxs.filter(tx => {
+            if (!tx.date || tx.date < start || tx.date > end) return false;
+            if (selRegion !== 'ALL' && tx.region !== selRegion) return false;
+            if (selWallet !== 'ALL' && tx.walletId !== selWallet) return false;
+            if (selCategory !== 'ALL' && tx.categoryId !== selCategory) return false;
+            return true;
+        }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+        // Separate totals for JP and IN
+        let jpIncome = 0, jpExpense = 0;
+        let inIncome = 0, inExpense = 0;
         const catMap = {};
 
         customTxs.forEach(tx => {
             const amt = Number(tx.amount || 0);
-            if (tx.type === 'income') {
-                customIncome += amt;
-            } else if (tx.type === 'expense') {
-                customExpense += amt;
+            const reg = tx.region || (storage.state.categories?.JP?.some(c => c.id === tx.categoryId) ? 'JP' : 'IN');
+            if (reg === 'JP') {
+                if (tx.type === 'income') jpIncome += amt;
+                else if (tx.type === 'expense') jpExpense += amt;
+            } else {
+                if (tx.type === 'income') inIncome += amt;
+                else if (tx.type === 'expense') inExpense += amt;
+            }
+
+            if (tx.type === 'expense') {
                 const cId = tx.categoryId || 'misc';
-                catMap[cId] = (catMap[cId] || 0) + amt;
+                if (!catMap[cId]) {
+                    catMap[cId] = {
+                        name: this.getCategoryName(cId, reg),
+                        icon: (storage.state.categories?.[reg]?.find(c => c.id === cId) || {}).icon || 'tag',
+                        region: reg,
+                        amount: 0,
+                        count: 0
+                    };
+                }
+                catMap[cId].amount += amt;
+                catMap[cId].count++;
             }
         });
 
-        const customNet = customIncome - customExpense;
+        const sortedCats = Object.values(catMap).sort((a, b) => b.amount - a.amount);
+
+        this.lastCustomReportData = {
+            startDate: start,
+            endDate: end,
+            region: selRegion,
+            wallet: selWallet,
+            category: selCategory,
+            transactions: customTxs,
+            jpIncome,
+            jpExpense,
+            jpNet: jpIncome - jpExpense,
+            inIncome,
+            inExpense,
+            inNet: inIncome - inExpense,
+            categories: sortedCats
+        };
+
+        const hasJp = (selRegion === 'ALL' || selRegion === 'JP');
+        const hasIn = (selRegion === 'ALL' || selRegion === 'IN');
+
+        let kpiHtml = '';
+        if (hasJp) {
+            kpiHtml += `
+                <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 16px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.06); display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        ${this.getCountryFlagSvg('JP', 16, 12)}
+                        <strong style="font-size: 0.85rem;">Japan (JPY ¥)</strong>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <div>
+                            <span class="text-xs text-muted">Income</span>
+                            <div class="font-bold text-success privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(jpIncome, '¥')}</div>
+                        </div>
+                        <div>
+                            <span class="text-xs text-muted">Expenses</span>
+                            <div class="font-bold text-danger privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(jpExpense, '¥')}</div>
+                        </div>
+                        <div>
+                            <span class="text-xs text-muted">Net Surplus</span>
+                            <div class="font-bold ${jpIncome - jpExpense >= 0 ? 'text-success' : 'text-danger'} privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(jpIncome - jpExpense, '¥')}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        if (hasIn) {
+            kpiHtml += `
+                <div style="background: rgba(255, 255, 255, 0.02); padding: 12px 16px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.06); display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        ${this.getCountryFlagSvg('IN', 16, 12)}
+                        <strong style="font-size: 0.85rem;">India (INR ₹)</strong>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <div>
+                            <span class="text-xs text-muted">Income</span>
+                            <div class="font-bold text-success privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(inIncome, '₹')}</div>
+                        </div>
+                        <div>
+                            <span class="text-xs text-muted">Expenses</span>
+                            <div class="font-bold text-danger privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(inExpense, '₹')}</div>
+                        </div>
+                        <div>
+                            <span class="text-xs text-muted">Net Surplus</span>
+                            <div class="font-bold ${inIncome - inExpense >= 0 ? 'text-success' : 'text-danger'} privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(inIncome - inExpense, '₹')}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        let catBreakdownHtml = '';
+        if (sortedCats.length > 0) {
+            catBreakdownHtml = `
+                <div style="margin-top: 10px;">
+                    <h5 style="margin: 0 0 8px 0; font-size: 0.86rem; font-weight: 600; color: var(--text-secondary);">Category Breakdown</h5>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        ${sortedCats.slice(0, 8).map(c => {
+                            const cur = c.region === 'JP' ? '¥' : '₹';
+                            const regTotalExp = c.region === 'JP' ? jpExpense : inExpense;
+                            const share = regTotalExp > 0 ? Math.round((c.amount / regTotalExp) * 100) : 0;
+                            return `
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.82rem;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <i data-lucide="${c.icon}" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                                        <span>${c.name}</span>
+                                        <span class="text-xs text-muted">(${c.count} txs)</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span class="text-xs text-muted font-numeric">${share}%</span>
+                                        <strong class="privacy-blur font-numeric">${this.formatMoney(c.amount, cur)}</strong>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
 
         resultsEl.style.display = 'block';
         resultsEl.innerHTML = `
-            <div style="padding: 16px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="padding: 18px 20px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
                     <div>
-                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Report: ${start} to ${end} (${this.reportRegion})</h4>
-                        <span class="text-xs text-muted">Continuous ledger summary • Read-only snapshot</span>
+                        <h4 style="margin: 0; font-size: 1.02rem; font-weight: 600;">Statement: ${start} to ${end}</h4>
+                        <span class="text-xs text-muted">Filtered: Region ${selRegion} • Wallet ${selWallet} • Category ${selCategory}</span>
                     </div>
-                    <span class="report-status-badge active" style="font-size: 0.72rem;">${customTxs.length} transactions included</span>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                    <div style="background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: var(--radius-sm);">
-                        <span class="text-xs text-muted">Total Income</span>
-                        <div class="font-bold text-success privacy-blur" style="font-size: 1.05rem;">${this.formatMoney(customIncome, currency)}</div>
-                    </div>
-                    <div style="background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: var(--radius-sm);">
-                        <span class="text-xs text-muted">Total Expense</span>
-                        <div class="font-bold text-danger privacy-blur" style="font-size: 1.05rem;">${this.formatMoney(customExpense, currency)}</div>
-                    </div>
-                    <div style="background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: var(--radius-sm);">
-                        <span class="text-xs text-muted">Net Surplus / Deficit</span>
-                        <div class="font-bold ${customNet >= 0 ? 'text-success' : 'text-danger'} privacy-blur" style="font-size: 1.05rem;">${this.formatMoney(customNet, currency)}</div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="report-status-badge active" style="font-size: 0.74rem;">${customTxs.length} transactions included</span>
+                        <button class="btn btn-secondary btn-sm" id="btn-custom-report-pdf" onclick="app.exportCustomReportPdf()" title="Download PDF Statement">
+                            <i data-lucide="file-down"></i>
+                            <span>Download PDF</span>
+                        </button>
                     </div>
                 </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    ${kpiHtml}
+                </div>
+
+                ${catBreakdownHtml}
             </div>
         `;
 
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             lucide.createIcons();
         }
+    }
+
+    exportCustomReportPdf() {
+        if (!this.lastCustomReportData) {
+            alert('Please generate a custom report first before exporting.');
+            return;
+        }
+
+        const data = this.lastCustomReportData;
+        const printContainer = document.getElementById('print-container');
+        if (!printContainer) return;
+
+        const isPrivacy = this.isPrivacyHidden;
+        const fmt = (val, cur) => {
+            if (isPrivacy) return '••••••';
+            return this.formatMoney(val, cur);
+        };
+
+        let sectionsHtml = '';
+
+        if (data.region === 'ALL' || data.region === 'JP') {
+            const jpTxs = data.transactions.filter(t => t.region === 'JP' || (!t.region && storage.state.categories?.JP?.some(c => c.id === t.categoryId)));
+            sectionsHtml += `
+                <div class="print-page-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px;">
+                        <h2 style="margin: 0; font-size: 1.3rem; color: #fff;">Japan Portfolio (JPY ¥)</h2>
+                        <span style="font-size: 0.85rem; color: #aaa;">${jpTxs.length} Transactions</span>
+                    </div>
+                    <div class="print-summary" style="margin-bottom: 20px;">
+                        <div class="print-summary-item">
+                            <span>Total Income</span>
+                            <strong style="color: #34d399;">${fmt(data.jpIncome, '¥')}</strong>
+                        </div>
+                        <div class="print-summary-item">
+                            <span>Total Expenses</span>
+                            <strong style="color: #fb7185;">${fmt(data.jpExpense, '¥')}</strong>
+                        </div>
+                        <div class="print-summary-item">
+                            <span>Net Position</span>
+                            <strong style="color: ${data.jpNet >= 0 ? '#34d399' : '#fb7185'};">${fmt(data.jpNet, '¥')}</strong>
+                        </div>
+                    </div>
+
+                    <table class="print-table" style="margin-bottom: 30px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.2); text-align: left;">
+                                <th style="padding: 8px;">Date</th>
+                                <th style="padding: 8px;">Wallet</th>
+                                <th style="padding: 8px;">Category</th>
+                                <th style="padding: 8px;">Note</th>
+                                <th style="padding: 8px; text-align: right;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${jpTxs.map(t => `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                                    <td style="padding: 6px 8px;">${t.date}</td>
+                                    <td style="padding: 6px 8px;">${t.walletId || '-'}</td>
+                                    <td style="padding: 6px 8px;">${this.getCategoryName(t.categoryId, 'JP')}</td>
+                                    <td style="padding: 6px 8px; color: #aaa;">${t.note || '-'}</td>
+                                    <td style="padding: 6px 8px; text-align: right; font-weight: 600; color: ${t.type === 'income' ? '#34d399' : '#ffffff'};">
+                                        ${t.type === 'income' ? '+' : '-'}${fmt(t.amount, '¥')}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        if (data.region === 'ALL' || data.region === 'IN') {
+            const inTxs = data.transactions.filter(t => t.region === 'IN' || (!t.region && storage.state.categories?.IN?.some(c => c.id === t.categoryId)));
+            sectionsHtml += `
+                <div class="print-page-section ${data.region === 'ALL' ? 'print-page-break' : ''}" style="margin-top: ${data.region === 'ALL' ? '40px' : '0'};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px;">
+                        <h2 style="margin: 0; font-size: 1.3rem; color: #fff;">India Portfolio (INR ₹)</h2>
+                        <span style="font-size: 0.85rem; color: #aaa;">${inTxs.length} Transactions</span>
+                    </div>
+                    <div class="print-summary" style="margin-bottom: 20px;">
+                        <div class="print-summary-item">
+                            <span>Total Income</span>
+                            <strong style="color: #34d399;">${fmt(data.inIncome, '₹')}</strong>
+                        </div>
+                        <div class="print-summary-item">
+                            <span>Total Expenses</span>
+                            <strong style="color: #fb7185;">${fmt(data.inExpense, '₹')}</strong>
+                        </div>
+                        <div class="print-summary-item">
+                            <span>Net Position</span>
+                            <strong style="color: ${data.inNet >= 0 ? '#34d399' : '#fb7185'};">${fmt(data.inNet, '₹')}</strong>
+                        </div>
+                    </div>
+
+                    <table class="print-table" style="margin-bottom: 30px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.2); text-align: left;">
+                                <th style="padding: 8px;">Date</th>
+                                <th style="padding: 8px;">Wallet</th>
+                                <th style="padding: 8px;">Category</th>
+                                <th style="padding: 8px;">Note</th>
+                                <th style="padding: 8px; text-align: right;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${inTxs.map(t => `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                                    <td style="padding: 6px 8px;">${t.date}</td>
+                                    <td style="padding: 6px 8px;">${t.walletId || '-'}</td>
+                                    <td style="padding: 6px 8px;">${this.getCategoryName(t.categoryId, 'IN')}</td>
+                                    <td style="padding: 6px 8px; color: #aaa;">${t.note || '-'}</td>
+                                    <td style="padding: 6px 8px; text-align: right; font-weight: 600; color: ${t.type === 'income' ? '#34d399' : '#ffffff'};">
+                                        ${t.type === 'income' ? '+' : '-'}${fmt(t.amount, '₹')}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        const now = new Date().toLocaleString();
+        printContainer.innerHTML = `
+            <div class="print-header">
+                <h1>Expense Manager Statement</h1>
+                <p>Statement Period: <strong>${data.startDate}</strong> to <strong>${data.endDate}</strong> • Scope: ${data.region} (${data.wallet} / ${data.category})</p>
+                <p style="font-size: 0.78rem; color: #888; margin-top: 4px;">Generated on ${now} • Continuous Ledger Audit Snapshot</p>
+            </div>
+            ${sectionsHtml}
+        `;
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons({ root: printContainer });
+        }
+
+        setTimeout(() => {
+            window.print();
+        }, 300);
     }
 
     // =========================================================================
@@ -5985,7 +6312,7 @@ class App {
                         <p class="text-xs text-muted" style="margin: 0;">Review financial performance before proceeding with the closing reconciliation.</p>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                    <div class="closing-stats-grid">
                         <div style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
                             <span class="text-xs text-muted">Total Recorded Income</span>
                             <div class="font-bold text-success privacy-blur" style="font-size: 1.1rem; margin-top: 4px;">${this.formatMoney(monthIncome, '¥')}</div>
@@ -6099,7 +6426,7 @@ class App {
                         <p class="text-xs text-muted" style="margin: 0;">Verify next month's opening state prior to final confirmation.</p>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="closing-stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                         <div style="background: rgba(255, 255, 255, 0.02); padding: 14px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.06);">
                             <span class="text-xs text-muted">Next Active Month</span>
                             <div class="font-bold text-primary" style="font-size: 1.15rem; margin-top: 4px;">${nextMonth}</div>
@@ -6125,7 +6452,7 @@ class App {
                         <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); color: #34d399; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
                             <i data-lucide="lock" style="width: 22px; height: 22px;"></i>
                         </div>
-                        <h3 style="margin: 0 0 6px 0; font-size: 1.15rem; font-weight: 700;">Final Confirmation: Close Month ${curMonth}</h3>
+                        <h3 style="margin: 0 0 6px 0; font-size: 1.15rem; font-weight: 600;">Final Confirmation: Close Month ${curMonth}</h3>
                         <p class="text-xs text-muted" style="margin: 0;">
                             Month <code>${curMonth}</code> will be frozen and permanently recorded in <code>closedMonths</code>.
                             The application will advance to <code>${nextMonth}</code>.
