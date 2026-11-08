@@ -6,7 +6,7 @@
 @font-face {
     font-family: 'SF Pro Text';
     src: local('SF Pro Text'), local('SF Pro Text Regular'), local('SF Pro'),
-         url('../fonts/SF-Pro-Text-Regular.otf') format('opentype');
+        url('../fonts/SF-Pro-Text-Regular.otf') format('opentype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -15,7 +15,7 @@
 @font-face {
     font-family: 'SF Pro Text';
     src: local('SF Pro Text Medium'), local('SF Pro Medium'),
-         url('../fonts/SF-Pro-Text-Medium.otf') format('opentype');
+        url('../fonts/SF-Pro-Text-Medium.otf') format('opentype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -24,7 +24,7 @@
 @font-face {
     font-family: 'SF Pro Text';
     src: local('SF Pro Text Semibold'), local('SF Pro Semibold'),
-         url('../fonts/SF-Pro-Text-Semibold.otf') format('opentype');
+        url('../fonts/SF-Pro-Text-Semibold.otf') format('opentype');
     font-weight: 600;
     font-style: normal;
     font-display: swap;
@@ -33,7 +33,7 @@
 @font-face {
     font-family: 'SF Pro Text';
     src: local('SF Pro Text Bold'), local('SF Pro Bold'),
-         url('../fonts/SF-Pro-Text-Bold.otf') format('opentype');
+        url('../fonts/SF-Pro-Text-Bold.otf') format('opentype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -43,7 +43,7 @@
 @font-face {
     font-family: 'SF Pro Display';
     src: local('SF Pro Display'), local('SF Pro Display Regular'), local('SF Pro'),
-         url('../fonts/SF-Pro-Display-Regular.otf') format('opentype');
+        url('../fonts/SF-Pro-Display-Regular.otf') format('opentype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -52,7 +52,7 @@
 @font-face {
     font-family: 'SF Pro Display';
     src: local('SF Pro Display Medium'), local('SF Pro Medium'),
-         url('../fonts/SF-Pro-Display-Medium.otf') format('opentype');
+        url('../fonts/SF-Pro-Display-Medium.otf') format('opentype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -61,7 +61,7 @@
 @font-face {
     font-family: 'SF Pro Display';
     src: local('SF Pro Display Semibold'), local('SF Pro Semibold'),
-         url('../fonts/SF-Pro-Display-Semibold.otf') format('opentype');
+        url('../fonts/SF-Pro-Display-Semibold.otf') format('opentype');
     font-weight: 600;
     font-style: normal;
     font-display: swap;
@@ -70,7 +70,7 @@
 @font-face {
     font-family: 'SF Pro Display';
     src: local('SF Pro Display Bold'), local('SF Pro Bold'),
-         url('../fonts/SF-Pro-Display-Bold.otf') format('opentype');
+        url('../fonts/SF-Pro-Display-Bold.otf') format('opentype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -80,8 +80,8 @@
 @font-face {
     font-family: 'SF Pro';
     src: local('SF Pro Text'), local('SF Pro'),
-         url('../fonts/SF-Pro.ttf') format('truetype'),
-         url('../fonts/SF-Pro-Text-Regular.otf') format('opentype');
+        url('../fonts/SF-Pro.ttf') format('truetype'),
+        url('../fonts/SF-Pro-Text-Regular.otf') format('opentype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -90,8 +90,8 @@
 @font-face {
     font-family: 'SF Pro';
     src: local('SF Pro Text Medium'), local('SF Pro Medium'),
-         url('../fonts/SF-Pro.ttf') format('truetype'),
-         url('../fonts/SF-Pro-Text-Medium.otf') format('opentype');
+        url('../fonts/SF-Pro.ttf') format('truetype'),
+        url('../fonts/SF-Pro-Text-Medium.otf') format('opentype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -100,8 +100,8 @@
 @font-face {
     font-family: 'SF Pro';
     src: local('SF Pro Text Semibold'), local('SF Pro Semibold'),
-         url('../fonts/SF-Pro.ttf') format('truetype'),
-         url('../fonts/SF-Pro-Text-Semibold.otf') format('opentype');
+        url('../fonts/SF-Pro.ttf') format('truetype'),
+        url('../fonts/SF-Pro-Text-Semibold.otf') format('opentype');
     font-weight: 600;
     font-style: normal;
     font-display: swap;
@@ -110,8 +110,8 @@
 @font-face {
     font-family: 'SF Pro';
     src: local('SF Pro Text Bold'), local('SF Pro Bold'),
-         url('../fonts/SF-Pro.ttf') format('truetype'),
-         url('../fonts/SF-Pro-Text-Bold.otf') format('opentype');
+        url('../fonts/SF-Pro.ttf') format('truetype'),
+        url('../fonts/SF-Pro-Text-Bold.otf') format('opentype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -157,7 +157,7 @@
     --font-main: var(--font-sans);
     --font-display: 'SF Pro Display', 'SF Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --font-numeric: 'SF Pro Text', 'SF Pro', -apple-system, BlinkMacSystemFont, 'SF Mono', monospace;
-    
+
     --text-primary: #f5f5f7;
     --text-main: #f5f5f7;
     --text-secondary: #a0a0ab;
@@ -426,7 +426,7 @@ button {
     gap: 4px;
 }
 
-.desktop-sidebar.collapsed .nav-list > li {
+.desktop-sidebar.collapsed .nav-list>li {
     width: 100%;
     display: flex;
     justify-content: center;
@@ -593,9 +593,9 @@ button {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.18);
     cursor: pointer;
     transition: background-color var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out),
-                transform var(--duration-instant) var(--ease-out);
+        border-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out),
+        transform var(--duration-instant) var(--ease-out);
 }
 
 .btn-add-tx:hover {
@@ -729,8 +729,15 @@ button {
 }
 
 @keyframes tooltip-fade {
-    from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
-    to { opacity: 1; transform: translateY(-50%) translateX(0); }
+    from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+    }
 }
 
 /* Sidebar Footer & Account */
@@ -775,8 +782,15 @@ button {
 }
 
 @keyframes pulse-sync {
-    from { opacity: 0.5; transform: scale(0.9); }
-    to { opacity: 1; transform: scale(1.15); }
+    from {
+        opacity: 0.5;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1.15);
+    }
 }
 
 .account-card {
@@ -1079,13 +1093,15 @@ button {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    position: static; /* Natural vertical scrolling flow: spending analysis → recent activity → loan progress */
+    position: static;
+    /* Natural vertical scrolling flow: spending analysis → recent activity → loan progress */
 }
 
 @media (max-width: 1200px) {
     .workspace-grid {
         grid-template-columns: 1fr;
     }
+
     .workspace-rail {
         position: static;
     }
@@ -1878,17 +1894,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     user-select: none;
     white-space: nowrap;
     transition: transform var(--duration-fast) var(--ease-out),
-                background-color var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out),
-                color var(--duration-fast) var(--ease-out);
+        background-color var(--duration-fast) var(--ease-out),
+        border-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out),
+        color var(--duration-fast) var(--ease-out);
 }
 
 .btn:active {
     transform: scale(0.98);
 }
 
-.btn:disabled, .btn[disabled] {
+.btn:disabled,
+.btn[disabled] {
     opacity: 0.45;
     cursor: not-allowed;
     pointer-events: none;
@@ -2109,7 +2126,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     grid-template-rows: 0fr;
 }
 
-.collapsible-wrapper > div,
+.collapsible-wrapper>div,
 .collapsible-inner {
     min-height: 0;
     overflow: hidden;
@@ -2118,7 +2135,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1), transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.collapsible-wrapper.collapsed > div,
+.collapsible-wrapper.collapsed>div,
 .collapsible-wrapper.collapsed .collapsible-inner {
     opacity: 0;
     transform: translateY(-6px);
@@ -2154,9 +2171,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     margin-bottom: 0px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     transition: background-color var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out),
-                transform var(--duration-instant) var(--ease-out);
+        border-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out),
+        transform var(--duration-instant) var(--ease-out);
 }
 
 .neon-row:hover {
@@ -2231,12 +2248,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0.28) 50%,
-        transparent 100%
-    );
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.28) 50%,
+            transparent 100%);
     background-size: 200% 100%;
     animation: budget-bar-glimmer 3.5s ease-in-out infinite;
     border-radius: inherit;
@@ -2247,6 +2262,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     0% {
         background-position: -200% 0;
     }
+
     100% {
         background-position: 200% 0;
     }
@@ -2457,8 +2473,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     min-height: 168px;
     box-sizing: border-box;
     transition: transform var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out);
+        box-shadow var(--duration-fast) var(--ease-out),
+        border-color var(--duration-fast) var(--ease-out);
     user-select: none;
 }
 
@@ -2474,8 +2490,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* Japan Card: Layered Crimson/Rose Radial Blooms */
 .country-card-jp {
     background: radial-gradient(circle at 10% 15%, rgba(225, 29, 72, 0.28), transparent 50%),
-                radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), transparent 55%),
-                linear-gradient(145deg, #181116, #100b10) !important;
+        radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), transparent 55%),
+        linear-gradient(145deg, #181116, #100b10) !important;
     border: 1px solid rgba(225, 29, 72, 0.26) !important;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -2489,8 +2505,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* India Card: Layered Saffron/Emerald Radial Blooms */
 .country-card-in {
     background: radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.24), transparent 50%),
-                radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), transparent 55%),
-                linear-gradient(145deg, #171510, #0c120e) !important;
+        radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), transparent 55%),
+        linear-gradient(145deg, #171510, #0c120e) !important;
     border: 1px solid rgba(245, 158, 11, 0.24) !important;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -2630,8 +2646,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     flex-direction: column;
     justify-content: space-between;
     transition: background-color var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out);
+        border-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .monthly-stat-card:hover {
@@ -3244,7 +3260,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .wallets-toolbar-actions {
         grid-template-columns: 1fr 1fr;
     }
-    
+
     .wallets-toolbar-actions #btn-add-wallet {
         grid-column: 1 / -1;
     }
@@ -3326,7 +3342,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     cursor: pointer;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     transition: border-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out);
+        box-shadow var(--duration-fast) var(--ease-out);
     user-select: none;
 }
 
@@ -3334,8 +3350,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .wallets-kpi-card.country-card-jp,
 .wallets-portfolio-grid .wallets-kpi-card:nth-child(1) {
     background: radial-gradient(circle at 10% 15%, rgba(225, 29, 72, 0.28), transparent 50%),
-                radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), transparent 55%),
-                linear-gradient(145deg, #181116, #100b10);
+        radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), transparent 55%),
+        linear-gradient(145deg, #181116, #100b10);
     border: 1px solid rgba(225, 29, 72, 0.26);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -3351,8 +3367,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .wallets-kpi-card.country-card-in,
 .wallets-portfolio-grid .wallets-kpi-card:nth-child(2) {
     background: radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.24), transparent 50%),
-                radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), transparent 55%),
-                linear-gradient(145deg, #171510, #0c120e);
+        radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), transparent 55%),
+        linear-gradient(145deg, #171510, #0c120e);
     border: 1px solid rgba(245, 158, 11, 0.24);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -3382,7 +3398,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .wallets-kpi-title {
-    font-size: 0.88rem;
+    font-size: 1.05rem;
     font-weight: 600;
     color: var(--text-primary);
     letter-spacing: -0.01em;
@@ -3438,7 +3454,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallets-kpi-card:hover .wallets-kpi-hint {
     opacity: 1;
-    transform: translateX(2px);
+    transform: translateX(5px);
 }
 
 /* Wallets Accordion Headers */
@@ -3497,9 +3513,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     justify-content: center;
     cursor: pointer;
     transition: background var(--duration-fast) var(--ease-out),
-                color var(--duration-fast) var(--ease-out),
-                transform var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out);
+        color var(--duration-fast) var(--ease-out),
+        transform var(--duration-fast) var(--ease-out),
+        border-color var(--duration-fast) var(--ease-out);
 }
 
 .wallets-collapse-btn:hover {
@@ -3556,8 +3572,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.16);
     transition: box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
-                border-color 180ms ease,
-                opacity 180ms ease;
+        border-color 180ms ease,
+        opacity 180ms ease;
     transform: none;
     user-select: none;
 }
@@ -3599,7 +3615,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     inset: 0;
     pointer-events: none;
     background: radial-gradient(circle at 82% 16%, rgba(255, 255, 255, 0.14), transparent 55%),
-                linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
     border-radius: inherit;
     z-index: 1;
@@ -3639,8 +3655,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     justify-content: center;
     cursor: pointer;
     transition: background var(--duration-fast) var(--ease-out),
-                color var(--duration-fast) var(--ease-out),
-                transform var(--duration-fast) var(--ease-out);
+        color var(--duration-fast) var(--ease-out),
+        transform var(--duration-fast) var(--ease-out);
     position: relative;
     z-index: 3;
 }
@@ -3706,11 +3722,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* 8. 14 Curated Wallet Themes */
 .wallet-theme-crimson-paypay {
     background: radial-gradient(circle at 12% 18%, rgba(255, 0, 51, 0.38), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(153, 0, 31, 0.26), transparent 55%),
-                linear-gradient(145deg, #1c0509, #110003);
+        radial-gradient(circle at 88% 85%, rgba(153, 0, 31, 0.26), transparent 55%),
+        linear-gradient(145deg, #1c0509, #110003);
     border: 1px solid rgba(255, 0, 51, 0.32);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-crimson-paypay:hover {
     border-color: rgba(255, 0, 51, 0.55);
     box-shadow: 0 10px 28px rgba(255, 0, 51, 0.22);
@@ -3718,11 +3735,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-emerald-salary {
     background: radial-gradient(circle at 12% 18%, rgba(16, 185, 129, 0.34), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(4, 120, 87, 0.24), transparent 55%),
-                linear-gradient(145deg, #051a14, #02100c);
+        radial-gradient(circle at 88% 85%, rgba(4, 120, 87, 0.24), transparent 55%),
+        linear-gradient(145deg, #051a14, #02100c);
     border: 1px solid rgba(16, 185, 129, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-emerald-salary:hover {
     border-color: rgba(16, 185, 129, 0.52);
     box-shadow: 0 10px 28px rgba(16, 185, 129, 0.2);
@@ -3730,11 +3748,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-amber-gold {
     background: radial-gradient(circle at 12% 18%, rgba(245, 158, 11, 0.32), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(180, 83, 9, 0.22), transparent 55%),
-                linear-gradient(145deg, #1c1507, #120d04);
+        radial-gradient(circle at 88% 85%, rgba(180, 83, 9, 0.22), transparent 55%),
+        linear-gradient(145deg, #1c1507, #120d04);
     border: 1px solid rgba(245, 158, 11, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-amber-gold:hover {
     border-color: rgba(245, 158, 11, 0.52);
     box-shadow: 0 10px 28px rgba(245, 158, 11, 0.2);
@@ -3742,11 +3761,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-burgundy-axis {
     background: radial-gradient(circle at 12% 18%, rgba(151, 20, 77, 0.38), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(92, 9, 45, 0.26), transparent 55%),
-                linear-gradient(145deg, #1a0610, #100208);
+        radial-gradient(circle at 88% 85%, rgba(92, 9, 45, 0.26), transparent 55%),
+        linear-gradient(145deg, #1a0610, #100208);
     border: 1px solid rgba(151, 20, 77, 0.34);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-burgundy-axis:hover {
     border-color: rgba(151, 20, 77, 0.55);
     box-shadow: 0 10px 28px rgba(151, 20, 77, 0.22);
@@ -3754,11 +3774,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-baroda-orange {
     background: radial-gradient(circle at 12% 18%, rgba(234, 88, 12, 0.35), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(194, 65, 12, 0.24), transparent 55%),
-                linear-gradient(145deg, #1c0e06, #120702);
+        radial-gradient(circle at 88% 85%, rgba(194, 65, 12, 0.24), transparent 55%),
+        linear-gradient(145deg, #1c0e06, #120702);
     border: 1px solid rgba(234, 88, 12, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-baroda-orange:hover {
     border-color: rgba(234, 88, 12, 0.52);
     box-shadow: 0 10px 28px rgba(234, 88, 12, 0.2);
@@ -3766,11 +3787,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-sapphire-sbi {
     background: radial-gradient(circle at 12% 18%, rgba(37, 99, 235, 0.35), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(29, 78, 216, 0.24), transparent 55%),
-                linear-gradient(145deg, #091326, #040916);
+        radial-gradient(circle at 88% 85%, rgba(29, 78, 216, 0.24), transparent 55%),
+        linear-gradient(145deg, #091326, #040916);
     border: 1px solid rgba(37, 99, 235, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-sapphire-sbi:hover {
     border-color: rgba(37, 99, 235, 0.52);
     box-shadow: 0 10px 28px rgba(37, 99, 235, 0.2);
@@ -3778,11 +3800,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-hfc-navy {
     background: radial-gradient(circle at 12% 18%, rgba(2, 132, 199, 0.35), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(3, 105, 161, 0.24), transparent 55%),
-                linear-gradient(145deg, #051724, #020d16);
+        radial-gradient(circle at 88% 85%, rgba(3, 105, 161, 0.24), transparent 55%),
+        linear-gradient(145deg, #051724, #020d16);
     border: 1px solid rgba(2, 132, 199, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-hfc-navy:hover {
     border-color: rgba(2, 132, 199, 0.52);
     box-shadow: 0 10px 28px rgba(2, 132, 199, 0.2);
@@ -3790,11 +3813,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-icici-ruby {
     background: radial-gradient(circle at 12% 18%, rgba(220, 38, 38, 0.35), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(153, 27, 27, 0.24), transparent 55%),
-                linear-gradient(145deg, #1d0707, #110303);
+        radial-gradient(circle at 88% 85%, rgba(153, 27, 27, 0.24), transparent 55%),
+        linear-gradient(145deg, #1d0707, #110303);
     border: 1px solid rgba(220, 38, 38, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-icici-ruby:hover {
     border-color: rgba(220, 38, 38, 0.52);
     box-shadow: 0 10px 28px rgba(220, 38, 38, 0.2);
@@ -3802,11 +3826,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-violet-suica {
     background: radial-gradient(circle at 12% 18%, rgba(139, 92, 246, 0.35), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(109, 40, 217, 0.24), transparent 55%),
-                linear-gradient(145deg, #140b26, #0b0517);
+        radial-gradient(circle at 88% 85%, rgba(109, 40, 217, 0.24), transparent 55%),
+        linear-gradient(145deg, #140b26, #0b0517);
     border: 1px solid rgba(139, 92, 246, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-violet-suica:hover {
     border-color: rgba(139, 92, 246, 0.52);
     box-shadow: 0 10px 28px rgba(139, 92, 246, 0.2);
@@ -3814,11 +3839,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-cyan-line {
     background: radial-gradient(circle at 12% 18%, rgba(6, 182, 212, 0.35), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(14, 116, 144, 0.24), transparent 55%),
-                linear-gradient(145deg, #051b20, #020e12);
+        radial-gradient(circle at 88% 85%, rgba(14, 116, 144, 0.24), transparent 55%),
+        linear-gradient(145deg, #051b20, #020e12);
     border: 1px solid rgba(6, 182, 212, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-cyan-line:hover {
     border-color: rgba(6, 182, 212, 0.52);
     box-shadow: 0 10px 28px rgba(6, 182, 212, 0.2);
@@ -3826,11 +3852,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-slate-reserve {
     background: radial-gradient(circle at 12% 18%, rgba(100, 116, 139, 0.32), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(51, 65, 85, 0.24), transparent 55%),
-                linear-gradient(145deg, #131924, #0a0e16);
+        radial-gradient(circle at 88% 85%, rgba(51, 65, 85, 0.24), transparent 55%),
+        linear-gradient(145deg, #131924, #0a0e16);
     border: 1px solid rgba(100, 116, 139, 0.28);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-slate-reserve:hover {
     border-color: rgba(100, 116, 139, 0.5);
     box-shadow: 0 10px 28px rgba(100, 116, 139, 0.18);
@@ -3838,11 +3865,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-rose-gold {
     background: radial-gradient(circle at 12% 18%, rgba(244, 63, 94, 0.35), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(190, 18, 60, 0.24), transparent 55%),
-                linear-gradient(145deg, #1c0810, #110309);
+        radial-gradient(circle at 88% 85%, rgba(190, 18, 60, 0.24), transparent 55%),
+        linear-gradient(145deg, #1c0810, #110309);
     border: 1px solid rgba(244, 63, 94, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-rose-gold:hover {
     border-color: rgba(244, 63, 94, 0.52);
     box-shadow: 0 10px 28px rgba(244, 63, 94, 0.2);
@@ -3850,11 +3878,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-amethyst-crypto {
     background: radial-gradient(circle at 12% 18%, rgba(168, 85, 247, 0.35), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(126, 34, 206, 0.24), transparent 55%),
-                linear-gradient(145deg, #170924, #0d0416);
+        radial-gradient(circle at 88% 85%, rgba(126, 34, 206, 0.24), transparent 55%),
+        linear-gradient(145deg, #170924, #0d0416);
     border: 1px solid rgba(168, 85, 247, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-amethyst-crypto:hover {
     border-color: rgba(168, 85, 247, 0.52);
     box-shadow: 0 10px 28px rgba(168, 85, 247, 0.2);
@@ -3862,11 +3891,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallet-theme-aurora-nordic {
     background: radial-gradient(circle at 12% 18%, rgba(13, 148, 136, 0.35), transparent 50%),
-                radial-gradient(circle at 88% 85%, rgba(30, 64, 175, 0.24), transparent 55%),
-                linear-gradient(145deg, #07171e, #030d15);
+        radial-gradient(circle at 88% 85%, rgba(30, 64, 175, 0.24), transparent 55%),
+        linear-gradient(145deg, #07171e, #030d15);
     border: 1px solid rgba(13, 148, 136, 0.3);
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
+
 .wallet-theme-aurora-nordic:hover {
     border-color: rgba(13, 148, 136, 0.52);
     box-shadow: 0 10px 28px rgba(13, 148, 136, 0.2);
@@ -3996,8 +4026,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     align-items: stretch;
     cursor: pointer;
     transition: border-color var(--duration-fast) ease,
-                background var(--duration-fast) ease,
-                box-shadow var(--duration-fast) ease;
+        background var(--duration-fast) ease,
+        box-shadow var(--duration-fast) ease;
     user-select: none;
     position: relative;
     box-sizing: border-box;
@@ -4051,7 +4081,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     position: absolute;
     inset: 0;
     background: radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.2), transparent 60%),
-                linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
     pointer-events: none;
     z-index: 1;
 }
@@ -4116,19 +4146,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
    ========================================================================== */
 
 @media (min-width: 1024px) {
+
     /* Desktop Mode */
     #bottom-nav {
         display: none !important;
     }
-    
+
     #main-fab {
         display: none !important;
     }
-    
+
     .fab-menu-overlay {
         display: none !important;
     }
-    
+
     .top-bar {
         display: none !important;
     }
@@ -4143,6 +4174,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 @media (max-width: 1023px) {
+
     /* Mobile / Tablet Mode */
     .desktop-sidebar {
         position: fixed;
@@ -4230,6 +4262,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
    ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
@@ -4277,8 +4310,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     @page {
         margin: 0;
     }
-    
-    body, html {
+
+    body,
+    html {
         background-color: #0a0a0f !important;
         color: #f8f9fa !important;
         margin: 0;
@@ -4287,12 +4321,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         print-color-adjust: exact !important;
         height: 100%;
     }
-    
+
     /* Hide everything except print container */
-    #app-content, .bottom-nav, .fab, .modal-overlay, #toast-container, .fab-menu-overlay, #reset-password-screen {
+    #app-content,
+    .bottom-nav,
+    .fab,
+    .modal-overlay,
+    #toast-container,
+    .fab-menu-overlay,
+    #reset-password-screen {
         display: none !important;
     }
-    
+
     #print-container {
         display: block !important;
         width: 100%;
@@ -4300,53 +4340,53 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         padding: 40px;
         background-color: #0a0a0f !important;
     }
-    
+
     /* PDF Document Styles */
     .print-header {
         text-align: center;
         margin-bottom: 30px;
         font-family: var(--font-main);
     }
-    
+
     .print-header h1 {
         margin: 0;
         font-size: 24px;
         color: #ffffff;
     }
-    
+
     .print-header p {
         margin: 5px 0 0 0;
         color: #a0a0b0;
     }
-    
+
     .print-summary {
         display: flex;
         justify-content: space-around;
         margin-bottom: 30px;
-        border: 1px solid rgba(255,255,255,0.1);
-        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.03);
         padding: 15px;
         border-radius: 8px;
         font-family: var(--font-main);
     }
-    
+
     .print-summary-item {
         text-align: center;
     }
-    
+
     .print-summary-item span {
         display: block;
         color: #a0a0b0;
         font-size: 14px;
         margin-bottom: 5px;
     }
-    
+
     .print-summary-item strong {
         display: block;
         font-size: 18px;
         color: #ffffff;
     }
-    
+
     .print-table {
         width: 100%;
         border-collapse: collapse;
@@ -4354,27 +4394,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         font-family: var(--font-main);
         font-size: 14px;
     }
-    
-    .print-table th, .print-table td {
-        border: 1px solid rgba(255,255,255,0.1);
+
+    .print-table th,
+    .print-table td {
+        border: 1px solid rgba(255, 255, 255, 0.1);
         padding: 12px;
         text-align: left;
     }
-    
+
     .print-table th {
-        background-color: rgba(255,255,255,0.05) !important;
+        background-color: rgba(255, 255, 255, 0.05) !important;
         font-weight: 600;
         color: #ffffff;
     }
-    
+
     .print-table td.amount-out {
         color: #fb7185 !important;
     }
-    
+
     .print-table td.amount-in {
         color: #34d399 !important;
     }
 }
+
 /* ==========================================================================
    PHASE 3: TRANSACTIONS & ANALYTICS REDESIGN (SpendIQ System)
    ========================================================================== */
@@ -4426,8 +4468,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     align-items: center;
     justify-content: center;
     transition: background-color var(--duration-fast) var(--ease-out),
-                color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out);
+        color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out);
     white-space: nowrap;
     user-select: none;
 }
@@ -4897,9 +4939,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background: rgba(255, 255, 255, 0.032);
     border: 1px solid rgba(255, 255, 255, 0.07);
     transition: background var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out),
-                transform var(--duration-instant) var(--ease-out);
+        border-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out),
+        transform var(--duration-instant) var(--ease-out);
     cursor: pointer;
     gap: 16px;
 }
@@ -5809,10 +5851,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* Responsive adjustments */
 @media (max-width: 1024px) {
+
     .analytics-breakdown-grid,
     .analytics-insights-grid {
         grid-template-columns: 1fr;
     }
+
     .analytics-kpi-grid {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -5824,6 +5868,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         align-items: stretch;
         gap: 10px;
     }
+
     .ledger-quick-actions {
         display: flex;
         align-items: center;
@@ -5831,19 +5876,24 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         gap: 8px;
         flex-wrap: wrap;
     }
+
     .ledger-quick-actions .btn {
         width: auto !important;
     }
+
     .filter-grid {
         grid-template-columns: 1fr;
     }
+
     .analytics-toolbar-card {
         flex-direction: column;
         align-items: stretch;
     }
+
     .analytics-period-selector {
         justify-content: space-between;
     }
+
     .tx-detail-info-grid {
         grid-template-columns: 1fr;
     }
@@ -5855,16 +5905,19 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         grid-template-columns: 1fr 1fr;
         gap: 8px;
     }
+
     .ledger-country-segment {
         grid-column: 1 / -1;
         width: 100%;
         display: flex;
         justify-content: space-between;
     }
+
     .ledger-country-segment .segment-btn {
         flex: 1;
         justify-content: center;
     }
+
     .ledger-quick-actions .btn {
         width: 100% !important;
     }
@@ -5910,6 +5963,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 @supports not (backdrop-filter: blur(1px)) {
+
     .liquid-glass,
     .card:not(.country-card-jp):not(.country-card-in),
     .budget-central-card,
@@ -5949,8 +6003,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .category-card.interactive,
 .monthly-stat-card {
     transition: border-color var(--duration-fast) var(--ease-out),
-                background-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out) !important;
+        background-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out) !important;
     transform: none !important;
 }
 
@@ -6072,11 +6126,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         grid-template-columns: repeat(2, 1fr) !important;
     }
 }
+
 @media (max-width: 640px) {
     .category-grid {
         grid-template-columns: 1fr !important;
         padding: 0 8px !important;
     }
+
     .dashboard-central-budget {
         padding: 0 8px;
     }
@@ -6197,6 +6253,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
 @media (max-width: 580px) {
     .reports-kpi-grid {
         grid-template-columns: 1fr;
@@ -6832,10 +6889,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .closing-stats-grid {
         grid-template-columns: 1fr;
     }
+
     .closing-modal-sheet {
         max-height: 94vh;
         border-radius: 18px;
     }
+
     .closing-modal-body {
         padding: 16px;
     }
@@ -6945,8 +7004,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     position: relative;
     box-shadow: var(--shadow-xs);
     transition: border-color var(--duration-fast) var(--ease-out),
-                background-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out);
+        background-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out);
     transform: none;
 }
 
@@ -7149,8 +7208,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     border: 1px solid var(--border-subtle);
     box-shadow: var(--shadow-xs);
     transition: border-color var(--duration-fast) var(--ease-out),
-                background-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out);
+        background-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out);
     transform: none;
 }
 
@@ -7556,9 +7615,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .budgets-kpi-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+
     .budgets-categories-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+
     .budgets-search-box input {
         width: 110px;
     }
@@ -7568,33 +7629,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .budgets-kpi-grid {
         grid-template-columns: 1fr;
     }
+
     .budgets-categories-grid {
         grid-template-columns: 1fr;
     }
+
     .budgets-section-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
     }
+
     .budgets-section-controls {
         width: 100%;
         flex-direction: column;
         align-items: stretch;
     }
+
     .budgets-search-box {
         width: 100%;
     }
+
     .budgets-search-box input {
         width: 100%;
     }
+
     .budgets-cat-segmented {
         width: 100%;
         justify-content: space-between;
     }
+
     .budgets-cat-segmented .segment-btn {
         flex: 1;
         text-align: center;
     }
+
     .icon-picker-grid {
         grid-template-columns: repeat(6, 1fr);
     }
@@ -7993,17 +8062,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .settings-workspace-layout {
         grid-template-columns: 1fr;
     }
+
     .settings-nav-rail {
         position: static;
     }
+
     .settings-tab-list {
         flex-direction: row;
         overflow-x: auto;
         padding-bottom: 4px;
     }
+
     .settings-tab-btn {
         white-space: nowrap;
     }
+
     .settings-form-row {
         grid-template-columns: 1fr;
         gap: 8px;
@@ -8050,6 +8123,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         border-bottom: none;
         transform: translateY(100%);
     }
+
     .modal-overlay.active .action-selector-card {
         transform: translateY(0);
         opacity: 1;
@@ -8096,9 +8170,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     width: 100%;
     box-sizing: border-box;
     transition: background-color var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out),
-                transform var(--duration-instant) var(--ease-out);
+        border-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out),
+        transform var(--duration-instant) var(--ease-out);
 }
 
 .action-type-card:hover {
@@ -8266,8 +8340,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     align-items: center;
     justify-content: center;
     transition: background-color var(--duration-fast) var(--ease-out),
-                color var(--duration-fast) var(--ease-out),
-                box-shadow var(--duration-fast) var(--ease-out);
+        color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out);
     white-space: nowrap;
     user-select: none;
 }
@@ -8444,8 +8518,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     padding: 3px 8px;
     cursor: pointer;
     transition: background-color var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out),
-                color var(--duration-fast) var(--ease-out);
+        border-color var(--duration-fast) var(--ease-out),
+        color var(--duration-fast) var(--ease-out);
 }
 
 .dash-see-all-btn:hover {
@@ -8476,7 +8550,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     border: 1px solid transparent;
     cursor: pointer;
     transition: background-color var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out);
+        border-color var(--duration-fast) var(--ease-out);
 }
 
 .dash-recent-row:hover {
