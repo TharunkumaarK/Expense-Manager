@@ -707,7 +707,7 @@ class App {
                     <label>Note (Optional)</label>
                     <input type="text" id="tx-note" placeholder="What was this for?">
                 </div>
-                <button type="submit" class="btn btn-primary">Save Expense</button>
+                <button type="submit" class="btn btn-primary"><span>Save Expense</span></button>
             `;
         } else if (type === 'transfer') {
             title.innerText = 'Transfer Between Wallets';
@@ -2828,15 +2828,15 @@ class App {
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">
                 <button class="btn btn-primary" onclick="app.openAddTxForWallet('${w.id}')">
-                    <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 6px;"></i> Log Expense
+                    <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 6px;"></i> <span>Log Expense</span>
                 </button>
                 <button class="btn btn-secondary" onclick="app.openTransferForWallet('${w.id}')">
-                    <i data-lucide="arrow-left-right" style="width: 14px; height: 14px; margin-right: 6px;"></i> Transfer
+                    <i data-lucide="arrow-left-right" style="width: 14px; height: 14px; margin-right: 6px;"></i> <span>Transfer</span>
                 </button>
             </div>
             <div style="margin-top: 8px;">
                 <button class="btn btn-secondary" style="width: 100%; font-size: 0.82rem;" onclick="app.openEditWalletModal('${w.id}')">
-                    <i data-lucide="edit-2" style="width: 14px; height: 14px; margin-right: 6px;"></i> Edit Account Details
+                    <i data-lucide="edit-2" style="width: 14px; height: 14px; margin-right: 6px;"></i> <span>Edit Account Details</span>
                 </button>
             </div>
         `;
@@ -5562,7 +5562,7 @@ class App {
         }
         const snapshotMeta = this.reportSnapshotsCache[cacheKey];
 
-        // 7. Render Snapshot Hero Card
+        // 7. Render Snapshot Hero Section
         const heroEl = document.getElementById('report-snapshot-hero');
         if (heroEl) {
             const statusBadge = isClosed 
@@ -5571,70 +5571,116 @@ class App {
 
             const budgetPct = periodTotalBudget > 0 ? Math.min((totalExpense / periodTotalBudget) * 100, 100) : 0;
             const budgetRem = periodTotalBudget - totalExpense;
+            const utilizationPct = periodTotalBudget > 0 ? Math.round((totalExpense / periodTotalBudget) * 100) : 0;
+            const isOver = budgetRem < 0;
+
+            let barClass = 'neon-safe';
+            if (budgetPct > 90 || utilizationPct > 100) barClass = 'neon-danger';
+            else if (budgetPct > 75 || utilizationPct >= 75) barClass = 'neon-warn';
+
+            const incomeCount = reportTxs.filter(t => t.type === 'income').length;
+            const expenseCount = reportTxs.filter(t => t.type === 'expense').length;
 
             heroEl.innerHTML = `
-                <div class="report-snapshot-top">
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                            ${this.getCountryFlagSvg(this.reportRegion, 24, 18)}
-                            <h2 style="margin: 0; font-size: 1.35rem; font-weight: 600;">${this.reportMonthKey} Financial Snapshot</h2>
-                            ${statusBadge}
-                        </div>
-                        <div class="report-meta-text">
-                            <span>Generated: <strong>${snapshotMeta.generatedAt}</strong></span>
-                            <span>•</span>
-                            <span>Last Refreshed: <strong>${snapshotMeta.refreshedAt}</strong> (Rev ${snapshotMeta.revisionsCount || 1})</span>
-                            <span>•</span>
-                            <span>Transactions: <strong>${reportTxs.length}</strong></span>
-                            <span>•</span>
-                            <span>Currency: <strong>${currency} (${this.reportRegion})</strong></span>
-                        </div>
-                        ${snapshotMeta.revisions && snapshotMeta.revisions.length > 1 ? `
-                            <div style="margin-top: 10px; padding: 8px 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-sm); font-size: 0.78rem;">
-                                <span style="color: var(--text-muted); font-weight: 600;">Revision History (${snapshotMeta.revisions.length} retained):</span>
-                                <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 3px; color: var(--text-secondary);">
-                                    ${snapshotMeta.revisions.slice(0, 3).map(r => `
-                                        <div>• Rev ${r.rev} (${r.timestamp}): ${r.txCount} txs, Spent ${this.formatMoney(r.totalExpense, currency)}</div>
-                                    `).join('')}
-                                </div>
+                <div class="card reports-snapshot-banner">
+                    <div class="report-snapshot-top">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                                ${this.getCountryFlagSvg(this.reportRegion, 24, 18)}
+                                <h2 style="margin: 0; font-size: 1.35rem; font-weight: 600;">${this.reportMonthKey} Financial Snapshot</h2>
+                                ${statusBadge}
                             </div>
-                        ` : ''}
+                            <div class="report-meta-text">
+                                <span>Generated: <strong>${snapshotMeta.generatedAt}</strong></span>
+                                <span>•</span>
+                                <span>Last Refreshed: <strong>${snapshotMeta.refreshedAt}</strong> (Rev ${snapshotMeta.revisionsCount || 1})</span>
+                                <span>•</span>
+                                <span>Transactions: <strong>${reportTxs.length}</strong></span>
+                                <span>•</span>
+                                <span>Currency: <strong>${currency} (${this.reportRegion})</strong></span>
+                            </div>
+                            ${snapshotMeta.revisions && snapshotMeta.revisions.length > 1 ? `
+                                <div class="card reports-revisions-box">
+                                    <span style="color: var(--text-muted); font-weight: 600;">Revision History (${snapshotMeta.revisions.length} retained):</span>
+                                    <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 3px; color: var(--text-secondary);">
+                                        ${snapshotMeta.revisions.slice(0, 3).map(r => `
+                                            <div>• Rev ${r.rev} (${r.timestamp}): ${r.txCount} txs, Spent ${this.formatMoney(r.totalExpense, currency)}</div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
 
                 <div class="reports-kpi-grid">
-                    <div class="card reports-kpi-card">
-                        <span class="reports-kpi-label">Total Income</span>
-                        <span class="reports-kpi-val positive privacy-blur">${this.formatMoney(totalIncome, currency)}</span>
-                        <span class="text-xs text-muted mt-1">${reportTxs.filter(t => t.type === 'income').length} income credits</span>
+                    <div class="card analytics-kpi-card reports-kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title reports-kpi-label">Total Income</span>
+                            <div class="kpi-icon-wrap income"><i data-lucide="arrow-down-left"></i></div>
+                        </div>
+                        <div class="kpi-value-row">
+                            <span class="kpi-value reports-kpi-val text-emerald positive privacy-blur">${this.formatMoney(totalIncome, currency)}</span>
+                        </div>
+                        <div class="kpi-meta">
+                            <span class="text-faint">${incomeCount} income credit${incomeCount === 1 ? '' : 's'}</span>
+                        </div>
                     </div>
-                    <div class="card reports-kpi-card">
-                        <span class="reports-kpi-label">Total Expenses</span>
-                        <span class="reports-kpi-val negative privacy-blur">${this.formatMoney(totalExpense, currency)}</span>
-                        <span class="text-xs text-muted mt-1">${reportTxs.filter(t => t.type === 'expense').length} expense debits</span>
+
+                    <div class="card analytics-kpi-card reports-kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title reports-kpi-label">Total Expenses</span>
+                            <div class="kpi-icon-wrap expense"><i data-lucide="arrow-up-right"></i></div>
+                        </div>
+                        <div class="kpi-value-row">
+                            <span class="kpi-value reports-kpi-val text-rose negative privacy-blur">${this.formatMoney(totalExpense, currency)}</span>
+                        </div>
+                        <div class="kpi-meta">
+                            <span class="text-faint">${expenseCount} expense debit${expenseCount === 1 ? '' : 's'}</span>
+                        </div>
                     </div>
-                    <div class="card reports-kpi-card">
-                        <span class="reports-kpi-label">Net Savings</span>
-                        <span class="reports-kpi-val ${netSavings >= 0 ? 'positive' : 'negative'} privacy-blur">${this.formatMoney(netSavings, currency)}</span>
-                        <span class="text-xs text-muted mt-1">${netSavings >= 0 ? 'Surplus retained' : 'Deficit spent'}</span>
+
+                    <div class="card analytics-kpi-card reports-kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title reports-kpi-label">Net Savings</span>
+                            <div class="kpi-icon-wrap savings"><i data-lucide="piggy-bank"></i></div>
+                        </div>
+                        <div class="kpi-value-row">
+                            <span class="kpi-value reports-kpi-val ${netSavings >= 0 ? 'text-emerald positive' : 'text-rose negative'} privacy-blur">${this.formatMoney(netSavings, currency)}</span>
+                        </div>
+                        <div class="kpi-meta">
+                            <span class="text-faint">${netSavings >= 0 ? 'Surplus retained' : 'Deficit spent'}</span>
+                        </div>
                     </div>
                 </div>
 
                 ${periodTotalBudget > 0 ? `
-                    <div style="padding: 16px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; gap: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                            <span class="text-xs text-muted" style="font-weight: 500;">Monthly Budget Performance</span>
-                            <span class="text-xs ${budgetRem >= 0 ? 'text-success' : 'text-danger'} privacy-blur" style="font-weight: 500;">
-                                ${budgetRem >= 0 ? `${this.formatMoney(budgetRem, currency)} remaining cushion` : `${this.formatMoney(Math.abs(budgetRem), currency)} over allocated budget`}
-                            </span>
+                    <div class="card budget-central-card reports-budget-perf-card">
+                        <div class="budget-central-header">
+                            <div class="budget-central-title-group">
+                                ${this.getCountryFlagSvg(this.reportRegion, 20, 15)}
+                                <h3>Monthly Budget Performance</h3>
+                                <span class="text-xs text-muted font-numeric">(${this.reportMonthKey})</span>
+                                <span class="budget-cushion-pill privacy-blur ${isOver ? 'text-danger' : ''}" style="${isOver ? 'background: rgba(244, 63, 94, 0.12); color: #fb7185; border-color: rgba(244, 63, 94, 0.25);' : ''}">
+                                    ${isOver ? `${this.formatMoney(Math.abs(budgetRem), currency)} over budget` : `+${this.formatMoney(budgetRem, currency)} cushion remaining`}
+                                </span>
+                            </div>
+                            <div class="budget-remaining-hero">
+                                <span class="remaining-val privacy-blur ${isOver ? 'text-danger' : 'text-success'}">
+                                    ${this.formatMoney(isOver ? Math.abs(budgetRem) : budgetRem, currency)}
+                                </span>
+                                <span class="remaining-label">${isOver ? 'over budget' : 'cushion remaining'}</span>
+                            </div>
                         </div>
-                        <div class="budget-streak-track">
-                            <div class="budget-streak-fill ${budgetPct > 90 ? 'neon-danger' : budgetPct > 75 ? 'neon-warn' : 'neon-safe'}" style="width: ${budgetPct}%;"></div>
+                        <div class="budget-central-progress-wrap">
+                            <div class="budget-streak-track">
+                                <div class="budget-streak-fill ${barClass}" style="width: ${budgetPct}%;"></div>
+                            </div>
                         </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem;" class="text-muted">
-                            <span class="privacy-blur">Spent: ${this.formatMoney(totalExpense, currency)}</span>
-                            <span>${Math.round(budgetPct)}% consumed</span>
-                            <span class="privacy-blur">Allocated Limit: ${this.formatMoney(periodTotalBudget, currency)}</span>
+                        <div class="budget-central-stats-row">
+                            <span class="privacy-blur">Spent: <strong>${this.formatMoney(totalExpense, currency)}</strong></span>
+                            <span class="text-xs text-muted font-numeric">${utilizationPct}% consumed</span>
+                            <span class="privacy-blur">Allocated Limit: <strong>${this.formatMoney(periodTotalBudget, currency)}</strong></span>
                         </div>
                     </div>
                 ` : ''}
@@ -5646,6 +5692,9 @@ class App {
                     </div>
                 ` : ''}
             `;
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
         }
 
         // 8. Render Category Breakdown Table

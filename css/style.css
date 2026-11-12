@@ -132,7 +132,8 @@
     --bg-modal: #161616;
     --bg-overlay: rgba(0, 0, 0, 0.78);
     --bg-glass: rgba(10, 10, 10, 0.85);
-    --bg-glass-card: rgba(18, 18, 18, 0.70);
+    --bg-glass-card: rgba(255, 255, 255, 0.035);
+    --border-glass-card: rgba(255, 255, 255, 0.07);
     --bg-surface-hover: rgba(255, 255, 255, 0.04);
     --bg-surface-active: rgba(255, 255, 255, 0.08);
 
@@ -207,13 +208,13 @@
     --radius-xs: 6px;
     --radius-sm: 8px;
     --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
-    --radius-2xl: 28px;
+    --radius-lg: 13px;
+    --radius-xl: 16px;
+    --radius-2xl: 22px;
     --radius-pill: 9999px;
 
-    --radius-card: var(--radius-lg);
-    --radius-button: var(--radius-md);
+    --radius-card: 13px;
+    --radius-button: var(--radius-sm);
     --radius-input: var(--radius-md);
 
     /* ==========================================================================
@@ -925,22 +926,19 @@ button {
 .header-breadcrumb {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0;
     font-size: 0.88rem;
 }
 
-.header-app-tag {
-    color: var(--text-muted);
-    font-weight: 500;
-}
-
-.header-sep {
-    color: var(--text-faint);
+.header-app-tag,
+.header-sep,
+.header-page-subtitle {
+    display: none !important;
 }
 
 .header-titles {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     justify-content: center;
 }
 
@@ -951,14 +949,6 @@ button {
     margin: 0;
     line-height: 1.2;
     letter-spacing: -0.01em;
-}
-
-.header-page-subtitle {
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    margin-top: 1px;
 }
 
 .header-month-selector {
@@ -1049,10 +1039,10 @@ button {
 }
 
 .header-action-btn {
-    height: 36px;
-    padding: 0 16px;
-    font-size: 0.85rem;
-    border-radius: var(--radius-md);
+    height: 32px;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
 }
 
 /* Desktop Workspace Views Container */
@@ -1932,30 +1922,145 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     height: 14px;
 }
 
+/* Primary Action Buttons (Shared Two-State Redesign) */
 .btn-primary {
-    background: var(--accent);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-    font-weight: 500;
+    display: inline-flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 4px 8px !important;
+    gap: 10px !important;
+    position: relative;
+    height: 32px;
+    background: linear-gradient(92.03deg, rgba(117, 117, 117, 0.3) 0%, rgba(255, 255, 255, 0.3) 48.03%, rgba(117, 117, 117, 0.3) 99.87%);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    color: #DCDCDC;
+    font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 510;
+    font-size: 12px !important;
+    line-height: 14px !important;
+    text-align: center;
+    letter-spacing: -0.04em;
+    cursor: pointer;
+    box-sizing: border-box;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background 240ms var(--ease-out),
+        border-color 240ms var(--ease-out),
+        box-shadow 240ms var(--ease-out),
+        color 240ms var(--ease-out);
+    transform: none !important;
+}
+
+.btn-primary svg {
+    stroke: #DCDCDC;
+    stroke-width: 2;
+    width: 16px !important;
+    height: 16px !important;
+    flex: none;
+    order: 0;
+    flex-grow: 0;
+    transition: stroke 240ms var(--ease-out);
+}
+
+.btn-primary span {
+    flex: none;
+    order: 1;
+    flex-grow: 0;
 }
 
 .btn-primary:hover {
-    background: var(--accent-hover);
-    border-color: rgba(255, 255, 255, 0.22);
-    box-shadow: 0 2px 10px rgba(59, 118, 225, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-    color: #ffffff;
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 4px 14px rgba(0, 0, 0, 0.35);
+    color: rgba(28, 28, 28, 0.92);
+    transform: none !important;
+}
+
+.btn-primary:hover span {
+    background: linear-gradient(124.12deg, rgba(130, 130, 130, 0.9) -81.38%, rgba(28, 28, 28, 0.9) 62.57%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    display: inline-block;
+}
+
+.btn-primary:hover svg {
+    stroke: rgba(28, 28, 28, 0.9);
 }
 
 .btn-primary:active {
-    transform: scale(0.98);
-    background: #2859b8;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.72) !important;
+    border-color: rgba(255, 255, 255, 0.72) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+    transform: none !important;
 }
 
 .btn-primary:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--bg-surface-1), 0 0 0 4px var(--accent);
+    box-shadow: 0 0 0 2px var(--bg-surface-1), 0 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+.btn-primary:disabled,
+.btn-primary[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none !important;
+    box-shadow: none !important;
+    background: linear-gradient(92.03deg, rgba(117, 117, 117, 0.3) 0%, rgba(255, 255, 255, 0.3) 48.03%, rgba(117, 117, 117, 0.3) 99.87%) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: #DCDCDC !important;
+}
+
+.btn-primary:disabled span,
+.btn-primary[disabled] span {
+    background: none !important;
+    -webkit-text-fill-color: #DCDCDC !important;
+    color: #DCDCDC !important;
+}
+
+.btn-primary:disabled svg,
+.btn-primary[disabled] svg {
+    stroke: #DCDCDC !important;
+}
+
+/* Top-Level Toolbar & Header Primary Action Buttons (158px width where applicable) */
+.header-action-btn,
+.reports-actions-group .btn-primary,
+.wallets-toolbar-actions .btn-primary,
+.categories-header-actions .btn-primary,
+.ledger-quick-actions .btn-primary,
+.budgets-header-actions .btn-primary,
+#btn-open-closing-wizard,
+#btn-custom-report-generate,
+#btn-header-add-category,
+#btn-add-category,
+#add-tx-btn {
+    width: 158px;
+    max-width: 100%;
+    justify-content: center;
+}
+
+@media (max-width: 640px) {
+
+    .header-action-btn,
+    .reports-actions-group .btn-primary,
+    .wallets-toolbar-actions .btn-primary,
+    .categories-header-actions .btn-primary,
+    .ledger-quick-actions .btn-primary,
+    .budgets-header-actions .btn-primary,
+    #btn-open-closing-wizard,
+    #btn-custom-report-generate,
+    #btn-header-add-category,
+    #btn-add-category,
+    #add-tx-btn {
+        width: auto;
+    }
 }
 
 .btn-secondary {
@@ -2436,7 +2541,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: -4px;
+    margin-bottom: 8px;
 }
 
 .greeting-title {
@@ -2444,13 +2549,11 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     font-weight: 600;
     color: var(--text-primary);
     letter-spacing: -0.02em;
-    margin: 0 0 2px 0;
+    margin: 0;
 }
 
 .greeting-subtitle {
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    margin: 0;
+    display: none !important;
 }
 
 /* 2. Country Balance Cards Grid (Japan & India) */
@@ -2639,21 +2742,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .monthly-stat-card {
     background: var(--bg-surface-2);
     border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-card);
     padding: 18px 20px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: none;
+    cursor: default;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    transition: background-color var(--duration-fast) var(--ease-out),
-        border-color var(--duration-fast) var(--ease-out),
-        box-shadow var(--duration-fast) var(--ease-out);
-}
-
-.monthly-stat-card:hover {
-    border-color: var(--border-hover);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
-    background: rgba(255, 255, 255, 0.02);
 }
 
 .monthly-stat-header {
@@ -3201,10 +3296,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .wallets-page-subtitle {
-    margin: 4px 0 0;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    line-height: 1.4;
+    display: none !important;
 }
 
 .wallets-toolbar-actions {
@@ -3579,13 +3671,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .wallet-card:hover {
-    border-color: rgba(255, 255, 255, 0.35);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 14px 36px -4px rgba(0, 0, 0, 0.65), 0 0 24px rgba(255, 255, 255, 0.08);
-    transform: none;
+    border-color: rgba(255, 255, 255, 0.45) !important;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25), 0 12px 32px rgba(255, 255, 255, 0.12), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+    transform: none !important;
 }
 
 .wallet-card:active {
-    transform: none;
+    transform: none !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* Secondary / Less Frequently Used Wallet Distinction */
@@ -4429,9 +4522,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .view-header-sub {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    margin: 0;
+    display: none !important;
 }
 
 .view-header-actions {
@@ -4677,14 +4768,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .ledger-quick-actions .btn-primary {
-    height: 38px;
-    padding: 0 16px;
-    border-radius: var(--radius-md);
-    font-size: 0.82rem;
-    font-weight: 600;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
 }
 
 /* Filter Dropdown Popover */
@@ -4948,14 +5034,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .ledger-tx-row:hover {
     background: rgba(255, 255, 255, 0.055);
-    border-color: rgba(255, 255, 255, 0.14);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    transform: none !important;
 }
 
 .ledger-tx-row:active {
     background: rgba(255, 255, 255, 0.04);
-    transform: translateY(0);
+    transform: none !important;
     border-color: var(--accent);
 }
 
@@ -5929,17 +6015,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 :root {
     --glass-bg: rgba(18, 19, 26, 0.76);
     --glass-bg-subtle: rgba(16, 17, 22, 0.60);
-    --glass-bg-card: rgba(20, 21, 28, 0.72);
-    --glass-bg-elevated: rgba(24, 25, 34, 0.90);
-    --glass-border: 1px solid rgba(255, 255, 255, 0.08);
-    --glass-border-highlight: 1px solid rgba(255, 255, 255, 0.14);
+    --glass-bg-card: rgba(255, 255, 255, 0.05);
+    --glass-bg-elevated: rgba(24, 25, 34, 0.40);
+    --glass-border: 1px solid rgba(255, 255, 255, 0.125);
+    --glass-border-highlight: 1px solid rgba(255, 255, 255, 0.12);
     --glass-border-subtle: 1px solid rgba(255, 255, 255, 0.05);
-    --glass-blur: blur(28px) saturate(125%);
-    --glass-blur-heavy: blur(40px) saturate(135%);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.50), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    --glass-blur: blur(20px);
+    --glass-blur-heavy: blur(32px);
+    --glass-shadow: none;
     --glass-shadow-elevated: 0 16px 48px 0 rgba(0, 0, 0, 0.75), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
-    --glass-reflection: radial-gradient(circle at top left, rgba(255, 255, 255, 0.04) 0%, transparent 60%);
-    --glass-glow-hover: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 10px 32px 0 rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+    --glass-reflection: none;
+    --glass-glow-hover: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 8px 24px 0 rgba(0, 0, 0, 0.45);
 }
 
 .liquid-glass {
@@ -5982,26 +6068,27 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .analytics-toolbar-card,
 .reports-toolbar-card,
 .budgets-toolbar-card,
-.reports-snapshot-hero,
+.reports-snapshot-banner,
+.reports-kpi-card,
+.reports-budget-perf-card,
 .reports-chart-card,
 .reports-data-table-card,
 .custom-report-panel,
-.budget-central-card {
+.budget-central-card,
+.monthly-stat-card {
     background: var(--glass-bg-card) !important;
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border: var(--glass-border) !important;
-    box-shadow: var(--glass-shadow);
-    border-radius: var(--radius-xl);
+    box-shadow: none !important;
+    border-radius: var(--radius-card);
     position: relative;
 }
 
 /* Card Subtle Elevation & Hover Illumination - Interactive Elements (Glow, NOT Lift) */
 .interactive-card,
-.wallet-card,
 .action-type-card,
-.category-card.interactive,
-.monthly-stat-card {
+.category-card.interactive {
     transition: border-color var(--duration-fast) var(--ease-out),
         background-color var(--duration-fast) var(--ease-out),
         box-shadow var(--duration-fast) var(--ease-out) !important;
@@ -6009,10 +6096,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .interactive-card:hover,
-.wallet-card:hover,
 .action-type-card:hover,
-.category-card.interactive:hover,
-.monthly-stat-card:hover {
+.category-card.interactive:hover {
     border-color: rgba(255, 255, 255, 0.22) !important;
     background-color: rgba(255, 255, 255, 0.055) !important;
     box-shadow: var(--glass-glow-hover) !important;
@@ -6020,12 +6105,43 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .interactive-card:active,
-.wallet-card:active,
 .action-type-card:active,
-.category-card.interactive:active,
-.monthly-stat-card:active {
+.category-card.interactive:active {
     transform: none !important;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Informational Non-Clickable Cards - Strictly Static */
+.monthly-stat-card,
+#dashboard-expense-chart-card,
+#dashboard-recent-tx-card,
+.dashboard-chart-card,
+.dashboard-recent-card,
+.rail-card,
+.reports-chart-card,
+.reports-data-table-card,
+.analytics-chart-card,
+.reports-kpi-card,
+.reports-budget-perf-card {
+    cursor: default;
+    box-shadow: none !important;
+}
+
+.monthly-stat-card:hover,
+#dashboard-expense-chart-card:hover,
+#dashboard-recent-tx-card:hover,
+.dashboard-chart-card:hover,
+.dashboard-recent-card:hover,
+.rail-card:hover,
+.reports-chart-card:hover,
+.reports-data-table-card:hover,
+.analytics-chart-card:hover,
+.reports-kpi-card:hover,
+.reports-budget-perf-card:hover {
+    transform: none !important;
+    box-shadow: none !important;
+    border-color: rgba(255, 255, 255, 0.07) !important;
+    background-color: var(--glass-bg-card) !important;
 }
 
 /* ==========================================================================
@@ -6166,10 +6282,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     flex-wrap: wrap;
     gap: 16px;
     padding: 16px 20px;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-card);
     background: var(--glass-bg-card);
     backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: var(--glass-border);
+    box-shadow: none;
+}
+
+.report-month-selector-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .reports-actions-group {
@@ -6180,17 +6306,30 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .reports-snapshot-hero {
-    border-radius: var(--radius-lg);
-    padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    background: var(--glass-bg-card);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    gap: 16px;
+    width: 100%;
+    margin-bottom: 0;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
 }
 
-.snapshot-hero-top {
+.reports-snapshot-banner {
+    padding: 20px 24px;
+    border-radius: var(--radius-card);
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: var(--glass-border);
+    box-shadow: none;
+    position: relative;
+}
+
+.snapshot-hero-top,
+.report-snapshot-top {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -6260,14 +6399,46 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     }
 }
 
-.reports-kpi-card {
-    padding: 16px 18px;
-    border-radius: var(--radius-md);
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+/* Cards inside the Reports Snapshot Section */
+.reports-kpi-card,
+.card.reports-kpi-card {
+    background: var(--glass-bg-card) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    border: var(--glass-border) !important;
+    border-radius: var(--radius-card) !important;
+    box-shadow: none !important;
+    position: relative;
+    padding: 18px 20px !important;
+    min-height: 120px;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    margin-bottom: 0 !important;
+    box-sizing: border-box;
+    cursor: default;
+}
+
+.reports-budget-perf-card,
+.card.reports-budget-perf-card {
+    background: var(--glass-bg-card) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    border: var(--glass-border) !important;
+    border-radius: var(--radius-card) !important;
+    box-shadow: none !important;
+    position: relative;
+    margin-bottom: 0 !important;
+    width: 100%;
+    box-sizing: border-box;
+    cursor: default;
+}
+
+.reports-revisions-box,
+.card.reports-revisions-box {
+    margin-top: 10px !important;
+    padding: 10px 14px !important;
+    font-size: 0.78rem !important;
 }
 
 .reports-kpi-label {
@@ -6314,13 +6485,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .reports-chart-card {
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card);
     padding: 22px;
     background: var(--glass-bg-card);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
+    border: var(--glass-border);
+    box-shadow: none;
     display: flex;
     flex-direction: column;
 }
@@ -6479,13 +6650,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* Category Expense Breakdown Table Card */
 .reports-data-table-card {
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card);
     padding: 20px 22px;
     background: var(--glass-bg-card);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
+    border: var(--glass-border);
+    box-shadow: none;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -6691,13 +6862,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .custom-report-panel {
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card);
     padding: 24px;
     background: var(--glass-bg-card);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
+    border: var(--glass-border);
+    box-shadow: none;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -6788,7 +6959,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     -webkit-backdrop-filter: blur(36px) saturate(130%);
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 24px 64px 0 rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    border-radius: 24px;
+    border-radius: 19px;
     display: flex;
     flex-direction: column;
     max-height: 88vh;
@@ -8550,12 +8721,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     border: 1px solid transparent;
     cursor: pointer;
     transition: background-color var(--duration-fast) var(--ease-out),
-        border-color var(--duration-fast) var(--ease-out);
+        border-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out);
+    transform: none !important;
 }
 
 .dash-recent-row:hover {
-    background: rgba(255, 255, 255, 0.035);
-    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.055);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: none !important;
 }
 
 .dash-recent-row:focus-visible {

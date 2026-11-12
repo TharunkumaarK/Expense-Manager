@@ -24,7 +24,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Styles -->
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=20261112_01">
 </head>
 
 <body>
@@ -741,7 +741,7 @@
                                         <button class="btn btn-ghost btn-sm" onclick="app.resetAllLedgerFilters()">Reset
                                             All</button>
                                         <button class="btn btn-primary btn-sm"
-                                            onclick="app.toggleLedgerFilterPanel()">Apply & Done</button>
+                                            onclick="app.toggleLedgerFilterPanel()"><span>Apply & Done</span></button>
                                     </div>
                                 </div>
 
@@ -1191,7 +1191,7 @@
                                 </div>
 
                                 <!-- Month / Period Selector -->
-                                <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="report-month-selector-wrap">
                                     <span class="text-sm text-muted">Snapshot Month:</span>
                                     <select id="report-month-select" class="filter-select"
                                         onchange="app.onReportMonthChange(event)" style="min-width: 140px;">
@@ -1214,8 +1214,8 @@
                                 </div>
                             </div>
 
-                            <!-- Monthly Snapshot Hero Card -->
-                            <div class="card reports-snapshot-hero" id="report-snapshot-hero">
+                            <!-- Monthly Snapshot Hero Section -->
+                            <div class="reports-snapshot-hero" id="report-snapshot-hero">
                                 <!-- Populated dynamically by app.renderReportsPage() -->
                             </div>
 
@@ -2361,7 +2361,7 @@
                 <!-- Section C: Actions -->
                 <div class="wallet-config-actions">
                     <button class="btn btn-secondary" onclick="app.closeModal('add-wallet-modal')">Cancel</button>
-                    <button class="btn btn-primary" onclick="app.saveAddWallet()">Create Wallet</button>
+                    <button class="btn btn-primary" onclick="app.saveAddWallet()"><span>Create Wallet</span></button>
                 </div>
             </div>
         </div>
@@ -2434,7 +2434,8 @@
                     </button>
                     <div class="wallet-action-buttons-group">
                         <button class="btn btn-secondary" onclick="app.closeModal('edit-wallet-modal')">Cancel</button>
-                        <button class="btn btn-primary" onclick="app.saveEditWallet()">Save Changes</button>
+                        <button class="btn btn-primary" onclick="app.saveEditWallet()"><span>Save
+                                Changes</span></button>
                     </div>
                 </div>
             </div>
@@ -2601,7 +2602,7 @@
                 <input type="hidden" id="quick-edit-id">
                 <input type="hidden" id="quick-edit-region">
                 <input type="hidden" id="quick-edit-type">
-                <button class="btn btn-primary" onclick="app.saveQuickEdit()">Save</button>
+                <button class="btn btn-primary" onclick="app.saveQuickEdit()"><span>Save</span></button>
             </div>
         </div>
     </div>
@@ -2628,7 +2629,8 @@
             <div style="padding:0 16px 20px;display:flex;gap:8px;">
                 <button class="btn btn-secondary" onclick="app.closeModal('color-picker-modal')"
                     style="flex:1;">Cancel</button>
-                <button class="btn btn-primary" onclick="app.applyWalletColor()" style="flex:1;">Apply</button>
+                <button class="btn btn-primary" onclick="app.applyWalletColor()"
+                    style="flex:1;"><span>Apply</span></button>
             </div>
         </div>
     </div>
@@ -2658,8 +2660,8 @@
             <div style="display:flex;gap:10px;margin-top:20px;">
                 <button class="btn btn-secondary" style="flex:1;"
                     onclick="document.getElementById('pdf-modal').classList.remove('active')">Cancel</button>
-                <button class="btn btn-primary" style="flex:1;background:var(--accent);color:white;border:none;"
-                    onclick="app.generatePdf()">Generate</button>
+                <button class="btn btn-primary" style="flex:1;"
+                    onclick="app.generatePdf()"><span>Generate</span></button>
             </div>
         </div>
     </div>
@@ -2944,10 +2946,10 @@
     <!-- Scripts -->
     <script src="js/supabase-config.js"></script>
     <script src="js/supabaseClient.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/charts.js"></script>
-    <script src="js/wallet.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/storage.js?v=20261111_04"></script>
+    <script src="js/charts.js?v=20261111_04"></script>
+    <script src="js/wallet.js?v=20261111_04"></script>
+    <script src="js/app.js?v=20261111_04"></script>
     <script>
         lucide.createIcons();
         if ('serviceWorker' in navigator) {
