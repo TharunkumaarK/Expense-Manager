@@ -24,7 +24,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Styles -->
-    <link rel="stylesheet" href="css/style.css?v=20261112_01">
+    <link rel="stylesheet" href="css/style.css?v=20261112_04">
 </head>
 
 <body>
@@ -158,7 +158,7 @@
                 <div class="sidebar-action-wrap">
                     <button class="btn-add-tx" onclick="app.openUnifiedTransactionSelector()"
                         id="desktop-sidebar-add-btn">
-                        <i data-lucide="plus-circle"></i>
+                        <i data-lucide="plus"></i>
                         <span class="sidebar-text">Add Transaction</span>
                     </button>
                 </div>
@@ -891,19 +891,6 @@
                                             <span class="text-faint">Income minus Outflows</span>
                                         </div>
                                     </div>
-
-                                    <div class="card analytics-kpi-card">
-                                        <div class="kpi-header">
-                                            <span class="kpi-title">Savings Rate</span>
-                                            <div class="kpi-icon-wrap rate"><i data-lucide="percent"></i></div>
-                                        </div>
-                                        <div class="kpi-value-row">
-                                            <span class="kpi-value privacy-blur" id="jp-kpi-savings-rate">0%</span>
-                                        </div>
-                                        <div class="kpi-meta" id="jp-kpi-savings-rate-meta">
-                                            <span class="text-faint">Target: &gt; 20%</span>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 <!-- Lifestyle Exclusions Banner -->
@@ -1344,7 +1331,7 @@
                                 </button>
                                 <button class="btn btn-primary btn-sm" id="btn-header-add-category"
                                     onclick="app.openCategoryManageModal(null)" title="Add Category">
-                                    <i data-lucide="plus-circle"></i>
+                                    <i data-lucide="plus"></i>
                                     <span class="btn-text">Add Category</span>
                                 </button>
                                 <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
@@ -1399,7 +1386,7 @@
                                     </button>
                                     <button class="btn btn-primary btn-sm" id="btn-add-category"
                                         onclick="app.openCategoryManageModal(null)" title="Create Category">
-                                        <i data-lucide="plus-circle"></i>
+                                        <i data-lucide="plus"></i>
                                         <span>Add Category</span>
                                     </button>
                                 </div>
@@ -1486,7 +1473,7 @@
 
                                 <!-- Portfolio Liquid Position Overview KPI Cards -->
                                 <div class="wallets-portfolio-grid">
-                                    <div class="country-card wallets-kpi-card country-card-jp interactive-card"
+                                    <div class="country-card wallets-kpi-card country-card-jp"
                                         onclick="app.openCountryExpansion('JP')" role="button" tabindex="0"
                                         title="Click to view Japan portfolio overview">
                                         <div class="wallets-kpi-header">
@@ -1498,7 +1485,7 @@
                                                     <rect width="640" height="480" fill="#ffffff" />
                                                     <circle cx="320" cy="240" r="120" fill="#bc002d" />
                                                 </svg>
-                                                <span class="wallets-kpi-title">Japan</span>
+                                                <span class="wallets-kpi-title">Japan Balances</span>
                                                 <span class="currency-code-pill">JPY</span>
                                             </div>
                                             <span class="wallets-count-badge" id="wallets-page-jp-count">0
@@ -1511,7 +1498,7 @@
                                             <span class="wallets-kpi-hint">View portfolio →</span>
                                         </div>
                                     </div>
-                                    <div class="country-card wallets-kpi-card country-card-in interactive-card"
+                                    <div class="country-card wallets-kpi-card country-card-in"
                                         onclick="app.openCountryExpansion('IN')" role="button" tabindex="0"
                                         title="Click to view India portfolio overview">
                                         <div class="wallets-kpi-header">
@@ -1527,7 +1514,7 @@
                                                     <circle cx="320" cy="240" r="32" fill="#ffffff" />
                                                     <circle cx="320" cy="240" r="8" fill="#000080" />
                                                 </svg>
-                                                <span class="wallets-kpi-title">India</span>
+                                                <span class="wallets-kpi-title">India Balances</span>
                                                 <span class="currency-code-pill">INR</span>
                                             </div>
                                             <span class="wallets-count-badge" id="wallets-page-in-count">0
@@ -2434,7 +2421,8 @@
                     </button>
                     <div class="wallet-action-buttons-group">
                         <button class="btn btn-secondary" onclick="app.closeModal('edit-wallet-modal')">Cancel</button>
-                        <button class="btn btn-primary" onclick="app.saveEditWallet()"><span>Save Changes</span></button>
+                        <button class="btn btn-primary" onclick="app.saveEditWallet()"><span>Save
+                                Changes</span></button>
                     </div>
                 </div>
             </div>
@@ -2628,7 +2616,8 @@
             <div style="padding:0 16px 20px;display:flex;gap:8px;">
                 <button class="btn btn-secondary" onclick="app.closeModal('color-picker-modal')"
                     style="flex:1;">Cancel</button>
-                <button class="btn btn-primary" onclick="app.applyWalletColor()" style="flex:1;"><span>Apply</span></button>
+                <button class="btn btn-primary" onclick="app.applyWalletColor()"
+                    style="flex:1;"><span>Apply</span></button>
             </div>
         </div>
     </div>

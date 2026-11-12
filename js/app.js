@@ -1722,11 +1722,11 @@ class App {
     }
 
     // ─── Drag and Drop Reordering ──────────────────────────────────────────────
-    
+
     handleDragStart(e) {
         const item = e.target.closest('.draggable-item');
         if (!item) return;
-        
+
         e.dataTransfer.setData('text/plain', item.dataset.id);
         item.style.opacity = '0.4';
         this.draggedElement = item;
@@ -1758,12 +1758,12 @@ class App {
         if (target) {
             target.style.borderTop = '';
         }
-        
+
         const draggedId = e.dataTransfer.getData('text/plain');
         if (!draggedId || !target || target.dataset.id === draggedId || target.dataset.type !== type) return;
 
         const targetId = target.dataset.id;
-        
+
         if (type === 'wallet') {
             this.reorderWallets(draggedId, targetId);
         } else if (type === 'category') {
@@ -1784,16 +1784,16 @@ class App {
         const keys = Object.keys(storage.state.wallets);
         const draggedIndex = keys.indexOf(draggedId);
         const targetIndex = keys.indexOf(targetId);
-        
+
         if (draggedIndex === -1 || targetIndex === -1) return;
-        
+
         keys.splice(draggedIndex, 1);
         keys.splice(targetIndex, 0, draggedId);
-        
+
         const newWallets = {};
         keys.forEach(k => newWallets[k] = storage.state.wallets[k]);
         storage.state.wallets = newWallets;
-        
+
         storage.saveData();
         this.renderAll();
         this.renderSettings();
@@ -1804,12 +1804,12 @@ class App {
         const cats = storage.state.categories[region];
         const draggedIndex = cats.findIndex(c => c.id === draggedId);
         const targetIndex = cats.findIndex(c => c.id === targetId);
-        
+
         if (draggedIndex === -1 || targetIndex === -1) return;
-        
+
         const [draggedItem] = cats.splice(draggedIndex, 1);
         cats.splice(targetIndex, 0, draggedItem);
-        
+
         storage.saveData();
         this.renderSettings();
         lucide.createIcons();
@@ -2071,8 +2071,8 @@ class App {
             monthKey: this.activeMonthKey,
             totalSpent: jpTotalSpent,
             allocatedBudget: storage.state.jpTotalBudget,
-            isInteractive: false,
-            showEditButton: false
+            isInteractive: true,
+            showEditButton: true
         });
 
         this.renderWalletsPage();
@@ -2155,9 +2155,21 @@ class App {
 
         if (el.classList.contains('budget-central-card')) {
             el.innerHTML = cardContent;
+            if (options.isInteractive) {
+                el.style.cursor = 'pointer';
+                el.setAttribute('title', 'Configure Overall Monthly Limit');
+                el.onclick = () => app.openOverallBudgetModal(region);
+                el.classList.add('interactive');
+            } else {
+                el.style.cursor = 'default';
+                el.removeAttribute('title');
+                el.onclick = null;
+                el.classList.remove('interactive');
+            }
         } else {
             const interactiveAttr = options.isInteractive ? `onclick="app.openOverallBudgetModal('${region}')" style="cursor: pointer;" title="Configure Overall Monthly Limit"` : '';
-            el.innerHTML = `<div class="card budget-central-card" ${interactiveAttr}>${cardContent}</div>`;
+            const interactiveCls = options.isInteractive ? ' interactive' : '';
+            el.innerHTML = `<div class="card budget-central-card${interactiveCls}" ${interactiveAttr}>${cardContent}</div>`;
         }
 
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -2293,7 +2305,7 @@ class App {
                 typeCls = 'expense';
                 amountCls = 'tx-amt-expense';
                 sign = '-';
-                
+
                 const regionCats = storage.state.categories[tx.region] || [];
                 const cat = regionCats.find(c => c.id === tx.categoryId);
                 const categoryName = cat ? cat.name : (tx.categoryId || 'Expense');
@@ -3621,8 +3633,8 @@ class App {
 
     forceUpdate() {
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (let registration of registrations) {
                     registration.unregister();
                 }
                 window.location.reload(true);
@@ -4972,7 +4984,7 @@ class App {
             // Selectable candidate categories for lifestyle exclusion
             const candidateCats = (storage.state?.categories?.JP || []).filter(c => {
                 return c.id === 'jp-food' || c.id === 'jp-dining' || c.id === 'jp-shopping' ||
-                       c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
+                    c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
             });
 
             let chipsHtml = '';
@@ -5434,7 +5446,7 @@ class App {
     exportReportCsv() {
         const allTxs = storage.state.transactions || [];
         const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
-        
+
         let csv = 'Transaction ID,Date,Region,Wallet,Category,Type,Amount,Currency,Note\n';
         reportTxs.forEach(tx => {
             const catName = this.getCategoryName(tx.categoryId, tx.region);
@@ -5565,7 +5577,7 @@ class App {
         // 7. Render Snapshot Hero Section
         const heroEl = document.getElementById('report-snapshot-hero');
         if (heroEl) {
-            const statusBadge = isClosed 
+            const statusBadge = isClosed
                 ? `<span class="report-status-badge closed"><i data-lucide="lock" style="width:12px;height:12px;"></i> Closed & Reconciled</span>`
                 : `<span class="report-status-badge active"><i data-lucide="activity" style="width:12px;height:12px;"></i> Active Reporting Period</span>`;
 
@@ -5701,7 +5713,7 @@ class App {
         const breakdownCard = document.getElementById('report-category-breakdown-card');
         if (breakdownCard) {
             const allRegionCats = storage.state.categories[this.reportRegion] || [];
-            
+
             // Collect all categories that either exist in config or have transactions
             const catMap = new Map();
             allRegionCats.forEach(c => catMap.set(c.id, c));
@@ -5766,11 +5778,11 @@ class App {
                             </div>
                         </td>
                         <td class="privacy-blur">
-                            ${cat.variance !== null 
-                                ? (cat.variance >= 0 
-                                    ? `<span class="badge-cushion">+${this.formatMoney(cat.variance, currency)}</span>` 
-                                    : `<span class="badge-overspend">${this.formatMoney(cat.variance, currency)}</span>`) 
-                                : '<span class="text-muted">—</span>'}
+                            ${cat.variance !== null
+                        ? (cat.variance >= 0
+                            ? `<span class="badge-cushion">+${this.formatMoney(cat.variance, currency)}</span>`
+                            : `<span class="badge-overspend">${this.formatMoney(cat.variance, currency)}</span>`)
+                        : '<span class="text-muted">—</span>'}
                         </td>
                         <td><span style="font-weight: 600; color: var(--text-secondary);">${cat.pctOfTotal}%</span></td>
                         <td><span class="tx-count-pill">${cat.txCount} tx${cat.txCount === 1 ? '' : 's'}</span></td>
@@ -5886,8 +5898,8 @@ class App {
 
         // Wallets
         const wallets = Object.values(storage.state.wallets || {});
-        const filteredWallets = selectedRegion === 'ALL' 
-            ? wallets 
+        const filteredWallets = selectedRegion === 'ALL'
+            ? wallets
             : wallets.filter(w => w.region === selectedRegion);
 
         walletSelect.innerHTML = '<option value="ALL">All Wallets</option>' +
@@ -6079,10 +6091,10 @@ class App {
                     <h5 style="margin: 0 0 8px 0; font-size: 0.86rem; font-weight: 600; color: var(--text-secondary);">Category Breakdown</h5>
                     <div style="display: flex; flex-direction: column; gap: 6px;">
                         ${sortedCats.slice(0, 8).map(c => {
-                            const cur = c.region === 'JP' ? '¥' : '₹';
-                            const regTotalExp = c.region === 'JP' ? jpExpense : inExpense;
-                            const share = regTotalExp > 0 ? Math.round((c.amount / regTotalExp) * 100) : 0;
-                            return `
+                const cur = c.region === 'JP' ? '¥' : '₹';
+                const regTotalExp = c.region === 'JP' ? jpExpense : inExpense;
+                const share = regTotalExp > 0 ? Math.round((c.amount / regTotalExp) * 100) : 0;
+                return `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.82rem;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <i data-lucide="${c.icon}" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
@@ -6095,7 +6107,7 @@ class App {
                                     </div>
                                 </div>
                             `;
-                        }).join('')}
+            }).join('')}
                     </div>
                 </div>
             `;
@@ -6421,32 +6433,16 @@ class App {
                     <div style="display: flex; flex-direction: column; gap: 10px;">
                         <div class="closing-option-box ${opt === 'copy' ? 'selected' : ''}" onclick="app.onClosingBudgetOptionChange('copy')">
                             <input type="radio" name="closing_budget_opt" ${opt === 'copy' ? 'checked' : ''} style="margin-top: 3px; accent-color: var(--accent);">
-                            <div>
+                            <div style="flex: 1;">
                                 <strong style="font-size: 0.9rem;">1. Copy Previous Month's Limits (Recommended)</strong>
                                 <p class="text-xs text-muted" style="margin: 4px 0 0 0;">Preserves the identical Japan budget limit (${this.formatMoney(currentJpLimit, '¥')}) and all active category limits without alteration.</p>
-                            </div>
-                        </div>
-
-                        <div class="closing-option-box ${opt === 'copy-adjust' ? 'selected' : ''}" onclick="app.onClosingBudgetOptionChange('copy-adjust')">
-                            <input type="radio" name="closing_budget_opt" ${opt === 'copy-adjust' ? 'checked' : ''} style="margin-top: 3px; accent-color: var(--accent);">
-                            <div style="flex: 1;">
-                                <strong style="font-size: 0.9rem;">2. Copy & Adjust Limits (+/- %)</strong>
-                                <p class="text-xs text-muted" style="margin: 4px 0 6px 0;">Scale previous limits proportionally across all categories.</p>
-                                ${opt === 'copy-adjust' ? `
-                                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
-                                        <label class="text-xs text-muted">Adjustment:</label>
-                                        <input type="number" id="closing-adjust-input" value="${this.closingWizardState.adjustmentPercent}" step="1" min="-50" max="100" style="width: 80px; padding: 6px 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;" onchange="app.closingWizardState.adjustmentPercent = Number(this.value); app.setClosingStep(3);">
-                                        <span class="text-xs font-bold">%</span>
-                                        <span class="text-xs text-muted">Resulting limit: <strong>${this.formatMoney(Math.round(currentJpLimit * (1 + (this.closingWizardState.adjustmentPercent / 100))), '¥')}</strong></span>
-                                    </div>
-                                ` : ''}
                             </div>
                         </div>
 
                         <div class="closing-option-box ${opt === 'manual' ? 'selected' : ''}" onclick="app.onClosingBudgetOptionChange('manual')">
                             <input type="radio" name="closing_budget_opt" ${opt === 'manual' ? 'checked' : ''} style="margin-top: 3px; accent-color: var(--accent);">
                             <div style="flex: 1;">
-                                <strong style="font-size: 0.9rem;">3. Configure Next Month's Budgets Manually</strong>
+                                <strong style="font-size: 0.9rem;">2. Configure Next Month's Budgets Manually</strong>
                                 <p class="text-xs text-muted" style="margin: 4px 0 6px 0;">Specify custom overall Japan budget limit.</p>
                                 ${opt === 'manual' ? `
                                     <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
@@ -6462,9 +6458,7 @@ class App {
         } else if (step === 4) {
             // STEP 4: Review Next Month's Opening State
             let calculatedNextJpBudget = storage.state.jpTotalBudget || 0;
-            if (this.closingWizardState.budgetOption === 'copy-adjust') {
-                calculatedNextJpBudget = Math.round(calculatedNextJpBudget * (1 + (this.closingWizardState.adjustmentPercent / 100)));
-            } else if (this.closingWizardState.budgetOption === 'manual') {
+            if (this.closingWizardState.budgetOption === 'manual') {
                 calculatedNextJpBudget = this.closingWizardState.customJpBudget || 0;
             }
 
@@ -6543,9 +6537,7 @@ class App {
 
         // Calculate next budget limit
         let nextJpBudget = storage.state.jpTotalBudget || 0;
-        if (this.closingWizardState.budgetOption === 'copy-adjust') {
-            nextJpBudget = Math.round(nextJpBudget * (1 + (this.closingWizardState.adjustmentPercent / 100)));
-        } else if (this.closingWizardState.budgetOption === 'manual') {
+        if (this.closingWizardState.budgetOption === 'manual') {
             nextJpBudget = this.closingWizardState.customJpBudget || 0;
         }
 
