@@ -1722,11 +1722,11 @@ class App {
     }
 
     // ─── Drag and Drop Reordering ──────────────────────────────────────────────
-
+    
     handleDragStart(e) {
         const item = e.target.closest('.draggable-item');
         if (!item) return;
-
+        
         e.dataTransfer.setData('text/plain', item.dataset.id);
         item.style.opacity = '0.4';
         this.draggedElement = item;
@@ -1758,12 +1758,12 @@ class App {
         if (target) {
             target.style.borderTop = '';
         }
-
+        
         const draggedId = e.dataTransfer.getData('text/plain');
         if (!draggedId || !target || target.dataset.id === draggedId || target.dataset.type !== type) return;
 
         const targetId = target.dataset.id;
-
+        
         if (type === 'wallet') {
             this.reorderWallets(draggedId, targetId);
         } else if (type === 'category') {
@@ -1784,16 +1784,16 @@ class App {
         const keys = Object.keys(storage.state.wallets);
         const draggedIndex = keys.indexOf(draggedId);
         const targetIndex = keys.indexOf(targetId);
-
+        
         if (draggedIndex === -1 || targetIndex === -1) return;
-
+        
         keys.splice(draggedIndex, 1);
         keys.splice(targetIndex, 0, draggedId);
-
+        
         const newWallets = {};
         keys.forEach(k => newWallets[k] = storage.state.wallets[k]);
         storage.state.wallets = newWallets;
-
+        
         storage.saveData();
         this.renderAll();
         this.renderSettings();
@@ -1804,12 +1804,12 @@ class App {
         const cats = storage.state.categories[region];
         const draggedIndex = cats.findIndex(c => c.id === draggedId);
         const targetIndex = cats.findIndex(c => c.id === targetId);
-
+        
         if (draggedIndex === -1 || targetIndex === -1) return;
-
+        
         const [draggedItem] = cats.splice(draggedIndex, 1);
         cats.splice(targetIndex, 0, draggedItem);
-
+        
         storage.saveData();
         this.renderSettings();
         lucide.createIcons();
@@ -2305,7 +2305,7 @@ class App {
                 typeCls = 'expense';
                 amountCls = 'tx-amt-expense';
                 sign = '-';
-
+                
                 const categoryName = this.getTransactionCategory(tx);
                 const walletName = this.getWalletName(tx.walletId);
 
@@ -3630,8 +3630,8 @@ class App {
 
     forceUpdate() {
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function (registrations) {
-                for (let registration of registrations) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
                     registration.unregister();
                 }
                 window.location.reload(true);
@@ -5035,7 +5035,7 @@ class App {
             // Selectable candidate categories for lifestyle exclusion
             const candidateCats = (storage.state?.categories?.JP || []).filter(c => {
                 return c.id === 'jp-food' || c.id === 'jp-dining' || c.id === 'jp-shopping' ||
-                    c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
+                       c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
             });
 
             let chipsHtml = '';
@@ -5498,7 +5498,7 @@ class App {
     exportReportCsv() {
         const allTxs = storage.state.transactions || [];
         const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
-
+        
         let csv = 'Transaction ID,Date,Region,Wallet,Category,Type,Amount,Currency,Note\n';
         reportTxs.forEach(tx => {
             const catName = this.getTransactionCategory(tx);
@@ -5629,7 +5629,7 @@ class App {
         // 7. Render Snapshot Hero Section
         const heroEl = document.getElementById('report-snapshot-hero');
         if (heroEl) {
-            const statusBadge = isClosed
+            const statusBadge = isClosed 
                 ? `<span class="report-status-badge closed"><i data-lucide="lock" style="width:12px;height:12px;"></i> Closed & Reconciled</span>`
                 : `<span class="report-status-badge active"><i data-lucide="activity" style="width:12px;height:12px;"></i> Active Reporting Period</span>`;
 
@@ -5765,7 +5765,7 @@ class App {
         const breakdownCard = document.getElementById('report-category-breakdown-card');
         if (breakdownCard) {
             const allRegionCats = storage.state.categories[this.reportRegion] || [];
-
+            
             // Collect all categories that either exist in config or have transactions
             const catMap = new Map();
             allRegionCats.forEach(c => catMap.set(c.id, c));
@@ -5830,11 +5830,11 @@ class App {
                             </div>
                         </td>
                         <td class="privacy-blur">
-                            ${cat.variance !== null
-                        ? (cat.variance >= 0
-                            ? `<span class="badge-cushion">+${this.formatMoney(cat.variance, currency)}</span>`
-                            : `<span class="badge-overspend">${this.formatMoney(cat.variance, currency)}</span>`)
-                        : '<span class="text-muted">—</span>'}
+                            ${cat.variance !== null 
+                                ? (cat.variance >= 0 
+                                    ? `<span class="badge-cushion">+${this.formatMoney(cat.variance, currency)}</span>` 
+                                    : `<span class="badge-overspend">${this.formatMoney(cat.variance, currency)}</span>`) 
+                                : '<span class="text-muted">—</span>'}
                         </td>
                         <td><span style="font-weight: 600; color: var(--text-secondary);">${cat.pctOfTotal}%</span></td>
                         <td><span class="tx-count-pill">${cat.txCount} tx${cat.txCount === 1 ? '' : 's'}</span></td>
@@ -5950,8 +5950,8 @@ class App {
 
         // Wallets
         const wallets = Object.values(storage.state.wallets || {});
-        const filteredWallets = selectedRegion === 'ALL'
-            ? wallets
+        const filteredWallets = selectedRegion === 'ALL' 
+            ? wallets 
             : wallets.filter(w => w.region === selectedRegion);
 
         walletSelect.innerHTML = '<option value="ALL">All Wallets</option>' +
@@ -6143,10 +6143,10 @@ class App {
                     <h5 style="margin: 0 0 8px 0; font-size: 0.86rem; font-weight: 600; color: var(--text-secondary);">Category Breakdown</h5>
                     <div style="display: flex; flex-direction: column; gap: 6px;">
                         ${sortedCats.slice(0, 8).map(c => {
-                const cur = c.region === 'JP' ? '¥' : '₹';
-                const regTotalExp = c.region === 'JP' ? jpExpense : inExpense;
-                const share = regTotalExp > 0 ? Math.round((c.amount / regTotalExp) * 100) : 0;
-                return `
+                            const cur = c.region === 'JP' ? '¥' : '₹';
+                            const regTotalExp = c.region === 'JP' ? jpExpense : inExpense;
+                            const share = regTotalExp > 0 ? Math.round((c.amount / regTotalExp) * 100) : 0;
+                            return `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.82rem;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <i data-lucide="${c.icon}" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
@@ -6159,7 +6159,7 @@ class App {
                                     </div>
                                 </div>
                             `;
-            }).join('')}
+                        }).join('')}
                     </div>
                 </div>
             `;
