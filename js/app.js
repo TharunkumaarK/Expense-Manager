@@ -1722,11 +1722,11 @@ class App {
     }
 
     // ─── Drag and Drop Reordering ──────────────────────────────────────────────
-    
+
     handleDragStart(e) {
         const item = e.target.closest('.draggable-item');
         if (!item) return;
-        
+
         e.dataTransfer.setData('text/plain', item.dataset.id);
         item.style.opacity = '0.4';
         this.draggedElement = item;
@@ -1758,12 +1758,12 @@ class App {
         if (target) {
             target.style.borderTop = '';
         }
-        
+
         const draggedId = e.dataTransfer.getData('text/plain');
         if (!draggedId || !target || target.dataset.id === draggedId || target.dataset.type !== type) return;
 
         const targetId = target.dataset.id;
-        
+
         if (type === 'wallet') {
             this.reorderWallets(draggedId, targetId);
         } else if (type === 'category') {
@@ -1784,16 +1784,16 @@ class App {
         const keys = Object.keys(storage.state.wallets);
         const draggedIndex = keys.indexOf(draggedId);
         const targetIndex = keys.indexOf(targetId);
-        
+
         if (draggedIndex === -1 || targetIndex === -1) return;
-        
+
         keys.splice(draggedIndex, 1);
         keys.splice(targetIndex, 0, draggedId);
-        
+
         const newWallets = {};
         keys.forEach(k => newWallets[k] = storage.state.wallets[k]);
         storage.state.wallets = newWallets;
-        
+
         storage.saveData();
         this.renderAll();
         this.renderSettings();
@@ -1804,12 +1804,12 @@ class App {
         const cats = storage.state.categories[region];
         const draggedIndex = cats.findIndex(c => c.id === draggedId);
         const targetIndex = cats.findIndex(c => c.id === targetId);
-        
+
         if (draggedIndex === -1 || targetIndex === -1) return;
-        
+
         const [draggedItem] = cats.splice(draggedIndex, 1);
         cats.splice(targetIndex, 0, draggedItem);
-        
+
         storage.saveData();
         this.renderSettings();
         lucide.createIcons();
@@ -2262,6 +2262,7 @@ class App {
 
         let html = '';
         txs.forEach(tx => {
+            const effectiveType = tx.type || (tx.isIncome ? 'income' : (tx.sourceId && tx.destId ? 'transfer' : 'expense'));
             let icon = 'arrow-up-right';
             let typeCls = 'expense';
             let amountCls = 'tx-amt-expense';
@@ -2272,27 +2273,26 @@ class App {
             const date = new Date(tx.date || Date.now());
             const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
-            if (tx.type === 'income') {
+            if (effectiveType === 'income') {
                 icon = 'arrow-down-left';
                 typeCls = 'income';
                 amountCls = 'tx-amt-income';
                 sign = '+';
-                title = tx.note || 'Income / Credit';
-                const wallet = storage.state.wallets[tx.walletId];
-                const walletName = wallet ? wallet.name : (tx.walletId || 'Wallet');
-                meta = `${dateStr} • ${walletName}`;
-            } else if (tx.type === 'transfer') {
+                const catName = this.getTransactionCategory(tx);
+                const walletName = this.getWalletName(tx.walletId);
+                title = tx.note || catName;
+                const metaParts = [dateStr, walletName, catName].filter(Boolean);
+                meta = metaParts.join(' • ');
+            } else if (effectiveType === 'transfer') {
                 icon = 'arrow-left-right';
                 typeCls = 'transfer';
                 amountCls = 'tx-amt-neutral';
                 sign = '';
-                const srcWallet = storage.state.wallets[tx.sourceId];
-                const dstWallet = storage.state.wallets[tx.destId];
-                const srcName = srcWallet ? srcWallet.name : (tx.sourceId || 'Source');
-                const dstName = dstWallet ? dstWallet.name : (tx.destId || 'Dest');
+                const srcName = this.getWalletName(tx.sourceId);
+                const dstName = this.getWalletName(tx.destId);
                 title = tx.note || 'Transfer';
                 meta = `${dateStr} • ${srcName} → ${dstName}`;
-            } else if (tx.type === 'remittance') {
+            } else if (effectiveType === 'remittance') {
                 icon = 'send';
                 typeCls = 'remittance';
                 amountCls = 'tx-amt-neutral';
@@ -2305,22 +2305,21 @@ class App {
                 typeCls = 'expense';
                 amountCls = 'tx-amt-expense';
                 sign = '-';
-                
-                const regionCats = storage.state.categories[tx.region] || [];
-                const cat = regionCats.find(c => c.id === tx.categoryId);
-                const categoryName = cat ? cat.name : (tx.categoryId || 'Expense');
-                const wallet = storage.state.wallets[tx.walletId];
-                const walletName = wallet ? wallet.name : (tx.walletId || '');
+
+                const categoryName = this.getTransactionCategory(tx);
+                const walletName = this.getWalletName(tx.walletId);
 
                 title = tx.note || categoryName;
                 if (tx.note && categoryName && tx.note !== categoryName) {
-                    meta = `${dateStr} • ${walletName ? walletName + ' • ' : ''}${categoryName}`;
+                    const metaParts = [dateStr, walletName, categoryName].filter(Boolean);
+                    meta = metaParts.join(' • ');
                 } else {
-                    meta = `${dateStr} • ${walletName || categoryName}`;
+                    const metaParts = [dateStr, walletName || categoryName].filter(Boolean);
+                    meta = metaParts.join(' • ');
                 }
             }
 
-            const amt = (tx.type === 'remittance')
+            const amt = (effectiveType === 'remittance')
                 ? (this.isPrivacyHidden ? '******' : `¥${(tx.sourceAmount || 0).toLocaleString()} → ₹${(tx.destAmount || 0).toLocaleString()}`)
                 : this.formatMoney(tx.amount, tx.currency, { prefix: sign });
 
@@ -2874,32 +2873,33 @@ class App {
             `;
         } else {
             recentTxs.forEach(tx => {
+                const effectiveType = tx.type || (tx.isIncome ? 'income' : (tx.sourceId && tx.destId ? 'transfer' : 'expense'));
                 let icon = 'arrow-up-right';
                 let colorCls = 'text-rose';
                 let sign = '-';
-                let label = tx.note || tx.categoryId || 'Expense';
+                const catName = this.getTransactionCategory(tx);
+                let label = tx.note || catName;
 
-                if (tx.type === 'income') {
+                if (effectiveType === 'income') {
                     icon = 'arrow-down-left';
                     colorCls = 'text-emerald';
                     sign = '+';
-                    label = tx.note || 'Income';
-                } else if (tx.type === 'transfer') {
+                    label = tx.note || catName;
+                } else if (effectiveType === 'transfer') {
                     icon = 'repeat';
                     colorCls = 'text-muted';
                     sign = (tx.destId === w.id) ? '+' : '-';
-                    label = `Transfer: ${tx.sourceId} → ${tx.destId}`;
-                } else if (tx.type === 'remittance') {
+                    label = `Transfer: ${this.getWalletName(tx.sourceId)} → ${this.getWalletName(tx.destId)}`;
+                } else if (effectiveType === 'remittance') {
                     icon = 'globe';
                     colorCls = 'text-muted';
                     sign = '-';
                     label = 'Remittance JP → IN';
-                } else if (tx.categoryId && storage.state.categories?.[tx.region]) {
-                    const cat = storage.state.categories[tx.region].find(c => c.id === tx.categoryId);
-                    if (cat) label = cat.name;
                 }
 
                 const formattedDate = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                const metaParts = [formattedDate, catName, (tx.note && tx.note !== label ? tx.note : '')].filter(Boolean);
+                const metaLine = metaParts.join(' • ');
                 txHtml += `
                     <div class="tx-row" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; transition: background 120ms ease;">
                         <div style="display: flex; align-items: center; gap: 10px;">
@@ -2908,7 +2908,7 @@ class App {
                             </div>
                             <div>
                                 <div style="font-weight: 500; font-size: 0.85rem; color: var(--text-primary);">${label}</div>
-                                <div style="font-size: 0.72rem; color: var(--text-muted);">${formattedDate} ${tx.note ? `• ${tx.note}` : ''}</div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted);">${metaLine}</div>
                             </div>
                         </div>
                         <div class="financial-amount privacy-blur" style="font-family: var(--font-numeric); font-weight: 600; font-size: 0.95rem; color: ${colorCls === 'text-emerald' ? 'var(--emerald)' : colorCls === 'text-rose' ? 'var(--rose)' : 'var(--text-secondary)'};">
@@ -3171,47 +3171,44 @@ class App {
     }
 
     getTransactionHtml(tx, editable = false, showDateInMeta = true) {
+        const effectiveType = tx.type || (tx.isIncome ? 'income' : (tx.sourceId && tx.destId ? 'transfer' : 'expense'));
         let icon = 'arrow-up-right';
         let colorCls = 'debit';
-        let title = tx.note || tx.categoryId || 'Expense';
+        const catName = this.getTransactionCategory(tx);
+        let title = tx.note || catName;
         let amt = '';
 
-        if (tx.type === 'income') {
+        if (effectiveType === 'income') {
             icon = 'arrow-down-left';
             colorCls = 'credit';
-            title = tx.note || 'Income';
+            title = tx.note || catName;
             amt = this.formatMoney(tx.amount, tx.currency, { prefix: '+' });
-        } else if (tx.type === 'transfer') {
+        } else if (effectiveType === 'transfer') {
             icon = 'repeat';
             colorCls = 'text-muted';
-            title = `Transfer: ${tx.sourceId} \u2192 ${tx.destId}`;
+            title = `Transfer: ${this.getWalletName(tx.sourceId)} \u2192 ${this.getWalletName(tx.destId)}`;
             amt = this.formatMoney(tx.amount, tx.currency);
-        } else if (tx.type === 'remittance') {
+        } else if (effectiveType === 'remittance') {
             icon = 'globe';
             colorCls = 'text-muted';
             title = tx.note || 'Remittance';
-            amt = this.isPrivacyHidden ? '******' : `\u00a5${tx.sourceAmount.toLocaleString()} \u2192 \u20b9${tx.destAmount.toLocaleString()}`;
+            amt = this.isPrivacyHidden ? '******' : `\u00a5${(tx.sourceAmount || 0).toLocaleString()} \u2192 \u20b9${(tx.destAmount || 0).toLocaleString()}`;
         } else {
             // expense
-            const regionKey = tx.region || (storage.state.categories.JP.some(c => c.id === tx.categoryId) ? 'JP' : 'IN');
-            const regionCats = storage.state.categories[regionKey];
-            if (regionCats) {
-                const cat = regionCats.find(c => c.id === tx.categoryId);
-                if (cat) title = cat.name;
-            }
+            title = tx.note || catName;
             const currency = tx.currency || (tx.region === 'JP' ? '\u00a5' : '\u20b9');
             amt = this.formatMoney(tx.amount, currency, { prefix: '-' });
         }
 
         const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
-        let metaString = tx.walletId || tx.sourceId || 'Wallet';
-        if (showDateInMeta) {
-            metaString = `${date} \u2022 ${metaString}`;
-        }
-        if (tx.note && tx.type !== 'income' && tx.type !== 'transfer' && tx.type !== 'remittance') {
-            metaString += ` \u2022 ${tx.note}`;
-        }
+        const walletName = this.getWalletName(tx.walletId || tx.sourceId);
+        const metaParts = [];
+        if (showDateInMeta) metaParts.push(date);
+        if (walletName) metaParts.push(walletName);
+        if (catName && catName !== title) metaParts.push(catName);
+        if (tx.note && tx.note !== title) metaParts.push(tx.note);
+        const metaString = metaParts.join(' \u2022 ');
 
         const clickAttr = editable ? `onclick="app.editTransaction('${tx.id}')" style="cursor:pointer;"` : '';
 
@@ -3633,8 +3630,8 @@ class App {
 
     forceUpdate() {
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (let registration of registrations) {
                     registration.unregister();
                 }
                 window.location.reload(true);
@@ -3963,7 +3960,12 @@ class App {
 
     // Helper: Category Name resolution
     getCategoryName(catId, region = null) {
-        if (!catId) return 'Uncategorized';
+        if (!catId || catId === 'undefined' || catId === 'null' || (typeof catId === 'string' && catId.trim() === '')) {
+            return 'Uncategorized';
+        }
+        if (typeof catId === 'object' && ('type' in catId || 'amount' in catId)) {
+            return this.getTransactionCategory(catId);
+        }
         if (storage.state?.categories) {
             if (region && storage.state.categories[region]) {
                 const found = storage.state.categories[region].find(c => c.id === catId || c.name === catId || c.id === `jp-${catId}` || c.id === `in-${catId}`);
@@ -3977,18 +3979,64 @@ class App {
         // Humanize slugs if not found directly
         if (typeof catId === 'string') {
             const cleaned = catId.replace(/^(jp|in)-/, '');
-            return cleaned.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            const humanized = cleaned.split(/[-_]/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            if (humanized && humanized.toLowerCase() !== 'undefined' && humanized.toLowerCase() !== 'null') {
+                return humanized;
+            }
         }
-        return catId;
+        return (catId && catId !== 'undefined' && catId !== 'null') ? catId : 'Uncategorized';
+    }
+
+    // Helper: Transaction Category resolution (handles income, transfer, remittance & expense)
+    getTransactionCategory(tx) {
+        if (!tx) return 'Uncategorized';
+
+        // 1. Income transactions
+        if (tx.type === 'income' || tx.isIncome || (tx.amount > 0 && tx.direction === 'credit')) {
+            const rawCat = tx.categoryId || tx.category || tx.incomeType;
+            if (rawCat && rawCat !== 'undefined' && rawCat !== 'null' && (typeof rawCat !== 'string' || rawCat.trim() !== '')) {
+                const resolved = this.getCategoryName(rawCat, tx.region);
+                if (resolved && resolved !== 'Uncategorized' && resolved.toLowerCase() !== 'undefined' && resolved.toLowerCase() !== 'null') {
+                    return resolved;
+                }
+                if (typeof rawCat === 'string') {
+                    const cleaned = rawCat.replace(/^(jp|in)-/, '');
+                    const humanized = cleaned.split(/[-_]/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    if (humanized && humanized.toLowerCase() !== 'undefined' && humanized.toLowerCase() !== 'null') {
+                        return humanized;
+                    }
+                }
+                return String(rawCat);
+            }
+            return 'Income';
+        }
+
+        // 2. Transfers
+        if (tx.type === 'transfer') {
+            return 'Internal Transfer';
+        }
+
+        // 3. Remittances
+        if (tx.type === 'remittance') {
+            return 'Cross-Border Remittance';
+        }
+
+        // 4. Expense transactions
+        const rawCat = tx.categoryId || tx.category;
+        if (!rawCat || rawCat === 'undefined' || rawCat === 'null' || (typeof rawCat === 'string' && rawCat.trim() === '')) {
+            return 'Uncategorized';
+        }
+        return this.getCategoryName(rawCat, tx.region);
     }
 
     // Helper: Wallet Name resolution
     getWalletName(walletId) {
         if (!walletId) return 'Wallet';
         if (storage.state?.wallets) {
-            if (storage.state.wallets[walletId]?.name) return storage.state.wallets[walletId].name;
-            const found = Object.values(storage.state.wallets).find(w => w.id === walletId || w.name === walletId);
-            if (found?.name) return found.name;
+            const w = storage.state.wallets[walletId];
+            if (w) return w.name || w.id || walletId;
+            const found = Object.values(storage.state.wallets).find(x => x.id === walletId || x.name === walletId);
+            if (found) return found.name || found.id || walletId;
         }
         // Humanize if it's an ID like "jp-wallet-1" or "in-wallet-bank"
         if (typeof walletId === 'string') {
@@ -3999,7 +4047,7 @@ class App {
             const cleaned = walletId.replace(/^(jp|in)-wallet-?/, '');
             return cleaned.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
         }
-        return walletId;
+        return String(walletId || 'Wallet');
     }
 
     // --------------------------------------------------------------------------
@@ -4145,25 +4193,26 @@ class App {
             `;
 
             groupTxs.forEach(tx => {
+                const effectiveType = tx.type || (tx.isIncome ? 'income' : 'expense');
                 let icon = 'arrow-up-right';
                 let typeCls = 'expense';
                 let sign = '-';
-                let title = tx.note || this.getCategoryName(tx.categoryId, tx.region);
-                let categoryName = this.getCategoryName(tx.categoryId, tx.region);
+                const categoryName = this.getTransactionCategory(tx);
+                let title = tx.note || categoryName;
                 let walletName = this.getWalletName(tx.walletId);
                 const flag = tx.region ? this.getCountryFlagSvg(tx.region, 14, 10.5) : '';
 
-                if (tx.type === 'income') {
+                if (effectiveType === 'income') {
                     icon = 'arrow-down-left';
                     typeCls = 'income';
                     sign = '+';
-                    title = tx.note || 'Income Deposit';
-                } else if (tx.type === 'transfer') {
+                    title = tx.note || categoryName;
+                } else if (effectiveType === 'transfer') {
                     icon = 'arrow-left-right';
                     typeCls = 'transfer';
                     sign = '';
                     title = `${this.getWalletName(tx.sourceId)} → ${this.getWalletName(tx.destId)}`;
-                } else if (tx.type === 'remittance') {
+                } else if (effectiveType === 'remittance') {
                     icon = 'send';
                     typeCls = 'remittance';
                     sign = '';
@@ -4172,7 +4221,7 @@ class App {
 
                 // Amount string
                 let amountHtml = '';
-                if (tx.type === 'remittance') {
+                if (effectiveType === 'remittance') {
                     if (this.isPrivacyHidden) {
                         amountHtml = '******';
                     } else {
@@ -4185,7 +4234,7 @@ class App {
 
                 // Refined typographic metadata line
                 let metaItemsHtml = '';
-                if (tx.type === 'expense') {
+                if (effectiveType === 'expense') {
                     metaItemsHtml += `<span class="ledger-tx-meta-item category">${categoryName}</span>`;
                     metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
                     metaItemsHtml += `<span class="ledger-tx-meta-item account">${walletName}</span>`;
@@ -4193,21 +4242,21 @@ class App {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
                         metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
                     }
-                } else if (tx.type === 'income') {
-                    metaItemsHtml += `<span class="ledger-tx-meta-item category">Income</span>`;
+                } else if (effectiveType === 'income') {
+                    metaItemsHtml += `<span class="ledger-tx-meta-item category">${categoryName}</span>`;
                     metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
                     metaItemsHtml += `<span class="ledger-tx-meta-item account">${walletName}</span>`;
                     if (tx.note && tx.note !== title) {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
                         metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
                     }
-                } else if (tx.type === 'transfer') {
+                } else if (effectiveType === 'transfer') {
                     metaItemsHtml += `<span class="ledger-tx-meta-item category">Internal Transfer</span>`;
                     if (tx.note) {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
                         metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
                     }
-                } else if (tx.type === 'remittance') {
+                } else if (effectiveType === 'remittance') {
                     metaItemsHtml += `<span class="ledger-tx-meta-item category">Cross-Border Remittance</span>`;
                     if (tx.exchangeRate) {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
@@ -4640,11 +4689,13 @@ class App {
             amountVal.className = `tx-detail-amount-val privacy-blur ${tx.type || 'expense'}`;
         }
 
+        const categoryName = this.getTransactionCategory(tx);
+
         if (subtitle) {
             if (tx.type === 'expense') {
-                subtitle.innerText = this.getCategoryName(tx.categoryId, tx.region);
+                subtitle.innerText = categoryName;
             } else if (tx.type === 'income') {
-                subtitle.innerText = 'Income Deposit';
+                subtitle.innerText = categoryName !== 'Income' ? `Income • ${categoryName}` : 'Income Deposit';
             } else if (tx.type === 'transfer') {
                 subtitle.innerText = 'Internal Wallet Transfer';
             } else if (tx.type === 'remittance') {
@@ -4656,9 +4707,9 @@ class App {
             walletVal.innerText = this.getWalletName(tx.walletId || tx.sourceId);
         }
 
-        if (tx.type === 'expense') {
+        if (tx.type === 'expense' || tx.type === 'income') {
             if (categoryWrap) categoryWrap.style.display = 'flex';
-            if (categoryVal) categoryVal.innerText = this.getCategoryName(tx.categoryId, tx.region);
+            if (categoryVal) categoryVal.innerText = categoryName;
             if (destWrap) destWrap.style.display = 'none';
             if (rateWrap) rateWrap.style.display = 'none';
         } else if (tx.type === 'transfer') {
@@ -4757,7 +4808,7 @@ class App {
                 `"${t.type || ''}"`,
                 `"${t.region || ''}"`,
                 `"${this.getWalletName(t.walletId || t.sourceId)}"`,
-                `"${this.getCategoryName(t.categoryId, t.region)}"`,
+                `"${this.getTransactionCategory(t)}"`,
                 t.amount !== undefined ? t.amount : (t.sourceAmount || 0),
                 `"${t.currency || t.sourceCurrency || ''}"`,
                 `"${t.destId ? this.getWalletName(t.destId) : ''}"`,
@@ -4984,7 +5035,7 @@ class App {
             // Selectable candidate categories for lifestyle exclusion
             const candidateCats = (storage.state?.categories?.JP || []).filter(c => {
                 return c.id === 'jp-food' || c.id === 'jp-dining' || c.id === 'jp-shopping' ||
-                       c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
+                    c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
             });
 
             let chipsHtml = '';
@@ -5136,7 +5187,7 @@ class App {
                             <div class="insight-icon"><i data-lucide="alert-circle"></i></div>
                             <div class="insight-content">
                                 <span class="insight-title">Peak Transaction Outlay</span>
-                                <p class="insight-desc">Largest single transaction was <span class="privacy-blur">${this.formatMoney(maxTx.amount, '¥')}</span> on ${maxTx.date} (${maxTx.note || this.getCategoryName(maxTx.categoryId, 'JP')}).</p>
+                                <p class="insight-desc">Largest single transaction was <span class="privacy-blur">${this.formatMoney(maxTx.amount, '¥')}</span> on ${maxTx.date} (${maxTx.note || this.getTransactionCategory(maxTx)}).</p>
                             </div>
                         </div>
                     `;
@@ -5325,11 +5376,12 @@ class App {
                                 <div class="tx-type-icon ${typeCls}"><i data-lucide="${tx.type === 'income' ? 'arrow-down-left' : 'arrow-up-right'}"></i></div>
                                 <div class="ledger-tx-details">
                                     <div class="ledger-tx-primary-line">
-                                        <span class="ledger-tx-title">${tx.note || this.getCategoryName(tx.categoryId, 'IN')}</span>
+                                        <span class="ledger-tx-title">${tx.note || this.getTransactionCategory(tx)}</span>
                                     </div>
                                     <div class="tx-meta-pills">
                                         <span class="tx-pill">${tx.date}</span>
                                         <span class="tx-pill">${this.getWalletName(tx.walletId)}</span>
+                                        <span class="tx-pill">${this.getTransactionCategory(tx)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -5446,10 +5498,10 @@ class App {
     exportReportCsv() {
         const allTxs = storage.state.transactions || [];
         const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
-        
+
         let csv = 'Transaction ID,Date,Region,Wallet,Category,Type,Amount,Currency,Note\n';
         reportTxs.forEach(tx => {
-            const catName = this.getCategoryName(tx.categoryId, tx.region);
+            const catName = this.getTransactionCategory(tx);
             const walletName = this.getWalletName(tx.walletId);
             const safeNote = (tx.note || '').replace(/"/g, '""');
             csv += `"${tx.id}","${tx.date}","${tx.region}","${walletName}","${catName}","${tx.type}","${tx.amount}","${tx.currency || ''}","${safeNote}"\n`;
@@ -5577,7 +5629,7 @@ class App {
         // 7. Render Snapshot Hero Section
         const heroEl = document.getElementById('report-snapshot-hero');
         if (heroEl) {
-            const statusBadge = isClosed 
+            const statusBadge = isClosed
                 ? `<span class="report-status-badge closed"><i data-lucide="lock" style="width:12px;height:12px;"></i> Closed & Reconciled</span>`
                 : `<span class="report-status-badge active"><i data-lucide="activity" style="width:12px;height:12px;"></i> Active Reporting Period</span>`;
 
@@ -5713,7 +5765,7 @@ class App {
         const breakdownCard = document.getElementById('report-category-breakdown-card');
         if (breakdownCard) {
             const allRegionCats = storage.state.categories[this.reportRegion] || [];
-            
+
             // Collect all categories that either exist in config or have transactions
             const catMap = new Map();
             allRegionCats.forEach(c => catMap.set(c.id, c));
@@ -5778,11 +5830,11 @@ class App {
                             </div>
                         </td>
                         <td class="privacy-blur">
-                            ${cat.variance !== null 
-                                ? (cat.variance >= 0 
-                                    ? `<span class="badge-cushion">+${this.formatMoney(cat.variance, currency)}</span>` 
-                                    : `<span class="badge-overspend">${this.formatMoney(cat.variance, currency)}</span>`) 
-                                : '<span class="text-muted">—</span>'}
+                            ${cat.variance !== null
+                        ? (cat.variance >= 0
+                            ? `<span class="badge-cushion">+${this.formatMoney(cat.variance, currency)}</span>`
+                            : `<span class="badge-overspend">${this.formatMoney(cat.variance, currency)}</span>`)
+                        : '<span class="text-muted">—</span>'}
                         </td>
                         <td><span style="font-weight: 600; color: var(--text-secondary);">${cat.pctOfTotal}%</span></td>
                         <td><span class="tx-count-pill">${cat.txCount} tx${cat.txCount === 1 ? '' : 's'}</span></td>
@@ -5898,8 +5950,8 @@ class App {
 
         // Wallets
         const wallets = Object.values(storage.state.wallets || {});
-        const filteredWallets = selectedRegion === 'ALL' 
-            ? wallets 
+        const filteredWallets = selectedRegion === 'ALL'
+            ? wallets
             : wallets.filter(w => w.region === selectedRegion);
 
         walletSelect.innerHTML = '<option value="ALL">All Wallets</option>' +
@@ -6091,10 +6143,10 @@ class App {
                     <h5 style="margin: 0 0 8px 0; font-size: 0.86rem; font-weight: 600; color: var(--text-secondary);">Category Breakdown</h5>
                     <div style="display: flex; flex-direction: column; gap: 6px;">
                         ${sortedCats.slice(0, 8).map(c => {
-                            const cur = c.region === 'JP' ? '¥' : '₹';
-                            const regTotalExp = c.region === 'JP' ? jpExpense : inExpense;
-                            const share = regTotalExp > 0 ? Math.round((c.amount / regTotalExp) * 100) : 0;
-                            return `
+                const cur = c.region === 'JP' ? '¥' : '₹';
+                const regTotalExp = c.region === 'JP' ? jpExpense : inExpense;
+                const share = regTotalExp > 0 ? Math.round((c.amount / regTotalExp) * 100) : 0;
+                return `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.82rem;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <i data-lucide="${c.icon}" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
@@ -6107,7 +6159,7 @@ class App {
                                     </div>
                                 </div>
                             `;
-                        }).join('')}
+            }).join('')}
                     </div>
                 </div>
             `;
@@ -6199,7 +6251,7 @@ class App {
                                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                                     <td style="padding: 6px 8px;">${t.date}</td>
                                     <td style="padding: 6px 8px;">${t.walletId || '-'}</td>
-                                    <td style="padding: 6px 8px;">${this.getCategoryName(t.categoryId, 'JP')}</td>
+                                    <td style="padding: 6px 8px;">${this.getTransactionCategory(t)}</td>
                                     <td style="padding: 6px 8px; color: #aaa;">${t.note || '-'}</td>
                                     <td style="padding: 6px 8px; text-align: right; font-weight: 600; color: ${t.type === 'income' ? '#34d399' : '#ffffff'};">
                                         ${t.type === 'income' ? '+' : '-'}${fmt(t.amount, '¥')}
@@ -6250,7 +6302,7 @@ class App {
                                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                                     <td style="padding: 6px 8px;">${t.date}</td>
                                     <td style="padding: 6px 8px;">${t.walletId || '-'}</td>
-                                    <td style="padding: 6px 8px;">${this.getCategoryName(t.categoryId, 'IN')}</td>
+                                    <td style="padding: 6px 8px;">${this.getTransactionCategory(t)}</td>
                                     <td style="padding: 6px 8px; color: #aaa;">${t.note || '-'}</td>
                                     <td style="padding: 6px 8px; text-align: right; font-weight: 600; color: ${t.type === 'income' ? '#34d399' : '#ffffff'};">
                                         ${t.type === 'income' ? '+' : '-'}${fmt(t.amount, '₹')}

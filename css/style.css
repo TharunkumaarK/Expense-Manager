@@ -8902,7 +8902,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 165px;
+    max-width: 100%;
     line-height: 1.25;
 }
 
@@ -8912,7 +8912,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 165px;
+    max-width: 100%;
     line-height: 1.2;
 }
 
