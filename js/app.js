@@ -2198,6 +2198,7 @@ class App {
                 let progressHtml = '';
 
                 const activeBudget = c.budget || 0;
+                const isOver = activeBudget > 0 && spent > activeBudget;
 
                 if (showProgress && activeBudget > 0) {
                     const pct = Math.min((spent / activeBudget) * 100, 100);
@@ -2219,7 +2220,7 @@ class App {
                 }
 
                 html += `
-                    <div class="neon-row" style="padding: 14px; cursor: pointer;" onclick="app.openCategoryManageModal('${c.id}', '${region}')" title="Click to manage ${c.name}">
+                    <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 14px; cursor: pointer;" onclick="app.openCategoryManageModal('${c.id}', '${region}')" title="Click to manage ${c.name}">
                         <div class="neon-header" style="margin-bottom: 8px;">
                             <span class="neon-title"><i data-lucide="${c.icon || 'tag'}"></i> ${c.name}</span>
                         </div>
@@ -3282,6 +3283,7 @@ class App {
                     if (spent === 0) return; // skip categories with no spend this month
 
                     const activeBudget = walletManager.getEffectiveBudget(catDef.id, region, h.monthKey);
+                    const isOver = activeBudget > 0 && spent > activeBudget;
                     regionSpent += spent;
 
                     let catProgressHtml = '';
@@ -3306,7 +3308,7 @@ class App {
                     }
 
                     catCardsHtml += `
-                        <div class="neon-row" style="padding: 12px;">
+                        <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 12px;">
                             <div class="neon-header" style="margin-bottom: 8px;">
                                 <span class="neon-title"><i data-lucide="${catDef.icon || 'tag'}"></i> ${catDef.name}</span>
                             </div>
@@ -3757,6 +3759,7 @@ class App {
                     if (spent === 0) return;
 
                     const activeBudget = walletManager.getEffectiveBudget(catDef.id, region, h.monthKey);
+                    const isOver = activeBudget > 0 && spent > activeBudget;
                     regionSpent += spent;
 
                     let catProgressHtml = '';
@@ -3781,7 +3784,7 @@ class App {
                     }
 
                     catCardsHtml += `
-                        <div class="neon-row" style="padding: 12px;">
+                        <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 12px;">
                             <div class="neon-header" style="margin-bottom: 8px;">
                                 <span class="neon-title"><i data-lucide="${catDef.icon || 'tag'}"></i> ${catDef.name}</span>
                             </div>

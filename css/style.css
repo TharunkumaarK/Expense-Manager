@@ -146,7 +146,7 @@
     --border-subtle: rgba(255, 255, 255, 0.06);
     --border-default: rgba(255, 255, 255, 0.09);
     --border-hover: rgba(255, 255, 255, 0.16);
-    --border-accent: rgba(59, 118, 225, 0.35);
+    --border-accent: rgba(255, 255, 255, 0.25);
     --border: var(--border-default);
     --divider: rgba(255, 255, 255, 0.06);
     --border-width: 1px;
@@ -175,10 +175,10 @@
     /* ==========================================================================
        Colour System (SpendIQ Palette & Status Colors)
        ========================================================================== */
-    --accent: #3b76e1;
-    --accent-hover: #2f65cc;
-    --accent-subtle: rgba(59, 118, 225, 0.12);
-    --accent-secondary: #06b6d4;
+    --accent: #f5f5f7;
+    --accent-hover: #ffffff;
+    --accent-subtle: rgba(255, 255, 255, 0.12);
+    --accent-secondary: rgba(255, 255, 255, 0.65);
 
     --success: #30d158;
     --green: #30d158;
@@ -449,9 +449,9 @@ button {
 }
 
 .desktop-sidebar.collapsed .desktop-nav-item.active {
-    background-color: var(--accent-subtle);
-    color: var(--accent);
-    border: 1px solid rgba(59, 118, 225, 0.25);
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .desktop-sidebar.collapsed .desktop-nav-item::before {
@@ -536,9 +536,9 @@ button {
     font-weight: 500;
     padding: 2px 6px;
     border-radius: var(--radius-pill);
-    background: var(--accent-subtle);
-    color: var(--accent);
-    border: 1px solid rgba(62, 99, 221, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    color: #dcdcdc;
+    border: 1px solid rgba(255, 255, 255, 0.14);
     letter-spacing: 0.05em;
 }
 
@@ -740,7 +740,7 @@ button {
     bottom: 8px;
     width: 3px;
     border-radius: 0 4px 4px 0;
-    background-color: var(--accent);
+    background-color: #ffffff;
 }
 
 .desktop-nav-item svg {
@@ -1511,7 +1511,7 @@ button {
 
 .progress-fill {
     height: 100%;
-    background: var(--accent);
+    background: rgba(255, 255, 255, 0.4);
     border-radius: 3px;
     transition: width 0.3s ease;
 }
@@ -1628,7 +1628,8 @@ button {
 }
 
 .nav-item.active {
-    color: var(--accent);
+    color: #ffffff;
+    font-weight: 600;
 }
 
 .nav-item i {
@@ -1654,20 +1655,21 @@ button {
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: var(--accent);
-    color: white;
-    border: none;
+    background: linear-gradient(92.03deg, rgba(117, 117, 117, 0.4) 0%, rgba(255, 255, 255, 0.4) 48.03%, rgba(117, 117, 117, 0.4) 99.87%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #f5f5f7;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: var(--shadow-fab);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     z-index: 100;
-    transition: transform 0.2s, background 0.2s;
+    transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
     margin-bottom: env(safe-area-inset-bottom);
 }
 
 .fab:active {
-    background: var(--accent-hover);
+    background: rgba(255, 255, 255, 0.85);
+    color: #1c1c1c;
     transform: translateX(-50%) scale(0.95);
 }
 
@@ -1886,7 +1888,8 @@ input {
 .form-control:focus,
 select:focus,
 input:focus {
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
 }
 
 input[type="date"] {
@@ -2252,7 +2255,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .section-header-toggle:focus-visible {
-    outline: 2px solid var(--accent-subtle);
+    outline: 2px solid rgba(255, 255, 255, 0.25);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
 }
@@ -2310,26 +2313,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .neon-row {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    background: var(--glass-bg-card);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
     padding: 14px 16px;
     margin-bottom: 0px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    transition: background-color var(--duration-fast) var(--ease-out),
-        border-color var(--duration-fast) var(--ease-out),
-        box-shadow var(--duration-fast) var(--ease-out),
-        transform var(--duration-instant) var(--ease-out);
+    box-shadow: var(--shadow-xs);
+    transition: border-color var(--duration-fast) var(--ease-out),
+        background-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out);
+    transform: none;
 }
 
 .neon-row:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.16);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 8px 24px rgba(0, 0, 0, 0.45);
+    transform: none;
 }
 
 .neon-row:active {
-    transform: scale(0.99);
+    transform: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.neon-row.is-overbudget {
+    border-color: rgba(244, 63, 94, 0.32);
+    background: rgba(244, 63, 94, 0.02);
+}
+
+.neon-row.is-overbudget:hover {
+    border-color: rgba(244, 63, 94, 0.55);
+    box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.25), 0 8px 28px rgba(0, 0, 0, 0.50);
+    transform: none;
 }
 
 .neon-header {
@@ -2465,54 +2483,633 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     transform: scale(1.15);
 }
 
-/* ===== Reset Password Screen ===== */
-#reset-password-screen {
-    display: none;
-    flex-direction: column;
-    justify-content: center;
+/* ==========================================================================
+   Modern Authentication & Reset Password Experience
+   ========================================================================== */
+
+.auth-viewport {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 9999;
+    background-color: #000000;
+    display: flex;
     align-items: center;
-    min-height: 100vh;
-    padding: 20px;
+    justify-content: center;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 32px 24px;
+    box-sizing: border-box;
 }
 
-#reset-password-screen .card {
+#reset-password-screen {
+    display: none;
+}
+
+/* Ensure bottom navigation, FAB, and top-bar never peek through while authentication is active */
+body:has(#auth-screen:not([style*="display: none"])) #bottom-nav,
+body:has(#auth-screen:not([style*="display: none"])) #main-fab,
+body:has(#auth-screen:not([style*="display: none"])) .top-bar,
+body:has(#reset-password-screen:not([style*="display: none"])) #bottom-nav,
+body:has(#reset-password-screen:not([style*="display: none"])) #main-fab,
+body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
+    display: none !important;
+}
+
+/* Ambient Background Mesh Glow (Subtle & Restrained) */
+.auth-ambient-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.032) 0%, transparent 48%),
+        radial-gradient(circle at 82% 78%, rgba(59, 130, 246, 0.038) 0%, transparent 44%);
+    z-index: 0;
+}
+
+/* Desktop 2-Column Grid Container */
+.auth-container {
     width: 100%;
-    max-width: 400px;
+    max-width: 1080px;
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 56px;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    margin: auto;
+}
+
+/* ===== Left Pane: Brand & Multi-Currency Treasury Canvas ===== */
+.auth-brand-pane {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 500px;
+    padding: 8px 0;
+}
+
+.auth-brand-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.auth-brand-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.auth-logo-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    flex-shrink: 0;
+}
+
+.auth-brand-name {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: -0.015em;
+}
+
+.auth-brand-pill {
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.auth-brand-content {
+    margin: 32px 0 28px 0;
+}
+
+.auth-headline {
+    font-family: var(--font-display);
+    font-size: 2.3rem;
+    font-weight: 700;
+    line-height: 1.18;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+    margin: 0 0 12px 0;
+}
+
+.auth-subhead {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    max-width: 440px;
+    margin: 0 0 32px 0;
+}
+
+/* Dual-Currency Code-Rendered Wallet Showcase */
+.auth-wallet-showcase {
+    position: relative;
+    width: 100%;
+    max-width: 450px;
+    height: 210px;
+}
+
+.auth-card-preview {
+    position: absolute;
+    width: 310px;
+    height: 175px;
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* JPY Showcase Card: Layered Crimson/Rose Radial Blooms (Matching Dashboard Country Balance Cards) */
+.auth-card-jp {
+    top: 0;
+    left: 0;
+    z-index: 1;
+    background: radial-gradient(circle at 10% 15%, rgba(225, 29, 72, 0.28), transparent 50%),
+        radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), transparent 55%),
+        linear-gradient(145deg, #181116, #100b10) !important;
+    border: 1px solid rgba(225, 29, 72, 0.28) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(225, 29, 72, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.auth-card-jp:hover {
+    border-color: rgba(225, 29, 72, 0.45) !important;
+    box-shadow: 0 0 0 1px rgba(225, 29, 72, 0.35), 0 16px 36px rgba(225, 29, 72, 0.22), 0 16px 36px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+    transform: translateY(-3px);
+}
+
+/* INR Showcase Card: Layered Saffron/Emerald Radial Blooms (Matching Dashboard Country Balance Cards) */
+.auth-card-in {
+    bottom: 0;
+    right: 12px;
+    z-index: 2;
+    background: radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.24), transparent 50%),
+        radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), transparent 55%),
+        linear-gradient(145deg, #171510, #0c120e) !important;
+    border: 1px solid rgba(245, 158, 11, 0.26) !important;
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.7), 0 0 28px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.auth-card-in:hover {
+    border-color: rgba(245, 158, 11, 0.45) !important;
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 22px 48px rgba(245, 158, 11, 0.22), 0 22px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+    transform: translateY(-3px);
+}
+
+.auth-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.auth-card-chip {
+    width: 30px;
+    height: 22px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #d4af37 0%, #aa8c2c 100%);
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 0 3px;
+}
+
+.chip-line {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.35);
+    width: 100%;
+}
+
+.auth-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: #f5f5f7;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 3px 8px;
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.auth-flag-svg {
+    display: inline-block;
+    flex-shrink: 0;
+    border-radius: 50%;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.auth-card-body {
+    margin: 4px 0;
+}
+
+.auth-card-label {
+    font-size: 0.68rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.auth-card-balance {
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.auth-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.auth-card-network {
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+}
+
+.auth-card-tag {
+    font-size: 0.72rem;
+    font-family: monospace;
+    color: var(--text-muted);
+}
+
+.auth-brand-footer {
+    display: flex;
+    align-items: center;
+}
+
+.auth-status-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.auth-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+/* ===== Right Pane: Authentication Workspace ===== */
+.auth-form-pane {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+.auth-form-card {
+    width: 100%;
+    max-width: 420px;
+    background: rgba(18, 18, 22, 0.78);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 36px 32px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+    box-sizing: border-box;
+    position: relative;
+}
+
+.auth-mobile-header {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: nowrap;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.auth-mobile-header .auth-brand-logo {
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+.auth-mobile-header .auth-brand-name {
+    font-size: 1.05rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.auth-mobile-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #f5f5f7;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.auth-badge-dot {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    line-height: 1;
+}
+
+.auth-form-intro {
+    margin-bottom: 22px;
+}
+
+.auth-title {
+    font-family: var(--font-display);
+    font-size: 1.55rem;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    margin: 0 0 6px 0;
+}
+
+.auth-desc {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.45;
+}
+
+.auth-alert-banner {
+    display: none;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+    text-align: left;
+    word-break: break-word;
+}
+
+.auth-field-group {
+    margin-bottom: 18px;
+}
+
+.auth-label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 7px;
+}
+
+.auth-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 7px;
+}
+
+.auth-label-row .auth-label {
+    margin-bottom: 0;
+}
+
+.auth-forgot-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s ease;
+    text-decoration: none;
+}
+
+.auth-forgot-link:hover {
+    color: #ffffff;
+    text-decoration: underline;
+}
+
+.auth-input-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.auth-input-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease;
+}
+
+.auth-input {
+    width: 100%;
+    height: 46px;
+    background: rgba(10, 10, 14, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 0 42px 0 40px;
+    font-size: 0.92rem;
+    color: #ffffff;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+    outline: none;
+    font-family: inherit;
+}
+
+.auth-input::placeholder {
+    color: rgba(255, 255, 255, 0.28);
+}
+
+.auth-input:focus {
+    background: rgba(14, 14, 20, 0.95);
+    border-color: rgba(255, 255, 255, 0.38);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+.auth-input-wrapper:focus-within .auth-input-icon {
+    color: #ffffff;
+}
+
+.auth-pwd-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.auth-pwd-toggle:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* Submit Action Button */
+.auth-submit-btn {
+    width: 100%;
+    height: 44px !important;
+    padding: 0 16px !important;
+    font-size: 14px !important;
+    line-height: 16px !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
+    margin-top: 8px;
+    letter-spacing: -0.01em;
+}
+
+.auth-form-footnote {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    margin-top: 22px;
+    line-height: 1.4;
     text-align: center;
 }
 
-#reset-password-screen h2 {
-    margin-bottom: 8px;
-    font-weight: 600;
-    font-size: 1.8rem;
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+.auth-lock-icon {
+    flex-shrink: 0;
+    opacity: 0.65;
 }
 
-#reset-password-screen .reset-subtitle {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    margin-bottom: 24px;
+/* ===== Reset Password Experience ===== */
+.auth-reset-container {
+    width: 100%;
+    max-width: 420px;
+    margin: auto;
+    position: relative;
+    z-index: 1;
+}
+
+.auth-reset-card {
+    margin: 0 auto;
 }
 
 #reset-password-screen .reset-success-msg {
     display: none;
-    color: var(--green);
-    font-size: 0.9rem;
+    color: #10b981;
+    font-size: 0.85rem;
+    line-height: 1.45;
     margin-bottom: 16px;
-    padding: 12px;
-    background: rgba(50, 215, 75, 0.1);
-    border: 1px solid rgba(50, 215, 75, 0.2);
-    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 10px;
+    text-align: left;
 }
 
 #reset-password-screen .reset-error-msg {
     display: none;
     color: var(--red);
     font-size: 0.85rem;
-    margin-bottom: 12px;
+    line-height: 1.45;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 10px;
+    text-align: left;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 960px) {
+    .auth-container {
+        grid-template-columns: 1fr;
+        gap: 28px;
+        max-width: 440px;
+    }
+
+    .auth-brand-pane {
+        display: none;
+    }
+
+    .auth-mobile-header {
+        display: flex;
+    }
+
+    .auth-viewport {
+        padding: 24px 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-viewport {
+        padding: 16px 12px;
+    }
+
+    .auth-form-card {
+        padding: 28px 20px;
+        border-radius: 16px;
+    }
+
+    .auth-input {
+        height: 48px;
+        font-size: 16px;
+        /* Prevents auto-zoom on iOS */
+    }
+
+    .auth-submit-btn {
+        height: 48px !important;
+    }
+
+    .auth-title {
+        font-size: 1.4rem;
+    }
 }
 
 /* Password input with toggle */
@@ -2884,9 +3481,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .stat-icon-wrap.savings {
-    background: rgba(62, 99, 221, 0.14);
-    color: var(--accent);
-    border: 1px solid rgba(62, 99, 221, 0.25);
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
 .stat-icon-wrap.rate {
@@ -3215,8 +3812,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     font-size: 0.74rem;
     font-weight: 500;
     padding: 3px 10px;
-    background: rgba(62, 99, 221, 0.15);
-    color: var(--accent);
+    background: rgba(255, 255, 255, 0.1);
+    color: #f5f5f7;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: var(--radius-full);
 }
 
@@ -3580,7 +4178,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .wallets-kpi-hint {
     font-size: 0.72rem;
-    color: var(--accent);
+    color: var(--text-muted);
     opacity: 0.85;
     transition: opacity 140ms ease, transform 140ms ease;
 }
@@ -4178,9 +4776,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .theme-picker-tile.active,
 .theme-tile.selected,
 .theme-tile.active {
-    border-color: var(--accent, #3b82f6);
-    background: rgba(59, 130, 246, 0.08);
-    box-shadow: 0 0 0 1px var(--accent, #3b82f6), 0 4px 12px rgba(59, 130, 246, 0.2);
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .theme-picker-tile .theme-tile-preview,
@@ -4228,8 +4826,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: var(--accent, #3b82f6);
-    color: #ffffff;
+    background: #ffffff;
+    color: #121212;
     display: none;
     align-items: center;
     justify-content: center;
@@ -4463,6 +5061,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .modal-overlay,
     #toast-container,
     .fab-menu-overlay,
+    #auth-screen,
     #reset-password-screen {
         display: none !important;
     }
@@ -4612,14 +5211,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .segment-btn.active {
-    background: var(--accent);
+    background: rgba(255, 255, 255, 0.14);
     color: #ffffff;
     font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .segment-btn:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid rgba(255, 255, 255, 0.25);
     outline-offset: 1px;
 }
 
@@ -4676,7 +5276,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .ledger-search-box:focus-within .search-icon {
-    color: var(--accent);
+    color: #f5f5f7;
 }
 
 .ledger-search-box input {
@@ -4693,10 +5293,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .ledger-search-box input:focus {
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.35);
     outline: none;
     background: rgba(12, 12, 20, 0.85);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
 }
 
 .search-clear-btn {
@@ -4799,8 +5399,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .filter-count-badge {
-    background: var(--accent);
+    background: rgba(255, 255, 255, 0.18);
     color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
     font-size: 0.68rem;
     font-weight: 500;
     padding: 1px 6px;
@@ -4884,9 +5485,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .filter-select:focus,
 .filter-date-input:focus,
 .filter-amount-input:focus {
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.35);
     background: rgba(255, 255, 255, 0.06);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
 }
 
 .filter-date-inputs,
@@ -4945,7 +5546,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .filter-chip:hover {
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.25);
     color: var(--text-primary);
 }
 
@@ -5083,7 +5684,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .ledger-tx-row:active {
     background: rgba(255, 255, 255, 0.04);
     transform: none !important;
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .ledger-tx-left {
@@ -5338,7 +5939,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     left: 20%;
     right: 20%;
     height: 100%;
-    background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+    background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
     pointer-events: none;
 }
 
@@ -5472,9 +6073,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .analytics-country-tab.active {
-    background: rgba(62, 99, 221, 0.14);
-    border-color: var(--accent);
-    box-shadow: 0 0 14px var(--accent-subtle);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 14px rgba(255, 255, 255, 0.08);
 }
 
 .tab-flag {
@@ -5571,8 +6172,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .kpi-icon-wrap.savings {
-    background: rgba(62, 99, 221, 0.12);
-    color: var(--accent);
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
 }
 
 .kpi-icon-wrap.rate {
@@ -5650,7 +6251,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .exclusions-icon {
     width: 16px;
     height: 16px;
-    color: var(--accent);
+    color: var(--text-secondary);
 }
 
 .exclusions-title {
@@ -5690,7 +6291,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .exclusion-pill:hover {
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.25);
     color: var(--text-primary);
 }
 
@@ -5814,7 +6415,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .category-rank-row:hover {
     background: var(--bg-surface-hover);
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .category-rank-top {
@@ -5881,7 +6482,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     padding: 18px 20px;
     background: var(--bg-surface-2);
     border: 1px solid var(--border-default);
-    border-left: 3px solid var(--accent);
+    border-left: 3px solid rgba(255, 255, 255, 0.4);
     border-radius: var(--radius-lg);
     animation: fadeIn 0.2s var(--ease-out);
 }
@@ -5936,8 +6537,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     width: 28px;
     height: 28px;
     border-radius: var(--radius-sm);
-    background: rgba(62, 99, 221, 0.12);
-    color: var(--accent);
+    background: rgba(255, 255, 255, 0.08);
+    color: #f5f5f7;
+    border: 1px solid rgba(255, 255, 255, 0.12);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -6420,9 +7022,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .snapshot-status-badge.closed,
 .report-status-badge.closed {
-    background: rgba(99, 102, 241, 0.15);
-    color: #818cf8;
-    border: 1px solid rgba(99, 102, 241, 0.3);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .snapshot-status-badge.active,
@@ -6962,7 +7564,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .custom-field-group select:focus,
 .custom-field-group input:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
 }
 
 .custom-range-row {
@@ -7067,9 +7670,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .closing-step-pill.active {
-    background: var(--accent);
+    background: rgba(255, 255, 255, 0.14);
     color: #ffffff;
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.25);
     font-weight: 600;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
@@ -7131,7 +7734,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     padding: 0 !important;
     margin: 3px 0 0 0 !important;
     flex: 0 0 18px !important;
-    accent-color: var(--accent);
+    accent-color: #f5f5f7;
     cursor: pointer;
     box-sizing: border-box !important;
 }
@@ -7191,8 +7794,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .closing-option-box.selected {
-    border-color: var(--accent);
-    background: rgba(62, 99, 221, 0.08);
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 /* ==========================================================================
@@ -7415,9 +8018,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .budgets-search-box:focus-within {
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.35);
     background: rgba(255, 255, 255, 0.06);
-    box-shadow: 0 0 0 1px var(--accent-glow);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
 }
 
 .budgets-search-box input {
@@ -7723,8 +8326,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     width: 20px;
     height: 20px;
     border-radius: 4px;
-    background: rgba(99, 102, 241, 0.15);
-    color: var(--accent);
+    background: rgba(255, 255, 255, 0.1);
+    color: #f5f5f7;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -7797,8 +8401,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .icon-group-pill.active {
-    background: var(--accent);
-    border-color: var(--border-accent);
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.25);
     color: #ffffff;
 }
 
@@ -7859,10 +8463,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .icon-picker-cell.selected {
-    background: var(--accent);
+    background: rgba(255, 255, 255, 0.15);
     color: #ffffff;
-    border-color: var(--border-accent);
-    box-shadow: 0 0 10px rgba(99, 102, 241, 0.35);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
 }
 
 .cat-config-toggles {
@@ -8135,13 +8739,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .settings-tab-btn.active {
     color: #ffffff;
-    background: rgba(62, 99, 221, 0.16);
-    border: 1px solid rgba(62, 99, 221, 0.35);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     font-weight: 600;
 }
 
 .settings-tab-btn.active svg {
-    color: var(--accent);
+    color: #ffffff;
 }
 
 .settings-tab-btn svg {
@@ -8255,9 +8859,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .settings-input:focus,
 .settings-select:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: rgba(255, 255, 255, 0.35);
     background: rgba(255, 255, 255, 0.06);
-    box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.2);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
 }
 
 .settings-input[readonly] {
@@ -8620,9 +9224,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .dash-region-pill.active {
-    background: var(--accent);
+    background: rgba(255, 255, 255, 0.14);
     color: #ffffff;
     font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
@@ -8632,7 +9237,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .dash-region-pill:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid rgba(255, 255, 255, 0.25);
     outline-offset: 1px;
 }
 
@@ -8836,7 +9441,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .dash-recent-row:focus-visible {
-    outline: 2px solid var(--accent-subtle);
+    outline: 2px solid rgba(255, 255, 255, 0.25);
     outline-offset: 1px;
 }
 
