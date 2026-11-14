@@ -324,32 +324,29 @@ class App {
     }
 
     setupNavigation() {
-        // Mobile bottom navigation items
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                const target = e.currentTarget.getAttribute('data-target');
-                this.switchView(target);
-            });
-        });
-
-        // Desktop sidebar navigation items
+        // Desktop & Mobile drawer navigation items
         document.querySelectorAll('.desktop-nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
                 const target = e.currentTarget.getAttribute('data-target');
                 this.switchView(target);
-                // Auto-close mobile drawer if open
-                const sidebar = document.getElementById('desktop-sidebar');
-                if (sidebar && sidebar.classList.contains('mobile-open')) {
-                    sidebar.classList.remove('mobile-open');
-                }
+                this.closeMobileSidebar();
             });
         });
 
-        // Keyboard shortcuts (Escape key dismisses focus overlay and modals)
+        // Keyboard shortcuts (Escape key dismisses mobile drawer, fab menu, focus overlay and modals)
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                const sidebar = document.getElementById('desktop-sidebar');
+                if (sidebar && sidebar.classList.contains('mobile-open')) {
+                    this.closeMobileSidebar();
+                    return;
+                }
+                const fabMenu = document.getElementById('fab-menu');
+                if (fabMenu && fabMenu.classList.contains('active')) {
+                    this.toggleFabMenu();
+                    return;
+                }
                 const detailModal = document.getElementById('transaction-detail-modal');
                 if (detailModal && detailModal.classList.contains('active')) {
                     this.closeTransactionDetail();
@@ -389,6 +386,40 @@ class App {
                 }
             }
         });
+
+        // Setup mouse-wheel & drag-to-scroll for horizontal pill strips on PC
+        const settingsTabList = document.querySelector('.settings-tab-list');
+        if (settingsTabList) {
+            settingsTabList.addEventListener('wheel', (e) => {
+                if (e.deltaY !== 0 && settingsTabList.scrollWidth > settingsTabList.clientWidth) {
+                    e.preventDefault();
+                    settingsTabList.scrollLeft += e.deltaY;
+                }
+            }, { passive: false });
+
+            let isDown = false;
+            let startX = 0;
+            let scrollLeft = 0;
+            settingsTabList.addEventListener('mousedown', (e) => {
+                isDown = true;
+                settingsTabList.classList.add('dragging');
+                startX = e.pageX - settingsTabList.offsetLeft;
+                scrollLeft = settingsTabList.scrollLeft;
+            });
+            window.addEventListener('mouseup', () => {
+                if (isDown) {
+                    isDown = false;
+                    settingsTabList.classList.remove('dragging');
+                }
+            });
+            settingsTabList.addEventListener('mousemove', (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - settingsTabList.offsetLeft;
+                const walk = (x - startX) * 1.5;
+                settingsTabList.scrollLeft = scrollLeft - walk;
+            });
+        }
     }
 
     switchView(viewId) {
@@ -428,7 +459,7 @@ class App {
             targetView.classList.add('active');
         }
 
-        // Synchronize active item on desktop sidebar
+        // Synchronize active item on sidebar
         document.querySelectorAll('.desktop-nav-item').forEach(n => {
             const t = n.getAttribute('data-target');
             if (t === resolvedId || (resolvedId === 'home-view' && t === 'home-view')) {
@@ -438,15 +469,8 @@ class App {
             }
         });
 
-        // Synchronize active item on mobile bottom nav
-        document.querySelectorAll('.nav-item').forEach(n => {
-            const t = n.getAttribute('data-target');
-            if (t === resolvedId || (resolvedId === 'home-view' && t === 'home-view')) {
-                n.classList.add('active');
-            } else {
-                n.classList.remove('active');
-            }
-        });
+        // Ensure mobile drawer is closed upon view transition
+        this.closeMobileSidebar();
 
         // Update Desktop Header title and subtitle
         const pageTitleEl = document.getElementById('desktop-page-title');
@@ -512,10 +536,28 @@ class App {
         }
     }
 
+    openMobileSidebar() {
+        const sidebar = document.getElementById('desktop-sidebar');
+        const backdrop = document.getElementById('mobile-sidebar-backdrop');
+        if (sidebar) sidebar.classList.add('mobile-open');
+        if (backdrop) backdrop.classList.add('active');
+        document.body.classList.add('drawer-open');
+    }
+
+    closeMobileSidebar() {
+        const sidebar = document.getElementById('desktop-sidebar');
+        const backdrop = document.getElementById('mobile-sidebar-backdrop');
+        if (sidebar) sidebar.classList.remove('mobile-open');
+        if (backdrop) backdrop.classList.remove('active');
+        document.body.classList.remove('drawer-open');
+    }
+
     toggleMobileSidebar() {
         const sidebar = document.getElementById('desktop-sidebar');
-        if (sidebar) {
-            sidebar.classList.toggle('mobile-open');
+        if (sidebar && sidebar.classList.contains('mobile-open')) {
+            this.closeMobileSidebar();
+        } else {
+            this.openMobileSidebar();
         }
     }
 
@@ -1386,6 +1428,9 @@ class App {
         tabs.forEach(tab => {
             if (tab.getAttribute('data-section') === sectionId) {
                 tab.classList.add('active');
+                if (typeof tab.scrollIntoView === 'function') {
+                    tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
             } else {
                 tab.classList.remove('active');
             }
@@ -2710,39 +2755,39 @@ class App {
         modalTitle.innerText = `${countryName} Overview`;
 
         primaryPanel.innerHTML = `
-            <div class="country-card ${cardThemeCls} expanded" style="padding: 26px; cursor: default; transform: none; min-height: 250px; display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-lg); position: relative; overflow: hidden; box-shadow: 0 16px 36px -10px rgba(0,0,0,0.6);">
+            <div class="country-card ${cardThemeCls} expanded focus-country-card">
                 <div class="wallet-card-overlay-sheen"></div>
-                <div class="country-card-header" style="display: flex; justify-content: space-between; align-items: center; z-index: 2;">
-                    <div class="country-badge" style="display: flex; align-items: center; gap: 8px;">
+                <div class="country-card-header">
+                    <div class="country-badge">
                         ${flagSvg}
-                        <span class="country-name" style="font-weight: 600; font-size: 1.1rem; color: #fff;">${countryName}</span>
-                        <span class="currency-code" style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.15); font-weight: 500; color: #fff;">${isJp ? 'JPY' : 'INR'}</span>
+                        <span class="country-name">${countryName}</span>
+                        <span class="currency-code">${isJp ? 'JPY' : 'INR'}</span>
                     </div>
-                    <span class="wallet-count-pill" style="font-size: 0.75rem; padding: 4px 10px; border-radius: 9999px; background: rgba(0,0,0,0.35); color: #fff; font-weight: 500; border: 1px solid rgba(255,255,255,0.12);">${regionWallets.length} ${regionWallets.length === 1 ? 'Account' : 'Accounts'}</span>
+                    <span class="wallet-count-pill">${regionWallets.length} ${regionWallets.length === 1 ? 'Account' : 'Accounts'}</span>
                 </div>
-                <div class="country-balance-body" style="margin: 22px 0; z-index: 2;">
-                    <span class="balance-label" style="font-size: 0.74rem; font-weight: 500; opacity: 0.8; color: #fff; display: block; margin-bottom: 4px;">Total Portfolio Balance</span>
-                    <div class="country-total-amount financial-amount privacy-blur" style="font-size: 2.3rem; font-weight: 600; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
+                <div class="country-balance-body">
+                    <span class="balance-label">Total Portfolio Balance</span>
+                    <div class="country-total-amount financial-amount privacy-blur">
                         ${this.formatMoney(total, currency)}
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; z-index: 2;">
-                    <button class="btn btn-secondary" style="flex: 1; background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.22); color: #fff; font-size: 0.82rem; padding: 8px 14px;" onclick="app.closeFocusOverlay(); app.openTransactionModal('expense');">
-                        <i data-lucide="plus" style="width:14px; height:14px; margin-right:4px;"></i> Log Expense
+                <div class="focus-country-actions">
+                    <button class="btn btn-secondary" onclick="app.closeFocusOverlay(); app.openTransactionModal('expense');">
+                        <i data-lucide="plus"></i> <span>Log Expense</span>
                     </button>
-                    <button class="btn btn-secondary" style="flex: 1; background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.22); color: #fff; font-size: 0.82rem; padding: 8px 14px;" onclick="app.closeFocusOverlay(); app.openTransactionModal('income');">
-                        <i data-lucide="arrow-down-left" style="width:14px; height:14px; margin-right:4px;"></i> Log Income
+                    <button class="btn btn-secondary" onclick="app.closeFocusOverlay(); app.openTransactionModal('income');">
+                        <i data-lucide="arrow-down-left"></i> <span>Log Income</span>
                     </button>
                 </div>
             </div>
         `;
 
         let walletsListHtml = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin: 0;">Associated Accounts (${regionWallets.length})</h4>
+            <div class="focus-activity-header">
+                <h4 class="focus-activity-title">Associated Accounts (${regionWallets.length})</h4>
                 <span class="text-muted text-xs">Click any wallet to focus</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
+            <div class="focus-country-wallets-list">
         `;
 
         if (regionWallets.length === 0) {
@@ -2752,21 +2797,21 @@ class App {
                 const theme = this.getThemeForWallet(w);
                 const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
                 walletsListHtml += `
-                    <div class="wallet-item-compact ${theme.cls}" onclick="app.openWalletFocus('${w.id}')" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-radius: var(--radius-md); cursor: pointer; transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out); border: 1px solid rgba(255,255,255,0.1);">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center;">
-                                <i data-lucide="${icon}" style="width: 16px; height: 16px; color: #fff;"></i>
+                    <div class="wallet-item-compact ${theme.cls} focus-associated-wallet-row" onclick="app.openWalletFocus('${w.id}')">
+                        <div class="focus-associated-wallet-left">
+                            <div class="focus-associated-wallet-icon">
+                                <i data-lucide="${icon}"></i>
                             </div>
-                            <div>
-                                <div style="font-weight: 600; color: #fff; font-size: 0.9rem;">${w.id}</div>
-                                <div style="font-size: 0.74rem; color: rgba(255,255,255,0.7);">${w.type || 'Account'} • ${w.currency}</div>
+                            <div class="focus-associated-wallet-info">
+                                <div class="focus-associated-wallet-name" title="${w.id}">${w.id}</div>
+                                <div class="focus-associated-wallet-meta">${w.type || 'Account'} • ${w.currency}</div>
                             </div>
                         </div>
-                        <div style="text-align: right;">
-                            <div class="financial-amount privacy-blur" style="font-family: var(--font-numeric); font-weight: 600; color: #fff; font-size: 1.05rem;">
+                        <div class="focus-associated-wallet-right">
+                            <div class="financial-amount privacy-blur focus-associated-wallet-amount">
                                 ${this.formatMoney(w.balance, w.currency)}
                             </div>
-                            <span style="font-size: 0.72rem; color: rgba(255,255,255,0.65);">View details →</span>
+                            <span class="focus-associated-wallet-arrow">View details →</span>
                         </div>
                     </div>
                 `;
@@ -2819,36 +2864,35 @@ class App {
         modalTitle.innerText = `${w.id}`;
 
         primaryPanel.innerHTML = `
-            <div class="wallet-card ${theme.cls}${secondaryCls}" style="padding: 24px; cursor: default; transform: none; min-height: 220px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 18px; position: relative; overflow: hidden; box-shadow: 0 16px 36px -10px rgba(0,0,0,0.6);">
+            <div class="wallet-card ${theme.cls}${secondaryCls} focus-wallet-card">
                 <div class="wallet-card-overlay-sheen"></div>
-                <div class="wallet-card-header" style="display: flex; justify-content: space-between; align-items: center; z-index: 2;">
-                    <div class="wallet-card-chip-group" style="display: flex; align-items: center; gap: 10px;">
+                <div class="wallet-card-header">
+                    <div class="wallet-card-chip-group">
                         ${chipSvg}
                         ${contactlessSvg}
                     </div>
                     ${secondaryBadge}
                 </div>
-                <div class="wallet-balance-wrap" style="margin: 20px 0; z-index: 2;">
-                    <span class="wallet-balance-label" style="font-size: 0.74rem; font-weight: 500; color: rgba(255,255,255,0.65); display: block; margin-bottom: 4px;">Current Balance</span>
-                    <div class="wallet-balance-val financial-amount privacy-blur" style="font-size: 2.25rem; font-weight: 600; color: #fff; font-family: var(--font-numeric); letter-spacing: -0.02em;">
+                <div class="wallet-balance-wrap">
+                    <span class="wallet-balance-label">Current Balance</span>
+                    <div class="wallet-balance-val financial-amount privacy-blur">
                         ${this.formatMoney(w.balance, w.currency)}
                     </div>
                 </div>
-                <div class="wallet-card-footer" style="display: flex; justify-content: space-between; align-items: flex-end; z-index: 2;">
-                    <div class="wallet-name" style="font-size: 1.15rem; font-weight: 500; color: rgba(255, 255, 255, 0.92); letter-spacing: 0.01em;">${w.id}</div>
+                <div class="wallet-card-footer">
+                    <div class="wallet-name" title="${w.id}">${w.id}</div>
+                    <div class="wallet-type-tag">${w.type || 'Account'} • ${w.currency}</div>
                 </div>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">
+            <div class="focus-wallet-actions">
                 <button class="btn btn-primary" onclick="app.openAddTxForWallet('${w.id}')">
-                    <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 6px;"></i> <span>Log Expense</span>
+                    <i data-lucide="plus"></i> <span>Log Expense</span>
                 </button>
                 <button class="btn btn-secondary" onclick="app.openTransferForWallet('${w.id}')">
-                    <i data-lucide="arrow-left-right" style="width: 14px; height: 14px; margin-right: 6px;"></i> <span>Transfer</span>
+                    <i data-lucide="arrow-left-right"></i> <span>Transfer</span>
                 </button>
-            </div>
-            <div style="margin-top: 8px;">
-                <button class="btn btn-secondary" style="width: 100%; font-size: 0.82rem;" onclick="app.openEditWalletModal('${w.id}')">
-                    <i data-lucide="edit-2" style="width: 14px; height: 14px; margin-right: 6px;"></i> <span>Edit Account Details</span>
+                <button class="btn btn-secondary btn-edit-account" onclick="app.closeFocusOverlay(); app.openEditWalletModal('${w.id}')">
+                    <i data-lucide="edit-2"></i> <span>Edit Account</span>
                 </button>
             </div>
         `;
@@ -2857,19 +2901,19 @@ class App {
         const recentTxs = txs.slice(0, 15);
 
         let txHtml = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin: 0;">Account Activity</h4>
+            <div class="focus-activity-header">
+                <h4 class="focus-activity-title">Account Activity</h4>
                 <span class="text-muted text-xs">${txs.length} ${txs.length === 1 ? 'transaction' : 'transactions'}</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; padding-right: 4px;">
+            <div class="focus-activity-list">
         `;
 
         if (recentTxs.length === 0) {
             txHtml += `
-                <div style="text-align: center; padding: 48px 16px; color: var(--text-muted);">
-                    <i data-lucide="receipt" style="width: 36px; height: 36px; opacity: 0.4; margin-bottom: 10px;"></i>
-                    <div style="font-weight: 500; font-size: 0.9rem;">No transactions found</div>
-                    <div style="font-size: 0.78rem; opacity: 0.8; margin-top: 4px;">New expenses, income or transfers logged to ${w.id} will appear here.</div>
+                <div class="focus-tx-empty-state">
+                    <i data-lucide="receipt"></i>
+                    <div class="focus-empty-title">No transactions found</div>
+                    <div class="focus-empty-subtitle">New expenses, income or transfers logged to ${w.id} will appear here.</div>
                 </div>
             `;
         } else {
@@ -2902,17 +2946,17 @@ class App {
                 const metaParts = [formattedDate, catName, (tx.note && tx.note !== label ? tx.note : '')].filter(Boolean);
                 const metaLine = metaParts.join(' • ');
                 txHtml += `
-                    <div class="tx-row" onclick="app.editTransaction('${tx.id}')" style="cursor: pointer; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; transition: background 120ms ease;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center;">
-                                <i data-lucide="${icon}" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
+                    <div class="tx-row focus-activity-row" onclick="app.editTransaction('${tx.id}')">
+                        <div class="focus-tx-left">
+                            <div class="focus-tx-icon-wrap">
+                                <i data-lucide="${icon}"></i>
                             </div>
-                            <div>
-                                <div style="font-weight: 500; font-size: 0.85rem; color: var(--text-primary);">${label}</div>
-                                <div style="font-size: 0.72rem; color: var(--text-muted);">${metaLine}</div>
+                            <div class="focus-tx-details">
+                                <div class="focus-tx-label" title="${label}">${label}</div>
+                                <div class="focus-tx-meta" title="${metaLine}">${metaLine}</div>
                             </div>
                         </div>
-                        <div class="financial-amount privacy-blur" style="font-family: var(--font-numeric); font-weight: 600; font-size: 0.95rem; color: ${colorCls === 'text-emerald' ? 'var(--emerald)' : colorCls === 'text-rose' ? 'var(--rose)' : 'var(--text-secondary)'};">
+                        <div class="financial-amount privacy-blur focus-tx-amount ${colorCls === 'text-emerald' ? 'text-emerald' : colorCls === 'text-rose' ? 'text-rose' : 'text-secondary'}">
                             ${this.formatMoney(tx.amount || tx.sourceAmount, w.currency, { prefix: sign })}
                         </div>
                     </div>

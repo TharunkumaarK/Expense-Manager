@@ -1,4 +1,4 @@
-const CACHE_NAME = 'em-v103';
+const CACHE_NAME = 'em-v112';
 const ASSETS = [
     './',
     './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
     './js/charts.js',
     './js/app.js',
     './icons/icon.svg',
+    './images/auth-bg.png',
     './manifest.json',
     './fonts/SF-Pro-Text-Regular.otf',
     './fonts/SF-Pro-Text-Medium.otf',

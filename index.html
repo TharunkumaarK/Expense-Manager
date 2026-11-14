@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0a0a0f">
     <title>TK Expense Manager</title>
 
@@ -24,29 +25,25 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Styles -->
-    <link rel="stylesheet" href="css/style.css?v=20261113_05">
+    <link rel="stylesheet" href="css/style.css?v=20261114_07">
 </head>
 
 <body>
 
     <!-- Auth Screen -->
     <div id="auth-screen" class="auth-viewport">
-        <!-- Ambient Background Mesh Glow (Restrained & Neutral) -->
+        <!-- Ambient Background Overlay -->
         <div class="auth-ambient-glow" aria-hidden="true"></div>
 
         <div class="auth-container">
             <!-- Left Pane: Brand & Multi-Currency Treasury Canvas -->
             <div class="auth-brand-pane">
                 <div class="auth-brand-header">
-                    <div class="auth-brand-logo">
-                        <span class="auth-brand-name">Expense Manager</span>
-                    </div>
-                    <span class="auth-brand-pill">Personal Treasury</span>
+                    <h1 class="auth-brand-title">Expense Manager</h1>
                 </div>
 
                 <div class="auth-brand-content">
-                    <h1 class="auth-headline">Cross-border finances,<br>unified in one ledger.</h1>
-                    <p class="auth-subhead">Real-time balances across Japan (JPY) and India (INR) accounts with multi-currency rollover budgets.</p>
+                    <p class="auth-headline">Cross-border finances,<br>unified in one ledger.</p>
 
                     <!-- Dual-Currency Wallet Showcase (Code-Rendered) -->
                     <div class="auth-wallet-showcase" aria-hidden="true">
@@ -58,7 +55,8 @@
                                     <div class="chip-line"></div>
                                 </div>
                                 <div class="auth-card-badge">
-                                    <svg class="auth-flag-svg" width="16" height="16" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <svg class="auth-flag-svg" width="18" height="18" viewBox="0 0 36 36"
+                                        xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                         <circle fill="#EEEEEE" cx="18" cy="18" r="18" />
                                         <circle fill="#D80027" cx="18" cy="18" r="7" />
                                     </svg>
@@ -83,7 +81,8 @@
                                     <div class="chip-line"></div>
                                 </div>
                                 <div class="auth-card-badge">
-                                    <svg class="auth-flag-svg" width="16" height="16" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <svg class="auth-flag-svg" width="18" height="18" viewBox="0 0 36 36"
+                                        xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                         <clipPath id="circleFlagINCard">
                                             <circle cx="18" cy="18" r="18" />
                                         </clipPath>
@@ -91,7 +90,8 @@
                                             <rect x="0" y="0" width="36" height="12" fill="#FF9933" />
                                             <rect x="0" y="12" width="36" height="12" fill="#FFFFFF" />
                                             <rect x="0" y="24" width="36" height="12" fill="#138808" />
-                                            <circle cx="18" cy="18" r="3.5" fill="none" stroke="#000080" stroke-width="1.5" />
+                                            <circle cx="18" cy="18" r="3.5" fill="none" stroke="#000080"
+                                                stroke-width="1.5" />
                                             <circle cx="18" cy="18" r="0.8" fill="#000080" />
                                         </g>
                                     </svg>
@@ -108,15 +108,15 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="auth-brand-footer">
-                    <div class="auth-status-item">
-                        <span class="auth-status-dot"></span>
-                        <span>End-to-end encrypted cloud sync</span>
-                    </div>
+                    <!-- Supporting Description Beneath Cards -->
+                    <p class="auth-subhead">Real-time balances across Japan (JPY) and India (INR) accounts with
+                        multi-currency rollover budgets.</p>
                 </div>
             </div>
+
+            <!-- Centre Vertical Divider -->
+            <div class="auth-divider" aria-hidden="true"></div>
 
             <!-- Right Pane: Authentication Workspace -->
             <div class="auth-form-pane">
@@ -127,13 +127,15 @@
                             <span class="auth-brand-name">Expense Manager</span>
                         </div>
                         <div class="auth-mobile-badge">
-                            <svg class="auth-flag-svg" width="14" height="14" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <svg class="auth-flag-svg" width="14" height="14" viewBox="0 0 36 36"
+                                xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                 <circle fill="#EEEEEE" cx="18" cy="18" r="18" />
                                 <circle fill="#D80027" cx="18" cy="18" r="7" />
                             </svg>
                             <span>JPY</span>
                             <span class="auth-badge-dot">•</span>
-                            <svg class="auth-flag-svg" width="14" height="14" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <svg class="auth-flag-svg" width="14" height="14" viewBox="0 0 36 36"
+                                xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                                 <clipPath id="circleFlagINMob">
                                     <circle cx="18" cy="18" r="18" />
                                 </clipPath>
@@ -150,41 +152,47 @@
                     </div>
 
                     <div class="auth-form-intro">
-                        <h2 class="auth-title">Welcome back</h2>
-                        <p class="auth-desc">Enter your credentials to access your treasury.</p>
+                        <h2 class="auth-title">Welcome!</h2>
+                        <p class="auth-desc">Sign in to access your ledger</p>
                     </div>
 
                     <!-- Dynamic Error / Notice Banner -->
                     <div id="auth-error" class="auth-alert-banner" role="alert" style="display: none;"></div>
 
                     <!-- Sign-in Form -->
-                    <form id="auth-form" class="auth-form" onsubmit="event.preventDefault(); supabaseClient.handleLogin();">
+                    <form id="auth-form" class="auth-form"
+                        onsubmit="event.preventDefault(); supabaseClient.handleLogin();">
                         <div class="auth-field-group">
-                            <label class="auth-label" for="auth-email">Email address</label>
+                            <label class="auth-label" for="auth-email">Email</label>
                             <div class="auth-input-wrapper">
                                 <span class="auth-input-icon">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <rect width="20" height="16" x="2" y="4" rx="2"></rect>
                                         <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
                                     </svg>
                                 </span>
-                                <input type="email" id="auth-email" class="auth-input" required autocomplete="email" placeholder="name@example.com">
+                                <input type="email" id="auth-email" class="auth-input" required autocomplete="email"
+                                    placeholder="name@example.com">
                             </div>
                         </div>
 
                         <div class="auth-field-group">
                             <div class="auth-label-row">
                                 <label class="auth-label" for="auth-password">Password</label>
-                                <button type="button" class="auth-forgot-link" onclick="supabaseClient.handleForgotPassword()">Forgot password?</button>
+                                <button type="button" class="auth-forgot-link"
+                                    onclick="supabaseClient.handleForgotPassword()">Forgot password?</button>
                             </div>
                             <div class="auth-input-wrapper">
                                 <span class="auth-input-icon">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
                                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                     </svg>
                                 </span>
-                                <input type="password" id="auth-password" class="auth-input" required autocomplete="current-password" placeholder="••••••••">
+                                <input type="password" id="auth-password" class="auth-input" required
+                                    autocomplete="current-password" placeholder="••••••••">
                                 <button type="button" class="password-toggle-btn auth-pwd-toggle"
                                     onclick="supabaseClient.togglePasswordVisibility('auth-password', this)"
                                     aria-label="Toggle password visibility">
@@ -202,14 +210,6 @@
                             <span>Sign In</span>
                         </button>
                     </form>
-
-                    <div class="auth-form-footnote">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="auth-lock-icon">
-                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                        </svg>
-                        <span>Seamless access — new accounts are created automatically</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -232,17 +232,20 @@
                 <div id="reset-success-msg" class="reset-success-msg"></div>
                 <div id="reset-error-msg" class="reset-error-msg"></div>
 
-                <form id="reset-password-form" class="auth-form" onsubmit="event.preventDefault(); supabaseClient.handleResetPassword();">
+                <form id="reset-password-form" class="auth-form"
+                    onsubmit="event.preventDefault(); supabaseClient.handleResetPassword();">
                     <div class="auth-field-group">
                         <label class="auth-label" for="reset-new-password">New password</label>
                         <div class="auth-input-wrapper">
                             <span class="auth-input-icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                     <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
                             </span>
-                            <input type="password" id="reset-new-password" class="auth-input" required autocomplete="new-password" placeholder="••••••••">
+                            <input type="password" id="reset-new-password" class="auth-input" required
+                                autocomplete="new-password" placeholder="••••••••">
                             <button type="button" class="password-toggle-btn auth-pwd-toggle"
                                 onclick="supabaseClient.togglePasswordVisibility('reset-new-password', this)"
                                 aria-label="Toggle new password visibility">
@@ -261,12 +264,14 @@
                         <label class="auth-label" for="reset-confirm-password">Confirm new password</label>
                         <div class="auth-input-wrapper">
                             <span class="auth-input-icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                     <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
                             </span>
-                            <input type="password" id="reset-confirm-password" class="auth-input" required autocomplete="new-password" placeholder="••••••••">
+                            <input type="password" id="reset-confirm-password" class="auth-input" required
+                                autocomplete="new-password" placeholder="••••••••">
                             <button type="button" class="password-toggle-btn auth-pwd-toggle"
                                 onclick="supabaseClient.togglePasswordVisibility('reset-confirm-password', this)"
                                 aria-label="Toggle confirm password visibility">
@@ -286,7 +291,8 @@
                 </form>
 
                 <div class="text-center mt-3">
-                    <span class="resend-link" onclick="supabaseClient.handleRequestNewLink()">Request a new recovery link</span>
+                    <span class="resend-link" onclick="supabaseClient.handleRequestNewLink()">Request a new recovery
+                        link</span>
                 </div>
             </div>
         </div>
@@ -295,8 +301,11 @@
     <!-- Main Content Area -->
     <main id="app-content" style="display: none;">
         <div class="app-layout">
-            <!-- Persistent Left Desktop Sidebar -->
-            <aside id="desktop-sidebar" class="desktop-sidebar" aria-label="Desktop Navigation">
+            <!-- Mobile Sidebar Backdrop -->
+            <div id="mobile-sidebar-backdrop" class="mobile-sidebar-backdrop" onclick="app.closeMobileSidebar()"></div>
+
+            <!-- Persistent Left Desktop / Mobile Sidebar Drawer -->
+            <aside id="desktop-sidebar" class="desktop-sidebar" aria-label="Application Navigation">
                 <!-- Sidebar Brand Header -->
                 <div class="sidebar-header">
                     <div class="brand-logo">
@@ -310,16 +319,7 @@
                     </button>
                 </div>
 
-                <!-- Global Action: Add Transaction -->
-                <div class="sidebar-action-wrap">
-                    <button class="btn-add-tx" onclick="app.openUnifiedTransactionSelector()"
-                        id="desktop-sidebar-add-btn">
-                        <i data-lucide="plus"></i>
-                        <span class="sidebar-text">Add Transaction</span>
-                    </button>
-                </div>
-
-                <!-- 7 Desktop Destinations -->
+                <!-- 7 Primary Destinations -->
                 <nav class="sidebar-nav">
                     <div class="nav-group-label sidebar-text">MAIN MENU</div>
                     <ul class="nav-list">
@@ -794,6 +794,13 @@
                                             <span>Filters</span>
                                             <span class="filter-count-badge" id="ledger-active-filter-badge"
                                                 style="display: none;">0</span>
+                                        </button>
+
+                                        <!-- Export Ledger CSV -->
+                                        <button class="btn btn-secondary btn-sm" id="ledger-export-btn"
+                                            onclick="app.exportTransactionsCsv()" title="Export filtered ledger as CSV">
+                                            <i data-lucide="download"></i>
+                                            <span class="btn-text">Export</span>
                                         </button>
 
                                         <!-- New Transaction Quick Trigger -->
@@ -2068,7 +2075,8 @@
                                                                 #181818<br><span
                                                                     style="font-size:0.6rem;color:#888;">Elevated</span>
                                                             </div>
-                                                            <div class="theme-swatch" style="background:#f5f5f7; color:#121212;">
+                                                            <div class="theme-swatch"
+                                                                style="background:#f5f5f7; color:#121212;">
                                                                 #f5f5f7<br><span
                                                                     style="font-size:0.6rem;color:#555;">Accent</span>
                                                             </div>
@@ -2364,29 +2372,8 @@
         </div> <!-- /.app-layout -->
     </main>
 
-    <!-- Bottom Navigation -->
-    <nav id="bottom-nav" class="bottom-nav">
-        <a href="#" class="nav-item active" data-target="home-view">
-            <i data-lucide="home"></i>
-            <span>Home</span>
-        </a>
-        <a href="#" class="nav-item" data-target="analytics-view">
-            <i data-lucide="pie-chart"></i>
-            <span>Analytics</span>
-        </a>
-        <div class="nav-fab-placeholder"></div>
-        <a href="#" class="nav-item" data-target="history-view">
-            <i data-lucide="calendar"></i>
-            <span>History</span>
-        </a>
-        <a href="#" class="nav-item" data-target="settings-view">
-            <i data-lucide="settings"></i>
-            <span>Settings</span>
-        </a>
-    </nav>
-
-    <!-- Floating Action Button -->
-    <button class="fab" id="main-fab" onclick="app.toggleFabMenu()">
+    <!-- Floating Action Button (Mobile Add Transaction) -->
+    <button class="fab" id="main-fab" onclick="app.toggleFabMenu()" aria-label="Add Transaction">
         <i data-lucide="plus"></i>
     </button>
 
@@ -2577,14 +2564,12 @@
                     </button>
                     <div class="wallet-action-buttons-group">
                         <button class="btn btn-secondary" onclick="app.closeModal('edit-wallet-modal')">Cancel</button>
-                        <button class="btn btn-primary" onclick="app.saveEditWallet()"><span>Save Changes</span></button>
+                        <button class="btn btn-primary" onclick="app.saveEditWallet()"><span>Save
+                                Changes</span></button>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-    </div>
-    </div>
     </div>
 
     <!-- Transaction Detail Inspection Modal (Phase 3) -->
@@ -2771,7 +2756,8 @@
             <div style="padding:0 16px 20px;display:flex;gap:8px;">
                 <button class="btn btn-secondary" onclick="app.closeModal('color-picker-modal')"
                     style="flex:1;">Cancel</button>
-                <button class="btn btn-primary" onclick="app.applyWalletColor()" style="flex:1;"><span>Apply</span></button>
+                <button class="btn btn-primary" onclick="app.applyWalletColor()"
+                    style="flex:1;"><span>Apply</span></button>
             </div>
         </div>
     </div>
@@ -3087,10 +3073,10 @@
     <!-- Scripts -->
     <script src="js/supabase-config.js"></script>
     <script src="js/supabaseClient.js"></script>
-    <script src="js/storage.js?v=20261113_01"></script>
-    <script src="js/charts.js?v=20261113_01"></script>
-    <script src="js/wallet.js?v=20261113_01"></script>
-    <script src="js/app.js?v=20261113_01"></script>
+    <script src="js/storage.js?v=20261114_07"></script>
+    <script src="js/charts.js?v=20261114_07"></script>
+    <script src="js/wallet.js?v=20261114_07"></script>
+    <script src="js/app.js?v=20261114_07"></script>
     <script>
         lucide.createIcons();
         if ('serviceWorker' in navigator) {
