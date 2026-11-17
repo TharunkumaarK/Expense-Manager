@@ -691,10 +691,10 @@
                                 <span class="onboarding-summary-label">Active Budgets</span>
                                 <span class="onboarding-summary-val">
                                     ${this.draft.activeCountries.map(c => {
-                const b = this.draft.budgets[c];
-                const sym = currencySymbols[c] || '';
-                return b && b.enabled ? `${c}: ${sym}${Number(b.monthlyTotal).toLocaleString()}` : `${c}: None`;
-            }).join(' • ')}
+                                        const b = this.draft.budgets[c];
+                                        const sym = currencySymbols[c] || '';
+                                        return b && b.enabled ? `${c}: ${sym}${Number(b.monthlyTotal).toLocaleString()}` : `${c}: None`;
+                                    }).join(' • ')}
                                 </span>
                             </div>
 
@@ -702,12 +702,12 @@
                                 <span class="onboarding-summary-label">Opening Balances</span>
                                 <span class="onboarding-summary-val">
                                     ${this.draft.activeCountries.map(c => {
-                const total = Object.values(this.draft.wallets)
-                    .filter(w => w.region === c)
-                    .reduce((sum, w) => sum + (Number(w.balance) || 0), 0);
-                const sym = currencySymbols[c] || '';
-                return `${c}: ${sym}${total.toLocaleString()}`;
-            }).join(' • ')}
+                                        const total = Object.values(this.draft.wallets)
+                                            .filter(w => w.region === c)
+                                            .reduce((sum, w) => sum + (Number(w.balance) || 0), 0);
+                                        const sym = currencySymbols[c] || '';
+                                        return `${c}: ${sym}${total.toLocaleString()}`;
+                                    }).join(' • ')}
                                 </span>
                             </div>
                         </div>

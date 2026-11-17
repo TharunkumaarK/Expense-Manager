@@ -314,12 +314,10 @@
                 </div>
 
                 <div class="auth-brand-content">
-                    <p class="auth-headline" id="onboarding-preview-headline">Cross-border finances,<br>unified in one
-                        ledger.</p>
+                    <p class="auth-headline" id="onboarding-preview-headline">Cross-border finances,<br>unified in one ledger.</p>
 
                     <!-- Live Dynamic Multi-Currency Wallet Showcase -->
-                    <div class="auth-wallet-showcase onboarding-wallet-showcase" id="onboarding-live-showcase"
-                        aria-hidden="true">
+                    <div class="auth-wallet-showcase onboarding-wallet-showcase" id="onboarding-live-showcase" aria-hidden="true">
                         <!-- Cards dynamically rendered via JS based on selected countries and balances -->
                     </div>
 
@@ -338,21 +336,18 @@
                     <!-- Step Progress & Title Header -->
                     <div class="onboarding-card-header">
                         <div class="onboarding-progress-track">
-                            <div class="onboarding-progress-bar" id="onboarding-progress-fill" style="width: 25%;">
-                            </div>
+                            <div class="onboarding-progress-bar" id="onboarding-progress-fill" style="width: 25%;"></div>
                         </div>
                         <div class="onboarding-title-row">
                             <div>
                                 <h2 class="auth-title" id="onboarding-step-title">Select Countries</h2>
-                                <p class="auth-desc" id="onboarding-step-desc">Choose the countries you manage finances
-                                    in.</p>
+                                <p class="auth-desc" id="onboarding-step-desc">Choose the countries you manage finances in.</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Dynamic Error / Notice Banner -->
-                    <div id="onboarding-error-banner" class="auth-alert-banner" role="alert" style="display: none;">
-                    </div>
+                    <div id="onboarding-error-banner" class="auth-alert-banner" role="alert" style="display: none;"></div>
 
                     <!-- Step 1: Country Selection -->
                     <div id="onboarding-step-1" class="onboarding-step-view"></div>
@@ -368,8 +363,7 @@
 
                     <!-- Navigation Action Footer -->
                     <div class="onboarding-actions">
-                        <button type="button" id="onboarding-back-btn" class="btn btn-secondary onboarding-btn-back"
-                            style="display: none;">
+                        <button type="button" id="onboarding-back-btn" class="btn btn-secondary onboarding-btn-back" style="display: none;">
                             <i data-lucide="arrow-left"></i>
                             <span>Back</span>
                         </button>
@@ -1505,41 +1499,27 @@
                                 <div class="custom-report-presets-row">
                                     <span class="presets-label text-xs text-muted">Quick Presets:</span>
                                     <div class="custom-report-presets-pills">
-                                        <button type="button" class="preset-pill-btn" data-preset="this-month"
-                                            onclick="app.setCustomReportPreset('this-month')">This Month</button>
-                                        <button type="button" class="preset-pill-btn" data-preset="last-month"
-                                            onclick="app.setCustomReportPreset('last-month')">Last Month</button>
-                                        <button type="button" class="preset-pill-btn" data-preset="last-90-days"
-                                            onclick="app.setCustomReportPreset('last-90-days')">Last 90 Days</button>
-                                        <button type="button" class="preset-pill-btn" data-preset="this-year"
-                                            onclick="app.setCustomReportPreset('this-year')">This Year</button>
+                                        <button type="button" class="preset-pill-btn" data-preset="this-month" onclick="app.setCustomReportPreset('this-month')">This Month</button>
+                                        <button type="button" class="preset-pill-btn" data-preset="last-month" onclick="app.setCustomReportPreset('last-month')">Last Month</button>
+                                        <button type="button" class="preset-pill-btn" data-preset="last-90-days" onclick="app.setCustomReportPreset('last-90-days')">Last 90 Days</button>
+                                        <button type="button" class="preset-pill-btn" data-preset="this-year" onclick="app.setCustomReportPreset('this-year')">This Year</button>
                                     </div>
                                 </div>
                                 <div class="custom-range-controls-grid">
                                     <div class="custom-field-group">
                                         <label class="filter-label" for="report-custom-start">From Date:</label>
-                                        <div class="date-picker-input-wrap"
-                                            onclick="app.openDatePicker('report-custom-start')">
-                                            <input type="date" id="report-custom-start" class="filter-date-input"
-                                                onclick="this.showPicker && this.showPicker()"
-                                                onchange="app.onCustomDateManualChange()" />
-                                            <button type="button" class="date-picker-icon-btn"
-                                                onclick="event.stopPropagation(); app.openDatePicker('report-custom-start')"
-                                                title="Select start date">
+                                        <div class="date-picker-input-wrap" onclick="app.openDatePicker('report-custom-start')">
+                                            <input type="date" id="report-custom-start" class="filter-date-input" onclick="this.showPicker && this.showPicker()" onchange="app.onCustomDateManualChange()" />
+                                            <button type="button" class="date-picker-icon-btn" onclick="event.stopPropagation(); app.openDatePicker('report-custom-start')" title="Select start date">
                                                 <i data-lucide="calendar"></i>
                                             </button>
                                         </div>
                                     </div>
                                     <div class="custom-field-group">
                                         <label class="filter-label" for="report-custom-end">To Date:</label>
-                                        <div class="date-picker-input-wrap"
-                                            onclick="app.openDatePicker('report-custom-end')">
-                                            <input type="date" id="report-custom-end" class="filter-date-input"
-                                                onclick="this.showPicker && this.showPicker()"
-                                                onchange="app.onCustomDateManualChange()" />
-                                            <button type="button" class="date-picker-icon-btn"
-                                                onclick="event.stopPropagation(); app.openDatePicker('report-custom-end')"
-                                                title="Select end date">
+                                        <div class="date-picker-input-wrap" onclick="app.openDatePicker('report-custom-end')">
+                                            <input type="date" id="report-custom-end" class="filter-date-input" onclick="this.showPicker && this.showPicker()" onchange="app.onCustomDateManualChange()" />
+                                            <button type="button" class="date-picker-icon-btn" onclick="event.stopPropagation(); app.openDatePicker('report-custom-end')" title="Select end date">
                                                 <i data-lucide="calendar"></i>
                                             </button>
                                         </div>
@@ -2511,12 +2491,8 @@
         <div class="focus-modal-card" onclick="event.stopPropagation()">
             <div class="focus-header">
                 <div class="focus-header-left">
-                    <button class="focus-back-btn" id="focus-back-btn" onclick="app.navigateFocusBack()"
-                        aria-label="Back" style="display: none;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="m15 18-6-6 6-6" />
-                        </svg>
+                    <button class="focus-back-btn" id="focus-back-btn" onclick="app.navigateFocusBack()" aria-label="Back" style="display: none;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
                         <span id="focus-back-label">Japan Overview</span>
                     </button>
                     <span class="focus-header-divider" id="focus-header-divider" style="display: none;">/</span>
@@ -2527,11 +2503,7 @@
                 </div>
                 <button class="focus-close-btn" onclick="app.closeFocusOverlay()" aria-label="Close focus view"
                     title="Close (Esc)">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M18 6 6 18" />
-                        <path d="m6 6 12 12" />
-                    </svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                 </button>
             </div>
             <div class="focus-body-grid">
@@ -2826,14 +2798,12 @@
         <div class="bottom-sheet">
             <div class="sheet-header">
                 <div class="sheet-header-left">
-                    <button class="icon-btn" id="tx-modal-back-btn" onclick="app.handleTransactionModalBack()"
-                        title="Back" aria-label="Back">
+                    <button class="icon-btn" id="tx-modal-back-btn" onclick="app.handleTransactionModalBack()" title="Back" aria-label="Back">
                         <i data-lucide="arrow-left"></i>
                     </button>
                     <h3 id="modal-title">New Transaction</h3>
                 </div>
-                <button class="icon-btn" onclick="app.closeModal('transaction-modal')" title="Close"
-                    aria-label="Close"><i data-lucide="x"></i></button>
+                <button class="icon-btn" onclick="app.closeModal('transaction-modal')" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
             </div>
             <div class="sheet-content" id="modal-content">
                 <!-- Dynamically populated by JS based on type -->
@@ -2971,7 +2941,8 @@
                         <span>Continue</span>
                         <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i>
                     </button>
-                    <button class="btn btn-primary" id="closing-btn-confirm" style="display:none;"
+                    <button class="btn btn-primary" id="closing-btn-confirm"
+                        style="display:none;"
                         onclick="app.executeMonthlyClosing()">
                         <i data-lucide="lock" style="width: 14px; height: 14px;"></i>
                         <span>Confirm & Close Month</span>
@@ -3209,7 +3180,8 @@
         lucide.createIcons();
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function (registrations) {
-                for (let registration of registrations)            registration.unregister();
+                for (let registration of registrations) {
+                    registration.unregister();
                 }
             });
         }
