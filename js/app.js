@@ -725,12 +725,32 @@ class App {
 
     selectTransactionType(type) {
         const ctx = this.currentTxContext;
+        this._txModalSource = 'selector';
         this.closeUnifiedTransactionSelector();
         this.closeFocusOverlay();
         this.openTransactionModal(type, ctx);
     }
 
+    handleTransactionModalBack() {
+        const source = this._txModalSource;
+        const ctx = this.currentTxContext;
+        const detailId = this._lastDetailTxId;
+        this._txModalSource = null;
+        this.closeModal('transaction-modal');
+        if (source === 'detail' && detailId) {
+            this.openTransactionDetail(detailId);
+        } else if (source === 'selector') {
+            this.openUnifiedTransactionSelector(ctx);
+        }
+    }
+
     openTransactionModal(type, context = null) {
+        if (!this._txModalSource) {
+            this._txModalSource = 'selector';
+        }
+        if (context) {
+            this.currentTxContext = context;
+        }
         document.getElementById('main-fab').classList.remove('open');
         document.getElementById('fab-menu').classList.remove('active');
 
@@ -774,7 +794,10 @@ class App {
                     <label>Note (Optional)</label>
                     <input type="text" id="tx-note" placeholder="What was this for?">
                 </div>
-                <button type="submit" class="btn btn-primary"><span>Save Expense</span></button>
+                <button type="submit" class="btn btn-tx-submit btn-tx-expense" id="tx-submit-btn">
+                    <i data-lucide="arrow-up-right"></i>
+                    <span>Save Expense</span>
+                </button>
             `;
         } else if (type === 'transfer') {
             title.innerText = 'Transfer Between Wallets';
@@ -803,7 +826,10 @@ class App {
                     <label>Note (Optional)</label>
                     <input type="text" id="tx-note" placeholder="ATM withdraw, topup, etc.">
                 </div>
-                <button type="submit" class="btn btn-blue">Complete Transfer</button>
+                <button type="submit" class="btn btn-tx-submit btn-tx-transfer" id="tx-submit-btn">
+                    <i data-lucide="arrow-left-right"></i>
+                    <span>Complete Transfer</span>
+                </button>
             `;
         } else if (type === 'remittance') {
             title.innerText = 'Remittance (Send to India)';
@@ -836,7 +862,10 @@ class App {
                     <label>Note</label>
                     <input type="text" id="tx-note" value="Monthly Remittance">
                 </div>
-                <button type="submit" class="btn btn-purple">Log Remittance</button>
+                <button type="submit" class="btn btn-tx-submit btn-tx-remittance" id="tx-submit-btn">
+                    <i data-lucide="send"></i>
+                    <span>Log Remittance</span>
+                </button>
             `;
         } else if (type === 'income') {
             title.innerText = 'Add Income / Credit';
@@ -859,7 +888,10 @@ class App {
                     <label>Note / Source</label>
                     <input type="text" id="tx-note" placeholder="Salary, refund, etc.">
                 </div>
-                <button type="submit" class="btn btn-green">Add Income</button>
+                <button type="submit" class="btn btn-tx-submit btn-tx-income" id="tx-submit-btn">
+                    <i data-lucide="arrow-down-left"></i>
+                    <span>Record Income</span>
+                </button>
             `;
         }
 
@@ -868,6 +900,9 @@ class App {
                 ${formInnerHtml}
             </form>
         `;
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            lucide.createIcons();
+        }
         modal.classList.add('active');
 
         this.setupDatePickerHelper();
@@ -948,8 +983,15 @@ class App {
             return;
         }
 
+        if (!this._txModalSource) {
+            this._txModalSource = 'ledger';
+        }
+
         this.openTransactionModal(tx.type);
         document.getElementById('modal-title').innerText = 'Edit Transaction';
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
 
         const form = document.getElementById('tx-form');
         if (form) {
@@ -962,12 +1004,13 @@ class App {
             delBtn = document.createElement('button');
             delBtn.id = 'tx-delete-btn';
             delBtn.type = 'button';
-            delBtn.className = 'btn btn-danger mt-2';
+            delBtn.className = 'btn btn-danger-ghost mt-2';
             delBtn.innerText = 'Delete Transaction';
             delBtn.onclick = () => this.deleteTx(id);
             if (form) form.appendChild(delBtn);
             else content.appendChild(delBtn);
         } else {
+            delBtn.className = 'btn btn-danger-ghost mt-2';
             delBtn.onclick = () => this.deleteTx(id);
         }
 
@@ -996,9 +1039,6 @@ class App {
             if (amtInput) amtInput.value = tx.amount;
             const noteInput = document.getElementById('tx-note');
             if (noteInput) noteInput.value = tx.note || '';
-
-            const btn = content.querySelector('.btn-primary');
-            if (btn) btn.innerText = 'Save Changes';
         } else if (tx.type === 'income') {
             const walletSelect = document.getElementById('tx-wallet');
             if (walletSelect) walletSelect.value = tx.walletId;
@@ -1006,9 +1046,6 @@ class App {
             if (amtInput) amtInput.value = tx.amount;
             const noteInput = document.getElementById('tx-note');
             if (noteInput) noteInput.value = tx.note || '';
-
-            const btn = content.querySelector('.btn-green');
-            if (btn) btn.innerText = 'Save Changes';
         } else if (tx.type === 'transfer') {
             const srcSelect = document.getElementById('tx-source');
             if (srcSelect) srcSelect.value = tx.sourceId;
@@ -1018,9 +1055,6 @@ class App {
             if (amtInput) amtInput.value = tx.amount;
             const noteInput = document.getElementById('tx-note');
             if (noteInput) noteInput.value = tx.note || '';
-
-            const btn = content.querySelector('.btn-blue');
-            if (btn) btn.innerText = 'Save Changes';
         } else if (tx.type === 'remittance') {
             const srcSelect = document.getElementById('tx-source');
             if (srcSelect) srcSelect.value = tx.sourceId;
@@ -1032,9 +1066,15 @@ class App {
             if (inrInput) inrInput.value = tx.destAmount;
             const noteInput = document.getElementById('tx-note');
             if (noteInput) noteInput.value = tx.note || '';
+        }
 
-            const btn = content.querySelector('.btn-purple');
-            if (btn) btn.innerText = 'Save Changes';
+        // Unify submit button label update for editing
+        const submitSpan = content.querySelector('#tx-submit-btn span') || content.querySelector('.btn-primary span');
+        if (submitSpan) {
+            submitSpan.innerText = 'Save Changes';
+        } else {
+            const submitBtn = document.getElementById('tx-submit-btn') || content.querySelector('.btn-primary');
+            if (submitBtn) submitBtn.innerText = 'Save Changes';
         }
     }
 
@@ -1243,7 +1283,11 @@ class App {
     }
 
     closeModal(id) {
-        document.getElementById(id).classList.remove('active');
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+        if (id === 'transaction-modal') {
+            this._txModalSource = null;
+        }
     }
 
     openQuickEditModal(type, id, region = null) {
@@ -4874,6 +4918,8 @@ class App {
 
     editCurrentDetailTransaction() {
         const id = this.currentDetailTxId;
+        this._lastDetailTxId = id;
+        this._txModalSource = 'detail';
         this.closeTransactionDetail();
         if (id) {
             this.editTransaction(id);

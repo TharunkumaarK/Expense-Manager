@@ -2389,19 +2389,19 @@
         <div class="fab-actions">
             <button class="fab-action" onclick="app.openTransactionModal('expense')">
                 <span class="fab-label">Expense</span>
-                <div class="fab-icon bg-red"><i data-lucide="arrow-up-circle"></i></div>
+                <div class="fab-icon fab-icon-expense"><i data-lucide="arrow-up-right"></i></div>
             </button>
             <button class="fab-action" onclick="app.openTransactionModal('transfer')">
                 <span class="fab-label">Transfer</span>
-                <div class="fab-icon bg-blue"><i data-lucide="repeat"></i></div>
+                <div class="fab-icon fab-icon-transfer"><i data-lucide="arrow-left-right"></i></div>
             </button>
             <button class="fab-action" onclick="app.openTransactionModal('remittance')">
                 <span class="fab-label">Remittance</span>
-                <div class="fab-icon bg-purple"><i data-lucide="globe"></i></div>
+                <div class="fab-icon fab-icon-remittance"><i data-lucide="send"></i></div>
             </button>
             <button class="fab-action" onclick="app.openTransactionModal('income')">
                 <span class="fab-label">Income</span>
-                <div class="fab-icon bg-green"><i data-lucide="arrow-down-circle"></i></div>
+                <div class="fab-icon fab-icon-income"><i data-lucide="arrow-down-left"></i></div>
             </button>
         </div>
     </div>
@@ -2633,7 +2633,7 @@
                 </div>
 
                 <div class="tx-detail-actions">
-                    <button class="btn btn-danger btn-sm" id="tx-detail-delete-btn"
+                    <button class="btn btn-danger-ghost btn-sm" id="tx-detail-delete-btn"
                         onclick="app.deleteCurrentDetailTransaction()">
                         <i data-lucide="trash-2"></i>
                         <span>Delete</span>
@@ -2718,8 +2718,13 @@
         onclick="if(event.target === this) app.closeModal('transaction-modal')">
         <div class="bottom-sheet">
             <div class="sheet-header">
-                <h3 id="modal-title">New Transaction</h3>
-                <button class="icon-btn" onclick="app.closeModal('transaction-modal')"><i data-lucide="x"></i></button>
+                <div class="sheet-header-left">
+                    <button class="icon-btn" id="tx-modal-back-btn" onclick="app.handleTransactionModalBack()" title="Back" aria-label="Back">
+                        <i data-lucide="arrow-left"></i>
+                    </button>
+                    <h3 id="modal-title">New Transaction</h3>
+                </div>
+                <button class="icon-btn" onclick="app.closeModal('transaction-modal')" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
             </div>
             <div class="sheet-content" id="modal-content">
                 <!-- Dynamically populated by JS based on type -->
@@ -2858,7 +2863,7 @@
                         <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i>
                     </button>
                     <button class="btn btn-primary" id="closing-btn-confirm"
-                        style="display:none; background: #10b981; border-color: #059669;"
+                        style="display:none;"
                         onclick="app.executeMonthlyClosing()">
                         <i data-lucide="lock" style="width: 14px; height: 14px;"></i>
                         <span>Confirm & Close Month</span>
@@ -2973,8 +2978,7 @@
 
             <div
                 style="padding: 16px 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.15);">
-                <button class="btn btn-secondary" id="cat-btn-archive"
-                    style="color: #ef4444; border-color: rgba(239, 68, 68, 0.2);" onclick="app.toggleCategoryArchive()">
+                <button class="btn btn-danger-ghost" id="cat-btn-archive" onclick="app.toggleCategoryArchive()">
                     <i data-lucide="archive" style="width: 14px; height: 14px;"></i>
                     <span id="cat-btn-archive-text">Archive Category</span>
                 </button>
