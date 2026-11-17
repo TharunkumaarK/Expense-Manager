@@ -1506,8 +1506,8 @@ class StorageManager {
         if (!countryOrKey) return;
         const key = String(countryOrKey).trim();
         const code = (key === 'jpTotalBudget' || key === 'JP' || key === 'JPY') ? 'JP' :
-            (key === 'inTotalBudget' || key === 'IN' || key === 'INR') ? 'IN' :
-                (key === 'DE' || key === 'EUR') ? 'DE' : key.toUpperCase();
+                     (key === 'inTotalBudget' || key === 'IN' || key === 'INR') ? 'IN' :
+                     (key === 'DE' || key === 'EUR') ? 'DE' : key.toUpperCase();
         const num = Number(amount) || 0;
 
         if (!this.state.budgets) {
