@@ -1,14 +1,56 @@
 const SUPABASE_CONFIG = window.SUPABASE_CONFIG;
-const DEV_PROJECT_REF = 'nyetklojxqnawdtrrhma';
+
+// Whitelist of valid deployment environments and their strict security invariants
+const ALLOWED_ENVIRONMENTS = Object.freeze({
+    development: Object.freeze({
+        projectRef: 'nyetklojxqnawdtrrhma',
+        expectedHostname: 'nyetklojxqnawdtrrhma.supabase.co',
+        keyPrefix: 'sb_publishable_',
+        expectedStorageKey: 'em_connected_v2_dev'
+    }),
+    production: Object.freeze({
+        projectRef: 'xrovzkibilgbpawnunle',
+        expectedHostname: 'xrovzkibilgbpawnunle.supabase.co',
+        keyPrefix: 'sb_publishable_',
+        expectedStorageKey: 'em_connected_v2'
+    })
+});
+
+// Fail-closed environment validation
+if (!SUPABASE_CONFIG || typeof SUPABASE_CONFIG !== 'object') {
+    throw new Error('[Supabase Security] SUPABASE_CONFIG is missing or invalid. Execution halted.');
+}
+
+const envDef = ALLOWED_ENVIRONMENTS[SUPABASE_CONFIG.environment];
+if (!envDef) {
+    throw new Error(`[Supabase Security] Unauthorized or unknown environment "${SUPABASE_CONFIG.environment}". Must be "development" or "production". Execution halted.`);
+}
+
+let parsedUrl;
+try {
+    parsedUrl = new URL(SUPABASE_CONFIG.url);
+} catch {
+    throw new Error(`[Supabase Security] Malformed Supabase URL: "${SUPABASE_CONFIG.url}". Execution halted.`);
+}
 
 if (
-    !SUPABASE_CONFIG ||
-    SUPABASE_CONFIG.environment !== 'development' ||
-    SUPABASE_CONFIG.projectRef !== DEV_PROJECT_REF ||
-    new URL(SUPABASE_CONFIG.url).hostname !== `${DEV_PROJECT_REF}.supabase.co` ||
-    !SUPABASE_CONFIG.publishableKey.startsWith('sb_publishable_')
+    SUPABASE_CONFIG.projectRef !== envDef.projectRef ||
+    parsedUrl.hostname !== envDef.expectedHostname ||
+    parsedUrl.protocol !== 'https:' ||
+    typeof SUPABASE_CONFIG.publishableKey !== 'string' ||
+    !SUPABASE_CONFIG.publishableKey.startsWith(envDef.keyPrefix) ||
+    SUPABASE_CONFIG.storageKey !== envDef.expectedStorageKey
 ) {
-    throw new Error('Development Supabase configuration is missing or invalid.');
+    throw new Error(`[Supabase Security] Environment "${SUPABASE_CONFIG.environment}" configuration parameters do not match required security invariants. Execution halted.`);
+}
+
+// Security guard: detect and block any accidental inclusion of privileged service-role credentials
+if (
+    SUPABASE_CONFIG.publishableKey.includes('service_role') ||
+    SUPABASE_CONFIG.secretKey ||
+    SUPABASE_CONFIG.serviceRoleKey
+) {
+    throw new Error('[Supabase Security] Privileged secret or service-role keys detected in client configuration! Execution halted.');
 }
 
 const supabaseClient = {

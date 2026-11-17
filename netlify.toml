@@ -1,0 +1,27 @@
+# Expense Manager — Netlify Automated Environment Configuration
+# Automatically binds production Supabase on 'main' and development Supabase on 'test'/previews
+
+[build]
+  publish = "."
+  command = "bash scripts/build.sh"
+
+[context.production]
+  command = "bash scripts/build.sh"
+
+[context.deploy-preview]
+  command = "bash scripts/build.sh"
+
+[context.branch-deploy]
+  command = "bash scripts/build.sh"
+
+# Ensure runtime configuration and service worker are never cached by Netlify CDN
+[[headers]]
+  for = "/js/supabase-config.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+

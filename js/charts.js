@@ -10,9 +10,11 @@ class ChartManager {
         this.inDonut = null;
         this.utilityLine = null;
 
-        if (typeof Chart !== 'undefined') {
+        if (typeof Chart !== 'undefined' && Chart.defaults) {
             Chart.defaults.color = '#8b8b99';
-            Chart.defaults.font.family = 'Inter, sans-serif';
+            if (Chart.defaults.font) {
+                Chart.defaults.font.family = 'Inter, sans-serif';
+            }
         }
     }
 
@@ -562,7 +564,7 @@ class ChartManager {
      */
     renderReportExpensePie(categories = [], totals = {}, currency = '¥', region = 'JP') {
         const ctx = document.getElementById('report-expense-pie-chart');
-        if (!ctx) return;
+        if (!ctx || typeof Chart === 'undefined') return;
 
         if (this.reportExpensePie) {
             this.reportExpensePie.destroy();

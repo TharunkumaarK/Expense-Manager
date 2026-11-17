@@ -1,5 +1,5 @@
 if (!window.SUPABASE_CONFIG?.storageKey) {
-    throw new Error('Development storage namespace is missing.');
+    throw new Error('Storage namespace is missing from configuration.');
 }
 
 const BASE_STORAGE_KEY = window.SUPABASE_CONFIG.storageKey;
@@ -166,7 +166,17 @@ class StorageManager {
             const data = localStorage.getItem(key);
             if (data) {
                 const parsed = JSON.parse(data);
-                return this.parseAndMergeData(parsed);
+                const preview = this.previewContinuousLedgerMigration(parsed);
+                if (preview.success) {
+                    this._attachHistoryGetters(preview.migratedState);
+                    return preview.migratedState;
+                } else {
+                    console.error('[Storage] Local data migration validation failed. Safe-halting storage load:', preview.error);
+                    this.migrationError = preview.error;
+                    const safeHaltedState = JSON.parse(JSON.stringify(defaultState));
+                    safeHaltedState._haltedMigration = true;
+                    return safeHaltedState;
+                }
             }
         } catch (e) {
             console.error("Failed to load local data", e);
@@ -175,152 +185,13 @@ class StorageManager {
     }
 
     parseAndMergeData(parsed) {
-        try {
-            // Merge top-level fields but always trust saved wallets/categories
-            let mergedState = {
-                ...defaultState,
-                ...parsed,
-                // Wallets: use parsed.wallets if it exists and is populated, else fallback to defaults.
-                // This prevents deleted default wallets from magically reappearing.
-                wallets: parsed.wallets && Object.keys(parsed.wallets).length > 0
-                    ? parsed.wallets
-                    : JSON.parse(JSON.stringify(defaultState.wallets)),
-                // Categories: use saved if valid arrays, else use defaults
-                categories: {
-                    JP: Array.isArray(parsed.categories?.JP) && parsed.categories.JP.length > 0
-                        ? parsed.categories.JP
-                        : JSON.parse(JSON.stringify(defaultState.categories.JP)),
-                    IN: Array.isArray(parsed.categories?.IN) && parsed.categories.IN.length > 0
-                        ? parsed.categories.IN
-                        : JSON.parse(JSON.stringify(defaultState.categories.IN)),
-                }
-            };
-
-            if (mergedState.wallets && mergedState.wallets['Forex Card']) {
-                delete mergedState.wallets['Forex Card'];
-            }
-
-            // MIGRATION: Add color field to wallets that don't have one
-            const legacyColors = {
-                'Salary Account': '#009944', 'PayPay': '#ff0033', 'Cash': '#d4af37',
-                'Axis Bank': '#97144d', 'Bank of Baroda': '#f05a28', 'Credit Card': '#94a3b8'
-            };
-            Object.values(mergedState.wallets).forEach(w => {
-                if (!w.color) w.color = legacyColors[w.id] || '#3351d6';
-            });
-            // Utility Categories Reverse Migration (Undo the previous merge)
-            const hasJpUtilities = mergedState.categories.JP.some(c => c.id === 'jp-utilities');
-            if (hasJpUtilities) {
-                // Remove 'jp-utilities'
-                mergedState.categories.JP = mergedState.categories.JP.filter(c => c.id !== 'jp-utilities');
-                // Add the original 4 utilities back
-                const oldUtils = [
-                    { id: 'jp-utility-electric', name: 'Electricity', icon: 'zap', budget: 0 },
-                    { id: 'jp-utility-gas', name: 'Gas', icon: 'flame', budget: 0 },
-                    { id: 'jp-utility-water', name: 'Water', icon: 'droplet', budget: 0 },
-                    { id: 'jp-utility-internet', name: 'Internet', icon: 'wifi', budget: 0 }
-                ];
-                // Insert at index 4 (after Rent)
-                mergedState.categories.JP.splice(4, 0, ...oldUtils);
-
-                // Recover transactions
-                const revMap = {
-                    'Electricity': 'jp-utility-electric',
-                    'Gas': 'jp-utility-gas',
-                    'Water': 'jp-utility-water',
-                    'Internet': 'jp-utility-internet'
-                };
-
-                if (mergedState.transactions && mergedState.transactions.length > 0) {
-                    mergedState.transactions.forEach(tx => {
-                        if (tx.categoryId === 'jp-utilities' && tx.note) {
-                            for (const [oldName, oldId] of Object.entries(revMap)) {
-                                if (tx.note.includes(oldName)) {
-                                    tx.categoryId = oldId;
-                                    // Clean up the note
-                                    if (tx.note === oldName) {
-                                        tx.note = '';
-                                    } else if (tx.note.startsWith(`${oldName} - `)) {
-                                        tx.note = tx.note.substring(oldName.length + 3);
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-            if (!mergedState.categories.IN.some(c => c.id === 'in-loan')) {
-                mergedState.categories.IN.splice(1, 0, { id: 'in-loan', name: 'Loan EMI', icon: 'landmark' });
-            }
-
-            if (!mergedState.loanConfig || Object.keys(mergedState.loanConfig).length === 0) {
-                mergedState.loanConfig = defaultState.loanConfig;
-            } else if (typeof mergedState.loanConfig.emiDrawDate === 'undefined') {
-                mergedState.loanConfig.emiDrawDate = 7;
-            }
-
-            // MIGRATION: Move Rent from JP to IN
-            const jpRentIndex = mergedState.categories.JP.findIndex(c => c.id === 'jp-rent');
-            if (jpRentIndex !== -1) {
-                const rentCat = mergedState.categories.JP.splice(jpRentIndex, 1)[0];
-                if (!mergedState.categories.IN.some(c => c.id === 'in-rent')) {
-                    mergedState.categories.IN.push({ id: 'in-rent', name: 'Rent', icon: rentCat.icon || 'home' });
-                }
-
-                // Update transactions
-                if (mergedState.transactions) {
-                    mergedState.transactions.forEach(tx => {
-                        if (tx.categoryId === 'jp-rent') {
-                            tx.categoryId = 'in-rent';
-                            tx.region = 'IN';
-                        }
-                    });
-                }
-                if (mergedState.history) {
-                    mergedState.history.forEach(h => {
-                        h.transactions.forEach(tx => {
-                            if (tx.categoryId === 'jp-rent') {
-                                tx.categoryId = 'in-rent';
-                                tx.region = 'IN';
-                            }
-                        });
-                    });
-                }
-            }
-
-            // MIGRATION: Merge duplicate history ledgers with the same monthKey
-            if (mergedState.history && mergedState.history.length > 0) {
-                const uniqueHistory = [];
-                mergedState.history.forEach(snapshot => {
-                    const existing = uniqueHistory.find(h => h.monthKey === snapshot.monthKey);
-                    if (existing) {
-                        // Merge transactions
-                        if (Array.isArray(snapshot.transactions)) {
-                            existing.transactions = (existing.transactions || []).concat(snapshot.transactions);
-                        }
-                    } else {
-                        uniqueHistory.push(snapshot);
-                    }
-                });
-
-                // Sort descending by monthKey
-                uniqueHistory.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-                mergedState.history = uniqueHistory;
-            }
-
-            // MIGRATION: Migrate to Continuous Ledger (v3)
-            mergedState = this.migrateToContinuousLedger(mergedState);
-            if (mergedState.closedMonths) {
-                mergedState.history = Object.values(mergedState.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-            }
-            this._attachHistoryGetters(mergedState);
-
-            return mergedState;
-        } catch (e) {
-            console.error("Failed to parse data", e);
+        const preview = this.previewContinuousLedgerMigration(parsed);
+        if (!preview.success) {
+            console.error('[Storage] parseAndMergeData validation failed:', preview.error);
+            throw new Error(preview.error);
         }
-        return JSON.parse(JSON.stringify(defaultState));
+        this._attachHistoryGetters(preview.migratedState);
+        return preview.migratedState;
     }
 
     /**
@@ -348,38 +219,172 @@ class StorageManager {
     }
 
     /**
-     * Migrate state to Continuous Transaction Ledger (Schema v3).
-     * Idempotent, safe, preserves historical metadata and does not mutate wallet balances.
+     * PHASE 1: PURE PREVIEW & VALIDATION
+     * Performs complete migration and invariant validation on an isolated deep clone of state.
+     * Guaranteed pure: does NOT write to localStorage, does NOT mutate inputState, does NOT call cloud sync.
+     * 
+     * @param {Object} rawInputState
+     * @returns {{ success: boolean, migratedState?: Object, error?: string, conflictDetails?: Object, preview?: Object, alreadyMigrated?: boolean }}
      */
-    migrateToContinuousLedger(state) {
-        if (!state) return state;
+    previewContinuousLedgerMigration(rawInputState) {
+        const normalizedInput = this.normalizeBackupPayload(rawInputState);
+        if (!normalizedInput || typeof normalizedInput !== 'object') {
+            return { success: false, error: 'Input state is not a valid object.' };
+        }
 
+        // Deep clone input to guarantee zero side-effects during validation
+        let state;
+        try {
+            state = JSON.parse(JSON.stringify(normalizedInput));
+        } catch (e) {
+            return { success: false, error: 'Failed to clone state: ' + e.message };
+        }
+
+        // Apply legacy repairs (Schema v1 -> v2) on clone
+        try {
+            // Wallets & Categories defaults fallback
+            if (!state.wallets || typeof state.wallets !== 'object' || Object.keys(state.wallets).length === 0) {
+                state.wallets = JSON.parse(JSON.stringify(defaultState.wallets));
+            }
+            if (!state.categories || typeof state.categories !== 'object') {
+                state.categories = JSON.parse(JSON.stringify(defaultState.categories));
+            } else {
+                if (!Array.isArray(state.categories.JP) || state.categories.JP.length === 0) {
+                    state.categories.JP = JSON.parse(JSON.stringify(defaultState.categories.JP));
+                }
+                if (!Array.isArray(state.categories.IN) || state.categories.IN.length === 0) {
+                    state.categories.IN = JSON.parse(JSON.stringify(defaultState.categories.IN));
+                }
+            }
+
+            // Remove deprecated Forex Card
+            if (state.wallets && state.wallets['Forex Card']) {
+                delete state.wallets['Forex Card'];
+            }
+
+            // Inject wallet colors
+            const legacyColors = {
+                'Salary Account': '#009944', 'PayPay': '#ff0033', 'Cash': '#d4af37',
+                'Axis Bank': '#97144d', 'Bank of Baroda': '#f05a28', 'Credit Card': '#94a3b8'
+            };
+            Object.values(state.wallets).forEach(w => {
+                if (w && !w.color) w.color = legacyColors[w.id] || '#3351d6';
+            });
+
+            // Utilities reverse migration
+            const hasJpUtilities = state.categories.JP.some(c => c.id === 'jp-utilities');
+            if (hasJpUtilities) {
+                state.categories.JP = state.categories.JP.filter(c => c.id !== 'jp-utilities');
+                const oldUtils = [
+                    { id: 'jp-utility-electric', name: 'Electricity', icon: 'zap', budget: 0 },
+                    { id: 'jp-utility-gas', name: 'Gas', icon: 'flame', budget: 0 },
+                    { id: 'jp-utility-water', name: 'Water', icon: 'droplet', budget: 0 },
+                    { id: 'jp-utility-internet', name: 'Internet', icon: 'wifi', budget: 0 }
+                ];
+                state.categories.JP.splice(4, 0, ...oldUtils);
+                const revMap = {
+                    'Electricity': 'jp-utility-electric',
+                    'Gas': 'jp-utility-gas',
+                    'Water': 'jp-utility-water',
+                    'Internet': 'jp-utility-internet'
+                };
+                if (Array.isArray(state.transactions)) {
+                    state.transactions.forEach(tx => {
+                        if (tx.categoryId === 'jp-utilities' && tx.note) {
+                            for (const [oldName, oldId] of Object.entries(revMap)) {
+                                if (tx.note.includes(oldName)) {
+                                    tx.categoryId = oldId;
+                                    if (tx.note === oldName) tx.note = '';
+                                    else if (tx.note.startsWith(`${oldName} - `)) tx.note = tx.note.substring(oldName.length + 3);
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Ensure Loan EMI category
+            if (!state.categories.IN.some(c => c.id === 'in-loan')) {
+                state.categories.IN.splice(1, 0, { id: 'in-loan', name: 'Loan EMI', icon: 'landmark' });
+            }
+
+            // Ensure loanConfig
+            if (!state.loanConfig || Object.keys(state.loanConfig).length === 0) {
+                state.loanConfig = JSON.parse(JSON.stringify(defaultState.loanConfig));
+            } else if (typeof state.loanConfig.emiDrawDate === 'undefined') {
+                state.loanConfig.emiDrawDate = 7;
+            }
+
+            // Remap Rent from JP to IN
+            const jpRentIndex = state.categories.JP.findIndex(c => c.id === 'jp-rent');
+            if (jpRentIndex !== -1) {
+                const rentCat = state.categories.JP.splice(jpRentIndex, 1)[0];
+                if (!state.categories.IN.some(c => c.id === 'in-rent')) {
+                    state.categories.IN.push({ id: 'in-rent', name: 'Rent', icon: rentCat.icon || 'home' });
+                }
+                if (Array.isArray(state.transactions)) {
+                    state.transactions.forEach(tx => {
+                        if (tx.categoryId === 'jp-rent') {
+                            tx.categoryId = 'in-rent';
+                            tx.region = 'IN';
+                        }
+                    });
+                }
+                if (Array.isArray(state.history)) {
+                    state.history.forEach(h => {
+                        if (Array.isArray(h.transactions)) {
+                            h.transactions.forEach(tx => {
+                                if (tx.categoryId === 'jp-rent') {
+                                    tx.categoryId = 'in-rent';
+                                    tx.region = 'IN';
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+
+            // Merge duplicate history ledgers with same monthKey
+            if (Array.isArray(state.history) && state.history.length > 0) {
+                const uniqueHistory = [];
+                state.history.forEach(snapshot => {
+                    const existing = uniqueHistory.find(h => h.monthKey === snapshot.monthKey);
+                    if (existing) {
+                        if (Array.isArray(snapshot.transactions)) {
+                            existing.transactions = (existing.transactions || []).concat(snapshot.transactions);
+                        }
+                    } else {
+                        uniqueHistory.push(snapshot);
+                    }
+                });
+                uniqueHistory.sort((a, b) => (b.monthKey || '').localeCompare(a.monthKey || ''));
+                state.history = uniqueHistory;
+            }
+        } catch (e) {
+            return { success: false, error: 'Legacy schema repair failed: ' + e.message };
+        }
+
+        // Check if already Schema v3 continuous ledger without raw history transactions
         const hasHistoryTransactions = Array.isArray(state.history) &&
             state.history.some(h => {
                 const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
                 return desc && Array.isArray(desc.value) && desc.value.length > 0;
             });
 
-        // If already migrated to v3 and has no raw nested transactions in history, return idempotently
         if (state.schemaVersion >= 3 && !hasHistoryTransactions && state.closedMonths) {
-            this._attachHistoryGetters(state);
-            return state;
+            return {
+                success: true,
+                migratedState: state,
+                alreadyMigrated: true,
+                preview: {
+                    totalTransactions: Array.isArray(state.transactions) ? state.transactions.length : 0,
+                    closedMonthsCount: Object.keys(state.closedMonths).length
+                }
+            };
         }
 
-        console.log('[Migration] Migrating state to Continuous Transaction Ledger (v3)...');
-
-        // 1. Safety Backup: save untouched copy before modifying
-        try {
-            const backupKey = `${this.getActiveStorageKey()}_backup_pre_v3`;
-            if (typeof localStorage !== 'undefined' && !localStorage.getItem(backupKey)) {
-                localStorage.setItem(backupKey, JSON.stringify(state));
-                console.log('[Migration] Safety backup saved to:', backupKey);
-            }
-        } catch (e) {
-            console.warn('[Migration] Could not save safety backup:', e);
-        }
-
-        // 2. Snapshot pre-migration wallet balances for invariant validation
+        // Snapshot pre-migration wallet balances for mathematical invariant check
         const preBalances = {};
         if (state.wallets) {
             Object.keys(state.wallets).forEach(wId => {
@@ -387,14 +392,12 @@ class StorageManager {
             });
         }
 
-        // 3. Collect transactions and detect conflicting duplicate IDs
+        // Continuous ledger collection and semantic conflict detection
         const continuousTransactions = [];
         const seenTxIds = new Map();
         const closedMonths = state.closedMonths ? { ...state.closedMonths } : {};
 
-        // Canonical comparison of all semantically meaningful transaction properties
         function areTransactionsConflicting(tx1, tx2) {
-            // Numerical comparisons
             const numFields = ['amount', 'sourceAmount', 'destAmount'];
             for (const f of numFields) {
                 const v1 = tx1[f];
@@ -405,79 +408,51 @@ class StorageManager {
                     }
                 }
             }
-
-            // Note & description
             const note1 = (tx1.note ?? tx1.description ?? '').toString().trim();
             const note2 = (tx2.note ?? tx2.description ?? '').toString().trim();
-            if (note1 !== note2) {
-                return `Conflicting note/description: "${note1}" !== "${note2}"`;
-            }
+            if (note1 !== note2) return `Conflicting note/description: "${note1}" !== "${note2}"`;
 
-            // Category
             const cat1 = (tx1.categoryId ?? tx1.category ?? '').toString().trim();
             const cat2 = (tx2.categoryId ?? tx2.category ?? '').toString().trim();
-            if (cat1 !== cat2) {
-                return `Conflicting category: "${cat1}" !== "${cat2}"`;
-            }
+            if (cat1 !== cat2) return `Conflicting category: "${cat1}" !== "${cat2}"`;
 
-            // Exchange rate
             if (tx1.exchangeRate !== undefined || tx2.exchangeRate !== undefined) {
                 const r1 = tx1.exchangeRate != null ? Number(tx1.exchangeRate).toFixed(4) : '';
                 const r2 = tx2.exchangeRate != null ? Number(tx2.exchangeRate).toFixed(4) : '';
-                if (r1 !== r2) {
-                    return `Conflicting exchangeRate: "${tx1.exchangeRate}" !== "${tx2.exchangeRate}"`;
-                }
+                if (r1 !== r2) return `Conflicting exchangeRate: "${tx1.exchangeRate}" !== "${tx2.exchangeRate}"`;
             }
 
-            // Currencies
             const curFields = ['currency', 'sourceCurrency', 'destCurrency'];
             for (const f of curFields) {
                 const c1 = (tx1[f] ?? '').toString().trim();
                 const c2 = (tx2[f] ?? '').toString().trim();
-                if (c1 !== c2) {
-                    return `Conflicting currency field "${f}": "${c1}" !== "${c2}"`;
-                }
+                if (c1 !== c2) return `Conflicting currency field "${f}": "${c1}" !== "${c2}"`;
             }
 
-            // Wallets & transfer endpoints
             const walletFields = ['walletId', 'sourceId', 'destId'];
             for (const f of walletFields) {
                 const w1 = (tx1[f] ?? '').toString().trim();
                 const w2 = (tx2[f] ?? '').toString().trim();
-                if (w1 !== w2) {
-                    return `Conflicting wallet/endpoint field "${f}": "${w1}" !== "${w2}"`;
-                }
+                if (w1 !== w2) return `Conflicting wallet/endpoint field "${f}": "${w1}" !== "${w2}"`;
             }
 
-            // Type, region, and date
             const strFields = ['type', 'date', 'region'];
             for (const f of strFields) {
                 const s1 = (tx1[f] ?? '').toString().trim();
                 const s2 = (tx2[f] ?? '').toString().trim();
-                if (s1 !== s2) {
-                    return `Conflicting field "${f}": "${s1}" !== "${s2}"`;
-                }
+                if (s1 !== s2) return `Conflicting field "${f}": "${s1}" !== "${s2}"`;
             }
 
-            // Compare all remaining fields (including arbitrary unknown metadata)
             const allKeys = new Set([...Object.keys(tx1), ...Object.keys(tx2)]);
             const handledKeys = new Set([
-                'id',
-                'amount', 'sourceAmount', 'destAmount',
-                'note', 'description',
-                'categoryId', 'category',
-                'exchangeRate',
-                'currency', 'sourceCurrency', 'destCurrency',
-                'walletId', 'sourceId', 'destId',
-                'type', 'date', 'region',
-                'updatedAt'
+                'id', 'amount', 'sourceAmount', 'destAmount', 'note', 'description',
+                'categoryId', 'category', 'exchangeRate', 'currency', 'sourceCurrency',
+                'destCurrency', 'walletId', 'sourceId', 'destId', 'type', 'date', 'region', 'updatedAt'
             ]);
-
             for (const key of allKeys) {
                 if (handledKeys.has(key)) continue;
                 const v1 = tx1[key];
                 const v2 = tx2[key];
-
                 if (typeof v1 === 'object' && v1 !== null && typeof v2 === 'object' && v2 !== null) {
                     if (JSON.stringify(v1) !== JSON.stringify(v2)) {
                         return `Conflicting object field "${key}": ${JSON.stringify(v1)} !== ${JSON.stringify(v2)}`;
@@ -486,54 +461,44 @@ class StorageManager {
                     return `Conflicting field "${key}": "${v1}" !== "${v2}"`;
                 }
             }
-
             return null; // Identical duplicate
         }
 
-        const ingestTransaction = (tx, source) => {
-            if (!tx || !tx.id) return;
+        let conflictError = null;
+        let conflictDetails = null;
 
+        const ingestTransaction = (tx, source) => {
+            if (conflictError || !tx || !tx.id) return;
             const existing = seenTxIds.get(tx.id);
             if (existing) {
                 const conflictReason = areTransactionsConflicting(existing, tx);
                 if (conflictReason) {
-                    console.error('[Migration] CONFLICT DETECTED on transaction ID:', tx.id, {
-                        reason: conflictReason,
-                        existing,
-                        duplicate: tx,
-                        source
-                    });
-                    throw new Error(`Migration conflict detected on transaction ID "${tx.id}" (${conflictReason}). Halting to prevent data corruption.`);
+                    conflictError = `Migration conflict detected on transaction ID "${tx.id}" (${conflictReason}). Halting to prevent data corruption.`;
+                    conflictDetails = { id: tx.id, reason: conflictReason, existing, duplicate: tx, source };
+                    return;
                 }
-                // Identical duplicate — skip safely
-                return;
+                return; // Identical duplicate — skip safely
             }
-
             const cloned = { ...tx };
             seenTxIds.set(cloned.id, cloned);
             continuousTransactions.push(cloned);
         };
 
-        // Ingest active transactions first
+        // Ingest active transactions
         if (Array.isArray(state.transactions)) {
             state.transactions.forEach(tx => ingestTransaction(tx, 'active'));
         }
 
-        // Ingest historical transactions and preserve metadata
-        if (Array.isArray(state.history)) {
+        // Ingest historical transactions
+        if (!conflictError && Array.isArray(state.history)) {
             state.history.forEach(h => {
-                if (!h || !h.monthKey) return;
-
+                if (!h || !h.monthKey || conflictError) return;
                 const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
                 const rawTxList = desc && Array.isArray(desc.value) ? desc.value : null;
                 if (rawTxList) {
                     rawTxList.forEach(tx => ingestTransaction(tx, `history_${h.monthKey}`));
                 }
-
-                // Preserve ALL archive metadata properties, safely excluding only nested transactions
                 const { transactions, ...archiveMetadata } = h;
-
-                // Apply defaults ONLY when a field is genuinely absent (undefined)
                 if (!closedMonths[h.monthKey]) {
                     closedMonths[h.monthKey] = {
                         ...archiveMetadata,
@@ -551,7 +516,6 @@ class StorageManager {
                         status: archiveMetadata.status !== undefined ? archiveMetadata.status : 'closed'
                     };
                 } else {
-                    // Merge any additional fields if closedMonths[h.monthKey] was already partially populated
                     closedMonths[h.monthKey] = {
                         ...archiveMetadata,
                         ...closedMonths[h.monthKey]
@@ -560,40 +524,114 @@ class StorageManager {
             });
         }
 
-        // 4. Chronological sort (newest first, secondary sort by ID)
+        if (conflictError) {
+            return { success: false, error: conflictError, conflictDetails };
+        }
+
+        // Chronological sort (newest first, secondary sort by ID)
         continuousTransactions.sort((a, b) => {
             const dateCmp = (b.date || '').localeCompare(a.date || '');
             if (dateCmp !== 0) return dateCmp;
             return String(b.id).localeCompare(String(a.id));
         });
 
-        // 5. Validation
+        // Invariant Validation: check that continuousTransactions is an array
         if (!Array.isArray(continuousTransactions)) {
-            throw new Error('Migration validation failed: continuousTransactions is not an array.');
+            return { success: false, error: 'Migration validation failed: continuousTransactions is not an array.' };
         }
 
+        // Invariant Validation: check that no wallet balance shifted
         if (state.wallets) {
-            Object.keys(preBalances).forEach(wId => {
+            for (const wId of Object.keys(preBalances)) {
                 if (state.wallets[wId].balance !== preBalances[wId]) {
-                    throw new Error(`Migration validation failed: Balance altered for wallet "${wId}". Expected ${preBalances[wId]}, got ${state.wallets[wId].balance}`);
+                    return {
+                        success: false,
+                        error: `Migration validation failed: Balance altered for wallet "${wId}". Expected ${preBalances[wId]}, got ${state.wallets[wId].balance}`
+                    };
                 }
-            });
+            }
         }
 
-        // 6. Apply migration to state
+        // Apply continuous ledger updates to cloned state
         state.transactions = continuousTransactions;
         state.closedMonths = closedMonths;
-
-        // Reconstruct history array as closed months metadata list
-        state.history = Object.values(closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-        this._attachHistoryGetters(state);
-
-        // 7. Update version
+        state.history = Object.values(closedMonths).sort((a, b) => (b.monthKey || '').localeCompare(a.monthKey || ''));
         state.schemaVersion = 3;
         state._updatedAt = new Date().toISOString();
 
-        console.log(`[Migration] Successfully migrated: ${state.transactions.length} total transactions, ${Object.keys(closedMonths).length} closed months.`);
-        return state;
+        return {
+            success: true,
+            migratedState: state,
+            alreadyMigrated: false,
+            preview: {
+                totalTransactions: continuousTransactions.length,
+                closedMonthsCount: Object.keys(closedMonths).length
+            }
+        };
+    }
+
+    /**
+     * PHASE 2: ATOMIC PERSISTENCE GATE
+     * Persists a verified migration state.
+     * Only callable when previewContinuousLedgerMigration has returned success: true.
+     * Takes an emergency local snapshot, updates in-memory state, attaches getters, and writes to storage.
+     * 
+     * NOTE ON SNAPSHOTS: Local snapshots in localStorage are ephemeral, device-local fallbacks
+     * meant for crash recovery during migration. They are NOT substitutes for authoritative
+     * production database backups (such as Supabase point-in-time recovery / WAL backups).
+     * 
+     * @param {Object} previewResult
+     * @param {Object} [options]
+     * @returns {boolean}
+     */
+    applyContinuousLedgerMigration(previewResult, { isAuthoritativeRemote = false } = {}) {
+        if (!previewResult || !previewResult.success || !previewResult.migratedState) {
+            console.error('[Migration Gate] Attempted to persist invalid or unverified migration state. Persistence halted.');
+            return false;
+        }
+
+        const migratedState = previewResult.migratedState;
+
+        // 1. Emergency local snapshot before overwriting
+        try {
+            const backupKey = `${this.getActiveStorageKey()}_backup_pre_v3`;
+            if (typeof localStorage !== 'undefined' && !localStorage.getItem(backupKey)) {
+                localStorage.setItem(backupKey, JSON.stringify(this.state || migratedState));
+                console.log('[Migration] Emergency local snapshot preserved at:', backupKey);
+            }
+        } catch (e) {
+            console.warn('[Migration] Could not save emergency local snapshot:', e);
+        }
+
+        // 2. Attach non-enumerable getters
+        this._attachHistoryGetters(migratedState);
+
+        // 3. Atomically update in-memory state
+        this.state = migratedState;
+
+        // 4. Persist to localStorage
+        try {
+            localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
+        } catch (e) {
+            console.error('[Migration] Failed to write migrated state to localStorage:', e);
+            return false;
+        }
+
+        console.log(`[Migration Gate] Schema v3 successfully persisted (${migratedState.transactions.length} continuous txs).`);
+        return true;
+    }
+
+    /**
+     * Migrate state to Continuous Transaction Ledger (Schema v3).
+     * Backward-compatible delegation wrapper around previewContinuousLedgerMigration.
+     */
+    migrateToContinuousLedger(state) {
+        const preview = this.previewContinuousLedgerMigration(state);
+        if (!preview.success) {
+            throw new Error(preview.error);
+        }
+        this._attachHistoryGetters(preview.migratedState);
+        return preview.migratedState;
     }
 
     /**
@@ -662,41 +700,23 @@ class StorageManager {
 
                 if (this.isFirstLoad && remoteIsValid) {
                     console.log('[Sync] Fresh device/account detected. Using remote state.');
-                    if (remoteNeedsMigration && typeof localStorage !== 'undefined') {
-                        try {
-                            localStorage.setItem(backupKey, JSON.stringify(remote));
-                            console.log('[Sync] Fresh account authoritative remote backup saved to:', backupKey);
-                        } catch (e) {
-                            console.warn('[Sync] Could not save remote backup:', e);
-                        }
+                    const preview = this.previewContinuousLedgerMigration(remote);
+                    if (!preview.success) {
+                        console.error('[Sync] Fresh load remote migration preview failed. Halting sync to prevent corruption:', preview.error);
+                        this.initialSyncDone = true;
+                        this.syncError = preview.error;
+                        return false;
                     }
 
-                    let migratedRemote;
-                    try {
-                        migratedRemote = this.parseAndMergeData(remote);
-                    } catch (e) {
-                        console.error('[Sync] Fresh load remote migration failed. Aborting:', e);
+                    const persisted = this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
+                    if (!persisted) {
                         this.initialSyncDone = true;
                         return false;
                     }
 
-                    const isValidMigrated = migratedRemote &&
-                        migratedRemote.wallets &&
-                        Array.isArray(migratedRemote.transactions) &&
-                        migratedRemote.closedMonths &&
-                        migratedRemote.schemaVersion >= 3;
-
-                    if (!isValidMigrated) {
-                        console.error('[Sync] Migrated remote state failed validation on fresh load.');
-                        this.initialSyncDone = true;
-                        return false;
-                    }
-
-                    this.state = migratedRemote;
                     this.isFirstLoad = false;
                     this.initialSyncDone = true;
                     this.checkRollover();
-                    localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
 
                     if (remoteNeedsMigration) {
                         await this.pushToSupabase();
@@ -732,43 +752,22 @@ class StorageManager {
                 if (shouldUseRemote) {
                     console.log(`[Sync] Remote state wins (${remoteTxCount} txs vs local ${localTxCount} txs). Loading...`);
 
-                    // Preserve untouched authoritative pre-migration remote backup
-                    if (remoteNeedsMigration && typeof localStorage !== 'undefined') {
-                        try {
-                            localStorage.setItem(backupKey, JSON.stringify(remote));
-                            console.log('[Sync] Authoritative remote pre-migration backup saved to:', backupKey);
-                        } catch (e) {
-                            console.warn('[Sync] Could not save remote backup:', e);
-                        }
+                    const preview = this.previewContinuousLedgerMigration(remote);
+                    if (!preview.success) {
+                        console.error('[Sync] Migration of authoritative remote state failed validation. Halting sync:', preview.error);
+                        this.initialSyncDone = true;
+                        this.syncError = preview.error;
+                        return false;
                     }
 
-                    // Attempt migration of authoritative remote state
-                    let migratedRemote;
-                    try {
-                        migratedRemote = this.parseAndMergeData(remote);
-                    } catch (e) {
-                        console.error('[Sync] Migration of authoritative remote state failed. Halting sync:', e);
+                    const persisted = this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
+                    if (!persisted) {
                         this.initialSyncDone = true;
                         return false;
                     }
 
-                    // Validate migrated state before persisting
-                    const isValidMigrated = migratedRemote &&
-                        migratedRemote.wallets &&
-                        Array.isArray(migratedRemote.transactions) &&
-                        migratedRemote.closedMonths &&
-                        migratedRemote.schemaVersion >= 3;
-
-                    if (!isValidMigrated) {
-                        console.error('[Sync] Migrated remote state failed validation. Aborting sync.');
-                        this.initialSyncDone = true;
-                        return false;
-                    }
-
-                    this.state = migratedRemote;
                     this.initialSyncDone = true;
                     this.checkRollover();
-                    localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
 
                     // Push migrated v3 state to Supabase only after successful validation
                     if (remoteNeedsMigration) {
@@ -801,6 +800,11 @@ class StorageManager {
         // Basic payload integrity validation
         if (!this.state || !this.state.wallets || !Array.isArray(this.state.transactions)) {
             console.error("[Storage] Refusing to push invalid state payload to Supabase");
+            return;
+        }
+
+        if (this.state._haltedMigration || this.migrationError) {
+            console.error("[Storage] Refusing to push state to Supabase because migration was halted due to validation/conflict errors.");
             return;
         }
 
@@ -840,15 +844,23 @@ class StorageManager {
         // If the incoming data is strictly newer than our local state, apply it.
         if (remoteTime && localTime && remoteTime > localTime) {
             console.log('[Realtime] Incoming update is newer. Applying...');
-            this.state = this.parseAndMergeData(remoteState);
+            const preview = this.previewContinuousLedgerMigration(remoteState);
+            if (!preview.success) {
+                console.error('[Realtime] Incoming update failed migration preview:', preview.error);
+                return false;
+            }
+            this.applyContinuousLedgerMigration(preview);
             this.checkRollover();
-            localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
             return true; // signals caller to re-render
         }
         return false;
     }
 
     saveData() {
+        if (this.state._haltedMigration || this.migrationError) {
+            console.warn('[Storage] saveData blocked because migration is in halted safety state.');
+            return;
+        }
         try {
             if (this.initialSyncDone || typeof supabaseClient === 'undefined' || !supabaseClient.session) {
                 this.state._updatedAt = new Date().toISOString();
@@ -952,22 +964,39 @@ class StorageManager {
         anchor.remove();
     }
 
-    validateBackupData(data) {
-        if (!data || typeof data !== 'object') {
-            return { valid: false, error: 'File content is not a valid JSON object.' };
+    /**
+     * Shared normalization helper for backup payloads.
+     * Supports both plain application-state backups and wrapped production exports
+     * ({ source, exportedAt, databaseUpdatedAt, state }).
+     * Rejects malformed wrappers (e.g. non-object or null state envelopes).
+     */
+    normalizeBackupPayload(data) {
+        if (!data || typeof data !== 'object') return data;
+        // Detect wrapped export envelope: has 'state' key along with envelope metadata or missing root wallets
+        if ('state' in data && (data.source || data.exportedAt || data.databaseUpdatedAt || !data.wallets)) {
+            return data.state;
         }
-        if (!data.wallets || typeof data.wallets !== 'object' || Object.keys(data.wallets).length === 0) {
+        return data;
+    }
+
+    validateBackupData(data) {
+        const payload = this.normalizeBackupPayload(data);
+        if (!payload || typeof payload !== 'object') {
+            return { valid: false, error: 'File content is not a valid JSON object or contains an invalid state envelope.' };
+        }
+        if (!payload.wallets || typeof payload.wallets !== 'object' || Object.keys(payload.wallets).length === 0) {
             return { valid: false, error: 'Backup is missing a valid "wallets" collection.' };
         }
-        if (!Array.isArray(data.transactions)) {
+        if (!Array.isArray(payload.transactions)) {
             return { valid: false, error: 'Backup is missing the required "transactions" ledger array.' };
         }
         return {
             valid: true,
-            walletsCount: Object.keys(data.wallets).length,
-            txCount: data.transactions.length,
-            schemaVersion: data.schemaVersion || 1,
-            closedMonthsCount: data.closedMonths ? Object.keys(data.closedMonths).length : 0
+            walletsCount: Object.keys(payload.wallets).length,
+            txCount: payload.transactions.length,
+            schemaVersion: payload.schemaVersion || 1,
+            closedMonthsCount: payload.closedMonths ? Object.keys(payload.closedMonths).length : 0,
+            normalizedData: payload
         };
     }
 
@@ -982,10 +1011,15 @@ class StorageManager {
                     return;
                 }
 
-                // Migrate to continuous ledger if needed and attach getters
-                let migrated = this.migrateToContinuousLedger(parsed);
-                this._attachHistoryGetters(migrated);
-                this.state = migrated;
+                const targetData = validation.normalizedData || this.normalizeBackupPayload(parsed);
+
+                // Migrate to continuous ledger if needed via Two-Phase pipeline
+                const preview = this.previewContinuousLedgerMigration(targetData);
+                if (!preview.success) {
+                    callback(false, preview.error);
+                    return;
+                }
+                this.applyContinuousLedgerMigration(preview);
                 this.saveData();
                 callback(true, null, validation);
             } catch (err) {

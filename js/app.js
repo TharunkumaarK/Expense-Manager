@@ -103,16 +103,12 @@ class App {
     }
 
     getCardChipSvg() {
-        return `<svg class="card-chip-svg" width="30" height="22" viewBox="0 0 34 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));">
-            <rect width="34" height="26" rx="4" fill="url(#chip-metallic-grad)" stroke="#d4af37" stroke-width="0.75"/>
-            <path d="M0 9h12v8H0M34 9H22v8h12M12 9V0M22 9V0M12 17v9M22 17v9M12 13h10" stroke="#997a15" stroke-width="0.75"/>
-            <defs>
-                <linearGradient id="chip-metallic-grad" x1="0" y1="0" x2="34" y2="26" gradientUnits="userSpaceOnUse">
-                    <stop stop-color="#ffe259"/>
-                    <stop offset="0.5" stop-color="#ffa751"/>
-                    <stop offset="1" stop-color="#b8860b"/>
-                </linearGradient>
-            </defs>
+        return `<svg class="card-chip-svg" width="34" height="26" viewBox="0 0 34 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="0.5" y="0.5" width="33" height="25" rx="4.5" fill="#e5c158" stroke="#a67c1e" stroke-width="1"/>
+            <rect x="1.5" y="1.5" width="31" height="23" rx="3.5" fill="#d9b247" stroke="#fff0a6" stroke-width="0.6" stroke-opacity="0.55"/>
+            <rect x="11" y="7" width="12" height="12" rx="2.5" fill="#caa038" stroke="#8c6414" stroke-width="0.75"/>
+            <rect x="12.5" y="8.5" width="9" height="9" rx="1.5" fill="#dfb750"/>
+            <path d="M1 10h10M23 10h10M1 16h10M23 16h10M17 1v6M17 19v6M7.5 10v6M26.5 10v6" stroke="#805b10" stroke-width="0.85" stroke-linecap="round"/>
         </svg>`;
     }
 
@@ -143,7 +139,7 @@ class App {
     }
 
     formatMoney(amount, currency = '', options = {}) {
-        if (this.isPrivacyHidden) {
+        if (this.isPrivacyHidden && !options.ignorePrivacy && !options.forceVisible) {
             return '******';
         }
         let sym = currency || '';
@@ -360,6 +356,11 @@ class App {
                 const menu = document.getElementById('sidebar-account-menu');
                 if (menu && menu.classList.contains('active')) {
                     menu.classList.remove('active');
+                    return;
+                }
+                const actionSelector = document.getElementById('tx-action-selector-modal');
+                if (actionSelector && actionSelector.classList.contains('active')) {
+                    this.closeUnifiedTransactionSelector();
                     return;
                 }
                 const overlay = document.getElementById('focus-overlay');
@@ -590,8 +591,15 @@ class App {
             if (nameEl) nameEl.innerText = displayName;
             if (emailEl) emailEl.innerText = 'Connected';
             if (popoverNameEl) popoverNameEl.innerText = displayName;
-            if (popoverEmailEl) popoverEmailEl.innerText = 'Connected (nyetklojxqnawdtrrhma)';
+            if (popoverEmailEl) popoverEmailEl.innerText = 'Connected';
             if (initialsEl) initialsEl.innerText = 'TK';
+        }
+
+        const aboutEnvEl = document.getElementById('about-env-label');
+        if (aboutEnvEl) {
+            const envName = (window.SUPABASE_CONFIG?.environment === 'production') ? 'Production' : 'Development';
+            const projectRef = window.SUPABASE_CONFIG?.projectRef || 'unconfigured';
+            aboutEnvEl.innerText = `${envName} (${projectRef})`;
         }
     }
 
@@ -686,9 +694,21 @@ class App {
         }
     }
 
-    openUnifiedTransactionSelector() {
+    openUnifiedTransactionSelector(context = null) {
+        this.currentTxContext = context;
         const modal = document.getElementById('tx-action-selector-modal');
         if (!modal) return;
+        const sub = document.getElementById('tx-selector-sub');
+        if (sub) {
+            if (context && context.walletId) {
+                sub.innerText = `Record for ${context.walletId}`;
+            } else if (context && context.region) {
+                const countryName = context.region === 'JP' ? 'Japan (JPY)' : 'India (INR)';
+                sub.innerText = `Record for ${countryName}`;
+            } else {
+                sub.innerText = 'Select transaction type to record';
+            }
+        }
         modal.classList.add('active');
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             lucide.createIcons();
@@ -696,16 +716,21 @@ class App {
     }
 
     closeUnifiedTransactionSelector() {
+        this.currentTxContext = null;
         const modal = document.getElementById('tx-action-selector-modal');
         if (modal) modal.classList.remove('active');
+        const sub = document.getElementById('tx-selector-sub');
+        if (sub) sub.innerText = 'Select transaction type to record';
     }
 
     selectTransactionType(type) {
+        const ctx = this.currentTxContext;
         this.closeUnifiedTransactionSelector();
-        this.openTransactionModal(type);
+        this.closeFocusOverlay();
+        this.openTransactionModal(type, ctx);
     }
 
-    openTransactionModal(type) {
+    openTransactionModal(type, context = null) {
         document.getElementById('main-fab').classList.remove('open');
         document.getElementById('fab-menu').classList.remove('active');
 
@@ -846,6 +871,66 @@ class App {
         modal.classList.add('active');
 
         this.setupDatePickerHelper();
+
+        // Handle context preselection
+        if (context) {
+            if (type === 'expense') {
+                const sel = document.getElementById('tx-wallet');
+                if (context.walletId && sel) {
+                    sel.value = context.walletId;
+                } else if (context.region && sel) {
+                    const w = Object.values(storage.state?.wallets || {}).find(item => item.region === context.region);
+                    if (w) sel.value = w.id;
+                }
+                this.updateExpenseCategories();
+            } else if (type === 'income') {
+                const sel = document.getElementById('tx-wallet');
+                if (context.walletId && sel) {
+                    sel.value = context.walletId;
+                } else if (context.region && sel) {
+                    const w = Object.values(storage.state?.wallets || {}).find(item => item.region === context.region);
+                    if (w) sel.value = w.id;
+                }
+            } else if (type === 'transfer') {
+                const srcSel = document.getElementById('tx-source');
+                const destSel = document.getElementById('tx-dest');
+                let targetSrc = null;
+                if (context.walletId) {
+                    targetSrc = context.walletId;
+                } else if (context.region) {
+                    const w = Object.values(storage.state?.wallets || {}).find(item => item.region === context.region);
+                    if (w) targetSrc = w.id;
+                }
+                if (targetSrc && srcSel) {
+                    srcSel.value = targetSrc;
+                    if (destSel && destSel.value === targetSrc) {
+                        for (let i = 0; i < destSel.options.length; i++) {
+                            if (destSel.options[i].value && destSel.options[i].value !== targetSrc) {
+                                destSel.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else if (type === 'remittance') {
+                const srcSel = document.getElementById('tx-source');
+                const destSel = document.getElementById('tx-dest');
+                if (context.walletId) {
+                    const w = storage.state?.wallets ? storage.state.wallets[context.walletId] : null;
+                    if (w && w.region === 'JP' && srcSel) {
+                        srcSel.value = context.walletId;
+                    } else if (w && w.region === 'IN' && destSel) {
+                        destSel.value = context.walletId;
+                    }
+                } else if (context.region === 'JP' && srcSel) {
+                    const w = Object.values(storage.state?.wallets || {}).find(item => item.region === 'JP');
+                    if (w) srcSel.value = w.id;
+                } else if (context.region === 'IN' && destSel) {
+                    const w = Object.values(storage.state?.wallets || {}).find(item => item.region === 'IN');
+                    if (w) destSel.value = w.id;
+                }
+            }
+        }
 
         if (type === 'expense') {
             this.updateExpenseCategories();
@@ -1414,7 +1499,13 @@ class App {
         // About section
         const syncStatusEl = document.getElementById('about-sync-status');
         if (syncStatusEl) {
-            syncStatusEl.innerText = (typeof supabaseClient !== 'undefined' && supabaseClient.session) ? 'Connected & Synced' : 'Connected (nyetklojxqnawdtrrhma)';
+            syncStatusEl.innerText = (typeof supabaseClient !== 'undefined' && supabaseClient.session) ? 'Connected & Synced' : 'Connected';
+        }
+        const aboutEnvEl = document.getElementById('about-env-label');
+        if (aboutEnvEl) {
+            const envName = (window.SUPABASE_CONFIG?.environment === 'production') ? 'Production' : 'Development';
+            const projectRef = window.SUPABASE_CONFIG?.projectRef || 'unconfigured';
+            aboutEnvEl.innerText = `${envName} (${projectRef})`;
         }
         const lastSyncedEl = document.getElementById('about-last-synced');
         if (lastSyncedEl) {
@@ -1612,7 +1703,7 @@ class App {
                         Closed Months: <strong>${validation.closedMonthsCount}</strong><br>
                         <span style="color:var(--text-secondary);font-size:0.72rem;">Click confirm below to restore state safely.</span>
                     `;
-                    this._pendingRestoreData = parsed;
+                    this._pendingRestoreData = validation.normalizedData || parsed;
                 }
             } catch (err) {
                 previewContainer.style.display = 'flex';
@@ -1767,11 +1858,11 @@ class App {
     }
 
     // ─── Drag and Drop Reordering ──────────────────────────────────────────────
-    
+
     handleDragStart(e) {
         const item = e.target.closest('.draggable-item');
         if (!item) return;
-        
+
         e.dataTransfer.setData('text/plain', item.dataset.id);
         item.style.opacity = '0.4';
         this.draggedElement = item;
@@ -1803,12 +1894,12 @@ class App {
         if (target) {
             target.style.borderTop = '';
         }
-        
+
         const draggedId = e.dataTransfer.getData('text/plain');
         if (!draggedId || !target || target.dataset.id === draggedId || target.dataset.type !== type) return;
 
         const targetId = target.dataset.id;
-        
+
         if (type === 'wallet') {
             this.reorderWallets(draggedId, targetId);
         } else if (type === 'category') {
@@ -1829,16 +1920,16 @@ class App {
         const keys = Object.keys(storage.state.wallets);
         const draggedIndex = keys.indexOf(draggedId);
         const targetIndex = keys.indexOf(targetId);
-        
+
         if (draggedIndex === -1 || targetIndex === -1) return;
-        
+
         keys.splice(draggedIndex, 1);
         keys.splice(targetIndex, 0, draggedId);
-        
+
         const newWallets = {};
         keys.forEach(k => newWallets[k] = storage.state.wallets[k]);
         storage.state.wallets = newWallets;
-        
+
         storage.saveData();
         this.renderAll();
         this.renderSettings();
@@ -1849,12 +1940,12 @@ class App {
         const cats = storage.state.categories[region];
         const draggedIndex = cats.findIndex(c => c.id === draggedId);
         const targetIndex = cats.findIndex(c => c.id === targetId);
-        
+
         if (draggedIndex === -1 || targetIndex === -1) return;
-        
+
         const [draggedItem] = cats.splice(draggedIndex, 1);
         cats.splice(targetIndex, 0, draggedItem);
-        
+
         storage.saveData();
         this.renderSettings();
         lucide.createIcons();
@@ -2351,7 +2442,7 @@ class App {
                 typeCls = 'expense';
                 amountCls = 'tx-amt-expense';
                 sign = '-';
-                
+
                 const categoryName = this.getTransactionCategory(tx);
                 const walletName = this.getWalletName(tx.walletId);
 
@@ -2734,9 +2825,12 @@ class App {
         const countryName = isJp ? 'Japan' : 'India';
         const cardThemeCls = isJp ? 'country-card-jp' : 'country-card-in';
 
+        this.focusCurrentRegion = region;
+        this.focusHistory = [];
+
         let total = 0;
         const regionWallets = [];
-        Object.values(storage.state.wallets).forEach(w => {
+        Object.values(storage.state?.wallets || {}).forEach(w => {
             if (w.region === region) {
                 regionWallets.push(w);
                 total += (w.balance || 0);
@@ -2744,6 +2838,8 @@ class App {
         });
 
         const overlay = document.getElementById('focus-overlay');
+        const backBtn = document.getElementById('focus-back-btn');
+        const divider = document.getElementById('focus-header-divider');
         const typeBadge = document.getElementById('focus-type-badge');
         const modalTitle = document.getElementById('focus-modal-title');
         const primaryPanel = document.getElementById('focus-primary-panel');
@@ -2751,8 +2847,13 @@ class App {
 
         if (!overlay || !primaryPanel || !secondaryPanel) return;
 
-        typeBadge.innerText = 'Country Portfolio';
-        modalTitle.innerText = `${countryName} Overview`;
+        if (backBtn) backBtn.style.display = 'none';
+        if (divider) divider.style.display = 'none';
+        if (typeBadge) {
+            typeBadge.style.display = 'inline-flex';
+            typeBadge.innerText = 'Country Portfolio';
+        }
+        if (modalTitle) modalTitle.innerText = `${countryName} Overview`;
 
         primaryPanel.innerHTML = `
             <div class="country-card ${cardThemeCls} expanded focus-country-card">
@@ -2771,14 +2872,12 @@ class App {
                         ${this.formatMoney(total, currency)}
                     </div>
                 </div>
-                <div class="focus-country-actions">
-                    <button class="btn btn-secondary" onclick="app.closeFocusOverlay(); app.openTransactionModal('expense');">
-                        <i data-lucide="plus"></i> <span>Log Expense</span>
-                    </button>
-                    <button class="btn btn-secondary" onclick="app.closeFocusOverlay(); app.openTransactionModal('income');">
-                        <i data-lucide="arrow-down-left"></i> <span>Log Income</span>
-                    </button>
-                </div>
+            </div>
+            <div class="focus-country-actions">
+                <button class="btn btn-primary w-100" onclick="app.openUnifiedTransactionSelector({ region: '${region}' })">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    <span>Add Transaction</span>
+                </button>
             </div>
         `;
 
@@ -2797,7 +2896,7 @@ class App {
                 const theme = this.getThemeForWallet(w);
                 const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
                 walletsListHtml += `
-                    <div class="wallet-item-compact ${theme.cls} focus-associated-wallet-row" onclick="app.openWalletFocus('${w.id}')">
+                    <div class="wallet-item-compact ${theme.cls} focus-associated-wallet-row" onclick="app.openWalletFocus('${w.id}', this, true)">
                         <div class="focus-associated-wallet-left">
                             <div class="focus-associated-wallet-icon">
                                 <i data-lucide="${icon}"></i>
@@ -2824,25 +2923,17 @@ class App {
         void overlay.offsetWidth;
         overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
-        lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
     }
 
-    openWalletFocus(walletId, sourceEl = null) {
-        const w = storage.state.wallets[walletId];
+    openWalletFocus(walletId, sourceEl = null, fromCountry = false) {
+        const w = storage.state?.wallets ? storage.state.wallets[walletId] : null;
         if (!w) return;
 
-        // Capture source rect for FLIP morphing transition
-        let sourceRect = null;
-        if (sourceEl && typeof sourceEl.getBoundingClientRect === 'function') {
-            sourceRect = sourceEl.getBoundingClientRect();
-        } else if (window.event) {
-            const evTarget = window.event.currentTarget || window.event.target;
-            const clickedCard = evTarget?.closest ? evTarget.closest('.wallet-item, .wallet-item-compact, .wallet-card') : null;
-            if (clickedCard) sourceRect = clickedCard.getBoundingClientRect();
-        }
-        if (!sourceRect) {
-            const candidate = document.querySelector(`[onclick*="'${walletId}'"]`);
-            if (candidate) sourceRect = candidate.getBoundingClientRect();
+        if (fromCountry) {
+            this.focusHistory = [{ type: 'country', region: this.focusCurrentRegion || w.region }];
         }
 
         const theme = this.getThemeForWallet(w);
@@ -2853,6 +2944,9 @@ class App {
         const secondaryBadge = isSecondary ? '<span class="wallet-badge-secondary">Secondary</span>' : '';
 
         const overlay = document.getElementById('focus-overlay');
+        const backBtn = document.getElementById('focus-back-btn');
+        const backLabel = document.getElementById('focus-back-label');
+        const divider = document.getElementById('focus-header-divider');
         const typeBadge = document.getElementById('focus-type-badge');
         const modalTitle = document.getElementById('focus-modal-title');
         const primaryPanel = document.getElementById('focus-primary-panel');
@@ -2860,7 +2954,22 @@ class App {
 
         if (!overlay || !primaryPanel || !secondaryPanel) return;
 
-        typeBadge.innerText = 'Account Focus';
+        if (this.focusHistory && this.focusHistory.length > 0) {
+            if (backBtn) backBtn.style.display = 'inline-flex';
+            const prev = this.focusHistory[this.focusHistory.length - 1];
+            const countryName = prev.region === 'JP' ? 'Japan' : 'India';
+            if (backLabel) backLabel.innerText = `${countryName} Overview`;
+            if (divider) divider.style.display = 'inline';
+            if (typeBadge) typeBadge.style.display = 'none';
+        } else {
+            if (backBtn) backBtn.style.display = 'none';
+            if (divider) divider.style.display = 'none';
+            if (typeBadge) {
+                typeBadge.style.display = 'inline-flex';
+                typeBadge.innerText = 'Account Focus';
+            }
+        }
+
         modalTitle.innerText = `${w.id}`;
 
         primaryPanel.innerHTML = `
@@ -2871,7 +2980,12 @@ class App {
                         ${chipSvg}
                         ${contactlessSvg}
                     </div>
-                    ${secondaryBadge}
+                    <div class="wallet-card-top-right">
+                        ${secondaryBadge}
+                        <button class="wallet-card-menu-btn" onclick="app.closeFocusOverlay(); app.openEditWalletModal('${w.id}')" title="Edit Account" aria-label="Edit Account">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="wallet-balance-wrap">
                     <span class="wallet-balance-label">Current Balance</span>
@@ -2885,14 +2999,9 @@ class App {
                 </div>
             </div>
             <div class="focus-wallet-actions">
-                <button class="btn btn-primary" onclick="app.openAddTxForWallet('${w.id}')">
-                    <i data-lucide="plus"></i> <span>Log Expense</span>
-                </button>
-                <button class="btn btn-secondary" onclick="app.openTransferForWallet('${w.id}')">
-                    <i data-lucide="arrow-left-right"></i> <span>Transfer</span>
-                </button>
-                <button class="btn btn-secondary btn-edit-account" onclick="app.closeFocusOverlay(); app.openEditWalletModal('${w.id}')">
-                    <i data-lucide="edit-2"></i> <span>Edit Account</span>
+                <button class="btn btn-primary w-100" onclick="app.openUnifiedTransactionSelector({ walletId: '${w.id}', region: '${w.region}' })">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    <span>Add Transaction</span>
                 </button>
             </div>
         `;
@@ -2971,55 +3080,23 @@ class App {
         void overlay.offsetWidth;
         overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
-        lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
 
-        // Progressive FLIP transition from source card to focused layout
-        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (sourceRect && !prefersReduced) {
-            const targetCard = primaryPanel.querySelector('.wallet-card');
-            if (targetCard) {
-                const targetRect = targetCard.getBoundingClientRect();
-                if (targetRect.width > 0 && targetRect.height > 0) {
-                    const dx = sourceRect.left - targetRect.left;
-                    const dy = sourceRect.top - targetRect.top;
-                    const scaleX = sourceRect.width / targetRect.width;
-                    const scaleY = sourceRect.height / targetRect.height;
-
-                    targetCard.style.transformOrigin = 'top left';
-                    targetCard.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
-                    targetCard.style.transition = 'none';
-
-                    secondaryPanel.style.opacity = '0';
-                    secondaryPanel.style.transform = 'translateX(14px)';
-                    secondaryPanel.style.transition = 'none';
-
-                    this.lastWalletFocusSourceRect = sourceRect;
-
-                    void targetCard.offsetWidth;
-
-                    requestAnimationFrame(() => {
-                        targetCard.style.transition = 'transform 280ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 280ms cubic-bezier(0.16, 1, 0.3, 1)';
-                        targetCard.style.transform = 'none';
-
-                        secondaryPanel.style.transition = 'opacity 240ms cubic-bezier(0.16, 1, 0.3, 1) 40ms, transform 240ms cubic-bezier(0.16, 1, 0.3, 1) 40ms';
-                        secondaryPanel.style.opacity = '1';
-                        secondaryPanel.style.transform = 'none';
-                    });
-
-                    setTimeout(() => {
-                        if (targetCard) {
-                            targetCard.style.transformOrigin = '';
-                            targetCard.style.transform = '';
-                            targetCard.style.transition = '';
-                        }
-                        if (secondaryPanel) {
-                            secondaryPanel.style.transition = '';
-                            secondaryPanel.style.opacity = '';
-                            secondaryPanel.style.transform = '';
-                        }
-                    }, 340);
-                }
+    navigateFocusBack() {
+        if (this.focusHistory && this.focusHistory.length > 0) {
+            const prev = this.focusHistory.pop();
+            if (prev.type === 'country') {
+                this.openCountryExpansion(prev.region);
+                return;
             }
+        }
+        if (this.focusCurrentRegion) {
+            this.openCountryExpansion(this.focusCurrentRegion);
+        } else {
+            this.closeFocusOverlay();
         }
     }
 
@@ -3027,40 +3104,30 @@ class App {
         const overlay = document.getElementById('focus-overlay');
         if (!overlay) return;
 
-        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const primaryPanel = document.getElementById('focus-primary-panel');
-        const targetCard = primaryPanel ? primaryPanel.querySelector('.wallet-card') : null;
-
-        if (targetCard && this.lastWalletFocusSourceRect && !prefersReduced) {
-            const targetRect = targetCard.getBoundingClientRect();
-            if (targetRect.width > 0 && targetRect.height > 0) {
-                const dx = this.lastWalletFocusSourceRect.left - targetRect.left;
-                const dy = this.lastWalletFocusSourceRect.top - targetRect.top;
-                const scaleX = this.lastWalletFocusSourceRect.width / targetRect.width;
-                const scaleY = this.lastWalletFocusSourceRect.height / targetRect.height;
-
-                targetCard.style.transformOrigin = 'top left';
-                targetCard.style.transition = 'transform 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease';
-                targetCard.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
-                targetCard.style.opacity = '0.3';
-            }
-        }
-
         overlay.classList.remove('active');
         setTimeout(() => {
             if (!overlay.classList.contains('active')) {
                 overlay.style.display = 'none';
-                if (targetCard) {
-                    targetCard.style.transformOrigin = '';
-                    targetCard.style.transform = '';
-                    targetCard.style.transition = '';
-                    targetCard.style.opacity = '';
-                }
+                const backBtn = document.getElementById('focus-back-btn');
+                if (backBtn) backBtn.style.display = 'none';
+                const divider = document.getElementById('focus-header-divider');
+                if (divider) divider.style.display = 'none';
+                this.focusHistory = [];
+                this.focusCurrentRegion = null;
             }
-            this.lastWalletFocusSourceRect = null;
-        }, 240);
+        }, 200);
 
         document.body.style.overflow = '';
+    }
+
+    openAddTxForWallet(walletId) {
+        this.closeFocusOverlay();
+        this.openTransactionModal('expense', { walletId });
+    }
+
+    openTransferForWallet(walletId) {
+        this.closeFocusOverlay();
+        this.openTransactionModal('transfer', { walletId });
     }
 
     openAddTxForWallet(walletId) {
@@ -3676,8 +3743,8 @@ class App {
 
     forceUpdate() {
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (let registration of registrations) {
                     registration.unregister();
                 }
                 window.location.reload(true);
@@ -4025,7 +4092,10 @@ class App {
         }
         // Humanize slugs if not found directly
         if (typeof catId === 'string') {
-            const cleaned = catId.replace(/^(jp|in)-/, '');
+            let cleaned = catId.replace(/^(jp|in)-/i, '');
+            // Restrict timestamp removal strictly to the generated timestamp pattern (12-14 digits from Date.now())
+            // while preserving legitimate category names that end in numbers (e.g. Room 101, Level 2).
+            cleaned = cleaned.replace(/-\d{12,14}$/, '');
             const humanized = cleaned.split(/[-_]/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
             if (humanized && humanized.toLowerCase() !== 'undefined' && humanized.toLowerCase() !== 'null') {
                 return humanized;
@@ -4909,7 +4979,18 @@ class App {
     }
 
     setAnalyticsCountry(country) {
+        if (country !== 'JP' && country !== 'IN') return;
         this.analyticsCountry = country;
+        const selector = document.getElementById('analytics-country-selector');
+        if (selector) {
+            selector.querySelectorAll('.segment-btn').forEach(btn => {
+                if (btn.getAttribute('data-region') === country) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
         this.renderAnalyticsPage();
     }
 
@@ -5082,7 +5163,7 @@ class App {
             // Selectable candidate categories for lifestyle exclusion
             const candidateCats = (storage.state?.categories?.JP || []).filter(c => {
                 return c.id === 'jp-food' || c.id === 'jp-dining' || c.id === 'jp-shopping' ||
-                       c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
+                    c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
             });
 
             let chipsHtml = '';
@@ -5539,13 +5620,425 @@ class App {
     }
 
     printCurrentReport() {
-        window.print();
+        const savedPrivacy = this.isPrivacyHidden;
+        this.isPrivacyHidden = false;
+
+        const monthKey = this.reportMonthKey || (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
+        const region = this.reportRegion || 'JP';
+        const currency = region === 'JP' ? '¥' : '₹';
+
+        const allTxs = storage.state.transactions || [];
+        const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(monthKey) && tx.region === region);
+
+        // 1. Calculate Financial Aggregates
+        let totalIncome = 0;
+        let totalExpense = 0;
+        const categorySpendMap = {};
+        const categoryTxCountMap = {};
+
+        reportTxs.forEach(tx => {
+            const amt = Number(tx.amount || 0);
+            if (tx.type === 'income') {
+                totalIncome += amt;
+            } else if (tx.type === 'expense') {
+                totalExpense += amt;
+                const cId = tx.categoryId || 'misc';
+                categorySpendMap[cId] = (categorySpendMap[cId] || 0) + amt;
+                categoryTxCountMap[cId] = (categoryTxCountMap[cId] || 0) + 1;
+            }
+        });
+
+        const netSavings = totalIncome - totalExpense;
+        const savingsRate = totalIncome > 0 ? Math.max(0, ((netSavings / totalIncome) * 100)).toFixed(1) : '0.0';
+
+        // 2. Budget Handling
+        const isClosed = storage.state.closedMonths && storage.state.closedMonths[monthKey];
+        const closedMeta = isClosed ? storage.state.closedMonths[monthKey] : null;
+
+        let periodTotalBudget = 0;
+        const periodCatBudgets = {};
+
+        if (closedMeta) {
+            periodTotalBudget = region === 'JP' ? (closedMeta.jpTotalBudget || 0) : (closedMeta.inTotalBudget || 0);
+            if (closedMeta.categoriesSnapshot && closedMeta.categoriesSnapshot[region]) {
+                closedMeta.categoriesSnapshot[region].forEach(c => {
+                    periodCatBudgets[c.id] = c.budget || 0;
+                });
+            }
+        } else if (monthKey === storage.state.currentMonthKey) {
+            if (region === 'JP') {
+                periodTotalBudget = storage.state.jpTotalBudget || 0;
+            } else {
+                periodTotalBudget = storage.state.inTotalBudget || (storage.state.categories['IN'] || []).reduce((sum, c) => sum + (c.budget || 0), 0);
+            }
+            (storage.state.categories[region] || []).forEach(c => {
+                periodCatBudgets[c.id] = c.budget || 0;
+            });
+        }
+
+        const budgetPct = periodTotalBudget > 0 ? Math.min((totalExpense / periodTotalBudget) * 100, 100).toFixed(1) : 0;
+        const budgetRem = periodTotalBudget - totalExpense;
+        const isOverBudget = budgetRem < 0;
+        const budgetBarClass = Number(budgetPct) > 90 ? 'danger' : (Number(budgetPct) > 75 ? 'warn' : 'safe');
+
+        // 3. Snapshot Metadata
+        const cacheKey = `${region}_${monthKey}`;
+        const snapshotMeta = (this.reportSnapshotsCache && this.reportSnapshotsCache[cacheKey]) || {
+            generatedAt: new Date().toLocaleString(),
+            revisionsCount: 1
+        };
+
+        // 4. Categories & Chart Data
+        const allRegionCats = (storage.state.categories && storage.state.categories[region]) || [];
+        const catMap = new Map();
+        allRegionCats.forEach(c => catMap.set(c.id, c));
+        Object.keys(categorySpendMap).forEach(id => {
+            if (!catMap.has(id)) {
+                catMap.set(id, { id: id, name: this.getCategoryName(id, region), icon: 'tag' });
+            }
+        });
+
+        const allCategoriesList = Array.from(catMap.values()).map(cat => {
+            const spent = categorySpendMap[cat.id] || 0;
+            const budgetLimit = periodCatBudgets[cat.id] || 0;
+            const txCount = categoryTxCountMap[cat.id] || 0;
+            const pctOfTotal = totalExpense > 0 ? ((spent / totalExpense) * 100).toFixed(1) : '0.0';
+            const variance = budgetLimit > 0 ? (budgetLimit - spent) : null;
+            return {
+                ...cat,
+                spent,
+                budgetLimit,
+                txCount,
+                pctOfTotal,
+                variance
+            };
+        });
+
+        allCategoriesList.sort((a, b) => {
+            if (b.spent !== a.spent) return b.spent - a.spent;
+            if (b.budgetLimit !== a.budgetLimit) return b.budgetLimit - a.budgetLimit;
+            return a.name.localeCompare(b.name);
+        });
+
+        const activeCategories = allCategoriesList.filter(c => c.spent > 0);
+
+        // 5. Build HTML Structure
+        const printContainer = document.getElementById('print-container');
+        if (!printContainer) return;
+
+        const incomeCount = reportTxs.filter(t => t.type === 'income').length;
+        const expenseCount = reportTxs.filter(t => t.type === 'expense').length;
+
+        const headerHtml = `
+            <div class="print-header-banner">
+                <div class="print-header-left">
+                    <div class="print-brand-tag">
+                        ${this.getCountryFlagSvg(region, 18, 13)}
+                        <span>EXPENSE MANAGER</span>
+                    </div>
+                    <h1 class="print-report-title">${monthKey} Financial Statement</h1>
+                    <p class="print-report-subtitle">${region === 'JP' ? 'Japan Portfolio (JPY ¥)' : 'India Portfolio (INR ₹)'} • Monthly Financial Snapshot & Continuous Audit</p>
+                </div>
+                <div class="print-header-right">
+                    <span class="print-status-badge ${isClosed ? 'closed' : 'active'}">
+                        ${isClosed ? '● Closed & Reconciled' : '● Active Ledger Snapshot'}
+                    </span>
+                    <span class="print-meta-line">Generated: ${snapshotMeta.generatedAt || new Date().toLocaleString()} (Rev ${snapshotMeta.revisionsCount || 1})</span>
+                    <span class="print-meta-line">${reportTxs.length} Transactions Captured</span>
+                </div>
+            </div>
+        `;
+
+        const kpisHtml = `
+            <div class="print-kpi-grid">
+                <div class="print-kpi-card">
+                    <span class="print-kpi-label">Total Income</span>
+                    <span class="print-kpi-value income">+${this.formatMoney(totalIncome, currency)}</span>
+                    <span class="print-kpi-sub">${incomeCount} income credit${incomeCount === 1 ? '' : 's'}</span>
+                </div>
+                <div class="print-kpi-card">
+                    <span class="print-kpi-label">Total Expenses</span>
+                    <span class="print-kpi-value expense">-${this.formatMoney(totalExpense, currency)}</span>
+                    <span class="print-kpi-sub">${expenseCount} expense debit${expenseCount === 1 ? '' : 's'}</span>
+                </div>
+                <div class="print-kpi-card">
+                    <span class="print-kpi-label">Net Savings / Surplus</span>
+                    <span class="print-kpi-value ${netSavings >= 0 ? 'savings-pos' : 'savings-neg'}">
+                        ${netSavings >= 0 ? '+' : '-'}${this.formatMoney(Math.abs(netSavings), currency)}
+                    </span>
+                    <span class="print-kpi-sub">${netSavings >= 0 ? `${savingsRate}% savings retained` : 'Deficit spent'}</span>
+                </div>
+            </div>
+        `;
+
+        let budgetHtml = '';
+        if (periodTotalBudget > 0) {
+            budgetHtml = `
+                <div class="print-budget-card">
+                    <div class="print-budget-header">
+                        <h3 class="print-budget-title">Monthly Budget Allocation & Performance</h3>
+                        <span class="print-budget-status ${isOverBudget ? 'over' : 'safe'}">
+                            ${isOverBudget ? `${this.formatMoney(Math.abs(budgetRem), currency)} Over Budget` : `+${this.formatMoney(budgetRem, currency)} Cushion Remaining`}
+                        </span>
+                    </div>
+                    <div class="print-budget-bar-track">
+                        <div class="print-budget-bar-fill ${budgetBarClass}" style="width: ${budgetPct}%;"></div>
+                    </div>
+                    <div class="print-budget-stats">
+                        <span>Spent: <strong>${this.formatMoney(totalExpense, currency)}</strong> (${budgetPct}% consumed)</span>
+                        <span>Monthly Limit: <strong>${this.formatMoney(periodTotalBudget, currency)}</strong></span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Japan Analytics Pie Chart (rendered for Japan alone per user confirmation)
+        let pieHtml = '';
+        const chartId = 'print-jp-pie-chart';
+        let chartData = null;
+
+        if (region === 'JP') {
+            const chartCategories = activeCategories.length > 0 ? activeCategories : [];
+            const glassStyles = typeof charts !== 'undefined' && typeof charts.getGlassStyles === 'function'
+                ? charts.getGlassStyles(document.createElement('canvas').getContext('2d'), Math.max(chartCategories.length, 1), 300)
+                : { backgrounds: ['#3e63dd'], borders: ['#3e63dd'] };
+
+            const legendItemsHtml = chartCategories.map((c, i) => {
+                const color = glassStyles.borders[i % glassStyles.borders.length];
+                return `
+                    <div class="print-legend-item">
+                        <div class="print-legend-left">
+                            <span class="print-legend-dot" style="background: ${color};"></span>
+                            <span class="print-legend-name">${c.name}</span>
+                        </div>
+                        <div class="print-legend-right">
+                            <span class="print-legend-pct">${c.pctOfTotal}%</span>
+                            <span class="print-legend-amt">${this.formatMoney(c.spent, currency)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            pieHtml = `
+                <div class="print-analytics-card">
+                    <div class="print-section-title">
+                        <span>Analytics: Expense Distribution by Category</span>
+                        <span style="font-size: 11px; font-weight: 500; color: #8b8b99;">Proportional Share (${chartCategories.length} Active)</span>
+                    </div>
+                    <div class="print-chart-grid">
+                        <div class="print-chart-visual">
+                            <canvas id="${chartId}" width="380" height="380" style="width: 190px; height: 190px; display: block;"></canvas>
+                        </div>
+                        <div class="print-chart-legend">
+                            ${chartCategories.length > 0 ? legendItemsHtml : '<p style="color:#8b8b99;font-size:12px;margin:auto;">No expense debits recorded in this period.</p>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            chartData = {
+                id: chartId,
+                labels: chartCategories.map(c => c.name),
+                data: chartCategories.map(c => c.spent),
+                glassStyles: glassStyles
+            };
+        }
+
+        // Category Breakdown Table
+        const displayedCats = allCategoriesList.filter(c => c.spent > 0 || c.budgetLimit > 0);
+        const tableRowsHtml = (displayedCats.length > 0 ? displayedCats : allCategoriesList.slice(0, 8)).map(cat => {
+            const varianceHtml = cat.variance !== null
+                ? (cat.variance >= 0
+                    ? `<span style="color:#34d399;font-weight:600;">+${this.formatMoney(cat.variance, currency)}</span>`
+                    : `<span style="color:#fb7185;font-weight:600;">${this.formatMoney(cat.variance, currency)}</span>`)
+                : '<span style="color:#6b6b78;">—</span>';
+
+            return `
+                <tr>
+                    <td style="font-weight: 600; color: #ffffff;">${cat.name}</td>
+                    <td>${cat.budgetLimit > 0 ? this.formatMoney(cat.budgetLimit, currency) : '<span style="color:#6b6b78;">—</span>'}</td>
+                    <td style="font-weight: 600;">${this.formatMoney(cat.spent, currency)}</td>
+                    <td>${varianceHtml}</td>
+                    <td style="color:#8b8b99;font-weight:600;">${cat.pctOfTotal}%</td>
+                    <td style="color:#8b8b99;">${cat.txCount}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const tableHtml = `
+            <div class="print-table-card">
+                <div class="print-section-title">
+                    <span>Category Breakdown & Budget Cushion Audit</span>
+                    <span style="font-size: 11px; font-weight: 500; color: #8b8b99;">${displayedCats.length} Categories</span>
+                </div>
+                <table class="print-report-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Allocated Budget</th>
+                            <th>Actual Spent</th>
+                            <th>Variance / Cushion</th>
+                            <th>% of Total</th>
+                            <th>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRowsHtml || '<tr><td colspan="6" style="text-align:center;color:#8b8b99;padding:16px;">No category records.</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        // Itemized Transactions
+        let txsHtml = '';
+        if (reportTxs.length > 0) {
+            const groupedTxs = {};
+            const sortedTxs = [...reportTxs].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            sortedTxs.forEach(tx => {
+                const dKey = tx.date || 'Undated';
+                if (!groupedTxs[dKey]) groupedTxs[dKey] = [];
+                groupedTxs[dKey].push(tx);
+            });
+
+            let groupsHtml = '';
+            Object.keys(groupedTxs).forEach(dateStr => {
+                const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                });
+
+                const groupRowsHtml = groupedTxs[dateStr].map(tx => {
+                    const isIncome = tx.type === 'income';
+                    const walletName = this.getWalletName(tx.walletId) || '-';
+                    const catName = this.getTransactionCategory(tx);
+                    const noteText = tx.note || catName;
+
+                    return `
+                        <tr>
+                            <td style="width: 25%; font-weight: 500; color: #ffffff;">${noteText}</td>
+                            <td style="width: 25%; color: #8b8b99;">${catName}</td>
+                            <td style="width: 25%; color: #8b8b99;">${walletName}</td>
+                            <td style="width: 25%;" class="${isIncome ? 'tx-amount-in' : 'tx-amount-out'}">
+                                ${isIncome ? '+' : '-'}${this.formatMoney(tx.amount, currency)}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                groupsHtml += `
+                    <div class="print-tx-group">
+                        <div class="print-date-header">${formattedDate}</div>
+                        <table class="print-tx-table">
+                            <tbody>
+                                ${groupRowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+
+            txsHtml = `
+                <div class="print-transactions-section">
+                    <div class="print-section-title" style="margin-bottom: 10px;">
+                        <span>Itemized Transactions Audit Ledger</span>
+                        <span style="font-size: 11px; font-weight: 500; color: #8b8b99;">${reportTxs.length} Records</span>
+                    </div>
+                    ${groupsHtml}
+                </div>
+            `;
+        }
+
+        const footerHtml = `
+            <div class="print-footer">
+                <span>Expense Manager • Financial Statement Snapshot (${monthKey} • ${region})</span>
+                <span>Continuous Ledger Integrity Verified • Generated ${new Date().toLocaleDateString()}</span>
+            </div>
+        `;
+
+        printContainer.innerHTML = `
+            <div class="print-report-wrapper">
+                ${headerHtml}
+                ${kpisHtml}
+                ${budgetHtml}
+                ${pieHtml}
+                ${tableHtml}
+                ${txsHtml}
+                ${footerHtml}
+            </div>
+        `;
+
+        const triggerBrowserPrint = () => {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                lucide.createIcons({ root: printContainer });
+            }
+
+            setTimeout(() => {
+                window.print();
+                this.isPrivacyHidden = savedPrivacy;
+                setTimeout(() => {
+                    printContainer.innerHTML = '';
+                }, 1000);
+            }, 300);
+        };
+
+        if (region === 'JP' && chartData && chartData.data.length > 0 && typeof Chart !== 'undefined') {
+            const canvasEl = document.getElementById(chartData.id);
+            if (canvasEl) {
+                try {
+                    const printChart = new Chart(canvasEl, {
+                        type: 'doughnut',
+                        data: {
+                            labels: chartData.labels,
+                            datasets: [{
+                                data: chartData.data,
+                                backgroundColor: chartData.glassStyles.backgrounds,
+                                borderColor: chartData.glassStyles.borders,
+                                borderWidth: 1.5,
+                                hoverOffset: 0
+                            }]
+                        },
+                        options: {
+                            responsive: false,
+                            animation: false,
+                            cutout: '70%',
+                            devicePixelRatio: 2,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { enabled: false }
+                            }
+                        }
+                    });
+
+                    setTimeout(() => {
+                        try {
+                            const img = document.createElement('img');
+                            img.src = canvasEl.toDataURL('image/png');
+                            img.style.width = '190px';
+                            img.style.height = '190px';
+                            img.style.display = 'block';
+                            img.style.margin = '0 auto';
+                            canvasEl.parentNode.replaceChild(img, canvasEl);
+                            printChart.destroy();
+                        } catch (err) {
+                            console.warn('[Print] Canvas toDataURL fallback:', err);
+                        }
+                        triggerBrowserPrint();
+                    }, 100);
+                    return;
+                } catch (e) {
+                    console.warn('[Print] Chart rendering failed:', e);
+                }
+            }
+        }
+
+        triggerBrowserPrint();
     }
 
     exportReportCsv() {
         const allTxs = storage.state.transactions || [];
         const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
-        
+
         let csv = 'Transaction ID,Date,Region,Wallet,Category,Type,Amount,Currency,Note\n';
         reportTxs.forEach(tx => {
             const catName = this.getTransactionCategory(tx);
@@ -5676,7 +6169,7 @@ class App {
         // 7. Render Snapshot Hero Section
         const heroEl = document.getElementById('report-snapshot-hero');
         if (heroEl) {
-            const statusBadge = isClosed 
+            const statusBadge = isClosed
                 ? `<span class="report-status-badge closed"><i data-lucide="lock" style="width:12px;height:12px;"></i> Closed & Reconciled</span>`
                 : `<span class="report-status-badge active"><i data-lucide="activity" style="width:12px;height:12px;"></i> Active Reporting Period</span>`;
 
@@ -5812,7 +6305,7 @@ class App {
         const breakdownCard = document.getElementById('report-category-breakdown-card');
         if (breakdownCard) {
             const allRegionCats = storage.state.categories[this.reportRegion] || [];
-            
+
             // Collect all categories that either exist in config or have transactions
             const catMap = new Map();
             allRegionCats.forEach(c => catMap.set(c.id, c));
@@ -5877,11 +6370,11 @@ class App {
                             </div>
                         </td>
                         <td class="privacy-blur">
-                            ${cat.variance !== null 
-                                ? (cat.variance >= 0 
-                                    ? `<span class="badge-cushion">+${this.formatMoney(cat.variance, currency)}</span>` 
-                                    : `<span class="badge-overspend">${this.formatMoney(cat.variance, currency)}</span>`) 
-                                : '<span class="text-muted">—</span>'}
+                            ${cat.variance !== null
+                        ? (cat.variance >= 0
+                            ? `<span class="badge-cushion">+${this.formatMoney(cat.variance, currency)}</span>`
+                            : `<span class="badge-overspend">${this.formatMoney(cat.variance, currency)}</span>`)
+                        : '<span class="text-muted">—</span>'}
                         </td>
                         <td><span style="font-weight: 600; color: var(--text-secondary);">${cat.pctOfTotal}%</span></td>
                         <td><span class="tx-count-pill">${cat.txCount} tx${cat.txCount === 1 ? '' : 's'}</span></td>
@@ -5997,8 +6490,8 @@ class App {
 
         // Wallets
         const wallets = Object.values(storage.state.wallets || {});
-        const filteredWallets = selectedRegion === 'ALL' 
-            ? wallets 
+        const filteredWallets = selectedRegion === 'ALL'
+            ? wallets
             : wallets.filter(w => w.region === selectedRegion);
 
         walletSelect.innerHTML = '<option value="ALL">All Wallets</option>' +
@@ -6028,6 +6521,79 @@ class App {
         this.populateCustomReportFilters();
     }
 
+    openDatePicker(inputId) {
+        const el = document.getElementById(inputId);
+        if (!el) return;
+        if (typeof el.showPicker === 'function') {
+            try {
+                el.showPicker();
+                return;
+            } catch (e) {
+                // fall through to focus
+            }
+        }
+        el.focus();
+    }
+
+    setCustomReportPreset(preset) {
+        const startInput = document.getElementById('report-custom-start');
+        const endInput = document.getElementById('report-custom-end');
+        if (!startInput || !endInput) return;
+
+        const now = new Date();
+        const curYear = now.getFullYear();
+        const curMonth = now.getMonth(); // 0-11
+        const curDay = now.getDate();
+
+        const formatDate = (y, m, d) => {
+            return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        };
+
+        let startStr = '';
+        let endStr = '';
+
+        if (preset === 'this-month') {
+            startStr = formatDate(curYear, curMonth + 1, 1);
+            const lastDay = new Date(curYear, curMonth + 1, 0).getDate();
+            endStr = formatDate(curYear, curMonth + 1, lastDay);
+        } else if (preset === 'last-month') {
+            const prevMonthDate = new Date(curYear, curMonth - 1, 1);
+            const py = prevMonthDate.getFullYear();
+            const pm = prevMonthDate.getMonth() + 1;
+            const lastDay = new Date(py, pm, 0).getDate();
+            startStr = formatDate(py, pm, 1);
+            endStr = formatDate(py, pm, lastDay);
+        } else if (preset === 'last-90-days') {
+            const d90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+            startStr = formatDate(d90.getFullYear(), d90.getMonth() + 1, d90.getDate());
+            endStr = formatDate(curYear, curMonth + 1, curDay);
+        } else if (preset === 'this-year') {
+            startStr = formatDate(curYear, 1, 1);
+            endStr = formatDate(curYear, curMonth + 1, curDay);
+        }
+
+        startInput.value = startStr;
+        endInput.value = endStr;
+
+        const container = document.querySelector('.custom-report-presets-pills');
+        if (container) {
+            container.querySelectorAll('.preset-pill-btn').forEach(btn => {
+                if (btn.getAttribute('data-preset') === preset) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+    }
+
+    onCustomDateManualChange() {
+        const container = document.querySelector('.custom-report-presets-pills');
+        if (container) {
+            container.querySelectorAll('.preset-pill-btn').forEach(btn => btn.classList.remove('active'));
+        }
+    }
+
     resetCustomRangeReport() {
         const startInput = document.getElementById('report-custom-start');
         const endInput = document.getElementById('report-custom-end');
@@ -6037,6 +6603,11 @@ class App {
         if (startInput) startInput.value = '';
         if (endInput) endInput.value = '';
         if (regSelect) regSelect.value = 'ALL';
+
+        const container = document.querySelector('.custom-report-presets-pills');
+        if (container) {
+            container.querySelectorAll('.preset-pill-btn').forEach(btn => btn.classList.remove('active'));
+        }
 
         this.populateCustomReportFilters();
 
@@ -6133,6 +6704,8 @@ class App {
         const hasJp = (selRegion === 'ALL' || selRegion === 'JP');
         const hasIn = (selRegion === 'ALL' || selRegion === 'IN');
 
+        const fmtMoney = (val, cur) => this.formatMoney(val, cur, { ignorePrivacy: true });
+
         let kpiHtml = '';
         if (hasJp) {
             kpiHtml += `
@@ -6144,15 +6717,15 @@ class App {
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                         <div>
                             <span class="text-xs text-muted">Income</span>
-                            <div class="font-bold text-success privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(jpIncome, '¥')}</div>
+                            <div class="font-bold text-success font-numeric" style="font-size: 1.05rem;">${fmtMoney(jpIncome, '¥')}</div>
                         </div>
                         <div>
                             <span class="text-xs text-muted">Expenses</span>
-                            <div class="font-bold text-danger privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(jpExpense, '¥')}</div>
+                            <div class="font-bold text-danger font-numeric" style="font-size: 1.05rem;">${fmtMoney(jpExpense, '¥')}</div>
                         </div>
                         <div>
                             <span class="text-xs text-muted">Net Surplus</span>
-                            <div class="font-bold ${jpIncome - jpExpense >= 0 ? 'text-success' : 'text-danger'} privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(jpIncome - jpExpense, '¥')}</div>
+                            <div class="font-bold ${jpIncome - jpExpense >= 0 ? 'text-success' : 'text-danger'} font-numeric" style="font-size: 1.05rem;">${fmtMoney(jpIncome - jpExpense, '¥')}</div>
                         </div>
                     </div>
                 </div>
@@ -6168,15 +6741,15 @@ class App {
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                         <div>
                             <span class="text-xs text-muted">Income</span>
-                            <div class="font-bold text-success privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(inIncome, '₹')}</div>
+                            <div class="font-bold text-success font-numeric" style="font-size: 1.05rem;">${fmtMoney(inIncome, '₹')}</div>
                         </div>
                         <div>
                             <span class="text-xs text-muted">Expenses</span>
-                            <div class="font-bold text-danger privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(inExpense, '₹')}</div>
+                            <div class="font-bold text-danger font-numeric" style="font-size: 1.05rem;">${fmtMoney(inExpense, '₹')}</div>
                         </div>
                         <div>
                             <span class="text-xs text-muted">Net Surplus</span>
-                            <div class="font-bold ${inIncome - inExpense >= 0 ? 'text-success' : 'text-danger'} privacy-blur font-numeric" style="font-size: 1.05rem;">${this.formatMoney(inIncome - inExpense, '₹')}</div>
+                            <div class="font-bold ${inIncome - inExpense >= 0 ? 'text-success' : 'text-danger'} font-numeric" style="font-size: 1.05rem;">${fmtMoney(inIncome - inExpense, '₹')}</div>
                         </div>
                     </div>
                 </div>
@@ -6190,10 +6763,10 @@ class App {
                     <h5 style="margin: 0 0 8px 0; font-size: 0.86rem; font-weight: 600; color: var(--text-secondary);">Category Breakdown</h5>
                     <div style="display: flex; flex-direction: column; gap: 6px;">
                         ${sortedCats.slice(0, 8).map(c => {
-                            const cur = c.region === 'JP' ? '¥' : '₹';
-                            const regTotalExp = c.region === 'JP' ? jpExpense : inExpense;
-                            const share = regTotalExp > 0 ? Math.round((c.amount / regTotalExp) * 100) : 0;
-                            return `
+                const cur = c.region === 'JP' ? '¥' : '₹';
+                const regTotalExp = c.region === 'JP' ? jpExpense : inExpense;
+                const share = regTotalExp > 0 ? Math.round((c.amount / regTotalExp) * 100) : 0;
+                return `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.82rem;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <i data-lucide="${c.icon}" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
@@ -6202,11 +6775,11 @@ class App {
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 10px;">
                                         <span class="text-xs text-muted font-numeric">${share}%</span>
-                                        <strong class="privacy-blur font-numeric">${this.formatMoney(c.amount, cur)}</strong>
+                                        <strong class="font-numeric">${fmtMoney(c.amount, cur)}</strong>
                                     </div>
                                 </div>
                             `;
-                        }).join('')}
+            }).join('')}
                     </div>
                 </div>
             `;
@@ -6252,11 +6825,9 @@ class App {
         const printContainer = document.getElementById('print-container');
         if (!printContainer) return;
 
-        const isPrivacy = this.isPrivacyHidden;
-        const fmt = (val, cur) => {
-            if (isPrivacy) return '••••••';
-            return this.formatMoney(val, cur);
-        };
+        const savedPrivacy = this.isPrivacyHidden;
+        this.isPrivacyHidden = false;
+        const fmt = (val, cur) => this.formatMoney(val, cur, { ignorePrivacy: true });
 
         let sectionsHtml = '';
 
@@ -6378,6 +6949,10 @@ class App {
 
         setTimeout(() => {
             window.print();
+            this.isPrivacyHidden = savedPrivacy;
+            setTimeout(() => {
+                printContainer.innerHTML = '';
+            }, 1000);
         }, 300);
     }
 

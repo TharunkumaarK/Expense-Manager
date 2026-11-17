@@ -3818,6 +3818,57 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     background: var(--bg-surface-2);
 }
 
+.focus-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.focus-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-xs);
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-out),
+        background-color var(--duration-fast) var(--ease-out);
+    flex-shrink: 0;
+}
+
+.focus-back-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.focus-back-btn svg,
+.focus-back-btn i {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+    transition: transform var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.focus-back-btn:hover svg,
+.focus-back-btn:hover i {
+    color: var(--text-primary);
+    transform: translateX(-2px);
+}
+
+.focus-header-divider {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    opacity: 0.45;
+    user-select: none;
+    flex-shrink: 0;
+}
+
 .focus-title-group {
     display: flex;
     align-items: center;
@@ -3876,6 +3927,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     border-right: 1px solid var(--border-subtle);
     position: relative;
     overflow: hidden;
+    animation: focusPanelFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .focus-wallet-card {
@@ -3943,15 +3995,19 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 .focus-wallet-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 10px;
+    display: flex;
+    width: 100%;
+    margin-top: 12px;
 }
 
-.focus-wallet-actions .btn-edit-account {
-    grid-column: 1 / -1;
-    font-size: 0.82rem;
+.focus-wallet-actions .btn {
+    width: 100%;
+    justify-content: center;
+    font-size: 0.88rem;
+    font-weight: 500;
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
+    gap: 8px;
 }
 
 .focus-country-card {
@@ -3992,18 +4048,18 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
 .focus-country-actions {
     display: flex;
-    gap: 10px;
-    z-index: 2;
+    width: 100%;
     margin-top: 12px;
 }
 
 .focus-country-actions .btn {
-    flex: 1;
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.22);
-    color: #fff;
-    font-size: 0.82rem;
-    padding: 8px 14px;
+    width: 100%;
+    justify-content: center;
+    font-size: 0.88rem;
+    font-weight: 500;
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
+    gap: 8px;
 }
 
 .focus-secondary-panel {
@@ -4012,6 +4068,35 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     flex-direction: column;
     overflow-y: auto;
     background: var(--bg-surface-2);
+    animation: focusPanelFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes focusPanelFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .focus-primary-panel,
+    .focus-secondary-panel {
+        animation: none !important;
+    }
+}
+
+/* Standalone Metallic EMV Microchip */
+.card-chip-svg {
+    width: 32px;
+    height: 24px;
+    filter: drop-shadow(0 1.5px 2px rgba(0, 0, 0, 0.45));
+    flex-shrink: 0;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .focus-activity-header {
@@ -4160,14 +4245,18 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     padding: 14px 16px;
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+    transition: border-color var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast) var(--ease-out),
+        background-color var(--duration-fast) var(--ease-out);
     border: 1px solid rgba(255, 255, 255, 0.1);
     gap: 12px;
 }
 
 .focus-associated-wallet-row:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+    transform: none !important;
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 .focus-associated-wallet-left {
@@ -5422,6 +5511,35 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     }
 
     /* Mobile Focus Overlay: Compact Header + Unified Single Scroll */
+    .focus-header {
+        padding: 12px 16px !important;
+    }
+
+    .focus-header-left {
+        gap: 8px !important;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .focus-back-btn {
+        padding: 4px 8px !important;
+        font-size: 0.8rem !important;
+        max-width: 140px;
+    }
+
+    .focus-back-btn span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    #focus-modal-title {
+        font-size: 1.05rem !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     .focus-body-grid {
         display: flex !important;
         flex-direction: column !important;
@@ -5481,40 +5599,29 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         font-size: 0.72rem !important;
     }
 
-    .focus-wallet-actions {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr 1fr !important;
-        gap: 6px !important;
-        margin-top: 6px !important;
+    .focus-wallet-actions,
+    .focus-country-actions {
+        display: flex !important;
+        width: 100% !important;
+        margin-top: 8px !important;
     }
 
     .focus-wallet-actions .btn,
     .focus-country-actions .btn {
-        padding: 8px 4px !important;
-        font-size: 0.76rem !important;
-        gap: 4px !important;
+        width: 100% !important;
+        padding: 9px 12px !important;
+        font-size: 0.84rem !important;
+        gap: 6px !important;
         justify-content: center !important;
-        white-space: nowrap !important;
     }
 
     .focus-wallet-actions .btn i,
     .focus-wallet-actions .btn svg,
     .focus-country-actions .btn i,
     .focus-country-actions .btn svg {
-        width: 13px !important;
-        height: 13px !important;
+        width: 14px !important;
+        height: 14px !important;
         margin-right: 2px !important;
-    }
-
-    .focus-wallet-actions .btn-edit-account {
-        grid-column: auto !important;
-    }
-
-    .focus-country-actions {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr !important;
-        gap: 8px !important;
-        margin-top: 8px !important;
     }
 
     .focus-secondary-panel {
@@ -5619,6 +5726,25 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     }
 
     #report-country-selector .segment-btn {
+        flex: 1 !important;
+        justify-content: center !important;
+        text-align: center !important;
+    }
+
+    /* Analytics Toolbar Mobile Breakpoint */
+    .analytics-toolbar-card {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+        padding: 12px 14px !important;
+    }
+
+    #analytics-country-selector {
+        width: 100% !important;
+        display: flex !important;
+    }
+
+    #analytics-country-selector .segment-btn {
         flex: 1 !important;
         justify-content: center !important;
         text-align: center !important;
@@ -5985,14 +6111,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 @media (max-width: 420px) {
-    .focus-wallet-actions {
-        grid-template-columns: 1fr 1fr !important;
-    }
-
-    .focus-wallet-actions .btn-edit-account {
-        grid-column: 1 / -1 !important;
-    }
-
     #analytics-jp-workspace .analytics-kpi-grid,
     .analytics-kpi-grid {
         grid-template-columns: 1fr !important;
@@ -6036,6 +6154,12 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     }
 }
 
+/* --- Custom Range Report Privacy Override --- */
+#report-custom-results .privacy-blur {
+    filter: none !important;
+    user-select: auto !important;
+}
+
 /* --- Print Styles --- */
 @media screen {
     #print-container {
@@ -6051,22 +6175,27 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
 @media print {
     @page {
-        margin: 0;
+        margin: 0 !important;
+        size: A4 portrait;
     }
 
     body,
     html {
-        background-color: #0a0a0f !important;
+        background-color: #000000 !important;
+        background: #000000 !important;
         color: #f8f9fa !important;
-        margin: 0;
-        padding: 0;
+        margin: 0 !important;
+        padding: 0 !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
-        height: 100%;
+        min-height: 100% !important;
+        height: auto !important;
+        width: 100% !important;
     }
 
     /* Hide everything except print container */
     #app-content,
+    .desktop-sidebar,
     .bottom-nav,
     .fab,
     .modal-overlay,
@@ -6079,13 +6208,443 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
     #print-container {
         display: block !important;
-        width: 100%;
-        margin: 0;
-        padding: 40px;
-        background-color: #0a0a0f !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 100vh !important;
+        margin: 0 !important;
+        padding: 32px 28px !important;
+        background-color: #000000 !important;
+        background: #000000 !important;
+        color: #f8f9fa !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        box-sizing: border-box !important;
     }
 
-    /* PDF Document Styles */
+    /* --- Obsidian Dark PDF Financial Report Styles --- */
+    .print-report-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        color: #f8f9fa;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        box-sizing: border-box;
+    }
+
+    .print-header-banner {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 16px 20px;
+        background: #111118 !important;
+        border: 1px solid #111118 !important;
+        border-radius: 12px;
+        box-shadow: none !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .print-header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .print-brand-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: #8b8b99;
+    }
+
+    .print-report-title {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: -0.3px;
+    }
+
+    .print-report-subtitle {
+        margin: 0;
+        font-size: 12px;
+        color: #a0a0ab;
+    }
+
+    .print-header-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        text-align: right;
+    }
+
+    .print-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 8px;
+        border-radius: 9999px;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+    }
+
+    .print-status-badge.closed {
+        background: rgba(16, 185, 129, 0.15) !important;
+        color: #34d399 !important;
+        border: 1px solid rgba(16, 185, 129, 0.25) !important;
+    }
+
+    .print-status-badge.active {
+        background: rgba(62, 99, 221, 0.15) !important;
+        color: #7090ff !important;
+        border: 1px solid rgba(62, 99, 221, 0.25) !important;
+    }
+
+    .print-meta-line {
+        font-size: 10.5px;
+        color: #8b8b99;
+    }
+
+    /* KPI Financial Summaries */
+    .print-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .print-kpi-card {
+        background: #111118 !important;
+        border: 1px solid #111118 !important;
+        border-radius: 10px;
+        box-shadow: none !important;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .print-kpi-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #8b8b99;
+    }
+
+    .print-kpi-value {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.2px;
+        font-family: inherit;
+    }
+
+    .print-kpi-value.income {
+        color: #34d399 !important;
+    }
+
+    .print-kpi-value.expense {
+        color: #fb7185 !important;
+    }
+
+    .print-kpi-value.savings-pos {
+        color: #34d399 !important;
+    }
+
+    .print-kpi-value.savings-neg {
+        color: #fb7185 !important;
+    }
+
+    .print-kpi-sub {
+        font-size: 10.5px;
+        color: #6b6b78;
+    }
+
+    /* Budget Performance Card */
+    .print-budget-card {
+        background: #111118 !important;
+        border: 1px solid #111118 !important;
+        border-radius: 10px;
+        box-shadow: none !important;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .print-budget-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .print-budget-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #f0f0f5;
+        margin: 0;
+    }
+
+    .print-budget-status {
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 4px;
+    }
+
+    .print-budget-status.safe {
+        background: rgba(16, 185, 129, 0.12) !important;
+        color: #34d399 !important;
+        border: 1px solid rgba(16, 185, 129, 0.2) !important;
+    }
+
+    .print-budget-status.over {
+        background: rgba(244, 63, 94, 0.12) !important;
+        color: #fb7185 !important;
+        border: 1px solid rgba(244, 63, 94, 0.2) !important;
+    }
+
+    .print-budget-bar-track {
+        height: 6px;
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .print-budget-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+    }
+
+    .print-budget-bar-fill.safe {
+        background: #10b981 !important;
+    }
+
+    .print-budget-bar-fill.warn {
+        background: #f59e0b !important;
+    }
+
+    .print-budget-bar-fill.danger {
+        background: #f43f5e !important;
+    }
+
+    .print-budget-stats {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10.5px;
+        color: #a0a0ab;
+    }
+
+    /* Analytics Chart & Distribution */
+    .print-analytics-card {
+        background: #111118 !important;
+        border: 1px solid #111118 !important;
+        border-radius: 10px;
+        box-shadow: none !important;
+        padding: 14px 18px;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .print-section-title {
+        margin: 0 0 10px 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .print-chart-grid {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .print-chart-visual {
+        flex-shrink: 0;
+        width: 190px;
+        height: 190px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .print-chart-legend {
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px 12px;
+    }
+
+    .print-legend-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 5px 8px;
+        background: #161622 !important;
+        border: 1px solid #161622 !important;
+        border-radius: 6px;
+        font-size: 10.5px;
+    }
+
+    .print-legend-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        overflow: hidden;
+    }
+
+    .print-legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .print-legend-name {
+        color: #e4e4e7;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .print-legend-right {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    .print-legend-pct {
+        font-size: 9.5px;
+        color: #8b8b99;
+        font-weight: 600;
+    }
+
+    .print-legend-amt {
+        color: #ffffff;
+        font-weight: 600;
+    }
+
+    /* Category Breakdown Table */
+    .print-table-card {
+        background: #111118 !important;
+        border: 1px solid #111118 !important;
+        border-radius: 10px;
+        box-shadow: none !important;
+        padding: 14px 18px;
+        break-inside: auto;
+    }
+
+    .print-report-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10.5px;
+        text-align: left;
+    }
+
+    .print-report-table thead th {
+        padding: 6px 8px;
+        border-bottom: 1px solid #1e1e2b !important;
+        color: #8b8b99;
+        font-size: 9.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+    }
+
+    .print-report-table tbody tr {
+        border-bottom: 1px solid #161622 !important;
+    }
+
+    .print-report-table tbody tr:last-child {
+        border-bottom: none !important;
+    }
+
+    .print-report-table td {
+        padding: 6px 8px;
+        color: #e4e4e7;
+    }
+
+    /* Transactions Audit Log */
+    .print-transactions-section {
+        margin-top: 6px;
+        break-inside: auto;
+    }
+
+    .print-tx-group {
+        margin-bottom: 12px;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .print-date-header {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: #7090ff;
+        padding: 3px 6px;
+        border-left: 2px solid #3e63dd !important;
+        border-top: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        background: #111118 !important;
+        border-radius: 0 4px 4px 0;
+        margin-bottom: 4px;
+        letter-spacing: 0.3px;
+    }
+
+    .print-tx-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10.5px;
+    }
+
+    .print-tx-table tr {
+        border-bottom: 1px solid #14141d !important;
+    }
+
+    .print-tx-table td {
+        padding: 5px 6px;
+    }
+
+    .print-tx-table .tx-amount-in {
+        color: #34d399 !important;
+        font-weight: 600;
+        text-align: right;
+    }
+
+    .print-tx-table .tx-amount-out {
+        color: #f4f4f5 !important;
+        font-weight: 600;
+        text-align: right;
+    }
+
+    /* Document Footer */
+    .print-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 10px;
+        border-top: 1px solid #1e1e2b !important;
+        font-size: 9.5px;
+        color: #6b6b78;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    /* Legacy PDF Document Styles for Settings Statement */
     .print-header {
         text-align: center;
         margin-bottom: 30px;
@@ -8579,6 +9138,92 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
 }
 
+/* Custom Report Presets & Calendar Date Picker Wrapper */
+.custom-report-presets-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+    margin-bottom: 2px;
+}
+
+.custom-report-presets-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.preset-pill-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all var(--duration-fast);
+    line-height: 1.3;
+}
+
+.preset-pill-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.preset-pill-btn.active {
+    background: rgba(62, 99, 221, 0.25);
+    border-color: #3e63dd;
+    color: #9cb3ff;
+    font-weight: 600;
+}
+
+.date-picker-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    cursor: pointer;
+}
+
+.date-picker-input-wrap .filter-date-input {
+    width: 100%;
+    padding-right: 34px !important;
+    cursor: pointer;
+}
+
+.date-picker-icon-btn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: color 0.15s, background-color 0.15s;
+    pointer-events: auto;
+}
+
+.date-picker-icon-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.date-picker-icon-btn svg,
+.date-picker-icon-btn i {
+    width: 15px;
+    height: 15px;
+}
+
 .custom-range-row {
     display: flex;
     align-items: center;
@@ -10101,8 +10746,8 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         gap: 8px;
     }
 
-    .settings-control-wrap > div[style*="display:flex"],
-    .settings-control-wrap > div[style*="display: flex"] {
+    .settings-control-wrap>div[style*="display:flex"],
+    .settings-control-wrap>div[style*="display: flex"] {
         flex-direction: column !important;
         align-items: stretch !important;
         width: 100% !important;
@@ -10156,7 +10801,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         overflow: hidden;
     }
 
-    .settings-theme-preview > div:first-child {
+    .settings-theme-preview>div:first-child {
         flex-wrap: wrap;
         gap: 6px;
     }
