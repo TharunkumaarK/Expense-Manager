@@ -61,11 +61,11 @@ const defaultState = {
         DE: [
             { id: 'de-groceries', name: 'Groceries & Supermarket', icon: 'shopping-basket', budget: 0 },
             { id: 'de-dining', name: 'Dining & Cafes', icon: 'utensils', budget: 0 },
-            { id: 'de-transport', name: 'Public Transit & DB', icon: 'train-front', budget: 0 },
-            { id: 'de-rent', name: 'Rent & Warmmiete', icon: 'home', budget: 0 },
+            { id: 'de-transport', name: 'Public Transit & Train', icon: 'train-front', budget: 0 },
+            { id: 'de-rent', name: 'Rent & Housing', icon: 'home', budget: 0 },
             { id: 'de-utilities', name: 'Electricity & Heating', icon: 'zap', budget: 0 },
             { id: 'de-internet', name: 'Internet & Mobile', icon: 'wifi', budget: 0 },
-            { id: 'de-insurance', name: 'Insurance (Versicherung)', icon: 'shield-check', budget: 0 },
+            { id: 'de-insurance', name: 'Insurance', icon: 'shield-check', budget: 0 },
             { id: 'de-health', name: 'Health & Pharmacy', icon: 'pill', budget: 0 },
             { id: 'de-leisure', name: 'Leisure & Subscriptions', icon: 'gamepad-2', budget: 0 },
             { id: 'de-shopping', name: 'Shopping & Household', icon: 'shopping-bag', budget: 0 },
@@ -375,8 +375,8 @@ class StorageManager {
             // An incomplete onboarding session is only considered to have established data if it contains
             // actual persisted transaction history from a continuous ledger
             return this.getUniqueTransactionCount(state) > 0 ||
-                   Boolean(state.closedMonths && Object.keys(state.closedMonths).length > 0) ||
-                   Boolean(Array.isArray(state.history) && state.history.length > 0);
+                Boolean(state.closedMonths && Object.keys(state.closedMonths).length > 0) ||
+                Boolean(Array.isArray(state.history) && state.history.length > 0);
         }
 
         // If onboarding was already marked complete, it is an established configuration
@@ -1619,8 +1619,8 @@ class StorageManager {
         if (!countryOrKey) return;
         const key = String(countryOrKey).trim();
         const code = (key === 'jpTotalBudget' || key === 'JP' || key === 'JPY') ? 'JP' :
-                     (key === 'inTotalBudget' || key === 'IN' || key === 'INR') ? 'IN' :
-                     (key === 'DE' || key === 'EUR') ? 'DE' : key.toUpperCase();
+            (key === 'inTotalBudget' || key === 'IN' || key === 'INR') ? 'IN' :
+                (key === 'DE' || key === 'EUR') ? 'DE' : key.toUpperCase();
         const num = Number(amount) || 0;
 
         if (!this.state.budgets) {

@@ -11526,3 +11526,592 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     color: var(--text-muted);
     margin: 0;
 }
+
+/* ==========================================================================
+   Desktop Onboarding Experience (Phase 3)
+   ========================================================================== */
+
+/* Prevent background leakage while onboarding is active */
+body:has(#onboarding-screen:not([style*="display: none"])) #bottom-nav,
+body:has(#onboarding-screen:not([style*="display: none"])) #main-fab,
+body:has(#onboarding-screen:not([style*="display: none"])) .top-bar,
+body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
+    display: none !important;
+}
+
+.onboarding-container {
+    max-width: 1280px;
+    grid-template-columns: 1.15fr auto 1.05fr;
+}
+
+.onboarding-preview-pane {
+    padding-right: 24px;
+}
+
+.onboarding-wallet-showcase {
+    position: relative;
+    width: 100%;
+    max-width: 550px;
+    height: 310px;
+    min-height: 310px;
+    margin-bottom: 28px !important;
+}
+
+.onboarding-wallet-showcase .auth-card-preview {
+    position: absolute;
+    width: 388px;
+    height: 220px;
+    border-radius: 18px;
+    padding: 22px 24px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    cursor: default;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease, border-color 0.28s ease, z-index 0.05s ease;
+}
+
+/* Hover elevation: lifts card up and brings to forefront */
+.onboarding-wallet-showcase .auth-card-preview:hover {
+    z-index: 10 !important;
+    transform: translateY(-8px) scale(1.02) !important;
+}
+
+.onboarding-preview-subhead {
+    margin-top: 0;
+    line-height: 1.6;
+}
+
+.onboarding-step-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #f5f5f7;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+}
+
+.onboarding-step-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #3b82f6;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+}
+
+.onboarding-card {
+    max-width: 580px;
+    background: rgba(14, 14, 18, 0.76);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 22px;
+    padding: 36px 32px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+    box-sizing: border-box;
+}
+
+.onboarding-progress-track {
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    margin-bottom: 22px;
+    overflow: hidden;
+}
+
+.onboarding-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    border-radius: 999px;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.onboarding-title-row {
+    margin-bottom: 24px;
+}
+
+/* Country Selection Cards */
+.onboarding-country-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.onboarding-country-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.onboarding-country-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.onboarding-country-card.selected {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.onboarding-country-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.onboarding-country-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.onboarding-flag-svg {
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.onboarding-country-name {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.onboarding-currency-badge {
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.onboarding-checkbox {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.onboarding-checkbox.checked {
+    border-color: #ffffff;
+    background: #ffffff;
+    color: #000000;
+}
+
+.onboarding-checkbox.checked i {
+    width: 13px;
+    height: 13px;
+    stroke-width: 3;
+}
+
+.onboarding-country-desc {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    margin: 0;
+}
+
+.onboarding-primary-currency-row {
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.onboarding-select {
+    padding-right: 18px;
+    cursor: pointer;
+}
+
+/* Budget Cards */
+.onboarding-budget-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.onboarding-budget-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 18px;
+}
+
+.onboarding-budget-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.onboarding-budget-title-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.onboarding-country-code-pill {
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 2px 7px;
+    border-radius: 5px;
+}
+
+.onboarding-budget-country-title {
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
+}
+
+/* iOS-Style Minimal Fintech Toggle Switch */
+.onboarding-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.onboarding-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.onboarding-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.onboarding-toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.onboarding-toggle-switch input:checked + .onboarding-toggle-slider {
+    background-color: #2563eb;
+}
+
+.onboarding-toggle-switch input:checked + .onboarding-toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.onboarding-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.onboarding-checkbox-row input {
+    cursor: pointer;
+}
+
+/* Wallets Configuration */
+.onboarding-wallets-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.onboarding-country-wallets-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 16px;
+}
+
+.onboarding-section-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.onboarding-section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
+}
+
+.onboarding-btn-add-wallet {
+    font-size: 0.78rem !important;
+    padding: 4px 10px !important;
+    height: 28px !important;
+    border-radius: 6px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.onboarding-btn-add-wallet i {
+    width: 14px;
+    height: 14px;
+}
+
+.onboarding-wallet-rows-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.onboarding-wallet-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.32);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+}
+
+.onboarding-wallet-row-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.onboarding-wallet-icon-box {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1.5px solid;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    flex-shrink: 0;
+}
+
+.onboarding-wallet-icon-box i {
+    width: 16px;
+    height: 16px;
+}
+
+.onboarding-wallet-row-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.onboarding-wallet-row-name {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.onboarding-wallet-row-type {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+}
+
+.onboarding-wallet-row-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.onboarding-balance-input-wrap {
+    width: 140px;
+}
+
+.onboarding-balance-input {
+    height: 38px !important;
+    padding: 0 12px 0 32px !important;
+    font-size: 0.9rem !important;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.onboarding-wallet-delete-btn {
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.onboarding-wallet-delete-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.onboarding-wallet-delete-btn i {
+    width: 16px;
+    height: 16px;
+}
+
+/* Loan Tracking & Review (Step 4) */
+.onboarding-loan-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 18px;
+}
+
+.onboarding-loan-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.onboarding-loan-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.onboarding-summary-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 18px;
+}
+
+.onboarding-review-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
+}
+
+.onboarding-summary-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.onboarding-summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+}
+
+.onboarding-summary-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.onboarding-summary-val {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+/* Actions Footer */
+.onboarding-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.onboarding-btn-back {
+    height: 44px;
+    padding: 0 18px;
+    font-size: 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.onboarding-btn-back:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+}
+
+.onboarding-btn-next {
+    height: 44px;
+    padding: 0 24px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+/* EUR Germany Showcase Card */
+.auth-card-de {
+    background: radial-gradient(circle at 10% 15%, rgba(37, 99, 235, 0.24), transparent 50%),
+        radial-gradient(circle at 90% 85%, rgba(30, 64, 175, 0.18), transparent 55%),
+        linear-gradient(145deg, #0e131d, #080c14) !important;
+    border: 1px solid rgba(59, 130, 246, 0.26) !important;
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.7), 0 0 28px rgba(37, 99, 235, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.auth-card-de:hover {
+    border-color: rgba(59, 130, 246, 0.45) !important;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35), 0 22px 48px rgba(37, 99, 235, 0.22), 0 22px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+    transform: translateY(-3px);
+}

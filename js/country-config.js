@@ -55,7 +55,7 @@
             flagSvg: '<svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="18" height="13.5" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);vertical-align:middle;display:inline-block;flex-shrink:0;" aria-label="India"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>',
             defaultWallets: Object.freeze([
                 { id: 'Bank Account', name: 'Bank Account', type: 'bank', region: 'IN', currency: '₹', color: '#97144d' },
-                { id: 'Cash', name: 'Cash', type: 'cash', region: 'IN', currency: '₹', color: '#d4af37' }
+                { id: 'Cash (IN)', name: 'Cash', type: 'cash', region: 'IN', currency: '₹', color: '#d4af37' }
             ]),
             defaultCategories: Object.freeze([
                 { id: 'in-petrol', name: 'Petrol & Fuel', icon: 'fuel', budget: 0 },
@@ -81,17 +81,17 @@
             symbolPosition: 'before', // '€1.234,50' or '1.234,50 €'
             flagSvg: '<svg class="country-flag-svg flag-de" viewBox="0 0 640 480" width="18" height="13.5" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);vertical-align:middle;display:inline-block;flex-shrink:0;" aria-label="Germany"><rect width="640" height="160" y="0" fill="#000000"/><rect width="640" height="160" y="160" fill="#dd0000"/><rect width="640" height="160" y="320" fill="#ffce00"/></svg>',
             defaultWallets: Object.freeze([
-                { id: 'Girokonto', name: 'Girokonto (Checking)', type: 'bank', region: 'DE', currency: '€', color: '#1e3a8a' },
-                { id: 'Bargeld', name: 'Bargeld (Cash)', type: 'cash', region: 'DE', currency: '€', color: '#d4af37' }
+                { id: 'Checking Account', name: 'Checking Account', type: 'bank', region: 'DE', currency: '€', color: '#1e3a8a' },
+                { id: 'Cash (DE)', name: 'Cash', type: 'cash', region: 'DE', currency: '€', color: '#d4af37' }
             ]),
             defaultCategories: Object.freeze([
                 { id: 'de-groceries', name: 'Groceries & Supermarket', icon: 'shopping-basket', budget: 0 },
                 { id: 'de-dining', name: 'Dining & Cafes', icon: 'utensils', budget: 0 },
-                { id: 'de-transport', name: 'Public Transit & DB', icon: 'train-front', budget: 0 },
-                { id: 'de-rent', name: 'Rent & Warmmiete', icon: 'home', budget: 0 },
+                { id: 'de-transport', name: 'Public Transit & Train', icon: 'train-front', budget: 0 },
+                { id: 'de-rent', name: 'Rent & Housing', icon: 'home', budget: 0 },
                 { id: 'de-utilities', name: 'Electricity & Heating', icon: 'zap', budget: 0 },
                 { id: 'de-internet', name: 'Internet & Mobile', icon: 'wifi', budget: 0 },
-                { id: 'de-insurance', name: 'Insurance (Versicherung)', icon: 'shield-check', budget: 0 },
+                { id: 'de-insurance', name: 'Insurance', icon: 'shield-check', budget: 0 },
                 { id: 'de-health', name: 'Health & Pharmacy', icon: 'pill', budget: 0 },
                 { id: 'de-leisure', name: 'Leisure & Subscriptions', icon: 'gamepad-2', budget: 0 },
                 { id: 'de-shopping', name: 'Shopping & Household', icon: 'shopping-bag', budget: 0 },

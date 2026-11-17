@@ -279,6 +279,18 @@ const supabaseClient = {
             if (typeof storage !== 'undefined') {
                 storage.onUserLogin(this.session.user.id);
                 const stateChanged = await storage.syncFromSupabase();
+
+                // If account requires onboarding (new user or incomplete setup), activate desktop onboarding
+                const requiresOnboarding = storage.isNewUser() || storage.getAccountStatus() === 'ONBOARDING_INCOMPLETE';
+                if (requiresOnboarding && typeof onboardingController !== 'undefined') {
+                    if (appContent) appContent.style.display = 'none';
+                    if (bottomNav) bottomNav.style.display = 'none';
+                    if (mainFab) mainFab.style.display = 'none';
+                    onboardingController.init();
+                    onboardingController.show();
+                    return;
+                }
+
                 if (typeof app !== 'undefined') {
                     if (!app._hasInit) {
                         console.log('[Sync] Initializing app after sync...');
@@ -296,6 +308,8 @@ const supabaseClient = {
         } else {
             authScreen.style.display = 'flex';
             if (resetScreen) resetScreen.style.display = 'none';
+            const onboardingScreen = document.getElementById('onboarding-screen');
+            if (onboardingScreen) onboardingScreen.style.display = 'none';
             appContent.style.display = 'none';
             if (bottomNav) bottomNav.style.display = 'none';
             if (mainFab) mainFab.style.display = 'none';
@@ -525,6 +539,8 @@ const supabaseClient = {
         }
     }
 };
+
+window.supabaseClient = supabaseClient;
 
 // Initialize after DOM load
 document.addEventListener('DOMContentLoaded', () => {
