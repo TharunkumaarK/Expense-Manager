@@ -110,6 +110,7 @@ class StorageManager {
         this.currentUserId = null;
         this.initialSyncDone = false;
         this.accountStatus = 'UNRESOLVED';
+        this.cloudSyncStatus = 'IDLE';
         this.syncError = null;
         this.state = this.loadData();
         this._attachBudgetAccessors(this.state);
@@ -177,6 +178,7 @@ class StorageManager {
         if (previousUserId !== userId) {
             this.initialSyncDone = false;
             this.accountStatus = 'UNRESOLVED';
+            this.cloudSyncStatus = 'IDLE';
             this.syncError = null;
             this.state = this.loadData();
             this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
@@ -192,6 +194,7 @@ class StorageManager {
         this.currentUserId = null;
         this.initialSyncDone = false;
         this.accountStatus = 'UNRESOLVED';
+        this.cloudSyncStatus = 'IDLE';
         this.syncError = null;
         this.isFirstLoad = true;
         this.state = JSON.parse(JSON.stringify(defaultState));
@@ -357,6 +360,85 @@ class StorageManager {
     }
 
     /**
+     * Determine if a state represents an established legacy account with real financial data.
+     * Draft onboarding states (preferences.onboardingCompleted === false) are strictly excluded,
+     * ensuring opening balances or draft inputs are never mistaken for established accounts.
+     *
+     * @param {Object} state
+     * @returns {boolean}
+     */
+    isEstablishedLegacyFinancialData(state) {
+        if (!state || typeof state !== 'object') return false;
+
+        // If explicitly marked as incomplete onboarding, this is draft configuration, NOT established legacy data
+        if (state.preferences && state.preferences.onboardingCompleted === false) {
+            // An incomplete onboarding session is only considered to have established data if it contains
+            // actual persisted transaction history from a continuous ledger
+            return this.getUniqueTransactionCount(state) > 0 ||
+                Boolean(state.closedMonths && Object.keys(state.closedMonths).length > 0) ||
+                Boolean(Array.isArray(state.history) && state.history.length > 0);
+        }
+
+        // If onboarding was already marked complete, it is an established configuration
+        if (state.preferences && state.preferences.onboardingCompleted === true) {
+            return true;
+        }
+
+        // For legacy states lacking a preferences object (pre-v3 envelopes):
+        return this.hasEstablishedFinancialData(state);
+    }
+
+    /**
+     * Check if a state is currently in draft (in-progress/interrupted) onboarding.
+     * Requires that onboarding is uncompleted AND user has made draft progress
+     * (e.g. advanced past step 1, or entered custom configuration/balances).
+     * @param {Object} state
+     * @returns {boolean}
+     */
+    isDraftOnboardingConfiguration(state) {
+        if (!state || typeof state !== 'object') return false;
+        if (!state.preferences || state.preferences.onboardingCompleted !== false) {
+            return false;
+        }
+        // If user has advanced past step 1, it's an in-progress draft
+        if (typeof state.preferences.onboardingStep === 'number' && state.preferences.onboardingStep > 1) {
+            return true;
+        }
+        // If user entered nonzero wallet balances or custom budget in draft steps
+        if (state.wallets && typeof state.wallets === 'object') {
+            const hasNonZeroBalance = Object.values(state.wallets).some(w => w && Number(w.balance) !== 0);
+            if (hasNonZeroBalance) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if a state has completed onboarding configuration.
+     * @param {Object} state
+     * @returns {boolean}
+     */
+    hasCompletedOnboarding(state) {
+        if (!state || typeof state !== 'object') return false;
+        return Boolean(state.preferences && state.preferences.onboardingCompleted === true);
+    }
+
+    /**
+     * Check if cloud synchronization has been confirmed by Supabase.
+     * @returns {boolean}
+     */
+    isCloudSyncConfirmed() {
+        return this.cloudSyncStatus === 'CONFIRMED';
+    }
+
+    /**
+     * Get the current cloud synchronization status.
+     * @returns {'IDLE' | 'SYNCING' | 'CONFIRMED' | 'FAILED'}
+     */
+    getCloudSyncStatus() {
+        return this.cloudSyncStatus || 'IDLE';
+    }
+
+    /**
      * PHASE 1: PURE PREVIEW & VALIDATION
      * Performs complete migration and invariant validation on an isolated deep clone of state.
      * Guaranteed pure: does NOT write to localStorage, does NOT mutate inputState, does NOT call cloud sync.
@@ -506,7 +588,7 @@ class StorageManager {
             this._attachBudgetAccessors(state);
 
             // Ensure user preferences & onboarding configuration layer
-            const hasFinancialData = this.hasEstablishedFinancialData(state);
+            const hasFinancialData = this.isEstablishedLegacyFinancialData(state);
             if (!state.preferences || typeof state.preferences !== 'object') {
                 const detectedCountries = new Set();
                 if (state.wallets && typeof state.wallets === 'object') {
@@ -915,18 +997,28 @@ class StorageManager {
             if (error) {
                 if (error.code === 'PGRST116') {
                     // No remote state found in Supabase for this user
-                    const hasLocalData = this.hasEstablishedFinancialData(this.state);
-                    if (hasLocalData) {
-                        console.log('[Sync] No remote state found, but established local financial data detected. Initializing cloud backup...');
+                    const isDraft = this.isDraftOnboardingConfiguration(this.state);
+                    const hasEstablishedLegacy = this.isEstablishedLegacyFinancialData(this.state);
+
+                    if (hasEstablishedLegacy) {
+                        console.log('[Sync] No remote state found, but established legacy financial data detected. Initializing cloud backup...');
                         this.accountStatus = 'EXISTING_USER';
+                        this.cloudSyncStatus = 'SYNCING';
                         if (this.state.preferences) {
                             this.state.preferences.onboardingCompleted = true;
                         }
                         this.initialSyncDone = true;
-                        await this.pushToSupabase();
+                        const pushed = await this.pushToSupabase({ force: true });
+                        this.cloudSyncStatus = pushed ? 'CONFIRMED' : 'FAILED';
+                    } else if (isDraft) {
+                        console.log('[Sync] Incomplete onboarding draft detected locally. Preserving local draft, deferring cloud push.');
+                        this.accountStatus = 'ONBOARDING_INCOMPLETE';
+                        this.cloudSyncStatus = 'IDLE';
+                        this.initialSyncDone = true;
                     } else {
                         console.log('[Sync] Genuine new user account detected (no remote row, empty financial data). Onboarding required.');
                         this.accountStatus = 'NEW_USER';
+                        this.cloudSyncStatus = 'IDLE';
                         if (this.state.preferences) {
                             this.state.preferences.onboardingCompleted = false;
                             this.state.preferences.onboardingStep = 1;
@@ -938,6 +1030,7 @@ class StorageManager {
                     console.error('[Sync] Error fetching from Supabase:', error);
                     // Network or server error: fail closed!
                     this.accountStatus = 'SYNC_FAILED';
+                    this.cloudSyncStatus = 'FAILED';
                     this.syncError = error.message || String(error);
                     this.initialSyncDone = true;
                 }
@@ -950,14 +1043,22 @@ class StorageManager {
 
                 if (!remoteIsValid) {
                     console.warn('[Sync] Remote state invalid or empty structure.');
-                    const hasLocalData = this.hasEstablishedFinancialData(this.state);
-                    if (hasLocalData) {
+                    const isDraft = this.isDraftOnboardingConfiguration(this.state);
+                    const hasEstablishedLegacy = this.isEstablishedLegacyFinancialData(this.state);
+                    if (hasEstablishedLegacy) {
                         console.log('[Sync] Local state has valid data. Preserving local and pushing up...');
                         this.accountStatus = 'EXISTING_USER';
+                        this.cloudSyncStatus = 'SYNCING';
                         this.initialSyncDone = true;
-                        await this.pushToSupabase();
+                        const pushed = await this.pushToSupabase({ force: true });
+                        this.cloudSyncStatus = pushed ? 'CONFIRMED' : 'FAILED';
+                    } else if (isDraft) {
+                        this.accountStatus = 'ONBOARDING_INCOMPLETE';
+                        this.cloudSyncStatus = 'IDLE';
+                        this.initialSyncDone = true;
                     } else {
                         this.accountStatus = 'NEW_USER';
+                        this.cloudSyncStatus = 'IDLE';
                         this.initialSyncDone = true;
                     }
                     return false;
@@ -968,6 +1069,7 @@ class StorageManager {
                 if (!preview.success) {
                     console.error('[Sync] Migration of authoritative remote state failed validation. Halting sync:', preview.error);
                     this.accountStatus = 'SYNC_FAILED';
+                    this.cloudSyncStatus = 'FAILED';
                     this.syncError = preview.error;
                     this.initialSyncDone = true;
                     return false;
@@ -1005,6 +1107,7 @@ class StorageManager {
                     const persisted = this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
                     if (!persisted) {
                         this.accountStatus = 'SYNC_FAILED';
+                        this.cloudSyncStatus = 'FAILED';
                         this.initialSyncDone = true;
                         return false;
                     }
@@ -1013,8 +1116,10 @@ class StorageManager {
                     if (this.state.preferences && this.state.preferences.onboardingCompleted === false) {
                         const hasTx = this.getUniqueTransactionCount(this.state) > 0;
                         this.accountStatus = hasTx ? 'EXISTING_USER' : 'ONBOARDING_INCOMPLETE';
+                        this.cloudSyncStatus = 'IDLE';
                     } else {
                         this.accountStatus = 'EXISTING_USER';
+                        this.cloudSyncStatus = 'CONFIRMED';
                     }
 
                     this.isFirstLoad = false;
@@ -1030,14 +1135,17 @@ class StorageManager {
                 } else {
                     console.log(`[Sync] Local state wins (${localTxCount} txs vs remote ${remoteTxCount} txs). Pushing up...`);
                     this.accountStatus = 'EXISTING_USER';
+                    this.cloudSyncStatus = 'SYNCING';
                     this.initialSyncDone = true;
-                    await this.pushToSupabase();
+                    const pushed = await this.pushToSupabase({ force: true });
+                    this.cloudSyncStatus = pushed ? 'CONFIRMED' : 'FAILED';
                     return false;
                 }
             }
         } catch (e) {
             console.error('[Sync] Supabase sync failed with exception:', e);
             this.accountStatus = 'SYNC_FAILED';
+            this.cloudSyncStatus = 'FAILED';
             this.syncError = e.message || String(e);
             this.initialSyncDone = true;
         }
@@ -1052,22 +1160,23 @@ class StorageManager {
         const userId = supabaseClient.session.user.id;
         if (!userId) return false;
 
+        const allowExplicitPersist = Boolean(options && (options.force || options.allowOnboardingPersist));
+
         // Fail-closed guard: do not push if synchronization failed with server/network error
-        if (this.accountStatus === 'SYNC_FAILED') {
+        // UNLESS an explicit retry / forced persist is requested
+        if (this.accountStatus === 'SYNC_FAILED' && !allowExplicitPersist) {
             console.warn('[Storage] Refusing to push state to Supabase while in SYNC_FAILED state.');
             return false;
         }
 
-        // Safety guard: do not push placeholder default state if onboarding has not been completed
-        // UNLESS the user explicitly completes onboarding, explicitly forces persist, or has real financial records.
+        // Safety guard for Risk 1:
+        // Draft onboarding configuration (preferences.onboardingCompleted !== true) must NEVER
+        // be uploaded to Supabase, even if the user entered nonzero wallet opening balances
+        // or draft budgets. It remains strictly local until onboarding is explicitly completed.
         const isSetupCompleted = Boolean(this.state.preferences?.onboardingCompleted);
-        const allowExplicitPersist = Boolean(options && (options.force || options.allowOnboardingPersist));
-        const hasRealFinancialRecords = this.getUniqueTransactionCount(this.state) > 0 ||
-            Object.values(this.state.wallets || {}).some(w => w && Number(w.balance) !== 0);
 
-        if ((this.accountStatus === 'NEW_USER' || this.accountStatus === 'ONBOARDING_INCOMPLETE' || !isSetupCompleted) &&
-            !hasRealFinancialRecords && !allowExplicitPersist) {
-            console.log('[Storage] Deferring pushToSupabase for un-onboarded account until setup completion.');
+        if (!isSetupCompleted && !allowExplicitPersist) {
+            console.log('[Storage] Deferring pushToSupabase: draft onboarding configuration must not be uploaded before confirmation.');
             return false;
         }
 
@@ -1093,11 +1202,14 @@ class StorageManager {
 
             if (error) {
                 console.error("[Sync] Failed to push to Supabase:", error);
+                this.syncError = error.message || String(error);
                 return false;
             }
+            this.syncError = null;
             return true;
         } catch (e) {
             console.error("[Sync] Push to Supabase failed:", e);
+            this.syncError = e.message || String(e);
             return false;
         }
     }
@@ -1381,7 +1493,7 @@ class StorageManager {
     /**
      * Check if current account is a genuine first-time user.
      * Strictly requires authoritative NEW_USER resolution from Supabase sync.
-     * Never infers new user on SYNC_FAILED, UNRESOLVED, or for returning users.
+     * Never infers new user on SYNC_FAILED, PENDING_CLOUD_SYNC, UNRESOLVED, or for returning users.
      * @returns {boolean}
      */
     isNewUser() {
@@ -1390,16 +1502,17 @@ class StorageManager {
         }
         if (this.accountStatus === 'EXISTING_USER' ||
             this.accountStatus === 'ONBOARDING_INCOMPLETE' ||
+            this.accountStatus === 'PENDING_CLOUD_SYNC' ||
             this.accountStatus === 'SYNC_FAILED' ||
             this.accountStatus === 'UNRESOLVED') {
             return false;
         }
-        return false;
+        return Boolean(!this.state.preferences?.onboardingCompleted && !this.isEstablishedLegacyFinancialData(this.state));
     }
 
     /**
      * Get account resolution status.
-     * @returns {'UNRESOLVED'|'NEW_USER'|'EXISTING_USER'|'ONBOARDING_INCOMPLETE'|'SYNC_FAILED'}
+     * @returns {'UNRESOLVED'|'NEW_USER'|'EXISTING_USER'|'ONBOARDING_INCOMPLETE'|'PENDING_CLOUD_SYNC'|'SYNC_FAILED'}
      */
     getAccountStatus() {
         return this.accountStatus;
@@ -1506,8 +1619,8 @@ class StorageManager {
         if (!countryOrKey) return;
         const key = String(countryOrKey).trim();
         const code = (key === 'jpTotalBudget' || key === 'JP' || key === 'JPY') ? 'JP' :
-                     (key === 'inTotalBudget' || key === 'IN' || key === 'INR') ? 'IN' :
-                     (key === 'DE' || key === 'EUR') ? 'DE' : key.toUpperCase();
+            (key === 'inTotalBudget' || key === 'IN' || key === 'INR') ? 'IN' :
+                (key === 'DE' || key === 'EUR') ? 'DE' : key.toUpperCase();
         const num = Number(amount) || 0;
 
         if (!this.state.budgets) {
@@ -1553,17 +1666,112 @@ class StorageManager {
     }
 
     /**
-     * Mark onboarding setup as completed.
+     * Mark onboarding setup as completed and perform cloud synchronization.
+     * Records local completion safely to localStorage first, then attempts pushToSupabase.
+     * Guarantees that local configuration is preserved even if cloud synchronization fails.
+     *
      * @param {boolean} [completed=true]
+     * @param {Object} [options]
+     * @returns {Promise<{localSaved: boolean, cloudSynced: boolean, accountStatus: string, cloudSyncStatus: string, error?: string}>}
      */
-    markOnboardingCompleted(completed = true) {
-        if (completed) {
-            this.accountStatus = 'EXISTING_USER';
-        }
-        return this.updatePreferences({
-            onboardingCompleted: Boolean(completed),
-            onboardingStep: completed ? 4 : 1
+    async markOnboardingCompleted(completed = true, options = {}) {
+        const isComplete = Boolean(completed);
+
+        // 1. Safely persist local configuration first
+        this.updatePreferences({
+            onboardingCompleted: isComplete,
+            onboardingStep: isComplete ? 4 : 1
         });
+
+        if (!isComplete) {
+            this.accountStatus = 'ONBOARDING_INCOMPLETE';
+            this.cloudSyncStatus = 'IDLE';
+            return {
+                localSaved: true,
+                cloudSynced: false,
+                accountStatus: this.accountStatus,
+                cloudSyncStatus: this.cloudSyncStatus
+            };
+        }
+
+        // Mark local completion, awaiting cloud confirmation
+        this.accountStatus = 'PENDING_CLOUD_SYNC';
+        this.cloudSyncStatus = 'SYNCING';
+
+        // 2. Check for active authentication session
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session || !supabaseClient.session.user) {
+            // Local configuration is safe. Cloud sync remains idle/unauthenticated.
+            this.cloudSyncStatus = 'IDLE';
+            return {
+                localSaved: true,
+                cloudSynced: false,
+                accountStatus: this.accountStatus,
+                cloudSyncStatus: this.cloudSyncStatus
+            };
+        }
+
+        // 3. Attempt cloud synchronization
+        const pushSuccess = await this.pushToSupabase({ allowOnboardingPersist: true, force: true });
+        if (pushSuccess) {
+            this.accountStatus = 'EXISTING_USER';
+            this.cloudSyncStatus = 'CONFIRMED';
+            this.syncError = null;
+            return {
+                localSaved: true,
+                cloudSynced: true,
+                accountStatus: this.accountStatus,
+                cloudSyncStatus: this.cloudSyncStatus
+            };
+        } else {
+            // Local configuration remains completely safe in localStorage!
+            this.accountStatus = 'SYNC_FAILED';
+            this.cloudSyncStatus = 'FAILED';
+            return {
+                localSaved: true,
+                cloudSynced: false,
+                accountStatus: this.accountStatus,
+                cloudSyncStatus: this.cloudSyncStatus,
+                error: this.syncError || 'Cloud synchronization failed'
+            };
+        }
+    }
+
+    /**
+     * Retry cloud synchronization following a failed push.
+     * Guaranteed to preserve local configuration and financial state.
+     * @returns {Promise<{success: boolean, accountStatus: string, cloudSyncStatus: string, error?: string}>}
+     */
+    async retryCloudSync() {
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session || !supabaseClient.session.user) {
+            return {
+                success: false,
+                accountStatus: this.accountStatus,
+                cloudSyncStatus: this.cloudSyncStatus,
+                error: 'No active authentication session'
+            };
+        }
+
+        this.cloudSyncStatus = 'SYNCING';
+        const pushSuccess = await this.pushToSupabase({ allowOnboardingPersist: true, force: true });
+        if (pushSuccess) {
+            this.accountStatus = 'EXISTING_USER';
+            this.cloudSyncStatus = 'CONFIRMED';
+            this.syncError = null;
+            return {
+                success: true,
+                accountStatus: this.accountStatus,
+                cloudSyncStatus: this.cloudSyncStatus
+            };
+        } else {
+            this.accountStatus = 'SYNC_FAILED';
+            this.cloudSyncStatus = 'FAILED';
+            return {
+                success: false,
+                accountStatus: this.accountStatus,
+                cloudSyncStatus: this.cloudSyncStatus,
+                error: this.syncError || 'Cloud synchronization retry failed'
+            };
+        }
     }
 
     /**
