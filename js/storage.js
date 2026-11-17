@@ -9,6 +9,21 @@ const defaultState = {
     currentMonthKey: "",
     jpTotalBudget: 0,
     inTotalBudget: 0,
+    preferences: {
+        version: 1,
+        activeCountries: ['JP', 'IN'],
+        defaultCountry: 'JP',
+        onboardingCompleted: false,
+        onboardingStep: 1,
+        tourCompleted: false,
+        tourDismissed: false,
+        theme: 'dark'
+    },
+    budgets: {
+        JP: { enabled: true, monthlyTotal: 0, rolloverEnabled: true },
+        IN: { enabled: false, monthlyTotal: 0, rolloverEnabled: false },
+        DE: { enabled: false, monthlyTotal: 0, rolloverEnabled: false }
+    },
     wallets: {
         'Salary Account': { id: 'Salary Account', type: 'bank', region: 'JP', balance: 0, currency: '¥', color: '#009944' },
         'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 0, currency: '¥', color: '#d4af37' },
@@ -42,10 +57,25 @@ const defaultState = {
             { id: 'in-recharge', name: 'Recharge', icon: 'smartphone' },
             { id: 'in-ration', name: 'Ration & Groceries', icon: 'shopping-basket' },
             { id: 'in-misc', name: 'Miscellaneous', icon: 'wrench' }
+        ],
+        DE: [
+            { id: 'de-groceries', name: 'Groceries & Supermarket', icon: 'shopping-basket', budget: 0 },
+            { id: 'de-dining', name: 'Dining & Cafes', icon: 'utensils', budget: 0 },
+            { id: 'de-transport', name: 'Public Transit & DB', icon: 'train-front', budget: 0 },
+            { id: 'de-rent', name: 'Rent & Warmmiete', icon: 'home', budget: 0 },
+            { id: 'de-utilities', name: 'Electricity & Heating', icon: 'zap', budget: 0 },
+            { id: 'de-internet', name: 'Internet & Mobile', icon: 'wifi', budget: 0 },
+            { id: 'de-insurance', name: 'Insurance (Versicherung)', icon: 'shield-check', budget: 0 },
+            { id: 'de-health', name: 'Health & Pharmacy', icon: 'pill', budget: 0 },
+            { id: 'de-leisure', name: 'Leisure & Subscriptions', icon: 'gamepad-2', budget: 0 },
+            { id: 'de-shopping', name: 'Shopping & Household', icon: 'shopping-bag', budget: 0 },
+            { id: 'de-misc', name: 'Miscellaneous', icon: 'wrench', budget: 0 }
         ]
     },
     loanConfig: {
         enabled: false,
+        country: 'IN',
+        currency: '₹',
         totalPrincipal: 0,
         principalLeft: 0,
         emi: 0,
@@ -79,7 +109,10 @@ class StorageManager {
     constructor() {
         this.currentUserId = null;
         this.initialSyncDone = false;
+        this.accountStatus = 'UNRESOLVED';
+        this.syncError = null;
         this.state = this.loadData();
+        this._attachBudgetAccessors(this.state);
         this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
     }
 
@@ -143,6 +176,8 @@ class StorageManager {
         // If the user changed or this is first init:
         if (previousUserId !== userId) {
             this.initialSyncDone = false;
+            this.accountStatus = 'UNRESOLVED';
+            this.syncError = null;
             this.state = this.loadData();
             this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
         }
@@ -156,8 +191,11 @@ class StorageManager {
     onUserLogout() {
         this.currentUserId = null;
         this.initialSyncDone = false;
+        this.accountStatus = 'UNRESOLVED';
+        this.syncError = null;
         this.isFirstLoad = true;
         this.state = JSON.parse(JSON.stringify(defaultState));
+        this._attachBudgetAccessors(this.state);
     }
 
     loadData() {
@@ -169,19 +207,23 @@ class StorageManager {
                 const preview = this.previewContinuousLedgerMigration(parsed);
                 if (preview.success) {
                     this._attachHistoryGetters(preview.migratedState);
+                    this._attachBudgetAccessors(preview.migratedState);
                     return preview.migratedState;
                 } else {
                     console.error('[Storage] Local data migration validation failed. Safe-halting storage load:', preview.error);
                     this.migrationError = preview.error;
                     const safeHaltedState = JSON.parse(JSON.stringify(defaultState));
                     safeHaltedState._haltedMigration = true;
+                    this._attachBudgetAccessors(safeHaltedState);
                     return safeHaltedState;
                 }
             }
         } catch (e) {
             console.error("Failed to load local data", e);
         }
-        return JSON.parse(JSON.stringify(defaultState));
+        const fallbackState = JSON.parse(JSON.stringify(defaultState));
+        this._attachBudgetAccessors(fallbackState);
+        return fallbackState;
     }
 
     parseAndMergeData(parsed) {
@@ -191,6 +233,7 @@ class StorageManager {
             throw new Error(preview.error);
         }
         this._attachHistoryGetters(preview.migratedState);
+        this._attachBudgetAccessors(preview.migratedState);
         return preview.migratedState;
     }
 
@@ -216,6 +259,101 @@ class StorageManager {
                 }
             }
         });
+    }
+
+    /**
+     * Attach synchronized getters and setters for legacy budget properties
+     * (jpTotalBudget and inTotalBudget) mapping directly to budgets.JP and budgets.IN.
+     * Guarantees that legacy direct assignments and new multi-country budget methods
+     * are always 100% synchronized and serialize identically into JSON.
+     * @param {Object} state
+     */
+    _attachBudgetAccessors(state) {
+        if (!state || typeof state !== 'object' || !state.budgets) return;
+
+        const descJp = Object.getOwnPropertyDescriptor(state, 'jpTotalBudget');
+        if (!descJp || descJp.configurable) {
+            Object.defineProperty(state, 'jpTotalBudget', {
+                get() {
+                    return (this.budgets && this.budgets.JP) ? Number(this.budgets.JP.monthlyTotal) || 0 : 0;
+                },
+                set(val) {
+                    const num = Number(val) || 0;
+                    if (!this.budgets) this.budgets = {};
+                    if (!this.budgets.JP) {
+                        this.budgets.JP = { enabled: true, monthlyTotal: num, rolloverEnabled: true };
+                    } else {
+                        this.budgets.JP.monthlyTotal = num;
+                    }
+                },
+                enumerable: true,
+                configurable: true
+            });
+        }
+
+        const descIn = Object.getOwnPropertyDescriptor(state, 'inTotalBudget');
+        if (!descIn || descIn.configurable) {
+            Object.defineProperty(state, 'inTotalBudget', {
+                get() {
+                    return (this.budgets && this.budgets.IN) ? Number(this.budgets.IN.monthlyTotal) || 0 : 0;
+                },
+                set(val) {
+                    const num = Number(val) || 0;
+                    if (!this.budgets) this.budgets = {};
+                    if (!this.budgets.IN) {
+                        this.budgets.IN = { enabled: num > 0, monthlyTotal: num, rolloverEnabled: false };
+                    } else {
+                        this.budgets.IN.monthlyTotal = num;
+                    }
+                },
+                enumerable: true,
+                configurable: true
+            });
+        }
+    }
+
+    /**
+     * Check if a state contains established user financial records.
+     * Used to safely distinguish between truly new accounts and existing accounts.
+     * Guaranteed pure: does NOT mutate state.
+     * @param {Object} state
+     * @returns {boolean}
+     */
+    hasEstablishedFinancialData(state) {
+        if (!state || typeof state !== 'object') return false;
+
+        // 1. Has any transactions (active or in historical archives)
+        const txCount = this.getUniqueTransactionCount(state);
+        if (txCount > 0) return true;
+
+        // 2. Has any closed months in history
+        if (state.closedMonths && Object.keys(state.closedMonths).length > 0) return true;
+        if (Array.isArray(state.history) && state.history.length > 0) return true;
+
+        // 3. Has wallets with non-zero balance or custom wallet IDs
+        if (state.wallets && typeof state.wallets === 'object') {
+            const walletsList = Object.values(state.wallets);
+            const hasNonZeroBalance = walletsList.some(w => w && Number(w.balance) !== 0);
+            if (hasNonZeroBalance) return true;
+
+            const defaultWalletIds = new Set(['Salary Account', 'Cash', 'PayPay', 'Bank Account']);
+            const hasCustomWallet = walletsList.some(w => w && w.id && !defaultWalletIds.has(w.id));
+            if (hasCustomWallet) return true;
+        }
+
+        // 4. Has custom budget limits configured
+        if (Number(state.jpTotalBudget) > 0 || Number(state.inTotalBudget) > 0) return true;
+        if (state.budgets && typeof state.budgets === 'object') {
+            const anyBudgetConfigured = Object.values(state.budgets).some(b => b && Number(b.monthlyTotal) > 0);
+            if (anyBudgetConfigured) return true;
+        }
+
+        // 5. Has active loan configuration
+        if (state.loanConfig && (state.loanConfig.enabled || Number(state.loanConfig.totalPrincipal) > 0)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -254,6 +392,11 @@ class StorageManager {
                 }
                 if (!Array.isArray(state.categories.IN) || state.categories.IN.length === 0) {
                     state.categories.IN = JSON.parse(JSON.stringify(defaultState.categories.IN));
+                }
+                if (!Array.isArray(state.categories.DE) || state.categories.DE.length === 0) {
+                    state.categories.DE = (typeof CountryConfig !== 'undefined' && typeof CountryConfig.getDefaultCategories === 'function')
+                        ? CountryConfig.getDefaultCategories('DE')
+                        : JSON.parse(JSON.stringify(defaultState.categories.DE));
                 }
             }
 
@@ -312,8 +455,102 @@ class StorageManager {
             // Ensure loanConfig
             if (!state.loanConfig || Object.keys(state.loanConfig).length === 0) {
                 state.loanConfig = JSON.parse(JSON.stringify(defaultState.loanConfig));
-            } else if (typeof state.loanConfig.emiDrawDate === 'undefined') {
-                state.loanConfig.emiDrawDate = 7;
+            } else {
+                if (typeof state.loanConfig.country === 'undefined') state.loanConfig.country = 'IN';
+                if (typeof state.loanConfig.currency === 'undefined') state.loanConfig.currency = '₹';
+                if (typeof state.loanConfig.emiDrawDate === 'undefined') state.loanConfig.emiDrawDate = 7;
+            }
+
+            // Ensure independent multi-country budgets map
+            if (!state.budgets || typeof state.budgets !== 'object') {
+                const jpVal = Number(state.jpTotalBudget) || 0;
+                const inVal = Number(state.inTotalBudget) || 0;
+                const hasInWallets = state.wallets && Object.values(state.wallets).some(w => w && (w.region === 'IN' || w.currency === '₹'));
+                state.budgets = {
+                    JP: {
+                        enabled: true,
+                        monthlyTotal: jpVal,
+                        rolloverEnabled: state.jpBudgetRolloverEnabled !== undefined ? Boolean(state.jpBudgetRolloverEnabled) : true
+                    },
+                    IN: {
+                        enabled: inVal > 0 || hasInWallets,
+                        monthlyTotal: inVal,
+                        rolloverEnabled: state.inBudgetRolloverEnabled !== undefined ? Boolean(state.inBudgetRolloverEnabled) : false
+                    },
+                    DE: {
+                        enabled: false,
+                        monthlyTotal: 0,
+                        rolloverEnabled: false
+                    }
+                };
+            } else {
+                if (!state.budgets.JP) {
+                    state.budgets.JP = { enabled: true, monthlyTotal: Number(state.jpTotalBudget) || 0, rolloverEnabled: true };
+                }
+                if (!state.budgets.IN) {
+                    state.budgets.IN = { enabled: (Number(state.inTotalBudget) || 0) > 0, monthlyTotal: Number(state.inTotalBudget) || 0, rolloverEnabled: false };
+                }
+                if (!state.budgets.DE) {
+                    state.budgets.DE = { enabled: false, monthlyTotal: 0, rolloverEnabled: false };
+                }
+            }
+
+            // Reconcile legacy direct assignments if present before attaching accessors
+            if (state.budgets && state.budgets.JP && state.jpTotalBudget !== undefined && Number(state.jpTotalBudget) !== state.budgets.JP.monthlyTotal) {
+                state.budgets.JP.monthlyTotal = Number(state.jpTotalBudget) || 0;
+            }
+            if (state.budgets && state.budgets.IN && state.inTotalBudget !== undefined && Number(state.inTotalBudget) !== state.budgets.IN.monthlyTotal) {
+                state.budgets.IN.monthlyTotal = Number(state.inTotalBudget) || 0;
+            }
+
+            this._attachBudgetAccessors(state);
+
+            // Ensure user preferences & onboarding configuration layer
+            const hasFinancialData = this.hasEstablishedFinancialData(state);
+            if (!state.preferences || typeof state.preferences !== 'object') {
+                const detectedCountries = new Set();
+                if (state.wallets && typeof state.wallets === 'object') {
+                    Object.values(state.wallets).forEach(w => {
+                        if (w && w.region) detectedCountries.add(w.region.toUpperCase());
+                        else if (w && w.currency === '¥') detectedCountries.add('JP');
+                        else if (w && w.currency === '₹') detectedCountries.add('IN');
+                        else if (w && w.currency === '€') detectedCountries.add('DE');
+                    });
+                }
+                if (Array.isArray(state.transactions)) {
+                    state.transactions.forEach(tx => {
+                        if (tx && tx.region) detectedCountries.add(tx.region.toUpperCase());
+                    });
+                }
+                const activeList = Array.from(detectedCountries).filter(c => ['JP', 'IN', 'DE'].includes(c));
+                const activeCountries = activeList.length > 0 ? activeList : ['JP', 'IN'];
+
+                state.preferences = {
+                    version: 1,
+                    activeCountries: activeCountries,
+                    defaultCountry: activeCountries.includes('JP') ? 'JP' : activeCountries[0] || 'JP',
+                    onboardingCompleted: hasFinancialData, // Existing users with data bypass onboarding
+                    onboardingStep: hasFinancialData ? 4 : 1,
+                    tourCompleted: hasFinancialData,
+                    tourDismissed: false,
+                    theme: (state.regionalPreferences && state.regionalPreferences.theme) || 'dark'
+                };
+            } else {
+                const currentActive = Array.isArray(state.preferences.activeCountries) && state.preferences.activeCountries.length > 0
+                    ? state.preferences.activeCountries
+                    : ['JP', 'IN'];
+                state.preferences = {
+                    version: state.preferences.version || 1,
+                    activeCountries: currentActive,
+                    defaultCountry: state.preferences.defaultCountry || (currentActive.includes('JP') ? 'JP' : currentActive[0]),
+                    onboardingCompleted: typeof state.preferences.onboardingCompleted === 'boolean'
+                        ? state.preferences.onboardingCompleted
+                        : hasFinancialData,
+                    onboardingStep: state.preferences.onboardingStep || (state.preferences.onboardingCompleted ? 4 : 1),
+                    tourCompleted: Boolean(state.preferences.tourCompleted),
+                    tourDismissed: Boolean(state.preferences.tourDismissed),
+                    theme: state.preferences.theme || 'dark'
+                };
             }
 
             // Remap Rent from JP to IN
@@ -603,8 +840,9 @@ class StorageManager {
             console.warn('[Migration] Could not save emergency local snapshot:', e);
         }
 
-        // 2. Attach non-enumerable getters
+        // 2. Attach non-enumerable getters and budget accessors
         this._attachHistoryGetters(migratedState);
+        this._attachBudgetAccessors(migratedState);
 
         // 3. Atomically update in-memory state
         this.state = migratedState;
@@ -631,6 +869,7 @@ class StorageManager {
             throw new Error(preview.error);
         }
         this._attachHistoryGetters(preview.migratedState);
+        this._attachBudgetAccessors(preview.migratedState);
         return preview.migratedState;
     }
 
@@ -659,6 +898,7 @@ class StorageManager {
         if (typeof supabaseClient === 'undefined' || !supabaseClient.session || !supabaseClient.session.user) {
             // Not logged in — allow local saves to work normally
             this.initialSyncDone = true;
+            this.accountStatus = this.hasEstablishedFinancialData(this.state) ? 'EXISTING_USER' : 'NEW_USER';
             return false;
         }
 
@@ -674,60 +914,62 @@ class StorageManager {
 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    // No row exists yet for this user in cloud — push local state up
-                    console.log('[Sync] No remote state found for user. Pushing local state to Supabase...');
-                    this.initialSyncDone = true;
-                    await this.pushToSupabase();
+                    // No remote state found in Supabase for this user
+                    const hasLocalData = this.hasEstablishedFinancialData(this.state);
+                    if (hasLocalData) {
+                        console.log('[Sync] No remote state found, but established local financial data detected. Initializing cloud backup...');
+                        this.accountStatus = 'EXISTING_USER';
+                        if (this.state.preferences) {
+                            this.state.preferences.onboardingCompleted = true;
+                        }
+                        this.initialSyncDone = true;
+                        await this.pushToSupabase();
+                    } else {
+                        console.log('[Sync] Genuine new user account detected (no remote row, empty financial data). Onboarding required.');
+                        this.accountStatus = 'NEW_USER';
+                        if (this.state.preferences) {
+                            this.state.preferences.onboardingCompleted = false;
+                            this.state.preferences.onboardingStep = 1;
+                        }
+                        this.initialSyncDone = true;
+                        // Intentionally do NOT push placeholder default wallets to cloud yet!
+                    }
                 } else {
                     console.error('[Sync] Error fetching from Supabase:', error);
+                    // Network or server error: fail closed!
+                    this.accountStatus = 'SYNC_FAILED';
+                    this.syncError = error.message || String(error);
                     this.initialSyncDone = true;
                 }
                 return false;
             }
 
             if (data && data.state) {
-                // Validate the remote state looks real (has wallets & transactions keys)
                 const remote = data.state;
                 const remoteIsValid = remote && remote.wallets && Array.isArray(remote.transactions);
 
-                const key = this.getActiveStorageKey();
-                const backupKey = `${key}_backup_pre_v3`;
-                const remoteNeedsMigration = remote && (!remote.schemaVersion || remote.schemaVersion < 3 ||
-                    (Array.isArray(remote.history) && remote.history.some(h => {
-                        const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
-                        return desc && Array.isArray(desc.value) && desc.value.length > 0;
-                    })));
-
-                if (this.isFirstLoad && remoteIsValid) {
-                    console.log('[Sync] Fresh device/account detected. Using remote state.');
-                    const preview = this.previewContinuousLedgerMigration(remote);
-                    if (!preview.success) {
-                        console.error('[Sync] Fresh load remote migration preview failed. Halting sync to prevent corruption:', preview.error);
+                if (!remoteIsValid) {
+                    console.warn('[Sync] Remote state invalid or empty structure.');
+                    const hasLocalData = this.hasEstablishedFinancialData(this.state);
+                    if (hasLocalData) {
+                        console.log('[Sync] Local state has valid data. Preserving local and pushing up...');
+                        this.accountStatus = 'EXISTING_USER';
                         this.initialSyncDone = true;
-                        this.syncError = preview.error;
-                        return false;
-                    }
-
-                    const persisted = this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
-                    if (!persisted) {
-                        this.initialSyncDone = true;
-                        return false;
-                    }
-
-                    this.isFirstLoad = false;
-                    this.initialSyncDone = true;
-                    this.checkRollover();
-
-                    if (remoteNeedsMigration) {
                         await this.pushToSupabase();
+                    } else {
+                        this.accountStatus = 'NEW_USER';
+                        this.initialSyncDone = true;
                     }
-                    return true;
+                    return false;
                 }
 
-                if (!remoteIsValid) {
-                    console.warn('[Sync] Remote state invalid or empty. Keeping local and pushing up.');
+                // Authoritative remote is structurally valid — run full migration preview
+                const preview = this.previewContinuousLedgerMigration(remote);
+                if (!preview.success) {
+                    console.error('[Sync] Migration of authoritative remote state failed validation. Halting sync:', preview.error);
+                    this.accountStatus = 'SYNC_FAILED';
+                    this.syncError = preview.error;
                     this.initialSyncDone = true;
-                    await this.pushToSupabase();
                     return false;
                 }
 
@@ -738,34 +980,44 @@ class StorageManager {
                 const remoteTxCount = this.getUniqueTransactionCount(remote);
                 const localTxCount = this.getUniqueTransactionCount(this.state);
 
-                let shouldUseRemote;
-                if (remoteUpdatedAt && localUpdatedAt) {
+                const remoteNeedsMigration = remote && (!remote.schemaVersion || remote.schemaVersion < 3 ||
+                    (Array.isArray(remote.history) && remote.history.some(h => {
+                        const desc = Object.getOwnPropertyDescriptor(h, 'transactions');
+                        return desc && Array.isArray(desc.value) && desc.value.length > 0;
+                    })) || !remote.preferences || !remote.budgets);
+
+                let shouldUseRemote = false;
+                if (this.isFirstLoad) {
+                    // Fresh device / returning user on new device loads remote
+                    console.log('[Sync] Fresh device/account detected. Using authoritative remote state.');
+                    shouldUseRemote = true;
+                } else if (remoteUpdatedAt && localUpdatedAt) {
                     shouldUseRemote = remoteUpdatedAt > localUpdatedAt;
                 } else if (remoteUpdatedAt && !localUpdatedAt) {
-                    // Remote has a timestamp, local doesn't — remote wins
                     shouldUseRemote = true;
                 } else {
-                    // No timestamps on either — more unique data = more complete
                     shouldUseRemote = remoteTxCount >= localTxCount;
                 }
 
                 if (shouldUseRemote) {
-                    console.log(`[Sync] Remote state wins (${remoteTxCount} txs vs local ${localTxCount} txs). Loading...`);
-
-                    const preview = this.previewContinuousLedgerMigration(remote);
-                    if (!preview.success) {
-                        console.error('[Sync] Migration of authoritative remote state failed validation. Halting sync:', preview.error);
-                        this.initialSyncDone = true;
-                        this.syncError = preview.error;
-                        return false;
-                    }
+                    console.log(`[Sync] Remote state accepted (${remoteTxCount} txs vs local ${localTxCount} txs). Applying...`);
 
                     const persisted = this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
                     if (!persisted) {
+                        this.accountStatus = 'SYNC_FAILED';
                         this.initialSyncDone = true;
                         return false;
                     }
 
+                    // Derive account resolution status
+                    if (this.state.preferences && this.state.preferences.onboardingCompleted === false) {
+                        const hasTx = this.getUniqueTransactionCount(this.state) > 0;
+                        this.accountStatus = hasTx ? 'EXISTING_USER' : 'ONBOARDING_INCOMPLETE';
+                    } else {
+                        this.accountStatus = 'EXISTING_USER';
+                    }
+
+                    this.isFirstLoad = false;
                     this.initialSyncDone = true;
                     this.checkRollover();
 
@@ -777,35 +1029,57 @@ class StorageManager {
                     return true; // signal caller to re-render
                 } else {
                     console.log(`[Sync] Local state wins (${localTxCount} txs vs remote ${remoteTxCount} txs). Pushing up...`);
+                    this.accountStatus = 'EXISTING_USER';
                     this.initialSyncDone = true;
                     await this.pushToSupabase();
                     return false;
                 }
             }
         } catch (e) {
-            console.error('[Sync] Supabase sync failed:', e);
+            console.error('[Sync] Supabase sync failed with exception:', e);
+            this.accountStatus = 'SYNC_FAILED';
+            this.syncError = e.message || String(e);
             this.initialSyncDone = true;
         }
         return false;
     }
 
-    async pushToSupabase() {
+    async pushToSupabase(options = {}) {
         if (typeof supabaseClient === 'undefined' || !supabaseClient.session || !supabaseClient.session.user) {
-            return;
+            return false;
         }
 
         const userId = supabaseClient.session.user.id;
-        if (!userId) return;
+        if (!userId) return false;
+
+        // Fail-closed guard: do not push if synchronization failed with server/network error
+        if (this.accountStatus === 'SYNC_FAILED') {
+            console.warn('[Storage] Refusing to push state to Supabase while in SYNC_FAILED state.');
+            return false;
+        }
+
+        // Safety guard: do not push placeholder default state if onboarding has not been completed
+        // UNLESS the user explicitly completes onboarding, explicitly forces persist, or has real financial records.
+        const isSetupCompleted = Boolean(this.state.preferences?.onboardingCompleted);
+        const allowExplicitPersist = Boolean(options && (options.force || options.allowOnboardingPersist));
+        const hasRealFinancialRecords = this.getUniqueTransactionCount(this.state) > 0 ||
+            Object.values(this.state.wallets || {}).some(w => w && Number(w.balance) !== 0);
+
+        if ((this.accountStatus === 'NEW_USER' || this.accountStatus === 'ONBOARDING_INCOMPLETE' || !isSetupCompleted) &&
+            !hasRealFinancialRecords && !allowExplicitPersist) {
+            console.log('[Storage] Deferring pushToSupabase for un-onboarded account until setup completion.');
+            return false;
+        }
 
         // Basic payload integrity validation
         if (!this.state || !this.state.wallets || !Array.isArray(this.state.transactions)) {
             console.error("[Storage] Refusing to push invalid state payload to Supabase");
-            return;
+            return false;
         }
 
         if (this.state._haltedMigration || this.migrationError) {
             console.error("[Storage] Refusing to push state to Supabase because migration was halted due to validation/conflict errors.");
-            return;
+            return false;
         }
 
         try {
@@ -819,9 +1093,12 @@ class StorageManager {
 
             if (error) {
                 console.error("[Sync] Failed to push to Supabase:", error);
+                return false;
             }
+            return true;
         } catch (e) {
             console.error("[Sync] Push to Supabase failed:", e);
+            return false;
         }
     }
 
@@ -936,6 +1213,9 @@ class StorageManager {
         // Add savings to next month's overall budget as cushion
         if (totalRollover > 0) {
             this.state.jpTotalBudget += Math.round(totalRollover);
+            if (this.state.budgets && this.state.budgets.JP) {
+                this.state.budgets.JP.monthlyTotal = this.state.jpTotalBudget;
+            }
         }
 
         // GUARD: Continuous Ledger must NEVER clear this.state.transactions!
@@ -1027,6 +1307,279 @@ class StorageManager {
             }
         };
         reader.readAsText(file);
+    }
+
+    // ===== Phase 2: User Preferences & Account Configuration API =====
+
+    /**
+     * Get a deep copy of current user preferences.
+     * @returns {Object}
+     */
+    getPreferences() {
+        if (!this.state || !this.state.preferences) {
+            return JSON.parse(JSON.stringify(defaultState.preferences));
+        }
+        return JSON.parse(JSON.stringify(this.state.preferences));
+    }
+
+    /**
+     * Update user preferences and persist.
+     * Validates active countries and preserves financial invariants.
+     * @param {Object} updates
+     * @returns {Object} Updated preferences
+     */
+    updatePreferences(updates) {
+        if (!updates || typeof updates !== 'object') return this.getPreferences();
+
+        if (!this.state.preferences) {
+            this.state.preferences = JSON.parse(JSON.stringify(defaultState.preferences));
+        }
+
+        // Validate activeCountries if provided
+        if (updates.activeCountries) {
+            if (Array.isArray(updates.activeCountries) && updates.activeCountries.length > 0) {
+                const valid = updates.activeCountries
+                    .map(c => String(c).toUpperCase())
+                    .filter(c => ['JP', 'IN', 'DE'].includes(c));
+                if (valid.length > 0) {
+                    this.state.preferences.activeCountries = Array.from(new Set(valid));
+                }
+            }
+        }
+
+        if (updates.defaultCountry && ['JP', 'IN', 'DE'].includes(updates.defaultCountry.toUpperCase())) {
+            this.state.preferences.defaultCountry = updates.defaultCountry.toUpperCase();
+        }
+
+        if (typeof updates.onboardingCompleted === 'boolean') {
+            this.state.preferences.onboardingCompleted = updates.onboardingCompleted;
+            if (updates.onboardingCompleted) {
+                this.accountStatus = 'EXISTING_USER';
+            }
+        }
+
+        if (typeof updates.onboardingStep === 'number') {
+            this.state.preferences.onboardingStep = updates.onboardingStep;
+        }
+
+        if (typeof updates.tourCompleted === 'boolean') {
+            this.state.preferences.tourCompleted = updates.tourCompleted;
+        }
+
+        if (typeof updates.tourDismissed === 'boolean') {
+            this.state.preferences.tourDismissed = updates.tourDismissed;
+        }
+
+        if (updates.theme && typeof updates.theme === 'string') {
+            this.state.preferences.theme = updates.theme;
+        }
+
+        this.saveData();
+        return this.getPreferences();
+    }
+
+    /**
+     * Check if current account is a genuine first-time user.
+     * Strictly requires authoritative NEW_USER resolution from Supabase sync.
+     * Never infers new user on SYNC_FAILED, UNRESOLVED, or for returning users.
+     * @returns {boolean}
+     */
+    isNewUser() {
+        if (this.accountStatus === 'NEW_USER') {
+            return true;
+        }
+        if (this.accountStatus === 'EXISTING_USER' ||
+            this.accountStatus === 'ONBOARDING_INCOMPLETE' ||
+            this.accountStatus === 'SYNC_FAILED' ||
+            this.accountStatus === 'UNRESOLVED') {
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Get account resolution status.
+     * @returns {'UNRESOLVED'|'NEW_USER'|'EXISTING_USER'|'ONBOARDING_INCOMPLETE'|'SYNC_FAILED'}
+     */
+    getAccountStatus() {
+        return this.accountStatus;
+    }
+
+    /**
+     * Check if a sovereign country is currently active in user preferences.
+     * @param {string} countryCode - 'JP', 'IN', 'DE'
+     * @returns {boolean}
+     */
+    isCountryActive(countryCode) {
+        if (!countryCode || !this.state.preferences?.activeCountries) return false;
+        return this.state.preferences.activeCountries.includes(countryCode.toUpperCase());
+    }
+
+    /**
+     * Get array of active country codes.
+     * @returns {Array<string>}
+     */
+    getActiveCountries() {
+        return (this.state.preferences && Array.isArray(this.state.preferences.activeCountries))
+            ? [...this.state.preferences.activeCountries]
+            : ['JP', 'IN'];
+    }
+
+    /**
+     * Set active countries.
+     * @param {Array<string>} countries
+     */
+    setActiveCountries(countries) {
+        return this.updatePreferences({ activeCountries: countries });
+    }
+
+    /**
+     * Check if budgeting is enabled for a given country.
+     * @param {string} countryCode
+     * @returns {boolean}
+     */
+    isBudgetEnabled(countryCode) {
+        if (!countryCode || !this.state.budgets) return false;
+        const code = countryCode.toUpperCase();
+        return Boolean(this.state.budgets[code]?.enabled);
+    }
+
+    /**
+     * Get budgeting configuration for a country.
+     * @param {string} countryCode
+     * @returns {Object} { enabled: boolean, monthlyTotal: number, rolloverEnabled: boolean }
+     */
+    getBudgetConfig(countryCode) {
+        if (!countryCode || !this.state.budgets) {
+            return { enabled: false, monthlyTotal: 0, rolloverEnabled: false };
+        }
+        const code = countryCode.toUpperCase();
+        return this.state.budgets[code]
+            ? { ...this.state.budgets[code] }
+            : { enabled: false, monthlyTotal: 0, rolloverEnabled: false };
+    }
+
+    /**
+     * Configure budget for a country and keep legacy properties in sync.
+     * @param {string} countryCode
+     * @param {boolean} enabled
+     * @param {number} [monthlyTotal]
+     * @param {boolean} [rolloverEnabled]
+     */
+    setBudgetEnabled(countryCode, enabled, monthlyTotal = null, rolloverEnabled = null) {
+        if (!countryCode) return;
+        const code = countryCode.toUpperCase();
+        if (!this.state.budgets) {
+            this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+        }
+        if (!this.state.budgets[code]) {
+            this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false };
+        }
+
+        this.state.budgets[code].enabled = Boolean(enabled);
+        if (monthlyTotal !== null && !isNaN(Number(monthlyTotal))) {
+            this.state.budgets[code].monthlyTotal = Number(monthlyTotal);
+        }
+        if (rolloverEnabled !== null) {
+            this.state.budgets[code].rolloverEnabled = Boolean(rolloverEnabled);
+        }
+
+        // Keep legacy properties in sync
+        if (code === 'JP') {
+            this.state.jpTotalBudget = this.state.budgets.JP.monthlyTotal;
+            this.state.jpBudgetRolloverEnabled = this.state.budgets.JP.rolloverEnabled;
+        } else if (code === 'IN') {
+            this.state.inTotalBudget = this.state.budgets.IN.monthlyTotal;
+            this.state.inBudgetRolloverEnabled = this.state.budgets.IN.rolloverEnabled;
+        }
+
+        this.saveData();
+    }
+
+    /**
+     * Set total allocated monthly budget for a sovereign country or legacy key.
+     * Centralized update method ensuring budgets[country].monthlyTotal and legacy fields stay in lockstep.
+     * @param {'JP'|'IN'|'DE'|'jpTotalBudget'|'inTotalBudget'} countryOrKey
+     * @param {number} amount
+     */
+    setTotalBudget(countryOrKey, amount) {
+        if (!countryOrKey) return;
+        const key = String(countryOrKey).trim();
+        const code = (key === 'jpTotalBudget' || key === 'JP' || key === 'JPY') ? 'JP' :
+            (key === 'inTotalBudget' || key === 'IN' || key === 'INR') ? 'IN' :
+                (key === 'DE' || key === 'EUR') ? 'DE' : key.toUpperCase();
+        const num = Number(amount) || 0;
+
+        if (!this.state.budgets) {
+            this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+        }
+        if (!this.state.budgets[code]) {
+            this.state.budgets[code] = { enabled: true, monthlyTotal: num, rolloverEnabled: code === 'JP' };
+        } else {
+            this.state.budgets[code].monthlyTotal = num;
+        }
+
+        this.saveData();
+    }
+
+    /**
+     * Check if loan tracking is enabled.
+     * @returns {boolean}
+     */
+    isLoanTrackingEnabled() {
+        return Boolean(this.state.loanConfig?.enabled);
+    }
+
+    /**
+     * Enable or disable loan tracking with optional parameters.
+     * @param {boolean} enabled
+     * @param {Object} [options]
+     */
+    setLoanTrackingEnabled(enabled, options = {}) {
+        if (!this.state.loanConfig) {
+            this.state.loanConfig = JSON.parse(JSON.stringify(defaultState.loanConfig));
+        }
+        this.state.loanConfig.enabled = Boolean(enabled);
+        if (options && typeof options === 'object') {
+            if (options.country) this.state.loanConfig.country = options.country;
+            if (options.currency) this.state.loanConfig.currency = options.currency;
+            if (typeof options.totalPrincipal === 'number') this.state.loanConfig.totalPrincipal = options.totalPrincipal;
+            if (typeof options.principalLeft === 'number') this.state.loanConfig.principalLeft = options.principalLeft;
+            if (typeof options.emi === 'number') this.state.loanConfig.emi = options.emi;
+            if (typeof options.annualInterestRate === 'number') this.state.loanConfig.annualInterestRate = options.annualInterestRate;
+            if (typeof options.emiDrawDate === 'number') this.state.loanConfig.emiDrawDate = options.emiDrawDate;
+        }
+        this.saveData();
+    }
+
+    /**
+     * Mark onboarding setup as completed.
+     * @param {boolean} [completed=true]
+     */
+    markOnboardingCompleted(completed = true) {
+        if (completed) {
+            this.accountStatus = 'EXISTING_USER';
+        }
+        return this.updatePreferences({
+            onboardingCompleted: Boolean(completed),
+            onboardingStep: completed ? 4 : 1
+        });
+    }
+
+    /**
+     * Mark guided tour as completed.
+     * @param {boolean} [completed=true]
+     */
+    markTourCompleted(completed = true) {
+        return this.updatePreferences({ tourCompleted: Boolean(completed) });
+    }
+
+    /**
+     * Mark guided tour as dismissed / skipped.
+     * @param {boolean} [dismissed=true]
+     */
+    markTourDismissed(dismissed = true) {
+        return this.updatePreferences({ tourDismissed: Boolean(dismissed) });
     }
 }
 

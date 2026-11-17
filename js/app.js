@@ -94,10 +94,16 @@ class App {
     }
 
     getCountryFlagSvg(region, width = 18, height = 13.5) {
-        if (region === 'JP') {
+        if (typeof CountryConfig !== 'undefined' && typeof CountryConfig.getFlagSvg === 'function') {
+            const svg = CountryConfig.getFlagSvg(region, width, height);
+            if (svg) return svg;
+        }
+        if (region === 'JP' || region === 'JPY') {
             return `<svg class="country-flag-svg flag-jp" viewBox="0 0 640 480" width="${width}" height="${height}" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);vertical-align:middle;display:inline-block;flex-shrink:0;" aria-label="Japan"><rect width="640" height="480" fill="#ffffff"/><circle cx="320" cy="240" r="120" fill="#bc002d"/></svg>`;
-        } else if (region === 'IN') {
+        } else if (region === 'IN' || region === 'INR') {
             return `<svg class="country-flag-svg flag-in" viewBox="0 0 640 480" width="${width}" height="${height}" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);vertical-align:middle;display:inline-block;flex-shrink:0;" aria-label="India"><path fill="#f4f5f8" d="M0 160h640v160H0z"/><path fill="#ff9933" d="M0 0h640v160H0z"/><path fill="#138808" d="M0 320h640v160H0z"/><circle cx="320" cy="240" r="40" fill="#000080"/><circle cx="320" cy="240" r="32" fill="#ffffff"/><circle cx="320" cy="240" r="8" fill="#000080"/></svg>`;
+        } else if (region === 'DE' || region === 'EUR') {
+            return `<svg class="country-flag-svg flag-de" viewBox="0 0 640 480" width="${width}" height="${height}" style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);vertical-align:middle;display:inline-block;flex-shrink:0;" aria-label="Germany"><rect width="640" height="160" y="0" fill="#000000"/><rect width="640" height="160" y="160" fill="#dd0000"/><rect width="640" height="160" y="320" fill="#ffce00"/></svg>`;
         }
         return '';
     }
@@ -3646,7 +3652,13 @@ class App {
 
     updateSetting(key, val) {
         if (key === 'jpTotalBudget') {
-            storage.state.jpTotalBudget = Number(val);
+            if (typeof storage.setTotalBudget === 'function') {
+                storage.setTotalBudget('JP', val);
+            } else {
+                storage.state.jpTotalBudget = Number(val);
+                storage.saveData();
+            }
+            return;
         }
         storage.saveData();
     }
@@ -7284,10 +7296,12 @@ class App {
 
         // Advance current month key and set next allocated budget limit
         storage.state.currentMonthKey = nextMonth;
-        storage.state.jpTotalBudget = nextJpBudget;
-
-        // Persist safely to local and cloud
-        storage.saveData();
+        if (typeof storage.setTotalBudget === 'function') {
+            storage.setTotalBudget('JP', nextJpBudget);
+        } else {
+            storage.state.jpTotalBudget = nextJpBudget;
+            storage.saveData();
+        }
 
         // Close wizard modal
         this.closeClosingWizard();
@@ -7678,14 +7692,16 @@ class App {
             return;
         }
 
-        if (isJp) {
-            storage.state.jpTotalBudget = numVal;
+        if (typeof storage.setTotalBudget === 'function') {
+            storage.setTotalBudget(isJp ? 'JP' : 'IN', numVal);
         } else {
-            storage.state.inTotalBudget = numVal;
+            if (isJp) {
+                storage.state.jpTotalBudget = numVal;
+            } else {
+                storage.state.inTotalBudget = numVal;
+            }
+            storage.saveData();
         }
-
-        // Persist via storage architecture
-        storage.saveData();
 
         // Update settings inputs if present
         const jpBudEl = document.getElementById('setting-jp-budget');
