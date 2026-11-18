@@ -199,6 +199,7 @@ class WalletManager {
             return false;
         }
 
+        const preBalance = wallet.balance;
         wallet.balance = this.roundCurrency(wallet.balance - numAmount, wallet.currency);
 
         const tx = {
@@ -215,7 +216,13 @@ class WalletManager {
 
         storage.state.transactions.unshift(tx);
         this._sortContinuousTransactions();
-        storage.saveData();
+        const saved = storage.saveData();
+        if (saved === false) {
+            console.error('[WalletManager] addExpense persistence failed. Rolling back...');
+            wallet.balance = preBalance;
+            storage.state.transactions.shift();
+            return false;
+        }
         return true;
     }
 
@@ -236,6 +243,7 @@ class WalletManager {
             return false;
         }
 
+        const preBalance = wallet.balance;
         wallet.balance = this.roundCurrency(wallet.balance + numAmount, wallet.currency);
 
         const tx = {
@@ -251,7 +259,13 @@ class WalletManager {
 
         storage.state.transactions.unshift(tx);
         this._sortContinuousTransactions();
-        storage.saveData();
+        const saved = storage.saveData();
+        if (saved === false) {
+            console.error('[WalletManager] addIncome persistence failed. Rolling back...');
+            wallet.balance = preBalance;
+            storage.state.transactions.shift();
+            return false;
+        }
         return true;
     }
 
@@ -426,11 +440,12 @@ class WalletManager {
 
         // Commit phase: apply state mutation atomically with rollback protection
         const preCommit = { [sourceId]: source.balance, [destId]: dest.balance };
+        let createdTx = null;
         try {
             source.balance = tentativeSource;
             dest.balance = tentativeDest;
 
-            const tx = {
+            createdTx = {
                 id: this.generateTransactionId(),
                 type: 'transfer',
                 sourceId,
@@ -441,14 +456,21 @@ class WalletManager {
                 date
             };
 
-            storage.state.transactions.unshift(tx);
+            storage.state.transactions.unshift(createdTx);
             this._sortContinuousTransactions();
-            storage.saveData();
+            const saved = storage.saveData();
+            if (saved === false) {
+                throw new Error("Local persistence failed.");
+            }
             return true;
         } catch (err) {
             console.error('[WalletManager] Transfer commit failed. Rolling back...', err);
             source.balance = preCommit[sourceId];
             dest.balance = preCommit[destId];
+            if (createdTx && Array.isArray(storage.state.transactions)) {
+                const idx = storage.state.transactions.findIndex(t => t.id === createdTx.id);
+                if (idx !== -1) storage.state.transactions.splice(idx, 1);
+            }
             return false;
         }
     }
@@ -482,11 +504,12 @@ class WalletManager {
 
         // Commit phase: apply state mutation atomically with rollback protection
         const preCommit = { [sourceId]: source.balance, [destId]: dest.balance };
+        let createdTx = null;
         try {
             source.balance = tentativeSource;
             dest.balance = tentativeDest;
 
-            const tx = {
+            createdTx = {
                 id: this.generateTransactionId(),
                 type: 'remittance',
                 sourceId,
@@ -500,14 +523,21 @@ class WalletManager {
                 date
             };
 
-            storage.state.transactions.unshift(tx);
+            storage.state.transactions.unshift(createdTx);
             this._sortContinuousTransactions();
-            storage.saveData();
+            const saved = storage.saveData();
+            if (saved === false) {
+                throw new Error("Local persistence failed.");
+            }
             return true;
         } catch (err) {
             console.error('[WalletManager] Remittance commit failed. Rolling back...', err);
             source.balance = preCommit[sourceId];
             dest.balance = preCommit[destId];
+            if (createdTx && Array.isArray(storage.state.transactions)) {
+                const idx = storage.state.transactions.findIndex(t => t.id === createdTx.id);
+                if (idx !== -1) storage.state.transactions.splice(idx, 1);
+            }
             return false;
         }
     }
@@ -894,11 +924,14 @@ class WalletManager {
             }
         }
 
-        // 5. Commit phase: Apply prepared changes atomically with rollback guarantee
+        // 5. Commit phase: Apply prepared changes atomically with complete rollback guarantee
         const preCommitBalances = {};
         affectedWalletIds.forEach(wId => {
             preCommitBalances[wId] = storage.state.wallets[wId].balance;
         });
+        const preCommitTxFields = JSON.parse(JSON.stringify(tx));
+        const preCommitTransactions = Array.isArray(storage.state.transactions) ? storage.state.transactions.slice() : [];
+        const preCommitHistory = storage.state.history ? JSON.parse(JSON.stringify(storage.state.history)) : null;
 
         try {
             affectedWalletIds.forEach(wId => {
@@ -909,13 +942,24 @@ class WalletManager {
             tx.updatedAt = new Date().toISOString();
 
             this._sortContinuousTransactions();
-            storage.saveData();
+            const saved = storage.saveData();
+            if (saved === false) {
+                throw new Error("Local persistence failed.");
+            }
             return true;
         } catch (commitErr) {
-            console.error('[WalletManager] Unexpected error during atomic update commit. Rolling back...', commitErr);
+            console.error('[WalletManager] Unexpected error during atomic update commit. Rolling back completely...', commitErr);
             affectedWalletIds.forEach(wId => {
                 storage.state.wallets[wId].balance = preCommitBalances[wId];
             });
+            Object.assign(tx, preCommitTxFields);
+            if (Array.isArray(storage.state.transactions)) {
+                storage.state.transactions = preCommitTransactions;
+            }
+            if (preCommitHistory) {
+                storage.state.history = preCommitHistory;
+                storage._attachHistoryGetters(storage.state);
+            }
             return false;
         }
     }
@@ -979,11 +1023,13 @@ class WalletManager {
             }
         }
 
-        // 3. Commit phase: Apply balances and remove transaction atomically with rollback safety
+        // 3. Commit phase: Apply balances and remove transaction atomically with complete rollback guarantee
         const preCommitBalances = {};
         affectedWalletIds.forEach(wId => {
             preCommitBalances[wId] = storage.state.wallets[wId].balance;
         });
+        const preCommitTransactions = Array.isArray(storage.state.transactions) ? storage.state.transactions.slice() : [];
+        const preCommitHistory = storage.state.history ? JSON.parse(JSON.stringify(storage.state.history)) : null;
 
         try {
             affectedWalletIds.forEach(wId => {
@@ -1012,13 +1058,23 @@ class WalletManager {
                 }
             }
 
-            storage.saveData();
+            const saved = storage.saveData();
+            if (saved === false) {
+                throw new Error("Local persistence failed.");
+            }
             return true;
         } catch (commitErr) {
-            console.error('[WalletManager] Unexpected error during atomic delete commit. Rolling back...', commitErr);
+            console.error('[WalletManager] Unexpected error during atomic delete commit. Rolling back completely...', commitErr);
             affectedWalletIds.forEach(wId => {
                 storage.state.wallets[wId].balance = preCommitBalances[wId];
             });
+            if (Array.isArray(storage.state.transactions)) {
+                storage.state.transactions = preCommitTransactions;
+            }
+            if (preCommitHistory) {
+                storage.state.history = preCommitHistory;
+                storage._attachHistoryGetters(storage.state);
+            }
             return false;
         }
     }

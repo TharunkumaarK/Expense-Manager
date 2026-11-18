@@ -1256,7 +1256,7 @@ class StorageManager {
     saveData() {
         if (this.state._haltedMigration || this.migrationError) {
             console.warn('[Storage] saveData blocked because migration is in halted safety state.');
-            return;
+            return false;
         }
         try {
             if (this.initialSyncDone || typeof supabaseClient === 'undefined' || !supabaseClient.session) {
@@ -1268,8 +1268,10 @@ class StorageManager {
             if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
                 this.pushToSupabase();
             }
+            return true;
         } catch (e) {
             console.error("Failed to save data", e);
+            return false;
         }
     }
 
@@ -1379,6 +1381,97 @@ class StorageManager {
     }
 
     /**
+     * Compute a deterministic financial revision fingerprint covering all financial information
+     * that materially influences recovery calculations: currentMonthKey, budgets, wallet balances,
+     * closedMonths snapshots, preferences, and transaction signatures.
+     * @param {Object} state
+     * @returns {string} Hexadecimal fingerprint hash.
+     */
+    computeFinancialFingerprint(state = this.state) {
+        if (!state || typeof state !== 'object') return '0';
+        try {
+            const relevant = {
+                m: state.currentMonthKey || '',
+                b: state.budgets || {},
+                w: Object.keys(state.wallets || {}).sort().map(k => `${k}:${state.wallets[k]?.balance}`),
+                c: Object.keys(state.closedMonths || {}).sort().map(k => `${k}:${state.closedMonths[k]?.status}:${state.closedMonths[k]?.JPRolloverAdded || 0}`),
+                p: state.preferences?.countries || [],
+                txLen: Array.isArray(state.transactions) ? state.transactions.length : 0,
+                txSig: Array.isArray(state.transactions)
+                    ? state.transactions.slice(0, 30).map(t => `${t.id}:${t.amount}:${t.date}:${t.walletId || ''}`).join('|')
+                    : ''
+            };
+            const str = JSON.stringify(relevant);
+            let hash = 2166136261;
+            for (let i = 0; i < str.length; i++) {
+                hash ^= str.charCodeAt(i);
+                hash = Math.imul(hash, 16777619);
+            }
+            return (hash >>> 0).toString(16);
+        } catch (e) {
+            return String(Date.now());
+        }
+    }
+
+    /**
+     * Validate all user-entered budget recovery inputs before generating preview or committing.
+     * Rejects negative amounts, NaN, Infinity, unknown country codes, excessive precision, and unsafe bounds.
+     * @param {Object} customAdjustments
+     * @param {string[]} unfinalizedMonths
+     * @returns {{ valid: boolean, error?: string }}
+     */
+    validateRecoveryAdjustments(customAdjustments, unfinalizedMonths = []) {
+        if (!customAdjustments || typeof customAdjustments !== 'object') {
+            return { valid: false, error: 'Adjustments payload must be an object.' };
+        }
+        const validMonths = new Set(unfinalizedMonths || []);
+        const validCountries = new Set(['JP', 'IN', 'DE']);
+
+        for (const [mKey, countriesObj] of Object.entries(customAdjustments)) {
+            if (!/^\d{4}-\d{2}$/.test(mKey)) {
+                return { valid: false, error: `Invalid month key format '${mKey}'. Expected YYYY-MM.` };
+            }
+            if (validMonths.size > 0 && !validMonths.has(mKey)) {
+                return { valid: false, error: `Month '${mKey}' is not in the unfinalized months list.` };
+            }
+            if (!countriesObj || typeof countriesObj !== 'object') {
+                return { valid: false, error: `Adjustments for month '${mKey}' must be an object.` };
+            }
+            for (const [code, adj] of Object.entries(countriesObj)) {
+                if (!validCountries.has(code)) {
+                    return { valid: false, error: `Unsupported country code '${code}' in month '${mKey}'.` };
+                }
+                if (!adj || typeof adj !== 'object') {
+                    return { valid: false, error: `Adjustment for '${code}' in month '${mKey}' must be an object.` };
+                }
+                if (typeof adj.baseBudget !== 'undefined') {
+                    const amt = Number(adj.baseBudget);
+                    if (typeof amt !== 'number' || isNaN(amt) || !isFinite(amt) || amt < 0 || amt > 1e12) {
+                        return { valid: false, error: `Invalid base budget amount '${adj.baseBudget}' for ${code} in month ${mKey}. Must be a finite number between 0 and 1e12.` };
+                    }
+                    if (code === 'JP' && !Number.isInteger(amt)) {
+                        return { valid: false, error: `Japanese Yen budget for ${mKey} must be a whole integer.` };
+                    }
+                    if (code === 'IN' || code === 'DE') {
+                        const str = amt.toString();
+                        if (str.includes('e') || str.includes('E')) {
+                            return { valid: false, error: `Budget for ${code} in ${mKey} contains exponential notation.` };
+                        }
+                        const parts = str.split('.');
+                        if (parts.length > 1 && parts[1].length > 2) {
+                            return { valid: false, error: `Budget for ${code} in ${mKey} cannot exceed 2 decimal places.` };
+                        }
+                    }
+                }
+                if (typeof adj.rolloverEnabled !== 'undefined' && typeof adj.rolloverEnabled !== 'boolean') {
+                    return { valid: false, error: `rolloverEnabled for ${code} in ${mKey} must be boolean.` };
+                }
+            }
+        }
+        return { valid: true };
+    }
+
+    /**
      * Compute a pure, read-only preview of budget reconciliation across unfinalized months.
      * Does NOT mutate state.
      *
@@ -1390,6 +1483,21 @@ class StorageManager {
         const unfinalized = this.detectUnfinalizedMonths();
         const actualMonth = this.getCurrentMonthKey();
         const supportedCountries = ['JP', 'IN', 'DE'];
+
+        // Strict engine-level validation for all adjustment inputs
+        if (customAdjustments && Object.keys(customAdjustments).length > 0) {
+            const valCheck = this.validateRecoveryAdjustments(customAdjustments, unfinalized);
+            if (!valCheck.valid) {
+                return {
+                    success: false,
+                    error: valCheck.error,
+                    unfinalizedMonths: unfinalized,
+                    monthsPreview: [],
+                    activeMonthSummary: { monthKey: actualMonth, countries: {} },
+                    stateToken: this.computeFinancialFingerprint()
+                };
+            }
+        }
 
         const monthsPreview = [];
         const runningCarryover = {};
@@ -1414,7 +1522,7 @@ class StorageManager {
         });
 
         // Sequential calculation for every unfinalized month
-        unfinalized.forEach(mKey => {
+        unfinalized.forEach((mKey, idx) => {
             const monthData = {
                 monthKey: mKey,
                 countries: {}
@@ -1428,21 +1536,45 @@ class StorageManager {
 
                 let baseBudget = defaultBaseBudget;
                 let rolloverEnabled = defaultRolloverEnabled;
+                let provenance = 'reused_active_setting';
+
+                // Look for prior closed snapshot
+                let priorSnapshotBudget = null;
+                if (this.state.closedMonths) {
+                    const keys = Object.keys(this.state.closedMonths).filter(k => k < mKey).sort();
+                    if (keys.length > 0) {
+                        const lastSnap = this.state.closedMonths[keys[keys.length - 1]];
+                        if (typeof lastSnap[`${code}TotalBudget`] === 'number') {
+                            priorSnapshotBudget = lastSnap[`${code}TotalBudget`];
+                        }
+                    }
+                }
 
                 if (option === 'fresh') {
                     baseBudget = 0;
                     rolloverEnabled = false;
+                    provenance = 'explicit_zero_budget';
                 } else if (option === 'review') {
                     if (customAdjustments[mKey] && customAdjustments[mKey][code]) {
                         if (typeof customAdjustments[mKey][code].baseBudget !== 'undefined') {
                             baseBudget = Number(customAdjustments[mKey][code].baseBudget);
+                            provenance = 'user_confirmed_adjustment';
                         }
                         if (typeof customAdjustments[mKey][code].rolloverEnabled !== 'undefined') {
                             rolloverEnabled = Boolean(customAdjustments[mKey][code].rolloverEnabled);
                         }
+                    } else if (priorSnapshotBudget !== null) {
+                        baseBudget = priorSnapshotBudget;
+                        provenance = 'prior_closed_snapshot';
+                    }
+                } else if (option === 'continue') {
+                    if (priorSnapshotBudget !== null) {
+                        baseBudget = priorSnapshotBudget;
+                        provenance = 'prior_closed_snapshot';
+                    } else {
+                        provenance = 'reused_active_setting';
                     }
                 }
-                // 'continue' reuses defaultBaseBudget and defaultRolloverEnabled
 
                 const carryoverPrior = (option === 'fresh') ? 0 : runningCarryover[code];
                 const totalAvailable = baseBudget + carryoverPrior;
@@ -1471,6 +1603,7 @@ class StorageManager {
                     totalAvailable,
                     rolloverEnabled,
                     rolloverAdded,
+                    provenance,
                     isConfigured: isEnabled || baseBudget > 0 || spent > 0
                 };
             });
@@ -1496,7 +1629,8 @@ class StorageManager {
             };
         });
 
-        const stateToken = `${this.state._updatedAt || ''}_${(this.state.transactions || []).length}`;
+        // Canonical financial revision fingerprint
+        const stateToken = this.computeFinancialFingerprint(this.state);
 
         return {
             success: true,
@@ -1509,8 +1643,7 @@ class StorageManager {
     }
 
     /**
-     * Atomically commit the approved budget recovery plan.
-     * All unfinalized months are finalized sequentially, audit metadata recorded, and active month updated.
+     * Atomically commit the approved budget recovery plan with full rollback safety and concurrency validation.
      *
      * @param {string} option 'review' | 'continue' | 'fresh'
      * @param {Object} customAdjustments Per-month adjustments
@@ -1526,90 +1659,136 @@ class StorageManager {
             return { success: true, reconciledMonths: [] };
         }
 
-        // Stale plan concurrency guard
-        const currentStateToken = `${this.state._updatedAt || ''}_${(this.state.transactions || []).length}`;
-        if (previewStateToken && previewStateToken !== currentStateToken) {
+        // Concurrency Guard 1: In-memory revision fingerprint check
+        const currentFingerprint = this.computeFinancialFingerprint(this.state);
+        if (previewStateToken && previewStateToken !== currentFingerprint) {
             return {
                 success: false,
-                error: 'Underlying transactions or data changed while reviewing. Please refresh the reconciliation preview.'
+                error: 'Financial state or transactions changed elsewhere. Please refresh the reconciliation preview.'
             };
+        }
+
+        // Concurrency Guard 2: Authoritative local storage cross-tab check
+        try {
+            const storedRaw = localStorage.getItem(this.getActiveStorageKey());
+            if (storedRaw) {
+                const storedState = JSON.parse(storedRaw);
+                const storedFingerprint = this.computeFinancialFingerprint(storedState);
+                if (storedFingerprint !== currentFingerprint) {
+                    return {
+                        success: false,
+                        conflict: true,
+                        error: 'Financial state changed in another tab or session. Please refresh your recovery plan.'
+                    };
+                }
+            }
+        } catch (e) {
+            // Storage access check handled gracefully
         }
 
         const preview = this.getBudgetRecoveryPreview(option, customAdjustments);
         if (!preview.success) {
-            return { success: false, error: 'Failed to generate reconciliation plan.' };
+            return { success: false, error: preview.error || 'Failed to generate reconciliation plan.' };
         }
 
-        if (!this.state.closedMonths) {
-            this.state.closedMonths = {};
-        }
+        // Snapshot authoritative pre-commit state for 100% complete rollback guarantee
+        const preCommitStateSnapshot = JSON.parse(JSON.stringify(this.state));
+        const preCommitRecoveryState = this.budgetRecoveryState;
 
-        const supportedCountries = ['JP', 'IN', 'DE'];
+        try {
+            if (!this.state.closedMonths) {
+                this.state.closedMonths = {};
+            }
 
-        // Commit Phase: Sequential creation of immutable closed month snapshots
-        preview.monthsPreview.forEach(m => {
-            const snapshot = {
-                monthKey: m.monthKey,
-                label: m.monthKey,
-                closedAt: new Date().toISOString(),
-                reason: `Budget Recovery: ${option}`,
-                walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets || {})),
-                status: 'closed'
-            };
+            const supportedCountries = ['JP', 'IN', 'DE'];
 
-            supportedCountries.forEach(code => {
-                const cData = m.countries[code];
-                snapshot[`${code}TotalBudget`] = cData.baseBudget;
-                snapshot[`${code}CarryoverPrior`] = cData.carryoverPrior;
-                snapshot[`${code}Spent`] = cData.spent;
-                snapshot[`${code}RolloverAdded`] = cData.rolloverAdded;
+            // Commit Phase: Sequential creation of immutable closed month snapshots
+            preview.monthsPreview.forEach(m => {
+                if (this.state.closedMonths[m.monthKey] && this.state.closedMonths[m.monthKey].status === 'closed') {
+                    throw new Error(`Month ${m.monthKey} is already finalized and closed. Skipping duplicate rollover.`);
+                }
+
+                const snapshot = {
+                    monthKey: m.monthKey,
+                    label: m.monthKey,
+                    closedAt: new Date().toISOString(),
+                    reason: `Budget Recovery: ${option}`,
+                    walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets || {})),
+                    status: 'closed'
+                };
+
+                supportedCountries.forEach(code => {
+                    const cData = m.countries[code];
+                    snapshot[`${code}TotalBudget`] = cData.baseBudget;
+                    snapshot[`${code}CarryoverPrior`] = cData.carryoverPrior;
+                    snapshot[`${code}Spent`] = cData.spent;
+                    snapshot[`${code}RolloverAdded`] = cData.rolloverAdded;
+                    snapshot[`${code}Provenance`] = cData.provenance;
+                });
+
+                // Legacy backward-compatibility
+                snapshot.jpTotalBudget = snapshot.JPTotalBudget || 0;
+                snapshot.jpRolloverAdded = snapshot.JPRolloverAdded || 0;
+
+                this.state.closedMonths[m.monthKey] = snapshot;
             });
 
-            // Legacy backward-compatibility
-            snapshot.jpTotalBudget = snapshot.JPTotalBudget || 0;
-            snapshot.jpRolloverAdded = snapshot.JPRolloverAdded || 0;
+            // Update active month carryover in state.budgets
+            supportedCountries.forEach(code => {
+                if (!this.state.budgets) {
+                    this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+                }
+                if (!this.state.budgets[code]) {
+                    this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
+                }
+                this.state.budgets[code].carryover = preview.activeMonthSummary.countries[code].carryover;
+            });
 
-            this.state.closedMonths[m.monthKey] = snapshot;
-        });
+            const actualMonth = this.getCurrentMonthKey();
+            this.state.currentMonthKey = actualMonth;
 
-        // Update active month carryover in state.budgets
-        supportedCountries.forEach(code => {
-            if (!this.state.budgets) {
-                this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+            // Stamp comprehensive recovery audit metadata including provenance summary
+            this.state.recoveryMetadata = {
+                id: `recovery_${Date.now()}`,
+                reconciledAt: new Date().toISOString(),
+                periodStart: unfinalized[0],
+                periodEnd: unfinalized[unfinalized.length - 1],
+                activeMonth: actualMonth,
+                option: option,
+                countries: supportedCountries,
+                reconciledMonths: unfinalized,
+                provenanceSummary: preview.monthsPreview.map(m => ({
+                    monthKey: m.monthKey,
+                    countries: Object.fromEntries(
+                        supportedCountries.map(c => [c, m.countries[c]?.provenance || 'unknown'])
+                    )
+                }))
+            };
+
+            // Re-derive history view from closedMonths
+            this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+            this._attachHistoryGetters(this.state);
+
+            // Transition workflow state to RESOLVED
+            this.budgetRecoveryState = 'RESOLVED';
+            this.unfinalizedMonths = [];
+            this.state.budgetRecoveryState = 'RESOLVED';
+            this.state.unfinalizedMonths = [];
+
+            const saved = this.saveData();
+            if (saved === false) {
+                throw new Error("Local persistence failed (storage quota or access error).");
             }
-            if (!this.state.budgets[code]) {
-                this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
-            }
-            this.state.budgets[code].carryover = preview.activeMonthSummary.countries[code].carryover;
-        });
 
-        const actualMonth = this.getCurrentMonthKey();
-        this.state.currentMonthKey = actualMonth;
-
-        // Stamp comprehensive recovery audit metadata
-        this.state.recoveryMetadata = {
-            id: `recovery_${Date.now()}`,
-            reconciledAt: new Date().toISOString(),
-            periodStart: unfinalized[0],
-            periodEnd: unfinalized[unfinalized.length - 1],
-            activeMonth: actualMonth,
-            option: option,
-            countries: supportedCountries,
-            reconciledMonths: unfinalized
-        };
-
-        // Re-derive history view from closedMonths
-        this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-        this._attachHistoryGetters(this.state);
-
-        // Transition workflow state to RESOLVED
-        this.budgetRecoveryState = 'RESOLVED';
-        this.unfinalizedMonths = [];
-        this.state.budgetRecoveryState = 'RESOLVED';
-        this.state.unfinalizedMonths = [];
-
-        this.saveData();
-        return { success: true, reconciledMonths: unfinalized };
+            return { success: true, reconciledMonths: unfinalized };
+        } catch (commitErr) {
+            console.error('[StorageManager] commitBudgetRecovery failed during commit. Rolling back completely...', commitErr);
+            this.state = preCommitStateSnapshot;
+            this.budgetRecoveryState = preCommitRecoveryState;
+            this._attachBudgetAccessors(this.state);
+            this._attachHistoryGetters(this.state);
+            return { success: false, error: commitErr.message || 'Recovery commit failed.' };
+        }
     }
 
     closeCurrentMonth(reason = "Manual Close", targetMonthKey = null) {

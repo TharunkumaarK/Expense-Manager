@@ -8053,7 +8053,10 @@ class App {
                             <span>${code} (${sym})</span>
                         </div>
                         <div>
-                            <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:2px;">Base Budget</div>
+                            <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:2px;display:flex;align-items:center;gap:6px;">
+                                <span>Base Budget</span>
+                                ${this.getProvenanceBadge(c.provenance)}
+                            </div>
                             ${option === 'review' ? `
                                 <input type="number" class="recovery-input-budget" value="${c.baseBudget}"
                                     onchange="app.onRecoveryAdjustmentChange('${m.monthKey}', '${code}', 'baseBudget', this.value)">
@@ -8119,6 +8122,45 @@ class App {
         }
     }
 
+    getProvenanceBadge(prov) {
+        switch (prov) {
+            case 'user_confirmed_adjustment':
+                return '<span class="recovery-prov-badge" style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);font-weight:500;">User Confirmed</span>';
+            case 'prior_closed_snapshot':
+                return '<span class="recovery-prov-badge" style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:rgba(168,85,247,0.15);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);font-weight:500;">Prior Snapshot</span>';
+            case 'explicit_zero_budget':
+                return '<span class="recovery-prov-badge" style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:rgba(148,163,184,0.15);color:#cbd5e1;border:1px solid rgba(148,163,184,0.3);font-weight:500;">Explicit Zero</span>';
+            case 'reused_active_setting':
+            default:
+                return '<span class="recovery-prov-badge" style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:rgba(16,185,129,0.15);color:#6ee7b7;border:1px solid rgba(16,185,129,0.3);font-weight:500;">Active Setting</span>';
+        }
+    }
+
+    showToast(message, type = 'info') {
+        let container = document.getElementById('app-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'app-toast-container';
+            container.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        const bg = type === 'error' ? 'rgba(239, 68, 68, 0.95)' : type === 'warning' ? 'rgba(245, 158, 11, 0.95)' : 'rgba(15, 23, 42, 0.95)';
+        const border = type === 'error' ? 'rgba(248, 113, 113, 0.4)' : type === 'warning' ? 'rgba(251, 191, 36, 0.4)' : 'rgba(59, 130, 246, 0.4)';
+        toast.style.cssText = `background:${bg};color:#ffffff;border:1px solid ${border};padding:12px 18px;border-radius:8px;font-size:0.85rem;box-shadow:0 10px 25px -5px rgba(0,0,0,0.5);pointer-events:auto;transition:all 0.3s ease;transform:translateY(10px);opacity:0;max-width:380px;line-height:1.4;`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        requestAnimationFrame(() => {
+            toast.style.transform = 'translateY(0)';
+            toast.style.opacity = '1';
+        });
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
     confirmBudgetRecovery() {
         const preview = this.budgetRecoveryState.preview || storage.getBudgetRecoveryPreview(
             this.budgetRecoveryState.option,
@@ -8137,8 +8179,15 @@ class App {
             this.renderAll();
             this.showToast(`Budget history successfully reconciled for ${result.reconciledMonths.join(', ')}.`);
         } else {
-            alert(`Reconciliation could not be applied: ${result.error}`);
-            this.budgetRecoveryState.preview = null;
+            if (result.conflict) {
+                this.showToast(`Financial state changed in another session. Recovery preview refreshed.`, 'warning');
+            } else {
+                this.showToast(`Reconciliation could not be applied: ${result.error}`, 'error');
+            }
+            this.budgetRecoveryState.preview = storage.getBudgetRecoveryPreview(
+                this.budgetRecoveryState.option,
+                this.budgetRecoveryState.customAdjustments
+            );
             this.renderBudgetRecoveryModal();
         }
     }
