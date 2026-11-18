@@ -250,6 +250,8 @@ const supabaseClient = {
         const bottomNav = document.getElementById('bottom-nav');
         const mainFab = document.getElementById('main-fab');
         const resetScreen = document.getElementById('reset-password-screen');
+        const syncErrorScreen = document.getElementById('sync-error-screen');
+        const onboardingScreen = document.getElementById('onboarding-screen');
         
         // Never show the dashboard while in recovery mode
         if (this.isRecoveryMode) {
@@ -257,6 +259,8 @@ const supabaseClient = {
             if (appContent) appContent.style.display = 'none';
             if (bottomNav) bottomNav.style.display = 'none';
             if (mainFab) mainFab.style.display = 'none';
+            if (syncErrorScreen) syncErrorScreen.style.display = 'none';
+            if (onboardingScreen) onboardingScreen.style.display = 'none';
             if (resetScreen) resetScreen.style.display = 'flex';
             return;
         }
@@ -264,9 +268,6 @@ const supabaseClient = {
         if (this.session) {
             if (authScreen) authScreen.style.display = 'none';
             if (resetScreen) resetScreen.style.display = 'none';
-            if (appContent) appContent.style.display = 'block';
-            if (bottomNav) bottomNav.style.display = 'flex';
-            if (mainFab) mainFab.style.display = 'flex';
             
             const emailDisplay = document.getElementById('account-email-display');
             if (emailDisplay) emailDisplay.innerText = `Logged in as ${this.session.user.email}`;
@@ -279,9 +280,31 @@ const supabaseClient = {
             if (typeof storage !== 'undefined') {
                 storage.onUserLogin(this.session.user.id);
                 const stateChanged = await storage.syncFromSupabase();
+                const accountStatus = storage.getAccountStatus();
 
-                // If account requires onboarding (new user or incomplete setup), activate desktop onboarding
-                const requiresOnboarding = storage.isNewUser() || storage.getAccountStatus() === 'ONBOARDING_INCOMPLETE';
+                // 1. If initial sync failed (network error, HTTP 503, offline), block dashboard safely
+                if (accountStatus === 'SYNC_FAILED') {
+                    if (appContent) appContent.style.display = 'none';
+                    if (bottomNav) bottomNav.style.display = 'none';
+                    if (mainFab) mainFab.style.display = 'none';
+                    if (onboardingScreen) onboardingScreen.style.display = 'none';
+
+                    const errorDetails = document.getElementById('sync-error-details');
+                    if (errorDetails) {
+                        errorDetails.textContent = storage.syncError || 'Network connection failed or server is temporarily unavailable. Please verify your connection.';
+                    }
+                    if (syncErrorScreen) {
+                        syncErrorScreen.style.display = 'flex';
+                        if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+                    }
+                    return;
+                }
+
+                // If sync succeeded or resolved, hide any prior sync error screen
+                if (syncErrorScreen) syncErrorScreen.style.display = 'none';
+
+                // 2. If account requires onboarding (new user or incomplete setup), activate desktop onboarding
+                const requiresOnboarding = storage.isNewUser() || accountStatus === 'ONBOARDING_INCOMPLETE';
                 if (requiresOnboarding && typeof onboardingController !== 'undefined') {
                     if (appContent) appContent.style.display = 'none';
                     if (bottomNav) bottomNav.style.display = 'none';
@@ -290,6 +313,12 @@ const supabaseClient = {
                     onboardingController.show();
                     return;
                 }
+
+                // 3. Existing account with confirmed cloud/local data: render dashboard
+                if (onboardingScreen) onboardingScreen.style.display = 'none';
+                if (appContent) appContent.style.display = 'block';
+                if (bottomNav) bottomNav.style.display = 'flex';
+                if (mainFab) mainFab.style.display = 'flex';
 
                 if (typeof app !== 'undefined') {
                     if (!app._hasInit) {
@@ -304,15 +333,39 @@ const supabaseClient = {
                         app.renderAll();
                     }
                 }
+            } else {
+                if (appContent) appContent.style.display = 'block';
+                if (bottomNav) bottomNav.style.display = 'flex';
+                if (mainFab) mainFab.style.display = 'flex';
             }
         } else {
-            authScreen.style.display = 'flex';
+            if (authScreen) authScreen.style.display = 'flex';
             if (resetScreen) resetScreen.style.display = 'none';
-            const onboardingScreen = document.getElementById('onboarding-screen');
+            if (syncErrorScreen) syncErrorScreen.style.display = 'none';
             if (onboardingScreen) onboardingScreen.style.display = 'none';
-            appContent.style.display = 'none';
+            if (appContent) appContent.style.display = 'none';
             if (bottomNav) bottomNav.style.display = 'none';
             if (mainFab) mainFab.style.display = 'none';
+        }
+    },
+
+    /**
+     * Retry initial account synchronization following a network failure.
+     */
+    async retryInitialSync() {
+        const retryBtn = document.getElementById('sync-retry-btn');
+        if (retryBtn) {
+            retryBtn.disabled = true;
+            retryBtn.innerHTML = `<span>Connecting...</span>`;
+        }
+        try {
+            await this.updateUI(false);
+        } finally {
+            if (retryBtn) {
+                retryBtn.disabled = false;
+                retryBtn.innerHTML = `<i data-lucide="refresh-cw"></i><span>Retry Connection</span>`;
+                if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+            }
         }
     },
 

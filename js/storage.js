@@ -1547,6 +1547,128 @@ class StorageManager {
     }
 
     /**
+     * Get the primary operating country code.
+     * @returns {string}
+     */
+    getPrimaryCountry() {
+        return (this.state.preferences && this.state.preferences.defaultCountry)
+            || (this.state.regionalPreferences && this.state.regionalPreferences.defaultCountry)
+            || this.getActiveCountries()[0]
+            || 'JP';
+    }
+
+    /**
+     * Set the primary operating country.
+     * @param {string} countryCode
+     */
+    setPrimaryCountry(countryCode) {
+        if (!countryCode) return;
+        const code = countryCode.toUpperCase();
+        if (!this.state.preferences) {
+            this.state.preferences = JSON.parse(JSON.stringify(defaultState.preferences));
+        }
+        this.state.preferences.defaultCountry = code;
+        if (this.state.regionalPreferences) {
+            this.state.regionalPreferences.defaultCountry = code;
+            const currencyCode = (typeof CountryConfig !== 'undefined' && CountryConfig.get(code)?.currencyCode) || (code === 'JP' ? 'JPY' : code === 'DE' ? 'EUR' : 'INR');
+            this.state.regionalPreferences.defaultCurrency = currencyCode;
+        }
+        this.saveData();
+    }
+
+    /**
+     * Activate an operating country.
+     * @param {string} countryCode
+     */
+    activateCountry(countryCode) {
+        if (!countryCode) return;
+        const code = countryCode.toUpperCase();
+        if (!['JP', 'IN', 'DE'].includes(code)) return;
+        const current = this.getActiveCountries();
+        if (!current.includes(code)) {
+            current.push(code);
+            this.setActiveCountries(current);
+            if (!this.state.budgets) {
+                this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+            }
+            if (!this.state.budgets[code]) {
+                this.state.budgets[code] = {
+                    enabled: true,
+                    monthlyTotal: code === 'JP' ? 50000 : code === 'DE' ? 2500 : 30000,
+                    rolloverEnabled: code === 'JP'
+                };
+            }
+            this.saveData();
+        }
+    }
+
+    /**
+     * Deactivate an operating country.
+     * Guaranteed safe: preserves all wallets, transactions, and snapshots.
+     * @param {string} countryCode
+     * @returns {boolean} Whether deactivation succeeded
+     */
+    deactivateCountry(countryCode) {
+        if (!countryCode) return false;
+        const code = countryCode.toUpperCase();
+        const current = this.getActiveCountries();
+        if (current.length <= 1) return false; // At least one country must remain active
+        const updated = current.filter(c => c !== code);
+        this.setActiveCountries(updated);
+        if (this.getPrimaryCountry() === code) {
+            this.setPrimaryCountry(updated[0]);
+        }
+        this.saveData();
+        return true;
+    }
+
+    /**
+     * Get total allocated monthly budget for a country.
+     * @param {string} countryCode
+     * @returns {number}
+     */
+    getTotalBudget(countryCode) {
+        if (!countryCode) return 0;
+        const code = countryCode.toUpperCase();
+        if (this.state.budgets && this.state.budgets[code] && typeof this.state.budgets[code].monthlyTotal === 'number') {
+            return this.state.budgets[code].monthlyTotal;
+        }
+        if (code === 'JP') return Number(this.state.jpTotalBudget) || 0;
+        if (code === 'IN') return Number(this.state.inTotalBudget) || 0;
+        return 0;
+    }
+
+    /**
+     * Check if budget rollover is enabled for a country.
+     * @param {string} countryCode
+     * @returns {boolean}
+     */
+    isBudgetRolloverEnabled(countryCode) {
+        if (!countryCode) return false;
+        const code = countryCode.toUpperCase();
+        if (this.state.budgets && this.state.budgets[code] && typeof this.state.budgets[code].rolloverEnabled === 'boolean') {
+            return this.state.budgets[code].rolloverEnabled;
+        }
+        if (code === 'JP') return Boolean(this.state.jpBudgetRolloverEnabled);
+        if (code === 'IN') return Boolean(this.state.inBudgetRolloverEnabled);
+        return false;
+    }
+
+    /**
+     * Get budget preference summary for a country.
+     * @param {string} countryCode
+     * @returns {{enabled: boolean, monthlyTotal: number, rolloverEnabled: boolean}}
+     */
+    getBudgetPreference(countryCode) {
+        const code = (countryCode || 'JP').toUpperCase();
+        return {
+            enabled: this.isBudgetEnabled(code),
+            monthlyTotal: this.getTotalBudget(code),
+            rolloverEnabled: this.isBudgetRolloverEnabled(code)
+        };
+    }
+
+    /**
      * Check if budgeting is enabled for a given country.
      * @param {string} countryCode
      * @returns {boolean}
@@ -1661,6 +1783,8 @@ class StorageManager {
             if (typeof options.emi === 'number') this.state.loanConfig.emi = options.emi;
             if (typeof options.annualInterestRate === 'number') this.state.loanConfig.annualInterestRate = options.annualInterestRate;
             if (typeof options.emiDrawDate === 'number') this.state.loanConfig.emiDrawDate = options.emiDrawDate;
+            if (typeof options.totalDues === 'number') this.state.loanConfig.totalDues = options.totalDues;
+            if (typeof options.duesPaid === 'number') this.state.loanConfig.duesPaid = options.duesPaid;
         }
         this.saveData();
     }

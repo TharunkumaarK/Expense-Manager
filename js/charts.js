@@ -431,7 +431,8 @@ class ChartManager {
             const centerEl = document.getElementById('report-pie-center-total');
             if (centerEl && typeof app !== 'undefined' && this.reportExpensePie.data?.datasets?.[0]?.data) {
                 const total = this.reportExpensePie.data.datasets[0].data.reduce((s, v) => s + v, 0);
-                const currency = (typeof app.reportRegion !== 'undefined' && app.reportRegion === 'IN') ? '₹' : '¥';
+                const repReg = app.reportRegion || 'JP';
+                const currency = (typeof CountryConfig !== 'undefined' ? CountryConfig.get(repReg)?.currency : null) || (repReg === 'IN' ? '₹' : repReg === 'DE' ? '€' : '¥');
                 centerEl.innerText = app.formatMoney(total, currency);
             }
         }
@@ -440,7 +441,8 @@ class ChartManager {
             const dashCenterEl = document.getElementById('dash-donut-center-total');
             if (dashCenterEl && typeof app !== 'undefined' && this.dashboardCategoryDonut.data?.datasets?.[0]?.data) {
                 const total = this.dashboardCategoryDonut.data.datasets[0].data.reduce((s, v) => s + v, 0);
-                const currency = (typeof app.dashboardChartRegion !== 'undefined' && app.dashboardChartRegion === 'IN') ? '₹' : '¥';
+                const dashReg = app.dashboardChartRegion || 'JP';
+                const currency = (typeof CountryConfig !== 'undefined' ? CountryConfig.get(dashReg)?.currency : null) || (dashReg === 'IN' ? '₹' : dashReg === 'DE' ? '€' : '¥');
                 dashCenterEl.innerText = app.formatMoney(total, currency);
             }
         }
@@ -780,7 +782,7 @@ class ChartManager {
     }
 
     getDonutOptions(region = 'JP') {
-        const currency = region === 'IN' ? '₹' : '¥';
+        const currency = (typeof CountryConfig !== 'undefined' ? CountryConfig.get(region)?.currency : null) || (region === 'IN' ? '₹' : region === 'DE' ? '€' : '¥');
         return {
             responsive: true,
             maintainAspectRatio: false,

@@ -112,12 +112,12 @@ class WalletManager {
                     tx.amount !== undefined ? String(tx.amount) : '',
                     tx.sourceAmount !== undefined ? String(tx.sourceAmount) : '',
                     tx.destAmount !== undefined ? String(tx.destAmount) : '',
-                    tx.region === 'JP' ? 'japan jpy ¥' : (tx.region === 'IN' ? 'india inr ₹' : '')
+                    tx.region === 'JP' ? 'japan jpy ¥' : (tx.region === 'IN' ? 'india inr ₹' : (tx.region === 'DE' ? 'germany eur €' : ''))
                 ];
 
                 // Add Category Names from storage
                 if (tx.categoryId && storage.state?.categories) {
-                    ['JP', 'IN'].forEach(reg => {
+                    Object.keys(storage.state.categories || {}).forEach(reg => {
                         const cat = storage.state.categories[reg]?.find(c => c.id === tx.categoryId);
                         if (cat?.name) tokens.push(cat.name);
                     });
@@ -552,7 +552,7 @@ class WalletManager {
 
     // Returns the category's base budget. Rollover is now in jpTotalBudget, not per-category.
     getEffectiveBudget(categoryId, region, monthKey) {
-        const cat = storage.state.categories[region].find(c => c.id === categoryId);
+        const cat = (storage.state.categories?.[region] || []).find(c => c.id === categoryId);
         return cat ? (cat.budget || 0) : 0;
     }
 

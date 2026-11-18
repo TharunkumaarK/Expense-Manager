@@ -3298,10 +3298,10 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     display: none !important;
 }
 
-/* 2. Country Balance Cards Grid (Japan & India) */
+/* 2. Country Balance Cards Grid (Japan, India & Germany) */
 .country-balance-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 20px;
     width: 100%;
 }
@@ -3359,6 +3359,21 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .country-card-in:hover {
     border-color: rgba(245, 158, 11, 0.45) !important;
     box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 12px 32px rgba(245, 158, 11, 0.20), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+    transform: none !important;
+}
+
+/* Germany Card: Layered Prussian Slate / Gold Radial Blooms */
+.country-card-de {
+    background: radial-gradient(circle at 10% 15%, rgba(220, 38, 38, 0.22), transparent 50%),
+        radial-gradient(circle at 90% 85%, rgba(234, 179, 8, 0.18), transparent 55%),
+        linear-gradient(145deg, #16181d, #0d0f14) !important;
+    border: 1px solid rgba(234, 179, 8, 0.22) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.country-card-de:hover {
+    border-color: rgba(234, 179, 8, 0.45) !important;
+    box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.35), 0 12px 32px rgba(234, 179, 8, 0.20), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
     transform: none !important;
 }
 
@@ -3666,6 +3681,11 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .section-badge-dot.in-dot {
     background-color: #f59e0b;
     box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.section-badge-dot.de-dot {
+    background-color: #eab308;
+    box-shadow: 0 0 8px rgba(234, 179, 8, 0.6);
 }
 
 .section-subtitle {
@@ -4164,6 +4184,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         opacity: 0;
         transform: translateY(6px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -4171,6 +4192,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     .focus-primary-panel,
     .focus-secondary-panel {
         animation: none !important;
@@ -4563,7 +4585,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 /* Wallets Portfolio Overview & Liquid Net Position KPI Grid */
 .wallets-portfolio-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 16px;
     margin-bottom: 28px;
 }
@@ -4588,8 +4610,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 /* Wallets Page Japan Balances Card: Layered Crimson/Rose Radial Blooms */
-.wallets-kpi-card.country-card-jp,
-.wallets-portfolio-grid .wallets-kpi-card:nth-child(1) {
+.wallets-kpi-card.country-card-jp {
     background: radial-gradient(circle at 10% 15%, rgba(225, 29, 72, 0.28), transparent 50%),
         radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), transparent 55%),
         linear-gradient(145deg, #181116, #100b10) !important;
@@ -4597,16 +4618,14 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
-.wallets-kpi-card.country-card-jp:hover,
-.wallets-portfolio-grid .wallets-kpi-card:nth-child(1):hover {
+.wallets-kpi-card.country-card-jp:hover {
     border-color: rgba(225, 29, 72, 0.45) !important;
     box-shadow: 0 0 0 1px rgba(225, 29, 72, 0.35), 0 12px 32px rgba(225, 29, 72, 0.22), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
     transform: none !important;
 }
 
 /* Wallets Page India Balances Card: Layered Saffron/Emerald Radial Blooms */
-.wallets-kpi-card.country-card-in,
-.wallets-portfolio-grid .wallets-kpi-card:nth-child(2) {
+.wallets-kpi-card.country-card-in {
     background: radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.24), transparent 50%),
         radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), transparent 55%),
         linear-gradient(145deg, #171510, #0c120e) !important;
@@ -4614,10 +4633,24 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
-.wallets-kpi-card.country-card-in:hover,
-.wallets-portfolio-grid .wallets-kpi-card:nth-child(2):hover {
+.wallets-kpi-card.country-card-in:hover {
     border-color: rgba(245, 158, 11, 0.45) !important;
     box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 12px 32px rgba(245, 158, 11, 0.20), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+    transform: none !important;
+}
+
+/* Wallets Page Germany Balances Card: Layered Prussian Slate / Gold Radial Blooms */
+.wallets-kpi-card.country-card-de {
+    background: radial-gradient(circle at 10% 15%, rgba(220, 38, 38, 0.20), transparent 50%),
+        radial-gradient(circle at 90% 85%, rgba(234, 179, 8, 0.16), transparent 55%),
+        linear-gradient(145deg, #16181d, #0d0f14) !important;
+    border: 1px solid rgba(234, 179, 8, 0.22) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.wallets-kpi-card.country-card-de:hover {
+    border-color: rgba(234, 179, 8, 0.45) !important;
+    box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.35), 0 12px 32px rgba(234, 179, 8, 0.20), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
     transform: none !important;
 }
 
@@ -5142,6 +5175,19 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .wallet-theme-aurora-nordic:hover {
     border-color: rgba(13, 148, 136, 0.52);
     box-shadow: 0 10px 28px rgba(13, 148, 136, 0.2);
+}
+
+.wallet-theme-frankfurt-slate {
+    background: radial-gradient(circle at 12% 18%, rgba(220, 38, 38, 0.28), transparent 50%),
+        radial-gradient(circle at 88% 85%, rgba(234, 179, 8, 0.20), transparent 55%),
+        linear-gradient(145deg, #131722, #0b0e17) !important;
+    border: 1px solid rgba(234, 179, 8, 0.28) !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.wallet-theme-frankfurt-slate:hover {
+    border-color: rgba(234, 179, 8, 0.48) !important;
+    box-shadow: 0 10px 28px rgba(234, 179, 8, 0.18) !important;
 }
 
 /* Wallet Configuration Modals (Add & Edit Wallet - Sectioned Layout) */
@@ -6206,6 +6252,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 @media (max-width: 420px) {
+
     #analytics-jp-workspace .analytics-kpi-grid,
     .analytics-kpi-grid {
         grid-template-columns: 1fr !important;
@@ -8367,7 +8414,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 @supports not (backdrop-filter: blur(1px)) {
 
     .liquid-glass,
-    .card:not(.country-card-jp):not(.country-card-in),
+    .card:not(.country-card-jp):not(.country-card-in):not(.country-card-de),
     .budget-central-card,
     .reports-chart-card,
     .reports-data-table-card,
@@ -8377,7 +8424,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 /* Glass Surface Upgrades for All Financial Cards & Panels */
-.card:not(.country-card-jp):not(.country-card-in),
+.card:not(.country-card-jp):not(.country-card-in):not(.country-card-de),
 .rail-card,
 .analytics-kpi-card,
 .ledger-toolbar-card,
@@ -8412,7 +8459,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     transform: none !important;
 }
 
-.interactive-card:not(.country-card-jp):not(.country-card-in):hover,
+.interactive-card:not(.country-card-jp):not(.country-card-in):not(.country-card-de):hover,
 .action-type-card:hover,
 .category-card.interactive:hover,
 .budget-central-card.interactive:hover {
@@ -10918,6 +10965,151 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     }
 }
 
+/* --------------------------------------------------------------------------
+   Settings Regional Preferences & Country Configuration Cards
+   -------------------------------------------------------------------------- */
+.settings-countries-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.settings-country-card {
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 12px;
+    transition: all var(--duration-fast) var(--ease-out);
+}
+
+.settings-country-card.active {
+    background: rgba(255, 255, 255, 0.045);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.settings-country-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.settings-country-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.settings-badge-primary {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(48, 209, 88, 0.15);
+    color: #30d158;
+    border: 1px solid rgba(48, 209, 88, 0.3);
+}
+
+.settings-country-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.settings-toggle-btn {
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 600;
+    transition: all var(--duration-fast) var(--ease-out);
+}
+
+.settings-toggle-btn.btn-active {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: var(--text-primary);
+}
+
+.settings-toggle-btn.btn-active:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #f87171;
+}
+
+.settings-toggle-btn.btn-inactive {
+    background: transparent;
+    border: 1px dashed rgba(255, 255, 255, 0.22);
+    color: var(--text-muted);
+}
+
+.settings-toggle-btn.btn-inactive:hover {
+    border-color: rgba(48, 209, 88, 0.5);
+    color: #30d158;
+    background: rgba(48, 209, 88, 0.08);
+}
+
+.settings-budget-item-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.settings-budget-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Budgets Disabled Banner */
+.budgets-disabled-banner {
+    padding: 28px 24px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-lg);
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.budgets-disabled-banner i {
+    width: 32px;
+    height: 32px;
+    color: var(--text-muted);
+}
+
+.budgets-disabled-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.budgets-disabled-desc {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    max-width: 480px;
+    line-height: 1.5;
+}
+
 /* ==========================================================================
    PASS 1: DASHBOARD & GLOBAL DESIGN LANGUAGE REFINEMENT
    ========================================================================== */
@@ -11824,11 +12016,11 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.onboarding-toggle-switch input:checked + .onboarding-toggle-slider {
+.onboarding-toggle-switch input:checked+.onboarding-toggle-slider {
     background-color: #2563eb;
 }
 
-.onboarding-toggle-switch input:checked + .onboarding-toggle-slider:before {
+.onboarding-toggle-switch input:checked+.onboarding-toggle-slider:before {
     transform: translateX(20px);
 }
 

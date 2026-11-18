@@ -10,6 +10,7 @@
  *   3. Mandatory Wallets & Opening Balances (English-alone naming).
  *   4. Optional Loan Tracking & Comprehensive Configuration Review.
  * - Local-only draft progress persistence via storage.saveData() (defers cloud push).
+ * - Safe HTML escaping and event delegation for user-supplied account names.
  * - Asynchronous confirmation gate with blocking retry on cloud failure.
  * - Seamless integration with StorageManager and SupabaseClient.
  */
@@ -45,56 +46,97 @@
         }
 
         /**
+         * Escape user input to prevent XSS and broken HTML attributes.
+         * @param {string|any} str
+         * @returns {string}
+         */
+        escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        /**
          * Initialize the controller and resume from draft state if available.
          */
         init() {
             if (typeof storage === 'undefined') return;
 
-            const isFresh = (typeof storage.isNewUser === 'function') ? storage.isNewUser() : true;
-            const prefs = (typeof storage.getPreferences === 'function') ? storage.getPreferences() : null;
+            const prefs = (typeof storage.getPreferences === 'function')
+                ? storage.getPreferences()
+                : (storage.state?.preferences || null);
 
-            if (!isFresh && prefs && prefs.onboardingStep > 1 && Array.isArray(prefs.activeCountries) && prefs.activeCountries.length > 0) {
-                this.draft.activeCountries = [...prefs.activeCountries];
-                this.draft.defaultCountry = prefs.defaultCountry || prefs.activeCountries[0] || 'JP';
-                this.currentStep = (typeof prefs.onboardingStep === 'number' && prefs.onboardingStep >= 1 && prefs.onboardingStep <= 4)
+            // An account is in resumable draft if onboardingCompleted is false AND
+            // (isDraftOnboardingConfiguration is true, or draftSaved flag is true, or onboardingStep > 1).
+            const isDraft = (typeof storage.isDraftOnboardingConfiguration === 'function')
+                ? storage.isDraftOnboardingConfiguration(storage.state)
+                : false;
+
+            const isResumingDraft = Boolean(
+                prefs &&
+                prefs.onboardingCompleted === false &&
+                (isDraft || prefs.draftSaved || (typeof prefs.onboardingStep === 'number' && prefs.onboardingStep > 1))
+            );
+
+            if (isResumingDraft) {
+                // Restore active countries
+                if (prefs && Array.isArray(prefs.activeCountries) && prefs.activeCountries.length > 0) {
+                    this.draft.activeCountries = [...prefs.activeCountries];
+                    this.draft.defaultCountry = prefs.defaultCountry || prefs.activeCountries[0] || 'JP';
+                } else {
+                    this.draft.activeCountries = ['JP'];
+                    this.draft.defaultCountry = 'JP';
+                }
+
+                // Restore destination step
+                this.currentStep = (prefs && typeof prefs.onboardingStep === 'number' && prefs.onboardingStep >= 1 && prefs.onboardingStep <= 4)
                     ? prefs.onboardingStep
                     : 1;
+
+                // Restore draft budgets
+                if (storage.state && storage.state.budgets) {
+                    for (const c of ['JP', 'IN', 'DE']) {
+                        if (storage.state.budgets[c]) {
+                            this.draft.budgets[c] = { ...storage.state.budgets[c] };
+                        }
+                    }
+                }
+
+                // Restore draft wallets safely
+                this.draft.wallets = {};
+                if (storage.state && storage.state.wallets && Object.keys(storage.state.wallets).length > 0) {
+                    for (const [id, w] of Object.entries(storage.state.wallets)) {
+                        if (w && this.draft.activeCountries.includes(w.region)) {
+                            this.draft.wallets[id] = { ...w };
+                        }
+                    }
+                }
+                // Populate starter templates for countries with 0 wallets without duplicating existing ones
+                this._initDraftWallets();
+
+                // Restore draft loan config
+                if (storage.state && storage.state.loanConfig) {
+                    this.draft.loanConfig = { ...storage.state.loanConfig };
+                }
             } else {
+                // Fresh default setup: Japan alone by default
                 this.draft.activeCountries = ['JP'];
                 this.draft.defaultCountry = 'JP';
                 this.currentStep = 1;
-            }
 
-            // Initialize draft budgets
-            if (!isFresh && storage.state && storage.state.budgets) {
-                for (const c of ['JP', 'IN', 'DE']) {
-                    if (storage.state.budgets[c]) {
-                        this.draft.budgets[c] = { ...storage.state.budgets[c] };
-                    }
-                }
-            } else {
                 this.draft.budgets = {
                     JP: { enabled: true, monthlyTotal: 0, rolloverEnabled: true },
                     IN: { enabled: false, monthlyTotal: 0, rolloverEnabled: false },
                     DE: { enabled: false, monthlyTotal: 0, rolloverEnabled: false }
                 };
-            }
 
-            // Reset/init draft wallets
-            this.draft.wallets = {};
-            if (!isFresh && storage.state && storage.state.wallets && Object.keys(storage.state.wallets).length > 0) {
-                for (const [id, w] of Object.entries(storage.state.wallets)) {
-                    if (w && this.draft.activeCountries.includes(w.region)) {
-                        this.draft.wallets[id] = { ...w };
-                    }
-                }
-            }
-            this._initDraftWallets();
+                this.draft.wallets = {};
+                this._initDraftWallets();
 
-            // Initialize draft loan config
-            if (!isFresh && storage.state && storage.state.loanConfig) {
-                this.draft.loanConfig = { ...storage.state.loanConfig };
-            } else {
                 this.draft.loanConfig = {
                     enabled: false,
                     country: 'IN',
@@ -105,6 +147,16 @@
                     annualInterestRate: 0,
                     emiDrawDate: 7
                 };
+            }
+
+            // Sync loan currency with active countries if loan country is not active
+            if (!this.draft.activeCountries.includes(this.draft.loanConfig.country)) {
+                const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
+                const fallbackCountry = this.draft.activeCountries.includes('IN')
+                    ? 'IN'
+                    : (this.draft.defaultCountry || this.draft.activeCountries[0] || 'JP');
+                this.draft.loanConfig.country = fallbackCountry;
+                this.draft.loanConfig.currency = currencySymbols[fallbackCountry] || '¥';
             }
 
             this.bindEvents();
@@ -161,6 +213,41 @@
             }
             if (backBtn) {
                 backBtn.onclick = () => this.handleBack();
+            }
+
+            // Event delegation for Step 3 wallets (safe input rendering: no inline onclick/oninput with dynamic strings)
+            const step3Container = document.getElementById('onboarding-step-3');
+            if (step3Container && !step3Container._delegationBound) {
+                step3Container._delegationBound = true;
+
+                step3Container.addEventListener('input', (e) => {
+                    if (e.target && e.target.classList.contains('onboarding-balance-input')) {
+                        const walletId = e.target.getAttribute('data-wallet-id');
+                        if (walletId) {
+                            this.setWalletBalance(walletId, e.target.value);
+                        }
+                    }
+                });
+
+                step3Container.addEventListener('click', (e) => {
+                    const deleteBtn = e.target.closest('.onboarding-wallet-delete-btn');
+                    if (deleteBtn) {
+                        const walletId = deleteBtn.getAttribute('data-wallet-id');
+                        if (walletId) {
+                            this.deleteWallet(walletId);
+                        }
+                        return;
+                    }
+
+                    const addBtn = e.target.closest('.onboarding-btn-add-wallet');
+                    if (addBtn) {
+                        const region = addBtn.getAttribute('data-region');
+                        if (region) {
+                            this.promptAddWallet(region);
+                        }
+                        return;
+                    }
+                });
             }
         }
 
@@ -390,8 +477,19 @@
                 this.draft.activeCountries.push(code);
             }
 
+            // Sync loan config country if activeCountries changed
+            if (!this.draft.activeCountries.includes(this.draft.loanConfig.country)) {
+                const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
+                const fallbackCountry = this.draft.activeCountries.includes('IN')
+                    ? 'IN'
+                    : (this.draft.defaultCountry || this.draft.activeCountries[0] || 'JP');
+                this.draft.loanConfig.country = fallbackCountry;
+                this.draft.loanConfig.currency = currencySymbols[fallbackCountry] || '¥';
+            }
+
             this._initDraftWallets();
             this.clearError();
+            this.persistDraftLocally();
             this.renderStep1();
             this.updateLiveShowcase();
         }
@@ -402,6 +500,7 @@
         setPrimaryCountry(code) {
             if (this.draft.activeCountries.includes(code)) {
                 this.draft.defaultCountry = code;
+                this.persistDraftLocally();
                 this.updateLiveShowcase();
             }
         }
@@ -468,6 +567,7 @@
                 this.draft.budgets[country] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false };
             }
             this.draft.budgets[country].enabled = Boolean(enabled);
+            this.persistDraftLocally();
             this.renderStep2();
             this.updateLiveShowcase();
         }
@@ -477,17 +577,21 @@
                 this.draft.budgets[country] = { enabled: true, monthlyTotal: 0, rolloverEnabled: false };
             }
             this.draft.budgets[country].monthlyTotal = Math.max(0, Number(amount) || 0);
+            this.persistDraftLocally();
             this.updateLiveShowcase();
         }
 
         toggleBudgetRollover(country, enabled) {
             if (this.draft.budgets[country]) {
                 this.draft.budgets[country].rolloverEnabled = Boolean(enabled);
+                this.persistDraftLocally();
             }
         }
 
         /**
          * STEP 3: Mandatory Wallets & Opening Balances.
+         * Renders user values safely via escapeHtml and uses event delegation to prevent script injection
+         * and attribute syntax errors on arbitrary wallet names (e.g. quotes, apostrophes).
          */
         renderStep3() {
             const container = document.getElementById('onboarding-step-3');
@@ -506,9 +610,9 @@
                 html += `
                     <div class="onboarding-country-wallets-section">
                         <div class="onboarding-section-header-row">
-                            <h3 class="onboarding-section-title">${name} Accounts</h3>
+                            <h3 class="onboarding-section-title">${this.escapeHtml(name)} Accounts</h3>
                             <button type="button" class="btn btn-secondary onboarding-btn-add-wallet"
-                                    onclick="onboardingController.promptAddWallet('${code}')">
+                                    data-region="${this.escapeHtml(code)}">
                                 <i data-lucide="plus"></i>
                                 <span>Add Account</span>
                             </button>
@@ -519,15 +623,20 @@
 
                 walletsForCountry.forEach(w => {
                     const typeIcon = w.type === 'cash' ? 'wallet' : (w.type === 'digital' ? 'smartphone' : 'landmark');
+                    const escapedId = this.escapeHtml(w.id);
+                    const escapedName = this.escapeHtml(w.name || w.id);
+                    const escapedType = this.escapeHtml((w.type || 'bank').toUpperCase());
+                    const escapedColor = this.escapeHtml(w.color || '#333');
+
                     html += `
                         <div class="onboarding-wallet-row">
                             <div class="onboarding-wallet-row-left">
-                                <div class="onboarding-wallet-icon-box" style="border-color: ${w.color || '#333'}">
+                                <div class="onboarding-wallet-icon-box" style="border-color: ${escapedColor}">
                                     <i data-lucide="${typeIcon}"></i>
                                 </div>
                                 <div class="onboarding-wallet-row-info">
-                                    <span class="onboarding-wallet-row-name">${w.name}</span>
-                                    <span class="onboarding-wallet-row-type">${w.type.toUpperCase()}</span>
+                                    <span class="onboarding-wallet-row-name">${escapedName}</span>
+                                    <span class="onboarding-wallet-row-type">${escapedType}</span>
                                 </div>
                             </div>
 
@@ -536,12 +645,12 @@
                                     <span class="auth-input-icon" style="font-weight: 700;">${symbol}</span>
                                     <input type="number" min="0" step="any" class="auth-input onboarding-balance-input"
                                            placeholder="0"
-                                           value="${w.balance !== 0 ? w.balance : ''}"
-                                           oninput="onboardingController.setWalletBalance('${w.id}', this.value)">
+                                           data-wallet-id="${escapedId}"
+                                           value="${w.balance !== 0 ? w.balance : ''}">
                                 </div>
                                 ${walletsForCountry.length > 1 ? `
                                     <button type="button" class="onboarding-wallet-delete-btn" title="Remove account"
-                                            onclick="onboardingController.deleteWallet('${w.id}')">
+                                            data-wallet-id="${escapedId}">
                                         <i data-lucide="trash-2"></i>
                                     </button>
                                 ` : ''}
@@ -563,6 +672,7 @@
         setWalletBalance(walletId, value) {
             if (this.draft.wallets[walletId]) {
                 this.draft.wallets[walletId].balance = Math.max(0, Number(value) || 0);
+                this.persistDraftLocally();
                 this.updateLiveShowcase();
             }
         }
@@ -596,8 +706,12 @@
                 balance: 0
             };
 
+            this.persistDraftLocally();
             this.renderStep3();
             this.updateLiveShowcase();
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
         }
 
         deleteWallet(walletId) {
@@ -605,19 +719,24 @@
             if (!w) return;
 
             // Ensure at least 1 wallet remains for this region
-            const regionWallets = Object.values(this.draft.wallets).filter(item => item.region === w.region);
+            const regionWallets = Object.values(this.draft.wallets).filter(item => item && item.region === w.region);
             if (regionWallets.length <= 1) {
                 this.showError(`Each active country must have at least one account.`);
                 return;
             }
 
             delete this.draft.wallets[walletId];
+            this.persistDraftLocally();
             this.renderStep3();
             this.updateLiveShowcase();
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
         }
 
         /**
          * STEP 4: Optional Loan Tracking & Configuration Review.
+         * Restrained, accurate fintech styling with dynamic currency support.
          */
         renderStep4() {
             const container = document.getElementById('onboarding-step-4');
@@ -625,6 +744,16 @@
 
             const lConfig = this.draft.loanConfig;
             const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
+            const countryNames = { JP: 'Japan', IN: 'India', DE: 'Germany' };
+
+            // Determine active loan currency
+            if (!lConfig.country || !this.draft.activeCountries.includes(lConfig.country)) {
+                lConfig.country = this.draft.activeCountries.includes('IN')
+                    ? 'IN'
+                    : (this.draft.defaultCountry || this.draft.activeCountries[0] || 'JP');
+            }
+            lConfig.currency = currencySymbols[lConfig.country] || '¥';
+            const loanSymbol = lConfig.currency;
 
             let html = `
                 <div class="onboarding-review-pane">
@@ -633,7 +762,7 @@
                         <div class="onboarding-loan-header">
                             <div>
                                 <h3 class="onboarding-review-section-title">Track Existing Loan (Optional)</h3>
-                                <p class="auth-desc">Manage outstanding principal, amortization, and monthly EMI deductions.</p>
+                                <p class="auth-desc">Monitor your loan principal balance and monthly payment benchmark.</p>
                             </div>
                             <label class="onboarding-toggle-switch">
                                 <input type="checkbox" ${lConfig.enabled ? 'checked' : ''}
@@ -643,30 +772,67 @@
                         </div>
 
                         <div class="onboarding-loan-body mt-3" style="${lConfig.enabled ? '' : 'display: none;'}">
+            `;
+
+            // If user has multiple countries active, show country/currency dropdown
+            if (this.draft.activeCountries.length > 1) {
+                html += `
+                    <div class="auth-field-group mb-3">
+                        <label class="auth-label" for="onboarding-loan-country-select">Loan Country & Currency</label>
+                        <div class="auth-input-wrapper">
+                            <select id="onboarding-loan-country-select" class="auth-input onboarding-select" 
+                                    onchange="onboardingController.setLoanCountry(this.value)">
+                `;
+                this.draft.activeCountries.forEach(code => {
+                    const cName = countryNames[code] || code;
+                    const cSym = currencySymbols[code] || '';
+                    const isSelected = lConfig.country === code;
+                    html += `<option value="${code}" ${isSelected ? 'selected' : ''}>${cName} (${cSym} ${code})</option>`;
+                });
+                html += `
+                            </select>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
                             <div class="onboarding-loan-grid">
                                 <div class="auth-field-group">
                                     <label class="auth-label">Original Principal</label>
-                                    <input type="number" min="0" class="auth-input" placeholder="e.g. 500000"
-                                           value="${lConfig.totalPrincipal > 0 ? lConfig.totalPrincipal : ''}"
-                                           oninput="onboardingController.setLoanField('totalPrincipal', this.value)">
+                                    <div class="auth-input-wrapper">
+                                        <span class="auth-input-icon" style="font-weight: 700;">${loanSymbol}</span>
+                                        <input type="number" min="0" class="auth-input" placeholder="e.g. 500000"
+                                               value="${lConfig.totalPrincipal > 0 ? lConfig.totalPrincipal : ''}"
+                                               oninput="onboardingController.setLoanField('totalPrincipal', this.value)">
+                                    </div>
                                 </div>
                                 <div class="auth-field-group">
                                     <label class="auth-label">Remaining Principal</label>
-                                    <input type="number" min="0" class="auth-input" placeholder="e.g. 420000"
-                                           value="${lConfig.principalLeft > 0 ? lConfig.principalLeft : ''}"
-                                           oninput="onboardingController.setLoanField('principalLeft', this.value)">
+                                    <div class="auth-input-wrapper">
+                                        <span class="auth-input-icon" style="font-weight: 700;">${loanSymbol}</span>
+                                        <input type="number" min="0" class="auth-input" placeholder="e.g. 420000"
+                                               value="${lConfig.principalLeft > 0 ? lConfig.principalLeft : ''}"
+                                               oninput="onboardingController.setLoanField('principalLeft', this.value)">
+                                    </div>
                                 </div>
                                 <div class="auth-field-group">
-                                    <label class="auth-label">Monthly EMI Amount</label>
-                                    <input type="number" min="0" class="auth-input" placeholder="e.g. 12500"
-                                           value="${lConfig.emi > 0 ? lConfig.emi : ''}"
-                                           oninput="onboardingController.setLoanField('emi', this.value)">
+                                    <label class="auth-label">Monthly Payment Benchmark</label>
+                                    <div class="auth-input-wrapper">
+                                        <span class="auth-input-icon" style="font-weight: 700;">${loanSymbol}</span>
+                                        <input type="number" min="0" class="auth-input" placeholder="e.g. 12500"
+                                               value="${lConfig.emi > 0 ? lConfig.emi : ''}"
+                                               oninput="onboardingController.setLoanField('emi', this.value)">
+                                    </div>
                                 </div>
                                 <div class="auth-field-group">
                                     <label class="auth-label">Annual Interest Rate (%)</label>
-                                    <input type="number" min="0" step="0.01" class="auth-input" placeholder="e.g. 8.5"
-                                           value="${lConfig.annualInterestRate > 0 ? lConfig.annualInterestRate : ''}"
-                                           oninput="onboardingController.setLoanField('annualInterestRate', this.value)">
+                                    <div class="auth-input-wrapper">
+                                        <span class="auth-input-icon" style="font-weight: 700;">%</span>
+                                        <input type="number" min="0" step="0.01" class="auth-input" placeholder="e.g. 8.5"
+                                               value="${lConfig.annualInterestRate > 0 ? lConfig.annualInterestRate : ''}"
+                                               oninput="onboardingController.setLoanField('annualInterestRate', this.value)">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -679,7 +845,7 @@
                         <div class="onboarding-summary-grid">
                             <div class="onboarding-summary-item">
                                 <span class="onboarding-summary-label">Selected Countries</span>
-                                <span class="onboarding-summary-val">${this.draft.activeCountries.join(', ')} (Primary: ${this.draft.defaultCountry})</span>
+                                <span class="onboarding-summary-val">${this.escapeHtml(this.draft.activeCountries.join(', '))} (Primary: ${this.escapeHtml(this.draft.defaultCountry)})</span>
                             </div>
 
                             <div class="onboarding-summary-item">
@@ -703,11 +869,18 @@
                                 <span class="onboarding-summary-val">
                                     ${this.draft.activeCountries.map(c => {
                                         const total = Object.values(this.draft.wallets)
-                                            .filter(w => w.region === c)
+                                            .filter(w => w && w.region === c)
                                             .reduce((sum, w) => sum + (Number(w.balance) || 0), 0);
                                         const sym = currencySymbols[c] || '';
                                         return `${c}: ${sym}${total.toLocaleString()}`;
                                     }).join(' • ')}
+                                </span>
+                            </div>
+
+                            <div class="onboarding-summary-item">
+                                <span class="onboarding-summary-label">Loan Tracking</span>
+                                <span class="onboarding-summary-val">
+                                    ${lConfig.enabled ? `Enabled (${loanSymbol}${Number(lConfig.principalLeft || 0).toLocaleString()} remaining)` : 'Disabled'}
                                 </span>
                             </div>
                         </div>
@@ -720,16 +893,29 @@
 
         toggleLoanTracking(enabled) {
             this.draft.loanConfig.enabled = Boolean(enabled);
+            this.persistDraftLocally();
             this.renderStep4();
         }
 
+        setLoanCountry(code) {
+            const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
+            if (this.draft.activeCountries.includes(code)) {
+                this.draft.loanConfig.country = code;
+                this.draft.loanConfig.currency = currencySymbols[code] || '¥';
+                this.persistDraftLocally();
+                this.renderStep4();
+            }
+        }
+
         setLoanField(field, value) {
-            this.draft.loanConfig[field] = Number(value) || 0;
+            this.draft.loanConfig[field] = Math.max(0, Number(value) || 0);
+            this.persistDraftLocally();
         }
 
         /**
-         * Update the live left-pane treasury showcase.
+         * Update the live left-pane showcase.
          * Code-renders responsive JPY, INR, and EUR cards matching the login page craft in a 3-tier cascade.
+         * Synchronized with draft wallet balances in real time.
          */
         updateLiveShowcase() {
             const showcase = document.getElementById('onboarding-live-showcase');
@@ -848,6 +1034,7 @@
 
         /**
          * Navigation: Next Step.
+         * Advances destination step and immediately persists the new destination step to draft.
          */
         handleNext() {
             if (this.isSubmitting) return;
@@ -855,25 +1042,27 @@
             // Validate current step
             if (!this.validateStep(this.currentStep)) return;
 
-            // Save draft progress locally before advancing
-            this.persistDraftLocally();
-
             if (this.currentStep < this.totalSteps) {
                 this.currentStep++;
+                // Destination step is saved AFTER incrementing
+                this.persistDraftLocally();
                 this.render();
             } else {
+                this.persistDraftLocally();
                 this.confirmAndLaunch();
             }
         }
 
         /**
          * Navigation: Back Step.
+         * Decrements destination step and immediately persists the new destination step to draft.
          */
         handleBack() {
             if (this.isSubmitting) return;
             if (this.currentStep > 1) {
-                this.persistDraftLocally();
                 this.currentStep--;
+                // Destination step is saved AFTER decrementing
+                this.persistDraftLocally();
                 this.render();
             }
         }
@@ -907,7 +1096,14 @@
         persistDraftLocally() {
             if (typeof storage === 'undefined') return;
 
+            if (!storage.state.preferences) {
+                storage.state.preferences = (typeof storage.getDefaultPreferences === 'function')
+                    ? storage.getDefaultPreferences()
+                    : {};
+            }
+
             // Update preferences draft
+            storage.state.preferences.draftSaved = true;
             storage.state.preferences.activeCountries = [...this.draft.activeCountries];
             storage.state.preferences.defaultCountry = this.draft.defaultCountry;
             storage.state.preferences.onboardingStep = this.currentStep;

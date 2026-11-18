@@ -298,6 +298,37 @@
         </div>
     </div>
 
+    <!-- Cloud Synchronization Error Screen -->
+    <div id="sync-error-screen" class="auth-viewport" style="display: none;">
+        <div class="auth-ambient-glow" aria-hidden="true"></div>
+        <div class="auth-card" style="max-width: 480px; text-align: center; margin: auto;">
+            <div class="auth-card-header" style="justify-content: center; margin-bottom: 20px;">
+                <div class="sync-error-icon-box" style="width: 54px; height: 54px; border-radius: 50%; background: rgba(225, 29, 72, 0.12); border: 1px solid rgba(225, 29, 72, 0.28); display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                    <i data-lucide="cloud-off" style="width: 24px; height: 24px; color: #fb7185;"></i>
+                </div>
+            </div>
+
+            <h2 class="auth-title" style="margin-bottom: 8px; font-size: 1.45rem;">Sync Connection Failed</h2>
+            <p class="auth-desc" style="margin-bottom: 20px; line-height: 1.55;">
+                Unable to verify your account ledger with the cloud server. The application has been safely halted to protect your data from unresolved state or loss.
+            </p>
+
+            <div id="sync-error-details" class="auth-alert-banner mb-4" role="alert" style="display: block; text-align: left; font-size: 0.85rem;">
+                Network connection failed or server is temporarily unavailable.
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" id="sync-retry-btn" class="btn btn-primary auth-submit-btn" onclick="supabaseClient.retryInitialSync()">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>Retry Connection</span>
+                </button>
+                <button type="button" class="btn btn-secondary auth-submit-btn" onclick="supabaseClient.signOut()">
+                    <span>Sign Out</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Desktop Onboarding Screen (Phase 3) -->
     <div id="onboarding-screen" class="auth-viewport" style="display: none;">
         <div class="auth-ambient-glow" aria-hidden="true"></div>
@@ -671,9 +702,47 @@
                                             <span class="footer-hint">Click to inspect India wallets & accounts</span>
                                         </div>
                                     </div>
+
+                                    <!-- Germany Balance Card -->
+                                    <div class="country-card country-card-de" id="de-country-card"
+                                        onclick="app.openCountryExpansion('DE')" style="display: none;">
+                                        <div class="country-card-header">
+                                            <div class="country-badge">
+                                                <span class="country-flag-icon">
+                                                    <svg width="20" height="20" viewBox="0 0 36 36"
+                                                        xmlns="http://www.w3.org/2000/svg">
+                                                        <clipPath id="circleViewDEDash">
+                                                            <circle cx="18" cy="18" r="18" />
+                                                        </clipPath>
+                                                        <g clip-path="url(#circleViewDEDash)">
+                                                            <rect x="0" y="0" width="36" height="12" fill="#000000" />
+                                                            <rect x="0" y="12" width="36" height="12" fill="#DD0000" />
+                                                            <rect x="0" y="24" width="36" height="12" fill="#FFCE00" />
+                                                        </g>
+                                                    </svg>
+                                                </span>
+                                                <span class="country-name">Germany</span>
+                                                <span class="currency-code">EUR</span>
+                                            </div>
+                                            <div class="country-card-action">
+                                                <span class="wallet-count-pill" id="de-wallet-count-badge">0
+                                                    Wallets</span>
+                                                <span class="expand-indicator"><i
+                                                        data-lucide="arrow-up-right"></i></span>
+                                            </div>
+                                        </div>
+                                        <div class="country-balance-body">
+                                            <span class="balance-label">Total Balance</span>
+                                            <div class="country-total-amount financial-amount" id="de-total-balance">€0
+                                            </div>
+                                        </div>
+                                        <div class="country-card-footer">
+                                            <span class="footer-hint">Click to inspect Germany wallets & accounts</span>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <!-- Monthly Financial Summary (Japan & India) -->
+                                <!-- Monthly Financial Summary -->
                                 <div class="monthly-summary-container" id="monthly-financial-summary">
                                     <!-- Populated dynamically by JS -->
                                 </div>
@@ -681,8 +750,9 @@
                                 <!-- Hidden containers for backward compatibility with JS queries -->
                                 <div style="display: none;" id="jp-wallets"></div>
                                 <div style="display: none;" id="in-wallets"></div>
+                                <div style="display: none;" id="de-wallets"></div>
 
-                                <div class="section-header-toggle" role="button" tabindex="0" aria-expanded="true"
+                                <div class="section-header-toggle" id="jp-categories-header-toggle" role="button" tabindex="0" aria-expanded="true"
                                     aria-controls="jp-categories-wrap"
                                     onclick="app.toggleCollapse('jp-categories-wrap', 'jp-chevron')"
                                     onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); app.toggleCollapse('jp-categories-wrap', 'jp-chevron'); }">
@@ -706,7 +776,7 @@
                                     </div>
                                 </div>
 
-                                <div class="section-header-toggle" role="button" tabindex="0" aria-expanded="false"
+                                <div class="section-header-toggle" id="in-categories-header-toggle" role="button" tabindex="0" aria-expanded="false"
                                     aria-controls="in-categories-wrap"
                                     onclick="app.toggleCollapse('in-categories-wrap', 'in-chevron')"
                                     onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); app.toggleCollapse('in-categories-wrap', 'in-chevron'); }">
@@ -719,7 +789,35 @@
                                 </div>
                                 <div class="collapsible-wrapper collapsed" id="in-categories-wrap">
                                     <div class="collapsible-inner">
+                                        <div class="card budget-central-card" id="budget-overview-card-in"
+                                            style="margin: 8px 16px 16px 16px; width: calc(100% - 32px); display: none;">
+                                            <!-- Populated dynamically if budget enabled for IN -->
+                                        </div>
                                         <div class="category-grid" id="in-categories-grid">
+                                            <!-- Populated by JS -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="section-header-toggle" id="de-categories-header-toggle" role="button" tabindex="0" aria-expanded="false"
+                                    aria-controls="de-categories-wrap"
+                                    onclick="app.toggleCollapse('de-categories-wrap', 'de-chevron')"
+                                    onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); app.toggleCollapse('de-categories-wrap', 'de-chevron'); }"
+                                    style="display: none;">
+                                    <div class="section-title-wrap">
+                                        <span class="section-badge-dot de-dot"></span>
+                                        <h3 class="section-title" style="margin:0; padding:0;">Germany Spending Categories
+                                        </h3>
+                                    </div>
+                                    <i data-lucide="chevron-down" id="de-chevron" class="rotated"></i>
+                                </div>
+                                <div class="collapsible-wrapper collapsed" id="de-categories-wrap" style="display: none;">
+                                    <div class="collapsible-inner">
+                                        <div class="card budget-central-card" id="budget-overview-card-de"
+                                            style="margin: 8px 16px 16px 16px; width: calc(100% - 32px); display: none;">
+                                            <!-- Populated dynamically if budget enabled for DE -->
+                                        </div>
+                                        <div class="category-grid" id="de-categories-grid">
                                             <!-- Populated by JS -->
                                         </div>
                                     </div>
@@ -747,6 +845,11 @@
                                                 onclick="app.setDashboardChartRegion('IN')" role="tab"
                                                 aria-selected="false">
                                                 IN (₹)
+                                            </button>
+                                            <button type="button" class="dash-region-pill" id="dash-region-de-btn"
+                                                onclick="app.setDashboardChartRegion('DE')" role="tab"
+                                                aria-selected="false" style="display: none;">
+                                                DE (€)
                                             </button>
                                         </div>
                                     </div>
@@ -1057,6 +1160,15 @@
                                             <circle cx="320" cy="240" r="32" fill="#ffffff" />
                                             <circle cx="320" cy="240" r="8" fill="#000080" />
                                         </svg>India (₹)</button>
+                                    <button class="segment-btn" data-region="DE" id="analytics-tab-de"
+                                        onclick="app.setAnalyticsCountry('DE')"><svg class="country-flag-svg flag-de"
+                                            viewBox="0 0 640 480" width="14" height="10.5"
+                                            style="border-radius:2px;vertical-align:middle;margin-right:5px;"
+                                            aria-hidden="true">
+                                            <rect width="640" height="160" y="0" fill="#000000" />
+                                            <rect width="640" height="160" y="160" fill="#dd0000" />
+                                            <rect width="640" height="160" y="320" fill="#ffce00" />
+                                        </svg>Germany (€)</button>
                                 </div>
 
                                 <!-- Period Selector -->
@@ -1351,6 +1463,95 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- GERMANY ANALYTICS WORKSPACE -->
+                            <div id="analytics-de-workspace" class="analytics-workspace" style="display: none;">
+                                <!-- KPI Cards Grid -->
+                                <div class="analytics-kpi-grid in-kpi-grid">
+                                    <div class="card analytics-kpi-card">
+                                        <div class="kpi-header">
+                                            <span class="kpi-title">Total German Expenses</span>
+                                            <div class="kpi-icon-wrap expense"><i data-lucide="arrow-up-right"></i></div>
+                                        </div>
+                                        <div class="kpi-value-row">
+                                            <span class="kpi-value text-rose privacy-blur" id="de-kpi-expenses">€0</span>
+                                        </div>
+                                        <div class="kpi-meta" id="de-kpi-expenses-meta">
+                                            <span class="delta-neutral">This month</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="card analytics-kpi-card">
+                                        <div class="kpi-header">
+                                            <span class="kpi-title">Average Weekly Spend</span>
+                                            <div class="kpi-icon-wrap savings"><i data-lucide="calendar"></i></div>
+                                        </div>
+                                        <div class="kpi-value-row">
+                                            <span class="kpi-value text-primary privacy-blur" id="de-kpi-weekly-avg">€0</span>
+                                        </div>
+                                        <div class="kpi-meta">
+                                            <span class="text-faint">Paced over active weeks</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="card analytics-kpi-card">
+                                        <div class="kpi-header">
+                                            <span class="kpi-title">Monthly Comparison</span>
+                                            <div class="kpi-icon-wrap rate"><i data-lucide="trending-up"></i></div>
+                                        </div>
+                                        <div class="kpi-value-row">
+                                            <span class="kpi-value" id="de-kpi-comparison">--</span>
+                                        </div>
+                                        <div class="kpi-meta" id="de-kpi-comparison-meta">
+                                            <span class="text-faint">vs previous month</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="card analytics-kpi-card">
+                                        <div class="kpi-header">
+                                            <span class="kpi-title">Transactions Recorded</span>
+                                            <div class="kpi-icon-wrap income"><i data-lucide="receipt"></i></div>
+                                        </div>
+                                        <div class="kpi-value-row">
+                                            <span class="kpi-value" id="de-kpi-count">0</span>
+                                        </div>
+                                        <div class="kpi-meta">
+                                            <span class="text-faint">In selected period</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Germany Spending Trend Chart -->
+                                <div class="card analytics-chart-card">
+                                    <div class="chart-card-header">
+                                        <div class="chart-title-group">
+                                            <h3>Weekly Spending Trend (Germany)</h3>
+                                            <p class="text-muted text-xs">Paced weekly expenditure in EUR (€)</p>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrap trend-canvas-wrap">
+                                        <canvas id="de-trend-chart"></canvas>
+                                    </div>
+                                </div>
+
+                                <!-- Germany Recent Transactions -->
+                                <div class="card">
+                                    <div class="chart-card-header">
+                                        <div class="chart-title-group">
+                                            <h3>Recent German Transactions</h3>
+                                            <p class="text-muted text-xs">Direct financial log for Germany</p>
+                                        </div>
+                                        <button class="btn btn-ghost btn-sm"
+                                            onclick="app.viewTransactionsWithFilter({ region: 'DE' })">
+                                            <span>View in Ledger</span>
+                                            <i data-lucide="arrow-right"></i>
+                                        </button>
+                                    </div>
+                                    <div class="in-recent-tx-list" id="de-recent-tx-list">
+                                        <!-- Recent Germany transactions injected dynamically -->
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div style="height: 80px;"></div>
                     </section>
@@ -1405,6 +1606,15 @@
                                             <circle cx="320" cy="240" r="32" fill="#ffffff" />
                                             <circle cx="320" cy="240" r="8" fill="#000080" />
                                         </svg>India (₹)</button>
+                                    <button class="segment-btn" data-region="DE" id="report-tab-de"
+                                        onclick="app.setReportRegion('DE')"><svg class="country-flag-svg flag-de"
+                                            viewBox="0 0 640 480" width="14" height="10.5"
+                                            style="border-radius:2px;vertical-align:middle;margin-right:5px;"
+                                            aria-hidden="true">
+                                            <rect width="640" height="160" y="0" fill="#000000" />
+                                            <rect width="640" height="160" y="160" fill="#dd0000" />
+                                            <rect width="640" height="160" y="320" fill="#ffce00" />
+                                        </svg>Germany (€)</button>
                                 </div>
 
                                 <!-- Month / Period Selector -->
@@ -1615,6 +1825,15 @@
                                             <circle cx="320" cy="240" r="32" fill="#ffffff" />
                                             <circle cx="320" cy="240" r="8" fill="#000080" />
                                         </svg>India (₹)</button>
+                                    <button class="segment-btn" data-region="DE" id="budgets-tab-de"
+                                        onclick="app.setBudgetsRegion('DE')"><svg class="country-flag-svg flag-de"
+                                            viewBox="0 0 640 480" width="14" height="10.5"
+                                            style="border-radius:2px;vertical-align:middle;margin-right:5px;"
+                                            aria-hidden="true">
+                                            <rect width="640" height="160" y="0" fill="#000000" />
+                                            <rect width="640" height="160" y="160" fill="#dd0000" />
+                                            <rect width="640" height="160" y="320" fill="#ffce00" />
+                                        </svg>Germany (€)</button>
                                 </div>
 
                                 <!-- Month Display Badge -->
@@ -1639,6 +1858,13 @@
                                         <span>Add Category</span>
                                     </button>
                                 </div>
+                            </div>
+
+                            <!-- Disabled Budgets Notice Banner (Shown when budgeting is disabled for this country or account) -->
+                            <div class="budgets-disabled-banner" id="budgets-disabled-banner" style="display: none;">
+                                <i data-lucide="shield-alert"></i>
+                                <div class="budgets-disabled-title">Budgeting is Disabled</div>
+                                <div class="budgets-disabled-desc">Monthly budget limits and rollover tracking are currently turned off for this country. You can enable them anytime in Settings &rarr; Regional Preferences.</div>
                             </div>
 
                             <!-- Consolidated Budgets Overview Card (Reuses Dashboard Summary Component) -->
@@ -1706,9 +1932,9 @@
                                             <i data-lucide="repeat" style="width: 15px; height: 15px;"></i>
                                             <span>Transfer</span>
                                         </button>
-                                        <button class="btn btn-secondary"
+                                        <button class="btn btn-secondary" id="wallets-remittance-btn"
                                             onclick="app.openTransactionModal('remittance')"
-                                            title="Remittance JP to IN">
+                                            title="Remittance cross-currency transfer">
                                             <i data-lucide="globe" style="width: 15px; height: 15px;"></i>
                                             <span>Remittance</span>
                                         </button>
@@ -1722,7 +1948,7 @@
 
                                 <!-- Portfolio Liquid Position Overview KPI Cards -->
                                 <div class="wallets-portfolio-grid">
-                                    <div class="country-card wallets-kpi-card country-card-jp"
+                                    <div class="country-card wallets-kpi-card country-card-jp" id="wallets-kpi-jp"
                                         onclick="app.openCountryExpansion('JP')" role="button" tabindex="0"
                                         title="Click to view Japan portfolio overview">
                                         <div class="wallets-kpi-header">
@@ -1747,7 +1973,7 @@
                                             <span class="wallets-kpi-hint">View portfolio →</span>
                                         </div>
                                     </div>
-                                    <div class="country-card wallets-kpi-card country-card-in"
+                                    <div class="country-card wallets-kpi-card country-card-in" id="wallets-kpi-in"
                                         onclick="app.openCountryExpansion('IN')" role="button" tabindex="0"
                                         title="Click to view India portfolio overview">
                                         <div class="wallets-kpi-header">
@@ -1773,6 +1999,32 @@
                                             id="wallets-page-in-total">₹0</div>
                                         <div class="wallets-kpi-sub">
                                             <span>Active rupee accounts &amp; deposits</span>
+                                            <span class="wallets-kpi-hint">View portfolio →</span>
+                                        </div>
+                                    </div>
+                                    <div class="country-card wallets-kpi-card country-card-de" id="wallets-kpi-de"
+                                        onclick="app.openCountryExpansion('DE')" role="button" tabindex="0"
+                                        title="Click to view Germany portfolio overview" style="display: none;">
+                                        <div class="wallets-kpi-header">
+                                            <div class="wallets-kpi-flag-group">
+                                                <svg class="country-flag-svg flag-de" viewBox="0 0 640 480" width="22"
+                                                    height="16.5"
+                                                    style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);"
+                                                    aria-hidden="true">
+                                                    <rect width="640" height="160" y="0" fill="#000000" />
+                                                    <rect width="640" height="160" y="160" fill="#dd0000" />
+                                                    <rect width="640" height="160" y="320" fill="#ffce00" />
+                                                </svg>
+                                                <span class="wallets-kpi-title">Germany Balances</span>
+                                                <span class="currency-code-pill">EUR</span>
+                                            </div>
+                                            <span class="wallets-count-badge" id="wallets-page-de-count">0
+                                                accounts</span>
+                                        </div>
+                                        <div class="wallets-kpi-val financial-amount privacy-blur"
+                                            id="wallets-page-de-total">€0</div>
+                                        <div class="wallets-kpi-sub">
+                                            <span>Active euro accounts &amp; cash</span>
                                             <span class="wallets-kpi-hint">View portfolio →</span>
                                         </div>
                                     </div>
@@ -1847,6 +2099,42 @@
                                     </div>
                                     <div class="wallets-accordion-body" id="wallets-container-in">
                                         <div class="wallets-cards-grid" id="wallets-page-in-grid">
+                                            <!-- Rendered by JS -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Germany Wallets Group -->
+                                <div class="wallets-group-section" id="wallets-group-de" style="margin-top: 32px; display: none;">
+                                    <div class="wallets-group-header" onclick="app.toggleWalletsSection('de')">
+                                        <div class="wallets-group-title-wrap">
+                                            <svg class="country-flag-svg flag-de" viewBox="0 0 640 480" width="20"
+                                                height="15"
+                                                style="border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,0.14);"
+                                                aria-hidden="true">
+                                                <rect width="640" height="160" y="0" fill="#000000" />
+                                                <rect width="640" height="160" y="160" fill="#dd0000" />
+                                                <rect width="640" height="160" y="320" fill="#ffce00" />
+                                            </svg>
+                                            <h3>Germany Accounts</h3>
+                                            <span class="wallets-count-badge" id="wallets-section-de-count">0
+                                                wallets</span>
+                                        </div>
+                                        <div class="wallets-group-actions-wrap">
+                                            <div class="wallets-group-subtotal">
+                                                <span class="text-muted text-xs">Total:</span>
+                                                <span class="wallets-subtotal-val financial-amount privacy-blur"
+                                                    id="wallets-section-de-total">€0</span>
+                                            </div>
+                                            <button class="wallets-collapse-btn"
+                                                onclick="event.stopPropagation(); app.toggleWalletsSection('de')"
+                                                aria-label="Toggle Germany accounts" title="Toggle section">
+                                                <i data-lucide="chevron-down" id="wallets-chevron-de"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="wallets-accordion-body" id="wallets-container-de">
+                                        <div class="wallets-cards-grid" id="wallets-page-de-grid">
                                             <!-- Rendered by JS -->
                                         </div>
                                     </div>
@@ -2008,45 +2296,68 @@
                                     <!-- 2. Regional Preferences Section -->
                                     <div class="settings-section-card" id="settings-sec-regional">
                                         <div class="settings-sec-header">
-                                            <h2>Regional Preferences</h2>
-                                            <p>Configure regional presentation formats for currencies, numbers, and
-                                                dates.</p>
+                                            <h2>Regional Preferences & Country Management</h2>
+                                            <p>Configure active operating countries, primary currency, independent budgets, and loan tracking.</p>
                                         </div>
                                         <div class="settings-callout">
-                                            <strong style="color:var(--text-primary);">Financial Integrity
-                                                Safeguard:</strong> Display preferences modify UI formatting only. They
-                                            will never convert, rewrite, or mutate historical transaction amounts or
-                                            wallet currency assignments.
+                                            <strong style="color:var(--text-primary);">Financial Integrity Safeguard:</strong>
+                                            Deactivating an operating country hides it from active dashboards, tabs, and transaction selectors while permanently preserving all historical records, wallet balances, and closed-month snapshots.
                                         </div>
+
+                                        <!-- Section 1: Active Operating Countries -->
+                                        <div class="settings-group">
+                                            <div style="margin-bottom: 6px;">
+                                                <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 4px 0;">Active Operating Countries</h3>
+                                                <p class="text-muted text-xs" style="margin: 0;">Select the sovereign jurisdictions enabled for your accounts and budgets.</p>
+                                            </div>
+                                            <div class="settings-countries-grid" id="settings-operating-countries-grid">
+                                                <!-- Populated dynamically by app.renderSettingsPage() -->
+                                            </div>
+                                        </div>
+
+                                        <!-- Section 2: Primary Operating Country -->
                                         <div class="settings-group">
                                             <div class="settings-form-row">
                                                 <div>
-                                                    <div class="settings-row-label">Default Region / Country</div>
-                                                    <div class="settings-row-desc">Primary geographic region for default
-                                                        view filters.</div>
+                                                    <div class="settings-row-label">Primary Operating Country</div>
+                                                    <div class="settings-row-desc">Default country context for monthly financial summary and initial ledger view.</div>
                                                 </div>
                                                 <div class="settings-control-wrap">
                                                     <select id="setting-default-country" class="settings-select"
-                                                        onchange="app.updateRegionalPreference('defaultCountry', this.value)">
-                                                        <option value="JP">Japan (JPY ¥)</option>
-                                                        <option value="IN">India (INR ₹)</option>
+                                                        onchange="app.setPrimaryOperatingCountry(this.value)">
+                                                        <!-- Populated dynamically with active countries -->
                                                     </select>
                                                 </div>
                                             </div>
+                                        </div>
 
-                                            <div class="settings-form-row">
-                                                <div>
-                                                    <div class="settings-row-label">Default Currency</div>
-                                                    <div class="settings-row-desc">Standard default currency for new
-                                                        wallets or quick filters.</div>
-                                                </div>
-                                                <div class="settings-control-wrap">
-                                                    <select id="setting-default-currency" class="settings-select"
-                                                        onchange="app.updateRegionalPreference('defaultCurrency', this.value)">
-                                                        <option value="JPY">JPY — Japanese Yen (¥)</option>
-                                                        <option value="INR">INR — Indian Rupee (₹)</option>
-                                                    </select>
-                                                </div>
+                                        <!-- Section 3: Country Budgeting Preferences -->
+                                        <div class="settings-group">
+                                            <div style="margin-bottom: 6px;">
+                                                <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 4px 0;">Country Budgeting Configuration</h3>
+                                                <p class="text-muted text-xs" style="margin: 0;">Configure independent spending limits and rollover per active country.</p>
+                                            </div>
+                                            <div id="settings-country-budgets-list" style="display: flex; flex-direction: column; gap: 12px;">
+                                                <!-- Populated dynamically by app.renderSettingsPage() -->
+                                            </div>
+                                        </div>
+
+                                        <!-- Section 4: Loan Tracker Setup -->
+                                        <div class="settings-group">
+                                            <div style="margin-bottom: 6px;">
+                                                <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 4px 0;">Loan Tracking Setup</h3>
+                                                <p class="text-muted text-xs" style="margin: 0;">Optional liability amortization tracking on the dashboard rail.</p>
+                                            </div>
+                                            <div id="settings-loan-config-container">
+                                                <!-- Populated dynamically by app.renderSettingsPage() -->
+                                            </div>
+                                        </div>
+
+                                        <!-- Section 5: Presentation Formatting -->
+                                        <div class="settings-group">
+                                            <div style="margin-bottom: 6px;">
+                                                <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 4px 0;">Presentation & Formats</h3>
+                                                <p class="text-muted text-xs" style="margin: 0;">Display formatting across tables, dates, and numbers.</p>
                                             </div>
 
                                             <div class="settings-form-row">
@@ -2108,6 +2419,7 @@
                                                         <option value="Asia/Tokyo">Asia/Tokyo (JST, UTC+9)</option>
                                                         <option value="Asia/Kolkata">Asia/Kolkata (IST, UTC+5:30)
                                                         </option>
+                                                        <option value="Europe/Berlin">Europe/Berlin (CET, UTC+1)</option>
                                                         <option value="UTC">UTC (Universal Coordinated Time)</option>
                                                     </select>
                                                 </div>
@@ -2474,7 +2786,7 @@
                 <span class="fab-label">Transfer</span>
                 <div class="fab-icon fab-icon-transfer"><i data-lucide="arrow-left-right"></i></div>
             </button>
-            <button class="fab-action" onclick="app.openTransactionModal('remittance')">
+            <button class="fab-action" id="fab-action-remittance" onclick="app.openTransactionModal('remittance')">
                 <span class="fab-label">Remittance</span>
                 <div class="fab-icon fab-icon-remittance"><i data-lucide="send"></i></div>
             </button>
@@ -2548,6 +2860,7 @@
                             <select id="add-wallet-region" onchange="app.onAddWalletRegionChange()">
                                 <option value="JP">Japan (¥ JPY)</option>
                                 <option value="IN">India (₹ INR)</option>
+                                <option value="DE">Germany (€ EUR)</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -3168,14 +3481,14 @@
     <div id="print-container"></div>
 
     <!-- Scripts -->
-    <script src="js/supabase-config.js?v=20261116_v121"></script>
-    <script src="js/supabaseClient.js?v=20261116_v121"></script>
-    <script src="js/country-config.js?v=20261117_v1"></script>
-    <script src="js/storage.js?v=20261116_v121"></script>
-    <script src="js/charts.js?v=20261116_v121"></script>
-    <script src="js/wallet.js?v=20261116_v121"></script>
-    <script src="js/onboarding.js?v=20261117_v1"></script>
-    <script src="js/app.js?v=20261116_v121"></script>
+    <script src="js/supabase-config.js?v=20261117_v122"></script>
+    <script src="js/supabaseClient.js?v=20261117_v122"></script>
+    <script src="js/country-config.js?v=20261117_v122"></script>
+    <script src="js/storage.js?v=20261117_v122"></script>
+    <script src="js/charts.js?v=20261117_v122"></script>
+    <script src="js/wallet.js?v=20261117_v122"></script>
+    <script src="js/onboarding.js?v=20261117_v122"></script>
+    <script src="js/app.js?v=20261117_v122"></script>
     <script>
         lucide.createIcons();
         if ('serviceWorker' in navigator) {

@@ -18,7 +18,8 @@ const WALLET_THEMES = [
     { id: 'slate-reserve', name: 'Slate Reserve', cls: 'wallet-theme-slate-reserve', color: '#334155', region: 'ALL', match: ['reserve', 'emergency', 'safe'] },
     { id: 'rose-gold', name: 'Rose Gold Card', cls: 'wallet-theme-rose-gold', color: '#e11d48', region: 'ALL', match: ['card', 'credit'] },
     { id: 'amethyst-crypto', name: 'Amethyst Vault', cls: 'wallet-theme-amethyst-crypto', color: '#9333ea', region: 'ALL', match: ['vault', 'crypto'] },
-    { id: 'aurora-nordic', name: 'Aurora Teal', cls: 'wallet-theme-aurora-nordic', color: '#0f766e', region: 'ALL', match: ['teal', 'savings'] }
+    { id: 'aurora-nordic', name: 'Aurora Teal', cls: 'wallet-theme-aurora-nordic', color: '#0f766e', region: 'ALL', match: ['teal', 'savings'] },
+    { id: 'frankfurt-slate', name: 'Frankfurt Slate', cls: 'wallet-theme-frankfurt-slate', color: '#1e293b', region: 'DE', match: ['checking', 'sparkasse', 'n26', 'deutsche', 'commerzbank'] }
 ];
 
 class App {
@@ -151,9 +152,10 @@ class App {
         let sym = currency || '';
         if (sym === 'JPY') sym = '¥';
         else if (sym === 'INR') sym = '₹';
+        else if (sym === 'EUR') sym = '€';
         const num = Number(amount) || 0;
         const prefix = options.prefix || '';
-        const locale = options.locale || (sym === '₹' ? 'en-IN' : undefined);
+        const locale = options.locale || (sym === '₹' ? 'en-IN' : (sym === '€' ? 'de-DE' : undefined));
         const formatted = num.toLocaleString(locale, options.formatOptions);
         return `${prefix}${sym}${formatted}`;
     }
@@ -251,7 +253,7 @@ class App {
             const typeBadge = document.getElementById('focus-type-badge');
             const titleEl = document.getElementById('focus-modal-title');
             if (typeBadge && typeBadge.innerText === 'Country View') {
-                const reg = titleEl && titleEl.innerText.includes('India') ? 'IN' : 'JP';
+                const reg = titleEl && titleEl.innerText.includes('India') ? 'IN' : (titleEl && titleEl.innerText.includes('Germany') ? 'DE' : 'JP');
                 this.openCountryExpansion(reg);
             } else if (titleEl) {
                 this.openWalletFocus(titleEl.innerText);
@@ -650,38 +652,38 @@ class App {
     }
 
     getWalletOptionsHtml(selectedWalletId = null, regionFilter = null) {
-        if (!storage.state || !storage.state.wallets) {
-            return `
-                <optgroup label="Japan">
-                    <option value="Salary Account">Salary Account (¥)</option>
-                    <option value="Cash">Cash (¥)</option>
-                    <option value="PayPay">PayPay (¥)</option>
-                </optgroup>
-                <optgroup label="India">
-                    <option value="Axis Bank">Axis Bank (₹)</option>
-                    <option value="Bank of Baroda">Bank of Baroda (₹)</option>
-                    <option value="Credit Card">Credit Card (₹)</option>
-                </optgroup>
-            `;
-        }
+        if (!storage.state || !storage.state.wallets) return '';
 
-        let jpOpts = '';
-        let inOpts = '';
+        const activeCountries = storage.getActiveCountries();
+        const groups = {};
 
         Object.values(storage.state.wallets).forEach(w => {
             if (regionFilter && w.region !== regionFilter) return;
+            if (!regionFilter && !activeCountries.includes(w.region)) return;
+
+            const reg = w.region || 'JP';
+            if (!groups[reg]) groups[reg] = [];
             const sel = (w.id === selectedWalletId) ? ' selected' : '';
-            const opt = `<option value="${w.id}"${sel}>${w.id} (${w.currency})</option>`;
-            if (w.region === 'JP') jpOpts += opt;
-            else inOpts += opt;
+            groups[reg].push(`<option value="${w.id}"${sel}>${w.id} (${w.currency || ''})</option>`);
         });
 
-        if (regionFilter === 'JP') return jpOpts;
-        if (regionFilter === 'IN') return inOpts;
+        if (regionFilter) {
+            return (groups[regionFilter] || []).join('');
+        }
 
         let html = '';
-        if (jpOpts) html += `<optgroup label="Japan">${jpOpts}</optgroup>`;
-        if (inOpts) html += `<optgroup label="India">${inOpts}</optgroup>`;
+        const order = ['JP', 'IN', 'DE'];
+        order.forEach(code => {
+            if (groups[code] && groups[code].length > 0) {
+                const cfg = (typeof CountryConfig !== 'undefined' && CountryConfig.get(code)) || { name: code };
+                html += `<optgroup label="${cfg.name}">${groups[code].join('')}</optgroup>`;
+            }
+        });
+        Object.keys(groups).forEach(code => {
+            if (!order.includes(code) && groups[code].length > 0) {
+                html += `<optgroup label="${code}">${groups[code].join('')}</optgroup>`;
+            }
+        });
         return html;
     }
 
@@ -1518,11 +1520,161 @@ class App {
             profileEmailInput.value = user ? user.email : 'user@example.com (Connected)';
         }
 
+        // Active Operating Countries Grid
+        const countriesGrid = document.getElementById('settings-operating-countries-grid');
+        const activeCountries = storage.getActiveCountries();
+        const primaryCountry = storage.getPrimaryCountry();
+
+        if (countriesGrid) {
+            const supported = [
+                { code: 'JP', name: 'Japan', curr: 'JPY (¥)', flag: this.getCountryFlagSvg('JP', 22, 16.5) },
+                { code: 'IN', name: 'India', curr: 'INR (₹)', flag: this.getCountryFlagSvg('IN', 22, 16.5) },
+                { code: 'DE', name: 'Germany', curr: 'EUR (€)', flag: this.getCountryFlagSvg('DE', 22, 16.5) }
+            ];
+
+            countriesGrid.innerHTML = supported.map(c => {
+                const isActive = activeCountries.includes(c.code);
+                const isPrimary = primaryCountry === c.code;
+                const canDeactivate = activeCountries.length > 1;
+
+                let actionBtn = '';
+                if (isActive) {
+                    if (!canDeactivate) {
+                        actionBtn = `<button class="btn btn-sm btn-ghost text-muted" disabled title="At least one operating country must remain active" style="opacity:0.4; cursor:not-allowed;">Active</button>`;
+                    } else {
+                        actionBtn = `<button class="btn btn-sm btn-ghost text-rose" onclick="app.deactivateCountryWithConfirmation('${c.code}')" title="Deactivate country">Deactivate</button>`;
+                    }
+                } else {
+                    actionBtn = `<button class="btn btn-sm btn-secondary" onclick="app.activateCountry('${c.code}')" title="Enable country">Activate</button>`;
+                }
+
+                return `
+                    <div class="settings-country-card ${isActive ? 'active' : 'inactive'}">
+                        <div class="settings-country-card-header">
+                            <div class="settings-country-card-title">
+                                ${c.flag}
+                                <span class="settings-country-card-name">${c.name}</span>
+                                <span class="currency-code-pill">${c.curr}</span>
+                                ${isPrimary ? '<span class="settings-badge-primary">Primary</span>' : ''}
+                            </div>
+                            <div class="settings-country-card-actions">
+                                ${actionBtn}
+                            </div>
+                        </div>
+                        <div class="settings-country-card-status">
+                            <span class="status-indicator ${isActive ? 'active' : 'inactive'}"></span>
+                            <span class="status-label">${isActive ? 'Active jurisdiction' : 'Inactive'}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Primary Operating Country Select
+        const countryEl = document.getElementById('setting-default-country');
+        if (countryEl) {
+            countryEl.innerHTML = activeCountries.map(c => {
+                const cfg = (typeof CountryConfig !== 'undefined' && CountryConfig.get(c)) || { name: c, currency: c === 'JP' ? '¥' : c === 'DE' ? '€' : '₹' };
+                return `<option value="${c}" ${c === primaryCountry ? 'selected' : ''}>${cfg.name} (${cfg.currency})</option>`;
+            }).join('');
+            countryEl.value = primaryCountry;
+        }
+
+        // Country Budgeting Preferences
+        const budgetsList = document.getElementById('settings-country-budgets-list');
+        if (budgetsList) {
+            budgetsList.innerHTML = activeCountries.map(c => {
+                const cfg = (typeof CountryConfig !== 'undefined' && CountryConfig.get(c)) || { name: c, currency: c === 'JP' ? '¥' : c === 'DE' ? '€' : '₹' };
+                const isEnabled = storage.isBudgetEnabled(c);
+                const limit = storage.getTotalBudget(c);
+                const rollover = storage.isBudgetRolloverEnabled(c);
+
+                return `
+                    <div class="settings-budget-item-card" style="padding: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                ${this.getCountryFlagSvg(c, 20, 15)}
+                                <span style="font-weight:600; font-size:0.95rem;">${cfg.name} Monthly Budget</span>
+                                <span class="currency-code-pill">${cfg.currency}</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="app.updateCountryBudgetPref('${c}', this.checked, undefined, undefined)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        ${isEnabled ? `
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06);">
+                                <div>
+                                    <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Monthly Spending Limit (${cfg.currency})</label>
+                                    <input type="number" class="settings-input" value="${limit}" onblur="app.updateCountryBudgetPref('${c}', undefined, this.value, undefined)" style="width: 100%;">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Unused Budget Rollover</label>
+                                    <label class="toggle-switch" style="margin-top: 4px;">
+                                        <input type="checkbox" ${rollover ? 'checked' : ''} onchange="app.updateCountryBudgetPref('${c}', undefined, undefined, this.checked)">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        ` : '<p class="text-muted text-xs" style="margin:8px 0 0 0;">Budget tracking is currently disabled for this jurisdiction.</p>'}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Loan Tracking Setup
+        const loanContainer = document.getElementById('settings-loan-config-container');
+        if (loanContainer) {
+            const loanCfg = storage.state.loanConfig || { enabled: false };
+            const isLoanEnabled = Boolean(loanCfg.enabled);
+            const loanCurrency = loanCfg.currency || '₹';
+
+            loanContainer.innerHTML = `
+                <div class="settings-loan-card" style="padding: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span style="font-weight:600; font-size:0.95rem;">Track Liability Amortization</span>
+                            <p class="text-muted text-xs" style="margin: 2px 0 0 0;">Display monthly EMI and payoff progress in the dashboard sidebar rail.</p>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="setting-loan-toggle" ${isLoanEnabled ? 'checked' : ''} onchange="app.updateLoanPref('enabled', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    ${isLoanEnabled ? `
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06);">
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Total Principal (${loanCurrency})</label>
+                                <input type="number" class="settings-input" id="setting-loan-total-principal" value="${loanCfg.totalPrincipal || 0}" onblur="app.updateLoanPref('totalPrincipal', this.value)" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Principal Left (${loanCurrency})</label>
+                                <input type="number" class="settings-input" id="setting-loan-principal" value="${loanCfg.principalLeft || 0}" onblur="app.updateLoanPref('principalLeft', this.value)" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Total Dues (Months)</label>
+                                <input type="number" class="settings-input" id="setting-loan-total-dues" value="${loanCfg.totalDues || 0}" onblur="app.updateLoanPref('totalDues', this.value)" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Dues Paid (Months)</label>
+                                <input type="number" class="settings-input" id="setting-loan-dues" value="${loanCfg.duesPaid || 0}" onblur="app.updateLoanPref('duesPaid', this.value)" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Monthly EMI Amount (${loanCurrency})</label>
+                                <input type="number" class="settings-input" id="setting-loan-emi" value="${loanCfg.emi || 0}" onblur="app.updateLoanPref('emi', this.value)" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Monthly Draw Date (1-31)</label>
+                                <input type="number" class="settings-input" id="setting-loan-date" value="${loanCfg.emiDrawDate || 7}" onblur="app.updateLoanPref('emiDrawDate', this.value)" style="width: 100%;">
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
         // Regional preferences
         const reg = storage.state.regionalPreferences;
-        const countryEl = document.getElementById('setting-default-country');
-        if (countryEl) countryEl.value = reg.defaultCountry || 'JP';
-
         const currEl = document.getElementById('setting-default-currency');
         if (currEl) currEl.value = reg.defaultCurrency || 'JPY';
 
@@ -1561,6 +1713,74 @@ class App {
         if (lastSyncedEl) {
             lastSyncedEl.innerText = this.lastSyncTime ? new Date(this.lastSyncTime).toLocaleTimeString() : 'Just now';
         }
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    activateCountry(code) {
+        storage.activateCountry(code);
+        this.renderAll();
+        this.renderSettingsPage();
+    }
+
+    deactivateCountryWithConfirmation(code) {
+        const active = storage.getActiveCountries();
+        if (active.length <= 1) {
+            alert("At least one operating country must remain active.");
+            return;
+        }
+        const countryName = (typeof CountryConfig !== 'undefined' && CountryConfig.get(code)?.name) || code;
+        const msg = `Are you sure you want to deactivate ${countryName}?\n\nDeactivating hides ${countryName} from active navigation, dashboards, and transaction selectors.\n\nAll historical ledger transactions, wallet balances, and closed-month snapshots are safely and permanently preserved.`;
+        if (confirm(msg)) {
+            storage.deactivateCountry(code);
+
+            const newPrimary = storage.getPrimaryCountry();
+            if (this.monthlySummaryRegion === code) this.monthlySummaryRegion = newPrimary;
+            if (this.dashboardChartRegion === code) this.dashboardChartRegion = newPrimary;
+            if (this.budgetsRegion === code) this.budgetsRegion = newPrimary;
+            if (this.analyticsCountry === code) this.analyticsCountry = newPrimary;
+            if (this.reportRegion === code) this.reportRegion = newPrimary;
+
+            this.renderAll();
+            this.renderSettingsPage();
+        }
+    }
+
+    setPrimaryOperatingCountry(code) {
+        storage.setPrimaryCountry(code);
+        this.renderAll();
+        this.renderSettingsPage();
+    }
+
+    updateCountryBudgetPref(code, enabled, monthlyTotal, rolloverEnabled) {
+        const cur = storage.getBudgetPreference(code);
+        const newEnabled = enabled !== undefined ? enabled : cur.enabled;
+        const newTotal = monthlyTotal !== undefined ? Number(monthlyTotal) : cur.monthlyTotal;
+        const newRollover = rolloverEnabled !== undefined ? rolloverEnabled : cur.rolloverEnabled;
+
+        storage.setBudgetEnabled(code, newEnabled, newTotal, newRollover);
+        this.renderAll();
+        this.renderSettingsPage();
+    }
+
+    updateLoanPref(field, value) {
+        if (!storage.state.loanConfig) storage.state.loanConfig = { enabled: false };
+        if (field === 'enabled') {
+            storage.state.loanConfig.enabled = Boolean(value);
+            if (storage.state.preferences?.loanTracking) {
+                storage.state.preferences.loanTracking.enabled = Boolean(value);
+            }
+        } else {
+            const num = parseFloat(value);
+            if (!isNaN(num)) {
+                storage.state.loanConfig[field] = num;
+            }
+        }
+        storage.saveData();
+        this.renderLoanTracker();
+        this.renderSettingsPage();
     }
 
     switchSettingsSection(sectionId) {
@@ -2180,11 +2400,12 @@ class App {
     }
 
     renderWallets() {
-        let jpTotal = 0, inTotal = 0;
-        let jpCount = 0, inCount = 0;
-        let jpHtml = '', inHtml = '';
+        const activeCountries = storage.getActiveCountries();
+        const countryTotals = { JP: 0, IN: 0, DE: 0 };
+        const countryCounts = { JP: 0, IN: 0, DE: 0 };
+        const countryHtml = { JP: '', IN: '', DE: '' };
 
-        Object.values(storage.state.wallets).forEach(w => {
+        Object.values(storage.state.wallets || {}).forEach(w => {
             const ws = this.getWalletStyle(w.color);
             const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
             const html = `
@@ -2196,33 +2417,45 @@ class App {
                     <div class="wallet-balance" style="color:${ws.text};">${this.formatMoney(w.balance, w.currency)}</div>
                 </div>
             `;
-            if (w.region === 'JP') {
-                jpHtml += html;
-                jpTotal += (w.balance || 0);
-                jpCount++;
-            } else {
-                inHtml += html;
-                inTotal += (w.balance || 0);
-                inCount++;
+            const reg = (w.region === 'DE' ? 'DE' : w.region === 'IN' ? 'IN' : 'JP');
+            if (countryHtml[reg] !== undefined) {
+                countryHtml[reg] += html;
+                countryTotals[reg] += (w.balance || 0);
+                countryCounts[reg]++;
             }
         });
 
         const jpel = document.getElementById('jp-wallets');
-        if (jpel) jpel.innerHTML = jpHtml;
+        if (jpel) jpel.innerHTML = countryHtml.JP;
         const inel = document.getElementById('in-wallets');
-        if (inel) inel.innerHTML = inHtml;
+        if (inel) inel.innerHTML = countryHtml.IN;
+        const deel = document.getElementById('de-wallets');
+        if (deel) deel.innerHTML = countryHtml.DE;
+
+        const jpCard = document.getElementById('jp-country-card');
+        const inCard = document.getElementById('in-country-card');
+        const deCard = document.getElementById('de-country-card');
+
+        if (jpCard) jpCard.style.display = activeCountries.includes('JP') ? '' : 'none';
+        if (inCard) inCard.style.display = activeCountries.includes('IN') ? '' : 'none';
+        if (deCard) deCard.style.display = activeCountries.includes('DE') ? '' : 'none';
 
         const jpTotalEl = document.getElementById('jp-total-balance');
-        if (jpTotalEl) jpTotalEl.innerText = this.formatMoney(jpTotal, '¥');
+        if (jpTotalEl) jpTotalEl.innerText = this.formatMoney(countryTotals.JP, '¥');
         const inTotalEl = document.getElementById('in-total-balance');
-        if (inTotalEl) inTotalEl.innerText = this.formatMoney(inTotal, '₹');
+        if (inTotalEl) inTotalEl.innerText = this.formatMoney(countryTotals.IN, '₹');
+        const deTotalEl = document.getElementById('de-total-balance');
+        if (deTotalEl) deTotalEl.innerText = this.formatMoney(countryTotals.DE, '€');
 
         const jpCountBadge = document.getElementById('jp-wallet-count-badge');
-        if (jpCountBadge) jpCountBadge.innerText = `${jpCount} ${jpCount === 1 ? 'account' : 'accounts'}`;
+        if (jpCountBadge) jpCountBadge.innerText = `${countryCounts.JP} ${countryCounts.JP === 1 ? 'account' : 'accounts'}`;
         const inCountBadge = document.getElementById('in-wallet-count-badge');
-        if (inCountBadge) inCountBadge.innerText = `${inCount} ${inCount === 1 ? 'account' : 'accounts'}`;
+        if (inCountBadge) inCountBadge.innerText = `${countryCounts.IN} ${countryCounts.IN === 1 ? 'account' : 'accounts'}`;
+        const deCountBadge = document.getElementById('de-wallet-count-badge');
+        if (deCountBadge) deCountBadge.innerText = `${countryCounts.DE} ${countryCounts.DE === 1 ? 'account' : 'accounts'}`;
 
-        // Refresh Dashboard Category Breakdown Chart (Pass 1 Requirement 6.B)
+        // Refresh Monthly Summary & Dashboard Category Breakdown Chart
+        this.renderMonthlySummary();
         this.renderDashboardExpenseChart();
 
         // Update Month Header
@@ -2242,23 +2475,13 @@ class App {
         if (desktopDisp) desktopDisp.innerHTML = headerStr;
 
         // Clear inline overrides so CSS responsive 3-column desktop layout applies
-        ['jp-categories-grid', 'in-categories-grid'].forEach(id => {
+        ['jp-categories-grid', 'in-categories-grid', 'de-categories-grid'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
                 el.style.display = '';
                 el.style.gridTemplateColumns = '';
                 el.style.gap = '';
             }
-        });
-
-        const jpTotalSpent = walletManager.getTotalSpent('JP', this.getActiveTransactions());
-        this.renderBudgetOverviewCard('budget-overview-card', {
-            region: 'JP',
-            monthKey: this.activeMonthKey,
-            totalSpent: jpTotalSpent,
-            allocatedBudget: storage.state.jpTotalBudget,
-            isInteractive: true,
-            showEditButton: true
         });
 
         this.renderWalletsPage();
@@ -2269,8 +2492,8 @@ class App {
         if (!el) return;
 
         const region = options.region || 'JP';
-        const isJp = region === 'JP';
-        const currency = isJp ? '¥' : '₹';
+        const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
+            || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
         const monthKey = options.monthKey || this.activeMonthKey || (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
 
         // Sum category limits for cushion calculation
@@ -2284,9 +2507,7 @@ class App {
         if (options.allocatedBudget !== undefined && options.allocatedBudget !== null) {
             allocatedBudget = Number(options.allocatedBudget) || 0;
         } else {
-            allocatedBudget = isJp
-                ? (storage.state.jpTotalBudget !== undefined && storage.state.jpTotalBudget !== null ? storage.state.jpTotalBudget : 0)
-                : (storage.state.inTotalBudget !== undefined && storage.state.inTotalBudget !== null ? storage.state.inTotalBudget : sumCatBudgets);
+            allocatedBudget = storage.getTotalBudget(region);
         }
 
         // Total spent in region for active month
@@ -2364,62 +2585,119 @@ class App {
     }
 
     renderCategories() {
-        const renderGrid = (region, elementId, showProgress) => {
-            const activeTxs = this.getActiveTransactions();
-            const totals = {};
-            activeTxs.forEach(tx => {
-                if (tx.type === 'expense' && tx.region === region) {
-                    totals[tx.categoryId] = (totals[tx.categoryId] || 0) + tx.amount;
+        const activeCountries = storage.getActiveCountries();
+        const singleCountry = activeCountries.length === 1;
+
+        const config = [
+            { region: 'JP', headerId: 'jp-categories-header-toggle', wrapId: 'jp-categories-wrap', gridId: 'jp-categories-grid', cardId: 'budget-overview-card', chevronId: 'jp-chevron' },
+            { region: 'IN', headerId: 'in-categories-header-toggle', wrapId: 'in-categories-wrap', gridId: 'in-categories-grid', cardId: 'budget-overview-card-in', chevronId: 'in-chevron' },
+            { region: 'DE', headerId: 'de-categories-header-toggle', wrapId: 'de-categories-wrap', gridId: 'de-categories-grid', cardId: 'budget-overview-card-de', chevronId: 'de-chevron' }
+        ];
+
+        config.forEach(cfg => {
+            const isActive = activeCountries.includes(cfg.region);
+            const headerEl = document.getElementById(cfg.headerId);
+            const wrapEl = document.getElementById(cfg.wrapId);
+            const cardEl = document.getElementById(cfg.cardId);
+
+            if (!isActive) {
+                if (headerEl) headerEl.style.display = 'none';
+                if (wrapEl) wrapEl.style.display = 'none';
+                return;
+            }
+
+            if (headerEl) headerEl.style.display = 'flex';
+            if (wrapEl) {
+                wrapEl.style.display = 'block';
+                if (singleCountry) {
+                    wrapEl.classList.remove('collapsed');
+                    if (headerEl) headerEl.setAttribute('aria-expanded', 'true');
+                    const chevron = document.getElementById(cfg.chevronId);
+                    if (chevron) chevron.classList.remove('rotate-180');
                 }
-            });
+            }
 
-            let html = '';
-            const currency = region === 'JP' ? '¥' : '₹';
-
-            // Filter out archived categories and those configured hidden from overview
-            const cats = (storage.state.categories[region] || []).filter(c => c.isActive !== false && !c.hiddenFromBudgetOverview);
-
-            cats.forEach(c => {
-                const spent = totals[c.id] || 0;
-                let progressHtml = '';
-
-                const activeBudget = c.budget || 0;
-                const isOver = activeBudget > 0 && spent > activeBudget;
-
-                if (showProgress && activeBudget > 0) {
-                    const pct = Math.min((spent / activeBudget) * 100, 100);
-                    let barClass = 'neon-safe';
-                    if (pct > 90) barClass = 'neon-danger';
-                    else if (pct > 75) barClass = 'neon-warn';
-
-                    progressHtml = `
-                        <div class="neon-bar-bg">
-                            <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
-                        </div>
-                        <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
-                            <span class="privacy-blur">${this.formatMoney(spent, currency)}</span>
-                            <span class="privacy-blur">${this.formatMoney(activeBudget, currency)}</span>
-                        </div>
-                    `;
+            // Central Budget Overview Card Visibility
+            const isBudgetEnabled = storage.isBudgetEnabled(cfg.region);
+            if (cardEl) {
+                if (isBudgetEnabled) {
+                    cardEl.style.display = 'block';
+                    const spent = walletManager.getTotalSpent(cfg.region, this.getActiveTransactions());
+                    this.renderBudgetOverviewCard(cfg.cardId, {
+                        region: cfg.region,
+                        monthKey: this.activeMonthKey,
+                        totalSpent: spent,
+                        allocatedBudget: storage.getTotalBudget(cfg.region),
+                        isInteractive: true,
+                        showEditButton: true
+                    });
                 } else {
-                    progressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: <span class="privacy-blur">${this.formatMoney(spent, currency)}</span></div>`;
+                    cardEl.style.display = 'none';
                 }
+            }
 
-                html += `
-                    <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 14px; cursor: pointer;" onclick="app.openCategoryManageModal('${c.id}', '${region}')" title="Click to manage ${c.name}">
-                        <div class="neon-header" style="margin-bottom: 8px;">
-                            <span class="neon-title"><i data-lucide="${c.icon || 'tag'}"></i> ${c.name}</span>
-                        </div>
-                        ${progressHtml}
+            // Render category grid for this active region
+            this.renderCategoryGrid(cfg.region, cfg.gridId);
+        });
+    }
+
+    renderCategoryGrid(region, elementId) {
+        const activeTxs = this.getActiveTransactions();
+        const totals = {};
+        activeTxs.forEach(tx => {
+            if (tx.type === 'expense' && tx.region === region) {
+                totals[tx.categoryId] = (totals[tx.categoryId] || 0) + tx.amount;
+            }
+        });
+
+        let html = '';
+        const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
+            || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
+        const isBudgetEnabled = storage.isBudgetEnabled(region);
+
+        // Filter out archived categories and those configured hidden from overview
+        const cats = (storage.state.categories?.[region] || []).filter(c => c.isActive !== false && !c.hiddenFromBudgetOverview);
+
+        cats.forEach(c => {
+            const spent = totals[c.id] || 0;
+            let progressHtml = '';
+
+            const activeBudget = c.budget || 0;
+            const isOver = isBudgetEnabled && activeBudget > 0 && spent > activeBudget;
+
+            if (isBudgetEnabled && activeBudget > 0) {
+                const pct = Math.min((spent / activeBudget) * 100, 100);
+                let barClass = 'neon-safe';
+                if (pct > 90) barClass = 'neon-danger';
+                else if (pct > 75) barClass = 'neon-warn';
+
+                progressHtml = `
+                    <div class="neon-bar-bg">
+                        <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
+                    </div>
+                    <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
+                        <span class="privacy-blur">${this.formatMoney(spent, currency)}</span>
+                        <span class="privacy-blur">${this.formatMoney(activeBudget, currency)}</span>
                     </div>
                 `;
-            });
-            const el = document.getElementById(elementId);
-            if (el) el.innerHTML = html;
-        };
+            } else {
+                progressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: <span class="privacy-blur">${this.formatMoney(spent, currency)}</span></div>`;
+            }
 
-        renderGrid('JP', 'jp-categories-grid', true);
-        renderGrid('IN', 'in-categories-grid', false);
+            html += `
+                <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 14px; cursor: pointer;" onclick="app.openCategoryManageModal('${c.id}', '${region}')" title="Click to manage ${c.name}">
+                    <div class="neon-header" style="margin-bottom: 8px;">
+                        <span class="neon-title"><i data-lucide="${c.icon || 'tag'}"></i> ${c.name}</span>
+                    </div>
+                    ${progressHtml}
+                </div>
+            `;
+        });
+        const el = document.getElementById(elementId);
+        if (el) el.innerHTML = html || `<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 24px 0; text-align: center;">No categories configured.</p>`;
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons({ root: el });
+        }
     }
 
     renderTransactions() {
@@ -2534,86 +2812,125 @@ class App {
         }
     }
 
+    setMonthlySummaryRegion(region) {
+        if (!storage.getActiveCountries().includes(region)) return;
+        this.monthlySummaryRegion = region;
+        this.renderMonthlySummary();
+    }
+
     renderMonthlySummary() {
         const summaryEl = document.getElementById('monthly-financial-summary');
         if (!summaryEl) return;
 
+        const activeCountries = storage.getActiveCountries();
+        const primaryCountry = storage.getPrimaryCountry();
+
+        // Default or sanitize monthlySummaryRegion
+        if (!this.monthlySummaryRegion || !activeCountries.includes(this.monthlySummaryRegion)) {
+            this.monthlySummaryRegion = activeCountries.includes(primaryCountry) ? primaryCountry : activeCountries[0] || 'JP';
+        }
+
+        const region = this.monthlySummaryRegion;
+        const countryObj = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)) || { name: region, currency: region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹' };
+        const currency = countryObj.currency;
+        const countryName = countryObj.name;
+
         const activeTxs = this.getActiveTransactions();
-        let jpIncome = 0;
-        let jpExpenses = 0;
-        let inExpenses = 0;
-        let inIncome = 0;
+        let income = 0;
+        let expenses = 0;
 
         activeTxs.forEach(tx => {
             const amt = Number(tx.amount) || 0;
-            if (tx.region === 'JP') {
-                if (tx.type === 'income') jpIncome += amt;
-                else if (tx.type === 'expense') jpExpenses += amt;
-            } else if (tx.region === 'IN') {
-                if (tx.type === 'income') inIncome += amt;
-                else if (tx.type === 'expense') inExpenses += amt;
+            if (tx.region === region) {
+                if (tx.type === 'income') income += amt;
+                else if (tx.type === 'expense') expenses += amt;
             }
         });
 
-        const jpNet = jpIncome - jpExpenses;
-        const jpSavingsRate = jpIncome > 0 ? Math.max(0, Math.round((jpNet / jpIncome) * 100)) : 0;
-        const netSavingsClass = jpNet >= 0 ? 'stat-positive' : 'stat-negative';
-        const netSavingsSign = jpNet > 0 ? '+' : '';
-        const savingsRateColor = jpSavingsRate >= 20 ? 'var(--emerald)' : jpSavingsRate >= 10 ? 'var(--amber)' : 'var(--text-muted)';
+        const net = income - expenses;
+        const netSavingsClass = net >= 0 ? 'stat-positive' : 'stat-negative';
+        const netSavingsSign = net > 0 ? '+' : '';
+
+        // If multiple countries are active, show mini country switcher pills
+        let selectorHtml = '';
+        if (activeCountries.length > 1) {
+            selectorHtml = `
+                <div class="monthly-summary-pills" style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+                    <span class="text-xs text-muted" style="font-weight: 500;">Financial Inflow &amp; Outflow (${countryName})</span>
+                    <div class="segmented-control" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 2px; border-radius: 6px;">
+                        ${activeCountries.map(c => `
+                            <button class="segment-btn ${c === region ? 'active' : ''}" onclick="app.setMonthlySummaryRegion('${c}')" style="padding: 3px 10px; font-size: 0.75rem; border-radius: 4px;">
+                                ${c === 'JP' ? 'Japan (¥)' : c === 'DE' ? 'Germany (€)' : 'India (₹)'}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
 
         summaryEl.innerHTML = `
+            ${selectorHtml}
             <div class="monthly-stat-card">
                 <div class="monthly-stat-header">
                     <span class="monthly-stat-label">Monthly Income</span>
                     <span class="monthly-stat-trend trend-positive">
-                        <i data-lucide="trending-up"></i> JP Inflow
+                        <i data-lucide="trending-up"></i> ${region} Inflow
                     </span>
                 </div>
                 <div class="monthly-stat-value privacy-blur financial-amount" style="color: var(--emerald);">
-                    ${this.formatMoney(jpIncome, '¥', { prefix: '+' })}
+                    ${this.formatMoney(income, currency, { prefix: '+' })}
                 </div>
-                <div class="monthly-stat-sub">Japan inflows this month</div>
+                <div class="monthly-stat-sub">${countryName} inflows this month</div>
             </div>
 
             <div class="monthly-stat-card">
                 <div class="monthly-stat-header">
                     <span class="monthly-stat-label">Total Outflows</span>
                     <span class="monthly-stat-trend trend-negative">
-                        <i data-lucide="trending-down"></i> JP Outflow
+                        <i data-lucide="trending-down"></i> ${region} Outflow
                     </span>
                 </div>
                 <div class="monthly-stat-value privacy-blur financial-amount" style="color: var(--rose);">
-                    ${this.formatMoney(jpExpenses, '¥', { prefix: '-' })}
+                    ${this.formatMoney(expenses, currency, { prefix: '-' })}
                 </div>
-                <div class="monthly-stat-sub">Japan expenses this month</div>
+                <div class="monthly-stat-sub">${countryName} expenses this month</div>
             </div>
 
             <div class="monthly-stat-card">
                 <div class="monthly-stat-header">
                     <span class="monthly-stat-label">Net Savings</span>
-                    <span class="monthly-stat-trend ${jpNet >= 0 ? 'trend-positive' : 'trend-negative'}">
-                        <i data-lucide="${jpNet >= 0 ? 'sparkles' : 'alert-circle'}"></i> JP Net
+                    <span class="monthly-stat-trend ${net >= 0 ? 'trend-positive' : 'trend-negative'}">
+                        <i data-lucide="${net >= 0 ? 'sparkles' : 'alert-circle'}"></i> ${region} Net
                     </span>
                 </div>
                 <div class="monthly-stat-value privacy-blur financial-amount ${netSavingsClass}">
-                    ${this.formatMoney(jpNet, '¥', { prefix: netSavingsSign })}
+                    ${this.formatMoney(net, currency, { prefix: netSavingsSign })}
                 </div>
                 <div class="monthly-stat-sub">Inflows minus outflows</div>
             </div>
         `;
-        lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons({ root: summaryEl });
+        }
     }
 
     setDashboardChartRegion(region) {
-        if (region !== 'JP' && region !== 'IN') return;
+        if (!storage.getActiveCountries().includes(region)) return;
         this.dashboardChartRegion = region;
         const jpBtn = document.getElementById('dash-region-jp-btn');
         const inBtn = document.getElementById('dash-region-in-btn');
-        if (jpBtn && inBtn) {
+        const deBtn = document.getElementById('dash-region-de-btn');
+        if (jpBtn) {
             jpBtn.classList.toggle('active', region === 'JP');
             jpBtn.setAttribute('aria-selected', region === 'JP' ? 'true' : 'false');
+        }
+        if (inBtn) {
             inBtn.classList.toggle('active', region === 'IN');
             inBtn.setAttribute('aria-selected', region === 'IN' ? 'true' : 'false');
+        }
+        if (deBtn) {
+            deBtn.classList.toggle('active', region === 'DE');
+            deBtn.setAttribute('aria-selected', region === 'DE' ? 'true' : 'false');
         }
         this.renderDashboardExpenseChart();
     }
@@ -2623,8 +2940,47 @@ class App {
         const canvas = document.getElementById('dashboard-category-donut');
         if (!canvas) return;
 
-        const region = this.dashboardChartRegion || 'JP';
-        const currency = region === 'JP' ? '¥' : '₹';
+        const activeCountries = storage.getActiveCountries();
+        const primaryCountry = storage.getPrimaryCountry();
+
+        // Ensure dashboardChartRegion is an active country
+        if (!this.dashboardChartRegion || !activeCountries.includes(this.dashboardChartRegion)) {
+            this.dashboardChartRegion = activeCountries.includes(primaryCountry) ? primaryCountry : activeCountries[0] || 'JP';
+        }
+
+        const region = this.dashboardChartRegion;
+        const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
+            || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
+
+        // Manage region switcher pills visibility
+        const pillsWrap = document.getElementById('dash-chart-region-pills');
+        const jpBtn = document.getElementById('dash-region-jp-btn');
+        const inBtn = document.getElementById('dash-region-in-btn');
+        const deBtn = document.getElementById('dash-region-de-btn');
+
+        if (pillsWrap) {
+            if (activeCountries.length <= 1) {
+                pillsWrap.style.display = 'none';
+            } else {
+                pillsWrap.style.display = 'flex';
+                if (jpBtn) {
+                    jpBtn.style.display = activeCountries.includes('JP') ? 'inline-flex' : 'none';
+                    jpBtn.classList.toggle('active', region === 'JP');
+                    jpBtn.setAttribute('aria-selected', region === 'JP' ? 'true' : 'false');
+                }
+                if (inBtn) {
+                    inBtn.style.display = activeCountries.includes('IN') ? 'inline-flex' : 'none';
+                    inBtn.classList.toggle('active', region === 'IN');
+                    inBtn.setAttribute('aria-selected', region === 'IN' ? 'true' : 'false');
+                }
+                if (deBtn) {
+                    deBtn.style.display = activeCountries.includes('DE') ? 'inline-flex' : 'none';
+                    deBtn.classList.toggle('active', region === 'DE');
+                    deBtn.setAttribute('aria-selected', region === 'DE' ? 'true' : 'false');
+                }
+            }
+        }
+
         const activeTxs = this.getActiveTransactions();
         const totals = {};
 
@@ -2680,21 +3036,11 @@ class App {
     }
 
     renderWalletsPage() {
-        const jpGrid = document.getElementById('wallets-page-jp-grid');
-        const inGrid = document.getElementById('wallets-page-in-grid');
-        if (!jpGrid || !inGrid) return;
-
-        let jpCount = 0;
-        let inCount = 0;
-        let jpTotal = 0;
-        let inTotal = 0;
+        const activeCountries = storage.getActiveCountries();
+        const allWallets = Object.values(storage.state.wallets || {});
 
         const chipSvg = this.getCardChipSvg();
         const contactlessSvg = this.getContactlessSvg();
-
-        const allWallets = Object.values(storage.state.wallets || {});
-        const jpWallets = allWallets.filter(w => w.region === 'JP').sort((a, b) => this.getWalletSortRank(a) - this.getWalletSortRank(b));
-        const inWallets = allWallets.filter(w => w.region !== 'JP').sort((a, b) => this.getWalletSortRank(a) - this.getWalletSortRank(b));
 
         const renderCard = (w) => {
             const theme = this.getThemeForWallet(w);
@@ -2728,48 +3074,87 @@ class App {
             `;
         };
 
-        let jpHtml = '';
-        jpWallets.forEach(w => {
-            jpHtml += renderCard(w);
-            jpCount++;
-            jpTotal += (w.balance || 0);
+        const regions = [
+            { code: 'JP', name: 'Japan', curr: '¥', kpiId: 'wallets-kpi-jp', groupId: 'wallets-group-jp', gridId: 'wallets-page-jp-grid', countElId: 'wallets-page-jp-count', totalElId: 'wallets-page-jp-total', secCountId: 'wallets-section-jp-count', secTotalId: 'wallets-section-jp-total' },
+            { code: 'IN', name: 'India', curr: '₹', kpiId: 'wallets-kpi-in', groupId: 'wallets-group-in', gridId: 'wallets-page-in-grid', countElId: 'wallets-page-in-count', totalElId: 'wallets-page-in-total', secCountId: 'wallets-section-in-count', secTotalId: 'wallets-section-in-total' },
+            { code: 'DE', name: 'Germany', curr: '€', kpiId: 'wallets-kpi-de', groupId: 'wallets-group-de', gridId: 'wallets-page-de-grid', countElId: 'wallets-page-de-count', totalElId: 'wallets-page-de-total', secCountId: 'wallets-section-de-count', secTotalId: 'wallets-section-de-total' }
+        ];
+
+        regions.forEach(r => {
+            const isActive = activeCountries.includes(r.code);
+            const kpiEl = document.getElementById(r.kpiId);
+            const groupEl = document.getElementById(r.groupId);
+            const gridEl = document.getElementById(r.gridId);
+
+            if (!isActive) {
+                if (kpiEl) kpiEl.style.display = 'none';
+                if (groupEl) groupEl.style.display = 'none';
+                return;
+            }
+
+            if (kpiEl) kpiEl.style.display = 'flex';
+            if (groupEl) groupEl.style.display = 'block';
+
+            const regionWallets = allWallets
+                .filter(w => w.region === r.code)
+                .sort((a, b) => this.getWalletSortRank(a) - this.getWalletSortRank(b));
+
+            let total = 0;
+            let cardsHtml = '';
+            regionWallets.forEach(w => {
+                cardsHtml += renderCard(w);
+                total += (w.balance || 0);
+            });
+
+            if (gridEl) {
+                gridEl.innerHTML = cardsHtml || `
+                    <div class="wallets-empty-state" style="grid-column: 1/-1; padding: 36px 16px; text-align: center;">
+                        <p class="text-muted text-sm mb-2">No ${r.name} accounts created yet.</p>
+                        <button class="btn btn-secondary btn-sm" onclick="app.openAddWalletModal('${r.code}')">
+                            <i data-lucide="plus" style="width:14px;height:14px;margin-right:4px;"></i>Add ${r.name} Account
+                        </button>
+                    </div>
+                `;
+            }
+
+            const countStr = `${regionWallets.length} ${regionWallets.length === 1 ? 'account' : 'accounts'}`;
+            const totalStr = this.formatMoney(total, r.curr);
+
+            const countEl = document.getElementById(r.countElId);
+            if (countEl) countEl.innerText = countStr;
+
+            const totalEl = document.getElementById(r.totalElId);
+            if (totalEl) totalEl.innerText = totalStr;
+
+            const secCountEl = document.getElementById(r.secCountId);
+            if (secCountEl) secCountEl.innerText = countStr;
+
+            const secTotalEl = document.getElementById(r.secTotalId);
+            if (secTotalEl) secTotalEl.innerText = totalStr;
         });
 
-        let inHtml = '';
-        inWallets.forEach(w => {
-            inHtml += renderCard(w);
-            inCount++;
-            inTotal += (w.balance || 0);
+        // Remittance visibility: only displayed if active accounts span > 1 distinct currency
+        const activeCurrencies = new Set();
+        allWallets.forEach(w => {
+            if (activeCountries.includes(w.region)) {
+                const c = w.currency || (typeof CountryConfig !== 'undefined' && CountryConfig.get(w.region)?.currency);
+                if (c) activeCurrencies.add(c);
+            }
         });
+        const hasCrossBorderCurrencies = activeCurrencies.size > 1;
 
-        jpGrid.innerHTML = jpHtml || '<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 32px 16px; text-align: center;">No Japan wallets created yet.</p>';
-        inGrid.innerHTML = inHtml || '<p class="text-muted text-sm" style="grid-column: 1/-1; padding: 32px 16px; text-align: center;">No India wallets created yet.</p>';
+        const remitBtn = document.getElementById('wallets-remittance-btn');
+        if (remitBtn) remitBtn.style.display = hasCrossBorderCurrencies ? '' : 'none';
 
-        const jpCountEl = document.getElementById('wallets-page-jp-count');
-        if (jpCountEl) jpCountEl.innerText = `${jpCount} ${jpCount === 1 ? 'account' : 'accounts'}`;
+        const fabRemit = document.getElementById('fab-action-remittance');
+        if (fabRemit) fabRemit.style.display = hasCrossBorderCurrencies ? '' : 'none';
 
-        const inCountEl = document.getElementById('wallets-page-in-count');
-        if (inCountEl) inCountEl.innerText = `${inCount} ${inCount === 1 ? 'account' : 'accounts'}`;
+        const modalRemit = document.getElementById('btn-select-tx-remittance');
+        if (modalRemit) modalRemit.style.display = hasCrossBorderCurrencies ? '' : 'none';
 
-        const jpSectionCount = document.getElementById('wallets-section-jp-count');
-        if (jpSectionCount) jpSectionCount.innerText = `${jpCount} ${jpCount === 1 ? 'account' : 'accounts'}`;
-
-        const inSectionCount = document.getElementById('wallets-section-in-count');
-        if (inSectionCount) inSectionCount.innerText = `${inCount} ${inCount === 1 ? 'account' : 'accounts'}`;
-
-        const jpTotalEl = document.getElementById('wallets-page-jp-total');
-        if (jpTotalEl) jpTotalEl.innerText = this.formatMoney(jpTotal, '¥');
-
-        const inTotalEl = document.getElementById('wallets-page-in-total');
-        if (inTotalEl) inTotalEl.innerText = this.formatMoney(inTotal, '₹');
-
-        const jpSectionTotal = document.getElementById('wallets-section-jp-total');
-        if (jpSectionTotal) jpSectionTotal.innerText = this.formatMoney(jpTotal, '¥');
-
-        const inSectionTotal = document.getElementById('wallets-section-in-total');
-        if (inSectionTotal) inSectionTotal.innerText = this.formatMoney(inTotal, '₹');
-
-        lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
     }
 
     getThemeForWallet(w) {
@@ -2869,11 +3254,13 @@ class App {
     }
 
     openCountryExpansion(region) {
-        const isJp = region === 'JP';
-        const currency = isJp ? '¥' : '₹';
+        const countryObj = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region))
+            || { name: region, currency: region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹', currencyCode: region === 'JP' ? 'JPY' : region === 'DE' ? 'EUR' : 'INR' };
+        const currency = countryObj.currency;
+        const countryName = countryObj.name;
+        const cardThemeCls = region === 'JP' ? 'country-card-jp' : region === 'DE' ? 'country-card-de' : 'country-card-in';
+        const currencyCode = countryObj.currencyCode;
         const flagSvg = this.getCountryFlagSvg(region, 22, 16.5);
-        const countryName = isJp ? 'Japan' : 'India';
-        const cardThemeCls = isJp ? 'country-card-jp' : 'country-card-in';
 
         this.focusCurrentRegion = region;
         this.focusHistory = [];
@@ -2912,7 +3299,7 @@ class App {
                     <div class="country-badge">
                         ${flagSvg}
                         <span class="country-name">${countryName}</span>
-                        <span class="currency-code">${isJp ? 'JPY' : 'INR'}</span>
+                        <span class="currency-code">${currencyCode}</span>
                     </div>
                     <span class="wallet-count-pill">${regionWallets.length} ${regionWallets.length === 1 ? 'Account' : 'Accounts'}</span>
                 </div>
@@ -3202,20 +3589,38 @@ class App {
         }
     }
 
-    openAddWalletModal() {
+    openAddWalletModal(defaultRegion = null) {
+        const activeCountries = storage.getActiveCountries();
+        const regSelect = document.getElementById('add-wallet-region');
+        if (regSelect) {
+            regSelect.innerHTML = activeCountries.map(c => {
+                const cfg = (typeof CountryConfig !== 'undefined' && CountryConfig.get(c))
+                    || { name: c, currency: c === 'JP' ? '¥' : c === 'DE' ? '€' : '₹', currencyCode: c === 'JP' ? 'JPY' : c === 'DE' ? 'EUR' : 'INR' };
+                return `<option value="${c}">${cfg.name} (${cfg.currency} ${cfg.currencyCode})</option>`;
+            }).join('');
+            const targetReg = (defaultRegion && activeCountries.includes(defaultRegion))
+                ? defaultRegion
+                : (activeCountries.includes(storage.getPrimaryCountry()) ? storage.getPrimaryCountry() : activeCountries[0]);
+            regSelect.value = targetReg || 'JP';
+        }
+
         document.getElementById('add-wallet-name').value = '';
         document.getElementById('add-wallet-balance').value = '0';
-        document.getElementById('add-wallet-region').value = 'JP';
         document.getElementById('add-wallet-type').value = 'bank';
-        document.getElementById('add-wallet-theme-val').value = 'emerald-salary';
-        this.populateThemePicker('add-wallet-theme-picker', 'emerald-salary');
+
+        const curReg = regSelect ? regSelect.value : 'JP';
+        const defaultTheme = curReg === 'IN' ? 'burgundy-axis' : curReg === 'DE' ? 'frankfurt-slate' : 'emerald-salary';
+        document.getElementById('add-wallet-theme-val').value = defaultTheme;
+        this.populateThemePicker('add-wallet-theme-picker', defaultTheme);
         document.getElementById('add-wallet-modal').classList.add('active');
-        lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
     }
 
     onAddWalletRegionChange() {
         const reg = document.getElementById('add-wallet-region').value;
-        const defaultTheme = reg === 'IN' ? 'burgundy-axis' : 'emerald-salary';
+        const defaultTheme = reg === 'IN' ? 'burgundy-axis' : reg === 'DE' ? 'frankfurt-slate' : 'emerald-salary';
         document.getElementById('add-wallet-theme-val').value = defaultTheme;
         this.populateThemePicker('add-wallet-theme-picker', defaultTheme);
     }
@@ -3238,7 +3643,8 @@ class App {
         }
 
         const balance = Number(balInput) || 0;
-        const currency = region === 'JP' ? '¥' : '₹';
+        const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
+            || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
         const chosenTheme = WALLET_THEMES.find(t => t.id === theme) || WALLET_THEMES[0];
 
         storage.state.wallets[name] = {
@@ -3709,9 +4115,13 @@ class App {
     renderLoanTracker() {
         if (this.currentView !== 'home-view') return;
 
-        const loanState = walletManager.getLoanState();
         const widget = document.getElementById('loan-tracker-widget');
+        if (!storage.isLoanTrackingEnabled()) {
+            if (widget) widget.style.display = 'none';
+            return;
+        }
 
+        const loanState = walletManager.getLoanState();
         if (!loanState || loanState.config.enabled === false) {
             if (widget) widget.style.display = 'none';
             return;
@@ -3719,14 +4129,18 @@ class App {
 
         if (widget) {
             widget.style.display = 'block';
+            const primary = storage.getPrimaryCountry();
+            const loanCurrency = loanState.config.currency || (typeof CountryConfig !== 'undefined' && CountryConfig.get(primary)?.currency) || '₹';
+            const loanLocale = (typeof CountryConfig !== 'undefined' && CountryConfig.get(primary)?.locale) || 'en-IN';
+
             widget.innerHTML = `
                 <div class="loan-header" style="flex-wrap: wrap; padding-bottom: 12px;">
                     <div style="width: 50%;">
-                        <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.totalPrincipal, '₹', { locale: 'en-IN' })}</div>
+                        <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.totalPrincipal, loanCurrency, { locale: loanLocale })}</div>
                         <div class="loan-label">Total Loan</div>
                     </div>
                     <div style="width: 50%; text-align: right;">
-                        <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.emi, '₹', { locale: 'en-IN' })}</div>
+                        <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.emi, loanCurrency, { locale: loanLocale })}</div>
                         <div class="loan-label">EMI</div>
                     </div>
                     <div style="width: 100%; text-align: center; font-size: 0.72rem; color: var(--text-muted); margin-top: 10px;">
@@ -3749,13 +4163,13 @@ class App {
                     
                     <div class="loan-stats-grid">
                         <span class="loan-stat-label">Amount Paid</span>
-                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.amountPaid, '₹', { locale: 'en-IN' })}</span>
+                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.amountPaid, loanCurrency, { locale: loanLocale })}</span>
                         
                         <span class="loan-stat-label">Principal Paid</span>
-                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.principalPaid, '₹', { locale: 'en-IN', formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
+                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.principalPaid, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
                         
                         <span class="loan-stat-label">Principal Left</span>
-                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.principalLeft, '₹', { locale: 'en-IN', formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
+                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.principalLeft, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
                     </div>
                 </div>
             `;
@@ -5010,24 +5424,50 @@ class App {
     // --------------------------------------------------------------------------
 
     renderAnalyticsPage() {
+        const activeCountries = storage.getActiveCountries();
+        const primaryCountry = storage.getPrimaryCountry();
+
+        if (!this.analyticsCountry || !activeCountries.includes(this.analyticsCountry)) {
+            this.analyticsCountry = activeCountries.includes(primaryCountry) ? primaryCountry : activeCountries[0] || 'JP';
+        }
+
         const jpWorkspace = document.getElementById('analytics-jp-workspace');
         const inWorkspace = document.getElementById('analytics-in-workspace');
+        const deWorkspace = document.getElementById('analytics-de-workspace');
+        const selector = document.getElementById('analytics-country-selector');
         const tabJp = document.getElementById('analytics-tab-jp');
         const tabIn = document.getElementById('analytics-tab-in');
+        const tabDe = document.getElementById('analytics-tab-de');
 
-        if (!jpWorkspace || !inWorkspace) return;
+        if (selector) {
+            if (activeCountries.length <= 1) {
+                selector.style.display = 'none';
+            } else {
+                selector.style.display = 'flex';
+                if (tabJp) {
+                    tabJp.style.display = activeCountries.includes('JP') ? 'inline-flex' : 'none';
+                    tabJp.classList.toggle('active', this.analyticsCountry === 'JP');
+                }
+                if (tabIn) {
+                    tabIn.style.display = activeCountries.includes('IN') ? 'inline-flex' : 'none';
+                    tabIn.classList.toggle('active', this.analyticsCountry === 'IN');
+                }
+                if (tabDe) {
+                    tabDe.style.display = activeCountries.includes('DE') ? 'inline-flex' : 'none';
+                    tabDe.classList.toggle('active', this.analyticsCountry === 'DE');
+                }
+            }
+        }
+
+        if (jpWorkspace) jpWorkspace.style.display = this.analyticsCountry === 'JP' ? 'flex' : 'none';
+        if (inWorkspace) inWorkspace.style.display = this.analyticsCountry === 'IN' ? 'flex' : 'none';
+        if (deWorkspace) deWorkspace.style.display = this.analyticsCountry === 'DE' ? 'flex' : 'none';
 
         if (this.analyticsCountry === 'JP') {
-            jpWorkspace.style.display = 'flex';
-            inWorkspace.style.display = 'none';
-            if (tabJp) tabJp.classList.add('active');
-            if (tabIn) tabIn.classList.remove('active');
             this.renderJapanAnalytics();
+        } else if (this.analyticsCountry === 'DE') {
+            this.renderGermanyAnalytics();
         } else {
-            jpWorkspace.style.display = 'none';
-            inWorkspace.style.display = 'flex';
-            if (tabJp) tabJp.classList.remove('active');
-            if (tabIn) tabIn.classList.add('active');
             this.renderIndiaAnalytics();
         }
 
@@ -5037,7 +5477,7 @@ class App {
     }
 
     setAnalyticsCountry(country) {
-        if (country !== 'JP' && country !== 'IN') return;
+        if (!storage.getActiveCountries().includes(country)) return;
         this.analyticsCountry = country;
         const selector = document.getElementById('analytics-country-selector');
         if (selector) {
@@ -5050,6 +5490,74 @@ class App {
             });
         }
         this.renderAnalyticsPage();
+    }
+
+    renderGermanyAnalytics() {
+        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod);
+        const { startDate, endDate, prevStartDate, prevEndDate, label } = periodRange;
+
+        // Query German transactions
+        const deTxs = walletManager.getTransactions({
+            region: 'DE',
+            startDate: startDate || undefined,
+            endDate: endDate || undefined
+        });
+
+        const expenseTxs = deTxs.filter(t => t.type === 'expense');
+        const totalExpenses = expenseTxs.reduce((s, t) => s + Number(t.amount || 0), 0);
+
+        // Previous period comparison
+        let deltaExpenses = null;
+        if (prevStartDate && prevEndDate) {
+            const prevDeTxs = walletManager.getTransactions({
+                region: 'DE',
+                startDate: prevStartDate,
+                endDate: prevEndDate
+            });
+            const prevExpenses = prevDeTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+            if (prevExpenses > 0) {
+                deltaExpenses = (((totalExpenses - prevExpenses) / prevExpenses) * 100).toFixed(1);
+            }
+        }
+
+        const kpiExpenses = document.getElementById('de-kpi-expenses');
+        const kpiExpensesMeta = document.getElementById('de-kpi-expenses-meta');
+        if (kpiExpenses) kpiExpenses.innerText = this.formatMoney(totalExpenses, '€');
+        if (kpiExpensesMeta) {
+            kpiExpensesMeta.innerHTML = `<span class="delta-neutral">${label || 'This period'}</span>`;
+        }
+
+        const weeks = (this.analyticsPeriod === 'last-3-months' ? 13 : 4);
+        const weeklyAvg = totalExpenses > 0 ? (totalExpenses / weeks) : 0;
+        const kpiWeeklyAvg = document.getElementById('de-kpi-weekly-avg');
+        if (kpiWeeklyAvg) kpiWeeklyAvg.innerText = this.formatMoney(weeklyAvg, '€');
+
+        const kpiComp = document.getElementById('de-kpi-comparison');
+        const kpiCompMeta = document.getElementById('de-kpi-comparison-meta');
+        if (kpiComp) {
+            if (deltaExpenses !== null) {
+                const isLess = Number(deltaExpenses) <= 0;
+                kpiComp.innerHTML = `<span class="${isLess ? 'text-emerald' : 'text-rose'}">${Number(deltaExpenses) >= 0 ? '+' : ''}${deltaExpenses}%</span>`;
+                if (kpiCompMeta) kpiCompMeta.innerHTML = `<span class="text-faint">vs prior period</span>`;
+            } else {
+                kpiComp.innerText = '--';
+                if (kpiCompMeta) kpiCompMeta.innerHTML = `<span class="text-faint">Baseline period</span>`;
+            }
+        }
+
+        const kpiCount = document.getElementById('de-kpi-count');
+        if (kpiCount) kpiCount.innerText = String(expenseTxs.length);
+
+        // Render recent German transactions list
+        const recentContainer = document.getElementById('de-recent-tx-list');
+        if (recentContainer) {
+            const recent = expenseTxs.slice(0, 5);
+            if (recent.length === 0) {
+                recentContainer.innerHTML = `<p class="text-muted text-sm" style="text-align: center; padding: 24px 0;">No German expense records found for this period.</p>`;
+            } else {
+                recentContainer.innerHTML = recent.map(tx => this.getTransactionHtml(tx, true, true)).join('');
+            }
+        }
     }
 
     setAnalyticsPeriod(period) {
@@ -5598,7 +6106,7 @@ class App {
     // =========================================================================
 
     setReportRegion(region) {
-        if (region !== 'JP' && region !== 'IN') return;
+        if (!storage.getActiveCountries().includes(region)) return;
         this.reportRegion = region;
         const selector = document.getElementById('report-country-selector');
         if (selector) {
@@ -6115,8 +6623,41 @@ class App {
     }
 
     renderReportsPage() {
+        const activeCountries = storage.getActiveCountries();
+        const primaryCountry = storage.getPrimaryCountry();
+
+        if (!this.reportRegion || !activeCountries.includes(this.reportRegion)) {
+            this.reportRegion = activeCountries.includes(primaryCountry) ? primaryCountry : activeCountries[0] || 'JP';
+        }
+
+        const selector = document.getElementById('report-country-selector');
+        const tabJp = document.getElementById('report-tab-jp');
+        const tabIn = document.getElementById('report-tab-in');
+        const tabDe = document.getElementById('report-tab-de');
+
+        if (selector) {
+            if (activeCountries.length <= 1) {
+                selector.style.display = 'none';
+            } else {
+                selector.style.display = 'flex';
+                if (tabJp) {
+                    tabJp.style.display = activeCountries.includes('JP') ? 'inline-flex' : 'none';
+                    tabJp.classList.toggle('active', this.reportRegion === 'JP');
+                }
+                if (tabIn) {
+                    tabIn.style.display = activeCountries.includes('IN') ? 'inline-flex' : 'none';
+                    tabIn.classList.toggle('active', this.reportRegion === 'IN');
+                }
+                if (tabDe) {
+                    tabDe.style.display = activeCountries.includes('DE') ? 'inline-flex' : 'none';
+                    tabDe.classList.toggle('active', this.reportRegion === 'DE');
+                }
+            }
+        }
+
         const allTxs = storage.state.transactions || [];
-        const currency = this.reportRegion === 'JP' ? '¥' : '₹';
+        const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(this.reportRegion)?.currency)
+            || (this.reportRegion === 'JP' ? '¥' : this.reportRegion === 'DE' ? '€' : '₹');
 
         // 1. Collect all available month keys (currentMonthKey + closedMonths + any dates present in ledger)
         const availableMonthsSet = new Set();
@@ -6179,7 +6720,7 @@ class App {
 
         if (closedMeta) {
             // Historical closed period
-            periodTotalBudget = this.reportRegion === 'JP' ? (closedMeta.jpTotalBudget || 0) : (closedMeta.inTotalBudget || 0);
+            periodTotalBudget = this.reportRegion === 'JP' ? (closedMeta.jpTotalBudget || 0) : this.reportRegion === 'DE' ? (closedMeta.deTotalBudget || 0) : (closedMeta.inTotalBudget || 0);
             if (closedMeta.categoriesSnapshot && closedMeta.categoriesSnapshot[this.reportRegion]) {
                 closedMeta.categoriesSnapshot[this.reportRegion].forEach(c => {
                     periodCatBudgets[c.id] = c.budget || 0;
@@ -6189,12 +6730,8 @@ class App {
             }
         } else if (this.reportMonthKey === storage.state.currentMonthKey) {
             // Current active month
-            if (this.reportRegion === 'JP') {
-                periodTotalBudget = storage.state.jpTotalBudget || 0;
-            } else {
-                periodTotalBudget = storage.state.inTotalBudget || (storage.state.categories['IN'] || []).reduce((sum, c) => sum + (c.budget || 0), 0);
-            }
-            (storage.state.categories[this.reportRegion] || []).forEach(c => {
+            periodTotalBudget = storage.getTotalBudget(this.reportRegion);
+            (storage.state.categories?.[this.reportRegion] || []).forEach(c => {
                 periodCatBudgets[c.id] = c.budget || 0;
             });
         } else {
@@ -7323,7 +7860,7 @@ class App {
     // =========================================================================
 
     setBudgetsRegion(region) {
-        if (region !== 'JP' && region !== 'IN') return;
+        if (!storage.getActiveCountries().includes(region)) return;
         this.budgetsRegion = region;
         const selector = document.getElementById('budgets-country-selector');
         if (selector) {
@@ -7363,9 +7900,16 @@ class App {
     }
 
     renderBudgetsPage() {
-        const region = this.budgetsRegion || 'JP';
-        const isJp = region === 'JP';
-        const currency = isJp ? '¥' : '₹';
+        const activeCountries = storage.getActiveCountries();
+        const primaryCountry = storage.getPrimaryCountry();
+
+        if (!this.budgetsRegion || !activeCountries.includes(this.budgetsRegion)) {
+            this.budgetsRegion = activeCountries.includes(primaryCountry) ? primaryCountry : activeCountries[0] || 'JP';
+        }
+
+        const region = this.budgetsRegion;
+        const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
+            || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
         const curMonth = (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
 
         // Update active month label
@@ -7374,10 +7918,38 @@ class App {
             monthLabel.innerText = curMonth;
         }
 
+        // Manage segmented country control visibility
+        const selector = document.getElementById('budgets-country-selector');
+        if (selector) {
+            if (activeCountries.length <= 1) {
+                selector.style.display = 'none';
+            } else {
+                selector.style.display = 'flex';
+                ['JP', 'IN', 'DE'].forEach(code => {
+                    const btn = selector.querySelector(`[data-region="${code}"]`);
+                    if (btn) {
+                        btn.style.display = activeCountries.includes(code) ? 'inline-flex' : 'none';
+                        btn.classList.toggle('active', code === region);
+                    }
+                });
+            }
+        }
+
         // Sync search input value if present
         const searchInput = document.getElementById('budgets-cat-search-input');
         if (searchInput && document.activeElement !== searchInput) {
             searchInput.value = this.budgetsCatSearch || '';
+        }
+
+        // Check whether budgeting is enabled for this active region
+        const isBudgetEnabled = storage.isBudgetEnabled(region);
+        const disabledBanner = document.getElementById('budgets-disabled-banner');
+        const summaryBanner = document.getElementById('budgets-summary-banner');
+        if (disabledBanner) {
+            disabledBanner.style.display = isBudgetEnabled ? 'none' : 'block';
+        }
+        if (summaryBanner) {
+            summaryBanner.style.display = isBudgetEnabled ? 'block' : 'none';
         }
 
         // Transactions in active month for active region
@@ -7395,16 +7967,14 @@ class App {
         });
 
         const totalSpent = Object.values(totals).reduce((s, v) => s + v, 0);
-        const allCats = storage.state.categories[region] || [];
+        const allCats = storage.state.categories?.[region] || [];
 
         const sumCatLimits = allCats
             .filter(c => c.contributesToTotalBudget !== false && c.isActive !== false)
             .reduce((s, c) => s + (c.budget || 0), 0);
 
-        // Overall Monthly Budget (Configurable independently of category-level limits)
-        const allocatedBudget = isJp
-            ? (storage.state.jpTotalBudget !== undefined && storage.state.jpTotalBudget !== null ? storage.state.jpTotalBudget : 0)
-            : (storage.state.inTotalBudget !== undefined && storage.state.inTotalBudget !== null ? storage.state.inTotalBudget : sumCatLimits);
+        // Overall Monthly Budget
+        const allocatedBudget = storage.getTotalBudget(region);
 
         const cushion = Math.max(0, allocatedBudget - sumCatLimits);
         const remaining = allocatedBudget - totalSpent;
@@ -7437,14 +8007,16 @@ class App {
         if (countOverEl) countOverEl.innerText = overBudgetCatsCount;
 
         // 1. Render Consolidated Budgets Overview Card (Reuses Dashboard Central Card)
-        this.renderBudgetOverviewCard('budgets-summary-banner', {
-            region: region,
-            monthKey: curMonth,
-            totalSpent: totalSpent,
-            allocatedBudget: allocatedBudget,
-            isInteractive: true,
-            showEditButton: true
-        });
+        if (isBudgetEnabled) {
+            this.renderBudgetOverviewCard('budgets-summary-banner', {
+                region: region,
+                monthKey: curMonth,
+                totalSpent: totalSpent,
+                allocatedBudget: allocatedBudget,
+                isInteractive: true,
+                showEditButton: true
+            });
+        }
 
         // 2. Filter Category List according to active segmented control & search input
         const currentFilter = this.budgetsCatFilter || 'all';
@@ -7594,27 +8166,23 @@ class App {
 
     setOverallBudgetRegion(region, updateFocus = true) {
         this.overallBudgetModalRegion = region;
-        const isJp = region === 'JP';
-        const currency = isJp ? '¥' : '₹';
+        const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
+            || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
 
         const btnJp = document.getElementById('overall-budget-btn-jp');
         const btnIn = document.getElementById('overall-budget-btn-in');
-        if (btnJp && btnIn) {
-            btnJp.classList.toggle('active', isJp);
-            btnIn.classList.toggle('active', !isJp);
-        }
+        if (btnJp) btnJp.classList.toggle('active', region === 'JP');
+        if (btnIn) btnIn.classList.toggle('active', region === 'IN');
 
         const currLabel = document.getElementById('overall-budget-curr-label');
         const currPrefix = document.getElementById('overall-budget-curr-prefix');
         if (currLabel) currLabel.innerText = currency;
         if (currPrefix) currPrefix.innerText = currency;
 
-        const cats = storage.state.categories[region] || [];
+        const cats = storage.state.categories?.[region] || [];
         const sumCatLimits = cats.filter(c => c.contributesToTotalBudget !== false && c.isActive !== false).reduce((s, c) => s + (c.budget || 0), 0);
 
-        const currentVal = isJp
-            ? (storage.state.jpTotalBudget !== undefined ? storage.state.jpTotalBudget : 0)
-            : (storage.state.inTotalBudget !== undefined && storage.state.inTotalBudget !== null ? storage.state.inTotalBudget : sumCatLimits);
+        const currentVal = storage.getTotalBudget(region) || sumCatLimits;
 
         const input = document.getElementById('overall-budget-input');
         if (input) {
@@ -7637,10 +8205,10 @@ class App {
 
     updateOverallBudgetCushionPreview() {
         const region = this.overallBudgetModalRegion || 'JP';
-        const isJp = region === 'JP';
-        const currency = isJp ? '¥' : '₹';
+        const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
+            || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
 
-        const cats = storage.state.categories[region] || [];
+        const cats = storage.state.categories?.[region] || [];
         const sumCatLimits = cats.filter(c => c.contributesToTotalBudget !== false && c.isActive !== false).reduce((s, c) => s + (c.budget || 0), 0);
 
         const input = document.getElementById('overall-budget-input');
@@ -7668,7 +8236,6 @@ class App {
 
     saveOverallBudget() {
         const region = this.overallBudgetModalRegion || 'JP';
-        const isJp = region === 'JP';
         const input = document.getElementById('overall-budget-input');
         const err = document.getElementById('overall-budget-error');
 
@@ -7693,11 +8260,11 @@ class App {
         }
 
         if (typeof storage.setTotalBudget === 'function') {
-            storage.setTotalBudget(isJp ? 'JP' : 'IN', numVal);
+            storage.setTotalBudget(region, numVal);
         } else {
-            if (isJp) {
+            if (region === 'JP') {
                 storage.state.jpTotalBudget = numVal;
-            } else {
+            } else if (region === 'IN') {
                 storage.state.inTotalBudget = numVal;
             }
             storage.saveData();
@@ -7705,7 +8272,7 @@ class App {
 
         // Update settings inputs if present
         const jpBudEl = document.getElementById('setting-jp-budget');
-        if (jpBudEl && isJp) {
+        if (jpBudEl && region === 'JP') {
             jpBudEl.value = numVal;
         }
 

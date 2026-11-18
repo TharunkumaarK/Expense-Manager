@@ -1,11 +1,15 @@
-const CACHE_NAME = 'em-v121';
+const CACHE_NAME = 'em-v122';
 const ASSETS = [
     './',
     './index.html',
     './css/style.css',
+    './js/supabase-config.js',
+    './js/supabaseClient.js',
+    './js/country-config.js',
     './js/storage.js',
     './js/wallet.js',
     './js/charts.js',
+    './js/onboarding.js',
     './js/app.js',
     './icons/icon.svg',
     './images/auth-bg.png',
