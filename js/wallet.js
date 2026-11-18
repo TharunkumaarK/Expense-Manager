@@ -266,21 +266,22 @@ class WalletManager {
     }
 
     // Validate numeric amount and decimal precision according to currency
+    // Exact monetary validation: JPY whole yen, INR/EUR max 2 decimal places
     isValidAmount(amount, currency) {
-        if (typeof amount !== 'number' || isNaN(amount) || !isFinite(amount) || amount <= 0) {
-            return false;
-        }
-        // Guard against unsafe arithmetic magnitudes / overflow
-        if (amount > 1e12) {
+        if (typeof amount !== 'number' || isNaN(amount) || !isFinite(amount) || amount <= 0 || amount > 1e12) {
             return false;
         }
         const cur = (currency || '').toUpperCase();
         if (cur === '¥' || cur === 'JPY') {
-            return Math.abs(amount - Math.round(amount)) < 1e-6;
+            return Number.isInteger(amount);
         }
-        // INR and EUR: max 2 decimal places
-        const rounded = Math.round(amount * 100) / 100;
-        return Math.abs(amount - rounded) < 1e-6;
+        // INR and EUR: max 2 decimal places with zero IEEE 754 precision leakage
+        const str = amount.toString();
+        if (str.includes('e') || str.includes('E')) return false;
+        const parts = str.split('.');
+        if (parts.length > 2) return false;
+        if (parts.length === 2 && parts[1].length > 2) return false;
+        return true;
     }
 
     // Pure calculation preview for domestic and international transfers (zero side effects)
@@ -415,24 +416,41 @@ class WalletManager {
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
 
-        source.balance = this.roundCurrency(source.balance - numAmount, source.currency);
-        dest.balance = this.roundCurrency(dest.balance + numAmount, dest.currency);
+        // Prepare phase: compute tentative balances and validate in isolated structures
+        const tentativeSource = this.roundCurrency(source.balance - numAmount, source.currency);
+        const tentativeDest = this.roundCurrency(dest.balance + numAmount, dest.currency);
+        if (!isFinite(tentativeSource) || !isFinite(tentativeDest)) {
+            console.warn('[WalletManager] Transfer aborted - resulting balances nonfinite.');
+            return false;
+        }
 
-        const tx = {
-            id: this.generateTransactionId(),
-            type: 'transfer',
-            sourceId,
-            destId,
-            amount: numAmount,
-            currency: source.currency,
-            note: note || '',
-            date
-        };
+        // Commit phase: apply state mutation atomically with rollback protection
+        const preCommit = { [sourceId]: source.balance, [destId]: dest.balance };
+        try {
+            source.balance = tentativeSource;
+            dest.balance = tentativeDest;
 
-        storage.state.transactions.unshift(tx);
-        this._sortContinuousTransactions();
-        storage.saveData();
-        return true;
+            const tx = {
+                id: this.generateTransactionId(),
+                type: 'transfer',
+                sourceId,
+                destId,
+                amount: numAmount,
+                currency: source.currency,
+                note: note || '',
+                date
+            };
+
+            storage.state.transactions.unshift(tx);
+            this._sortContinuousTransactions();
+            storage.saveData();
+            return true;
+        } catch (err) {
+            console.error('[WalletManager] Transfer commit failed. Rolling back...', err);
+            source.balance = preCommit[sourceId];
+            dest.balance = preCommit[destId];
+            return false;
+        }
     }
 
     // Remittance (cross currency international money transfer)
@@ -454,27 +472,44 @@ class WalletManager {
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
 
-        source.balance = this.roundCurrency(source.balance - numSource, source.currency);
-        dest.balance = this.roundCurrency(dest.balance + numDest, dest.currency);
+        // Prepare phase: compute tentative balances and validate in isolated structures
+        const tentativeSource = this.roundCurrency(source.balance - numSource, source.currency);
+        const tentativeDest = this.roundCurrency(dest.balance + numDest, dest.currency);
+        if (!isFinite(tentativeSource) || !isFinite(tentativeDest)) {
+            console.warn('[WalletManager] Remittance aborted - resulting balances nonfinite.');
+            return false;
+        }
 
-        const tx = {
-            id: this.generateTransactionId(),
-            type: 'remittance',
-            sourceId,
-            destId,
-            sourceAmount: numSource,
-            destAmount: numDest,
-            sourceCurrency: source.currency,
-            destCurrency: dest.currency,
-            exchangeRate: (numDest / numSource).toFixed(6),
-            note: note || '',
-            date
-        };
+        // Commit phase: apply state mutation atomically with rollback protection
+        const preCommit = { [sourceId]: source.balance, [destId]: dest.balance };
+        try {
+            source.balance = tentativeSource;
+            dest.balance = tentativeDest;
 
-        storage.state.transactions.unshift(tx);
-        this._sortContinuousTransactions();
-        storage.saveData();
-        return true;
+            const tx = {
+                id: this.generateTransactionId(),
+                type: 'remittance',
+                sourceId,
+                destId,
+                sourceAmount: numSource,
+                destAmount: numDest,
+                sourceCurrency: source.currency,
+                destCurrency: dest.currency,
+                exchangeRate: (numDest / numSource).toFixed(6),
+                note: note || '',
+                date
+            };
+
+            storage.state.transactions.unshift(tx);
+            this._sortContinuousTransactions();
+            storage.saveData();
+            return true;
+        } catch (err) {
+            console.error('[WalletManager] Remittance commit failed. Rolling back...', err);
+            source.balance = preCommit[sourceId];
+            dest.balance = preCommit[destId];
+            return false;
+        }
     }
 
     // Find transaction anywhere in continuous ledger (with legacy fallback)
@@ -795,20 +830,94 @@ class WalletManager {
             return false;
         }
 
-        // 4. Commit phase: Reverse old financial impacts
-        this.reverseTransactionEffects(tx);
+        // 4. Prepare phase: Identify all affected wallets and compute final tentative balances in isolated temporary structures
+        const affectedWalletIds = new Set();
+        if (tx.type === 'expense' || tx.type === 'income') {
+            affectedWalletIds.add(tx.walletId);
+        } else if (tx.type === 'transfer' || tx.type === 'remittance') {
+            affectedWalletIds.add(tx.sourceId);
+            affectedWalletIds.add(tx.destId);
+        }
+        if (prospectiveTx.type === 'expense' || prospectiveTx.type === 'income') {
+            affectedWalletIds.add(prospectiveTx.walletId);
+        } else if (prospectiveTx.type === 'transfer' || prospectiveTx.type === 'remittance') {
+            affectedWalletIds.add(prospectiveTx.sourceId);
+            affectedWalletIds.add(prospectiveTx.destId);
+        }
 
-        // 5. Commit phase: Apply field updates in place (preserving tx ID and metadata)
-        Object.assign(tx, prospectiveTx);
-        tx.updatedAt = new Date().toISOString();
+        for (const wId of affectedWalletIds) {
+            const w = storage.state.wallets[wId];
+            if (!w || typeof w !== 'object' || typeof w.balance !== 'number' || !isFinite(w.balance)) {
+                console.warn(`[WalletManager] Update aborted - affected wallet '${wId}' is invalid or missing.`);
+                return false;
+            }
+        }
 
-        // 6. Commit phase: Apply new financial impacts
-        this.applyTransactionEffects(tx);
+        const tentativeBalances = {};
+        affectedWalletIds.forEach(wId => {
+            tentativeBalances[wId] = storage.state.wallets[wId].balance;
+        });
 
-        // 7. Commit phase: Re-sort continuous transactions & persist atomically
-        this._sortContinuousTransactions();
-        storage.saveData();
-        return true;
+        // 4a. Apply reversal delta to tentative balances
+        if (tx.type === 'expense') {
+            tentativeBalances[tx.walletId] += Number(tx.amount);
+        } else if (tx.type === 'income') {
+            tentativeBalances[tx.walletId] -= Number(tx.amount);
+        } else if (tx.type === 'transfer') {
+            tentativeBalances[tx.sourceId] += Number(tx.amount);
+            tentativeBalances[tx.destId] -= Number(tx.amount);
+        } else if (tx.type === 'remittance') {
+            tentativeBalances[tx.sourceId] += Number(tx.sourceAmount);
+            tentativeBalances[tx.destId] -= Number(tx.destAmount);
+        }
+
+        // 4b. Apply prospective application delta to tentative balances
+        if (prospectiveTx.type === 'expense') {
+            tentativeBalances[prospectiveTx.walletId] -= Number(prospectiveTx.amount);
+        } else if (prospectiveTx.type === 'income') {
+            tentativeBalances[prospectiveTx.walletId] += Number(prospectiveTx.amount);
+        } else if (prospectiveTx.type === 'transfer') {
+            tentativeBalances[prospectiveTx.sourceId] -= Number(prospectiveTx.amount);
+            tentativeBalances[prospectiveTx.destId] += Number(prospectiveTx.amount);
+        } else if (prospectiveTx.type === 'remittance') {
+            tentativeBalances[prospectiveTx.sourceId] -= Number(prospectiveTx.sourceAmount);
+            tentativeBalances[prospectiveTx.destId] += Number(prospectiveTx.destAmount);
+        }
+
+        // 4c. Round and validate all tentative balances
+        for (const wId of affectedWalletIds) {
+            const cur = storage.state.wallets[wId].currency;
+            tentativeBalances[wId] = this.roundCurrency(tentativeBalances[wId], cur);
+            if (typeof tentativeBalances[wId] !== 'number' || isNaN(tentativeBalances[wId]) || !isFinite(tentativeBalances[wId])) {
+                console.warn(`[WalletManager] Update aborted - resulting balance for '${wId}' is nonfinite.`);
+                return false;
+            }
+        }
+
+        // 5. Commit phase: Apply prepared changes atomically with rollback guarantee
+        const preCommitBalances = {};
+        affectedWalletIds.forEach(wId => {
+            preCommitBalances[wId] = storage.state.wallets[wId].balance;
+        });
+
+        try {
+            affectedWalletIds.forEach(wId => {
+                storage.state.wallets[wId].balance = tentativeBalances[wId];
+            });
+
+            Object.assign(tx, prospectiveTx);
+            tx.updatedAt = new Date().toISOString();
+
+            this._sortContinuousTransactions();
+            storage.saveData();
+            return true;
+        } catch (commitErr) {
+            console.error('[WalletManager] Unexpected error during atomic update commit. Rolling back...', commitErr);
+            affectedWalletIds.forEach(wId => {
+                storage.state.wallets[wId].balance = preCommitBalances[wId];
+            });
+            return false;
+        }
     }
 
     // Delete a transaction and reverse its effects with atomicity and wallet existence guarantees
@@ -816,50 +925,102 @@ class WalletManager {
         const found = this.findTransaction(txId);
         if (!found) return false;
 
-        const origMonth = (found.tx.date || '').slice(0, 7);
+        const tx = found.tx;
+        const origMonth = (tx.date || '').slice(0, 7);
         if (this.isMonthClosed(origMonth)) {
             console.warn(`[WalletManager] Month ${origMonth} is closed. Cannot delete transaction.`);
             return false;
         }
 
-        // Validate that transaction CAN be reversed before touching anything
-        const revCheck = this.validateTransactionForReversal(found.tx);
+        // 1. Prepare phase: Validate that transaction CAN be reversed before touching anything
+        const revCheck = this.validateTransactionForReversal(tx);
         if (!revCheck.valid) {
             console.warn(`[WalletManager] Cannot delete transaction due to invalid or missing wallet reference: ${revCheck.error}`);
             return false;
         }
 
-        // Execute reversal
-        const reversed = this.reverseTransactionEffects(found.tx);
-        if (!reversed) return false;
+        // 2. Prepare phase: Identify affected wallets and compute tentative balances
+        const affectedWalletIds = new Set();
+        if (tx.type === 'expense' || tx.type === 'income') {
+            affectedWalletIds.add(tx.walletId);
+        } else if (tx.type === 'transfer' || tx.type === 'remittance') {
+            affectedWalletIds.add(tx.sourceId);
+            affectedWalletIds.add(tx.destId);
+        }
 
-        // 1. Remove from canonical continuous transactions if present
-        let deleted = false;
-        if (Array.isArray(storage.state.transactions)) {
-            const cIndex = storage.state.transactions.findIndex(t => t.id === txId);
-            if (cIndex !== -1) {
-                storage.state.transactions.splice(cIndex, 1);
-                deleted = true;
+        const tentativeBalances = {};
+        for (const wId of affectedWalletIds) {
+            const w = storage.state.wallets[wId];
+            if (!w || typeof w !== 'object' || typeof w.balance !== 'number' || !isFinite(w.balance)) {
+                console.warn(`[WalletManager] Delete aborted - affected wallet '${wId}' is invalid.`);
+                return false;
+            }
+            tentativeBalances[wId] = w.balance;
+        }
+
+        if (tx.type === 'expense') {
+            tentativeBalances[tx.walletId] += Number(tx.amount);
+        } else if (tx.type === 'income') {
+            tentativeBalances[tx.walletId] -= Number(tx.amount);
+        } else if (tx.type === 'transfer') {
+            tentativeBalances[tx.sourceId] += Number(tx.amount);
+            tentativeBalances[tx.destId] -= Number(tx.amount);
+        } else if (tx.type === 'remittance') {
+            tentativeBalances[tx.sourceId] += Number(tx.sourceAmount);
+            tentativeBalances[tx.destId] -= Number(tx.destAmount);
+        }
+
+        for (const wId of affectedWalletIds) {
+            const cur = storage.state.wallets[wId].currency;
+            tentativeBalances[wId] = this.roundCurrency(tentativeBalances[wId], cur);
+            if (!isFinite(tentativeBalances[wId])) {
+                console.warn(`[WalletManager] Delete aborted - resulting balance for '${wId}' is nonfinite.`);
+                return false;
             }
         }
 
-        // 2. If found in legacy history with raw own-property transactions array (unmigrated)
-        if (found.location === 'history' && found.ledgerIndex !== undefined) {
-            const ledger = storage.state.history[found.ledgerIndex];
-            if (ledger) {
-                const desc = Object.getOwnPropertyDescriptor(ledger, 'transactions');
-                if (desc && Array.isArray(desc.value)) {
-                    const hIndex = ledger.transactions.findIndex(t => t.id === txId);
-                    if (hIndex !== -1) {
-                        ledger.transactions.splice(hIndex, 1);
-                        deleted = true;
+        // 3. Commit phase: Apply balances and remove transaction atomically with rollback safety
+        const preCommitBalances = {};
+        affectedWalletIds.forEach(wId => {
+            preCommitBalances[wId] = storage.state.wallets[wId].balance;
+        });
+
+        try {
+            affectedWalletIds.forEach(wId => {
+                storage.state.wallets[wId].balance = tentativeBalances[wId];
+            });
+
+            // Remove from canonical continuous collection
+            if (Array.isArray(storage.state.transactions)) {
+                const cIndex = storage.state.transactions.findIndex(t => t.id === txId);
+                if (cIndex !== -1) {
+                    storage.state.transactions.splice(cIndex, 1);
+                }
+            }
+
+            // Remove from legacy history if present
+            if (found.location === 'history' && found.ledgerIndex !== undefined) {
+                const ledger = storage.state.history[found.ledgerIndex];
+                if (ledger) {
+                    const desc = Object.getOwnPropertyDescriptor(ledger, 'transactions');
+                    if (desc && Array.isArray(desc.value)) {
+                        const hIndex = ledger.transactions.findIndex(t => t.id === txId);
+                        if (hIndex !== -1) {
+                            ledger.transactions.splice(hIndex, 1);
+                        }
                     }
                 }
             }
-        }
 
-        storage.saveData();
-        return true;
+            storage.saveData();
+            return true;
+        } catch (commitErr) {
+            console.error('[WalletManager] Unexpected error during atomic delete commit. Rolling back...', commitErr);
+            affectedWalletIds.forEach(wId => {
+                storage.state.wallets[wId].balance = preCommitBalances[wId];
+            });
+            return false;
+        }
     }
 
     // Compute total spent per category in a given region for a specific month (defaults to active month)

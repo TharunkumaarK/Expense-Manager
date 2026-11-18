@@ -82,6 +82,11 @@ class App {
             customJpBudget: 0,
             customCatBudgets: {}
         };
+        this.budgetRecoveryState = {
+            option: 'review',
+            customAdjustments: {},
+            preview: null
+        };
     }
 
     init() {
@@ -92,6 +97,14 @@ class App {
         this.updatePrivacyUI();
         this.updateDesktopAccountInfo();
         this.renderAll();
+
+        // Gated Budget Recovery & Reconciliation Check
+        if (typeof storage !== 'undefined' && storage.getBudgetRecoveryStatus() === 'BUDGET_RECOVERY_REQUIRED') {
+            this.updateBudgetRecoveryBanner();
+            this.openBudgetRecoveryModal();
+        } else {
+            this.updateBudgetRecoveryBanner();
+        }
     }
 
     escapeHtml(str) {
@@ -720,6 +733,11 @@ class App {
     }
 
     openUnifiedTransactionSelector(context = null) {
+        if (typeof storage !== 'undefined' && storage.getBudgetRecoveryStatus() === 'BUDGET_RECOVERY_REQUIRED') {
+            console.warn('[App] New transaction creation paused pending budget recovery.');
+            this.openBudgetRecoveryModal();
+            return;
+        }
         this.currentTxContext = context;
         const modal = document.getElementById('tx-action-selector-modal');
         if (!modal) return;
@@ -770,6 +788,11 @@ class App {
     }
 
     openTransactionModal(type, context = null) {
+        if (typeof storage !== 'undefined' && storage.getBudgetRecoveryStatus() === 'BUDGET_RECOVERY_REQUIRED') {
+            console.warn('[App] New transaction creation paused pending budget recovery.');
+            this.openBudgetRecoveryModal();
+            return;
+        }
         if (!this._txModalSource) {
             this._txModalSource = 'selector';
         }
@@ -7859,6 +7882,264 @@ class App {
         if (modal) {
             modal.classList.add('active');
             this.setClosingStep(1);
+        }
+    }
+
+    // =========================================================================
+    // Budget Recovery & Reconciliation Handlers
+    // =========================================================================
+
+    updateBudgetRecoveryBanner() {
+        const banner = document.getElementById('budget-recovery-banner');
+        if (!banner) return;
+        const status = (typeof storage !== 'undefined') ? storage.getBudgetRecoveryStatus() : 'RESOLVED';
+        if (status === 'BUDGET_RECOVERY_REQUIRED') {
+            banner.style.display = 'flex';
+            const desc = document.getElementById('recovery-banner-desc');
+            const unfinalized = storage.unfinalizedMonths || [];
+            if (desc && unfinalized.length > 0) {
+                desc.textContent = `Unfinalized accounting months detected (${unfinalized.join(', ')}). New transactions are paused until budget history is reconciled.`;
+            }
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    openBudgetRecoveryModal() {
+        const modal = document.getElementById('budget-recovery-modal');
+        if (!modal) return;
+        if (!this.budgetRecoveryState.preview) {
+            this.budgetRecoveryState.preview = storage.getBudgetRecoveryPreview(
+                this.budgetRecoveryState.option,
+                this.budgetRecoveryState.customAdjustments
+            );
+        }
+        this.renderBudgetRecoveryModal();
+        modal.classList.add('active');
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    closeBudgetRecoveryModal() {
+        const modal = document.getElementById('budget-recovery-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        this.updateBudgetRecoveryBanner();
+    }
+
+    setBudgetRecoveryOption(option) {
+        if (!['review', 'continue', 'fresh'].includes(option)) return;
+        this.budgetRecoveryState.option = option;
+        this.budgetRecoveryState.preview = storage.getBudgetRecoveryPreview(
+            option,
+            this.budgetRecoveryState.customAdjustments
+        );
+        this.renderBudgetRecoveryModal();
+    }
+
+    onRecoveryAdjustmentChange(monthKey, countryCode, field, value) {
+        if (!this.budgetRecoveryState.customAdjustments[monthKey]) {
+            this.budgetRecoveryState.customAdjustments[monthKey] = {};
+        }
+        if (!this.budgetRecoveryState.customAdjustments[monthKey][countryCode]) {
+            this.budgetRecoveryState.customAdjustments[monthKey][countryCode] = {};
+        }
+        if (field === 'baseBudget') {
+            const num = Math.max(0, Number(value) || 0);
+            this.budgetRecoveryState.customAdjustments[monthKey][countryCode].baseBudget = num;
+        } else if (field === 'rolloverEnabled') {
+            this.budgetRecoveryState.customAdjustments[monthKey][countryCode].rolloverEnabled = Boolean(value);
+        }
+
+        // Recalculate preview
+        this.budgetRecoveryState.preview = storage.getBudgetRecoveryPreview(
+            'review',
+            this.budgetRecoveryState.customAdjustments
+        );
+        this.renderBudgetRecoveryModal();
+    }
+
+    renderBudgetRecoveryModal() {
+        const contentEl = document.getElementById('budget-recovery-content');
+        if (!contentEl) return;
+
+        const preview = this.budgetRecoveryState.preview || storage.getBudgetRecoveryPreview(
+            this.budgetRecoveryState.option,
+            this.budgetRecoveryState.customAdjustments
+        );
+        this.budgetRecoveryState.preview = preview;
+
+        const unfinalized = preview.unfinalizedMonths || [];
+        const option = this.budgetRecoveryState.option;
+
+        const periodLabel = (unfinalized.length > 0)
+            ? `${unfinalized[0]} – ${unfinalized[unfinalized.length - 1]} (${unfinalized.length} month${unfinalized.length > 1 ? 's' : ''})`
+            : 'No unfinalized months';
+
+        let html = '';
+
+        // Period chip
+        html += `
+            <div class="recovery-period-chip">
+                <div class="recovery-period-info">
+                    <i data-lucide="calendar" style="width: 16px; height: 16px; color: #94a3b8;"></i>
+                    <span>Unfinalized Accounting Period: <strong>${this.escapeHtml(periodLabel)}</strong></span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    ${this.getCountryFlagSvg('JP')}
+                    ${this.getCountryFlagSvg('IN')}
+                    ${this.getCountryFlagSvg('DE')}
+                </div>
+            </div>
+        `;
+
+        // 3 Recovery Option Cards
+        html += `
+            <div class="recovery-options-group">
+                <div class="recovery-option-card ${option === 'review' ? 'active' : ''}" onclick="app.setBudgetRecoveryOption('review')">
+                    <div class="recovery-opt-title">
+                        <i data-lucide="sliders" style="width: 14px; height: 14px;"></i>
+                        <span>Review Missed Months</span>
+                    </div>
+                    <div class="recovery-opt-desc">
+                        (Recommended) Inspect and adjust recurring base budgets and rollover flags per month.
+                    </div>
+                </div>
+
+                <div class="recovery-option-card ${option === 'continue' ? 'active' : ''}" onclick="app.setBudgetRecoveryOption('continue')">
+                    <div class="recovery-opt-title">
+                        <i data-lucide="fast-forward" style="width: 14px; height: 14px;"></i>
+                        <span>Continue Previous</span>
+                    </div>
+                    <div class="recovery-opt-desc">
+                        Apply previous recurring budget settings to missing months in chronological order.
+                    </div>
+                </div>
+
+                <div class="recovery-option-card ${option === 'fresh' ? 'active' : ''}" onclick="app.setBudgetRecoveryOption('fresh')">
+                    <div class="recovery-opt-title">
+                        <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                        <span>Start Fresh</span>
+                    </div>
+                    <div class="recovery-opt-desc">
+                        Seal missing months with zero budget and zero carryover. Active month starts clean.
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Month-by-month details
+        html += `<div class="recovery-months-list">`;
+        preview.monthsPreview.forEach(m => {
+            html += `
+                <div class="recovery-month-block">
+                    <div class="recovery-month-header">
+                        <span class="recovery-month-label">${this.escapeHtml(m.monthKey)}</span>
+                        <span style="font-size:0.72rem;color:#94a3b8;">Accounting Closure Preview</span>
+                    </div>
+            `;
+
+            ['JP', 'IN', 'DE'].forEach(code => {
+                const c = m.countries[code];
+                if (!c || !c.isConfigured) return;
+                const sym = (code === 'JP') ? '¥' : (code === 'IN') ? '₹' : '€';
+
+                html += `
+                    <div class="recovery-country-row">
+                        <div class="recovery-country-label">
+                            ${this.getCountryFlagSvg(code, 16, 12)}
+                            <span>${code} (${sym})</span>
+                        </div>
+                        <div>
+                            <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:2px;">Base Budget</div>
+                            ${option === 'review' ? `
+                                <input type="number" class="recovery-input-budget" value="${c.baseBudget}"
+                                    onchange="app.onRecoveryAdjustmentChange('${m.monthKey}', '${code}', 'baseBudget', this.value)">
+                            ` : `
+                                <span style="font-weight:500;color:#f8fafc;">${sym} ${c.baseBudget.toLocaleString()}</span>
+                            `}
+                        </div>
+                        <div>
+                            <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:2px;">Expenses Spent</div>
+                            <span style="font-weight:500;color:#f43f5e;">${sym} ${c.spent.toLocaleString()}</span>
+                        </div>
+                        <div>
+                            <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:2px;">Prior Inflow</div>
+                            <span style="font-weight:500;color:#94a3b8;">${sym} ${c.carryoverPrior.toLocaleString()}</span>
+                        </div>
+                        <div>
+                            <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:2px;">Rollover Out</div>
+                            <span style="font-weight:600;color:#34d399;">+ ${sym} ${c.rolloverAdded.toLocaleString()}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+        });
+        html += `</div>`;
+
+        // Active Month Result
+        const activeSummary = preview.activeMonthSummary;
+        html += `
+            <div class="recovery-active-preview">
+                <div class="recovery-active-header">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <i data-lucide="check-circle-2" style="width:16px;height:16px;"></i>
+                        <span>Result for Active Month (${this.escapeHtml(activeSummary.monthKey)})</span>
+                    </div>
+                    <span style="font-size:0.72rem;color:#93c5fd;">Calculated available budget</span>
+                </div>
+                <div class="recovery-active-grid">
+        `;
+
+        ['JP', 'IN', 'DE'].forEach(code => {
+            const c = activeSummary.countries[code];
+            if (!c || !c.isConfigured) return;
+            const sym = (code === 'JP') ? '¥' : (code === 'IN') ? '₹' : '€';
+            html += `
+                <div class="recovery-active-col">
+                    <div class="recovery-active-label">${code} Available:</div>
+                    <div class="recovery-active-val">${sym} ${c.totalAvailable.toLocaleString()}</div>
+                    <div style="font-size:0.68rem;color:#94a3b8;">Base ${sym}${c.baseBudget.toLocaleString()} + Rollover ${sym}${c.carryover.toLocaleString()}</div>
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+
+        contentEl.innerHTML = html;
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    confirmBudgetRecovery() {
+        const preview = this.budgetRecoveryState.preview || storage.getBudgetRecoveryPreview(
+            this.budgetRecoveryState.option,
+            this.budgetRecoveryState.customAdjustments
+        );
+
+        const result = storage.commitBudgetRecovery(
+            this.budgetRecoveryState.option,
+            this.budgetRecoveryState.customAdjustments,
+            preview?.stateToken
+        );
+
+        if (result.success) {
+            this.closeBudgetRecoveryModal();
+            this.updateBudgetRecoveryBanner();
+            this.renderAll();
+            this.showToast(`Budget history successfully reconciled for ${result.reconciledMonths.join(', ')}.`);
+        } else {
+            alert(`Reconciliation could not be applied: ${result.error}`);
+            this.budgetRecoveryState.preview = null;
+            this.renderBudgetRecoveryModal();
         }
     }
 

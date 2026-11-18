@@ -603,6 +603,23 @@
 
                 <!-- Desktop Workspace Views Container -->
                 <div class="desktop-content-area" id="desktop-content-area">
+                    <!-- Persistent Budget Recovery & Reconciliation Banner -->
+                    <div id="budget-recovery-banner" class="budget-recovery-banner" style="display: none;">
+                        <div class="recovery-banner-content">
+                            <div class="recovery-banner-icon">
+                                <i data-lucide="alert-circle"></i>
+                            </div>
+                            <div class="recovery-banner-text">
+                                <strong id="recovery-banner-title">Budget Reconciliation Required</strong>
+                                <span id="recovery-banner-desc">Unfinalized accounting months detected. New transactions and automatic rollover are paused until budget history is reconciled.</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-primary recovery-banner-btn" onclick="app.openBudgetRecoveryModal()">
+                            <span>Review & Reconcile</span>
+                            <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
+
                     <!-- Home / Dashboard View -->
                     <section id="home-view" class="view active">
                         <header class="top-bar">
@@ -3317,6 +3334,38 @@
                         <span>Confirm & Close Month</span>
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget Recovery & Reconciliation Modal -->
+    <div class="closing-modal-backdrop" id="budget-recovery-modal"
+        onclick="if(event.target===this) app.closeBudgetRecoveryModal()">
+        <div class="closing-modal-sheet budget-recovery-sheet" onclick="event.stopPropagation()">
+            <div class="closing-modal-header">
+                <div>
+                    <h3 style="margin:0; font-size: 1.15rem; font-weight: 600;">Welcome Back</h3>
+                    <p class="text-xs text-muted" id="budget-recovery-subtitle" style="margin: 4px 0 0 0;">
+                        We found some months that haven't been finalized. Review your budget history before continuing.
+                    </p>
+                </div>
+                <button class="icon-btn" onclick="app.closeBudgetRecoveryModal()" title="Remind me later (read-only mode)">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div class="closing-modal-body budget-recovery-body" id="budget-recovery-content">
+                <!-- Dynamically rendered recovery options, review table, and preview -->
+            </div>
+
+            <div class="closing-modal-footer">
+                <button class="btn btn-secondary" onclick="app.closeBudgetRecoveryModal()">
+                    <span>Remind Me Later (Read-Only)</span>
+                </button>
+                <button class="btn btn-primary" id="btn-confirm-recovery" onclick="app.confirmBudgetRecovery()">
+                    <i data-lucide="check" style="width: 14px; height: 14px;"></i>
+                    <span>Confirm & Apply Recovery</span>
+                </button>
             </div>
         </div>
     </div>

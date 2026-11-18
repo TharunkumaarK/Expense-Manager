@@ -1278,23 +1278,338 @@ class StorageManager {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     }
 
+    /**
+     * Compute chronological list of month keys strictly between startKey and endKey.
+     * Inclusive of startKey, exclusive of endKey. Safely handles year transitions.
+     * @param {string} startKey e.g. "2026-08"
+     * @param {string} endKey e.g. "2026-11"
+     * @returns {string[]} e.g. ["2026-08", "2026-09", "2026-10"]
+     */
+    getMonthRange(startKey, endKey) {
+        if (!startKey || !endKey || startKey >= endKey) return [];
+        const [startYear, startMonth] = startKey.split('-').map(Number);
+        const [endYear, endMonth] = endKey.split('-').map(Number);
+        if (!startYear || !startMonth || !endYear || !endMonth) return [];
+
+        const months = [];
+        let curYear = startYear;
+        let curMonth = startMonth;
+
+        while (curYear < endYear || (curYear === endYear && curMonth < endMonth)) {
+            months.push(`${curYear}-${String(curMonth).padStart(2, '0')}`);
+            curMonth++;
+            if (curMonth > 12) {
+                curMonth = 1;
+                curYear++;
+            }
+        }
+        return months;
+    }
+
+    /**
+     * Detect unfinalized calendar months requiring budget reconciliation.
+     * Guaranteed pure against unwanted mutations: only updates workflow state.
+     * @returns {string[]} Chronological list of unfinalized month keys.
+     */
+    detectUnfinalizedMonths() {
+        const actualMonth = this.getCurrentMonthKey();
+        if (!this.state) return [];
+
+        // Exclude accounts still undergoing onboarding or brand-new accounts
+        if (this.state.preferences && this.state.preferences.onboardingCompleted === false) {
+            return [];
+        }
+        if (this.isNewUser()) {
+            return [];
+        }
+
+        const trackedMonth = this.state.currentMonthKey || actualMonth;
+        const monthsToCheck = this.getMonthRange(trackedMonth, actualMonth);
+
+        // Filter out any months already sealed and finalized in closedMonths
+        const unfinalized = monthsToCheck.filter(m => {
+            return !this.state.closedMonths || !this.state.closedMonths[m] || this.state.closedMonths[m].status !== 'closed';
+        });
+
+        if (unfinalized.length > 0) {
+            this.budgetRecoveryState = 'BUDGET_RECOVERY_REQUIRED';
+            this.unfinalizedMonths = unfinalized;
+            this.state.budgetRecoveryState = 'BUDGET_RECOVERY_REQUIRED';
+            this.state.unfinalizedMonths = unfinalized;
+            return unfinalized;
+        } else {
+            this.budgetRecoveryState = 'RESOLVED';
+            this.unfinalizedMonths = [];
+            this.state.budgetRecoveryState = 'RESOLVED';
+            this.state.unfinalizedMonths = [];
+            if (this.state.currentMonthKey !== actualMonth) {
+                this.state.currentMonthKey = actualMonth;
+                this.saveData();
+            }
+            return [];
+        }
+    }
+
+    getBudgetRecoveryStatus() {
+        if (this.budgetRecoveryState) return this.budgetRecoveryState;
+        if (this.state && this.state.budgetRecoveryState) return this.state.budgetRecoveryState;
+        const unfinalized = this.detectUnfinalizedMonths();
+        return unfinalized.length > 0 ? 'BUDGET_RECOVERY_REQUIRED' : 'RESOLVED';
+    }
+
     checkRollover() {
         const actualMonth = this.getCurrentMonthKey();
         if (!this.state.currentMonthKey) {
             this.state.currentMonthKey = actualMonth;
             this.saveData();
-            return;
+            return { recoveryRequired: false };
+        }
+
+        const unfinalized = this.detectUnfinalizedMonths();
+        if (unfinalized.length > 0) {
+            console.log(`[StorageManager] Budget recovery required for unfinalized months: ${unfinalized.join(', ')}`);
+            return { recoveryRequired: true, unfinalizedMonths: unfinalized };
         }
 
         if (this.state.currentMonthKey !== actualMonth) {
-            const previousMonth = this.state.currentMonthKey;
-            // Only auto-close previous month if it has not already been finalized
-            if (!this.state.closedMonths || !this.state.closedMonths[previousMonth] || this.state.closedMonths[previousMonth].status !== 'closed') {
-                this.closeCurrentMonth("Auto Rollover", previousMonth);
-            }
             this.state.currentMonthKey = actualMonth;
             this.saveData();
         }
+        return { recoveryRequired: false };
+    }
+
+    /**
+     * Compute a pure, read-only preview of budget reconciliation across unfinalized months.
+     * Does NOT mutate state.
+     *
+     * @param {string} option 'review' | 'continue' | 'fresh'
+     * @param {Object} customAdjustments Per-month adjustments { [monthKey]: { [countryCode]: { baseBudget, rolloverEnabled } } }
+     * @returns {Object} Complete projection of month-by-month closures and resulting active month carryover.
+     */
+    getBudgetRecoveryPreview(option = 'review', customAdjustments = {}) {
+        const unfinalized = this.detectUnfinalizedMonths();
+        const actualMonth = this.getCurrentMonthKey();
+        const supportedCountries = ['JP', 'IN', 'DE'];
+
+        const monthsPreview = [];
+        const runningCarryover = {};
+
+        // Initialize incoming carryover for each country
+        supportedCountries.forEach(code => {
+            const b = (this.state.budgets && this.state.budgets[code]) || {};
+            // If there's an immediate prior closed month, read its carryover
+            const priorMonthKey = this.getMonthRange(this.state.currentMonthKey, actualMonth)[0];
+            let priorClosed = null;
+            if (this.state.closedMonths && priorMonthKey) {
+                const keys = Object.keys(this.state.closedMonths).filter(k => k < priorMonthKey).sort();
+                if (keys.length > 0) {
+                    priorClosed = this.state.closedMonths[keys[keys.length - 1]];
+                }
+            }
+            if (priorClosed && typeof priorClosed[`${code}RolloverAdded`] === 'number') {
+                runningCarryover[code] = priorClosed[`${code}RolloverAdded`];
+            } else {
+                runningCarryover[code] = Number(b.carryover || 0);
+            }
+        });
+
+        // Sequential calculation for every unfinalized month
+        unfinalized.forEach(mKey => {
+            const monthData = {
+                monthKey: mKey,
+                countries: {}
+            };
+
+            supportedCountries.forEach(code => {
+                const b = (this.state.budgets && this.state.budgets[code]) || { enabled: false, monthlyTotal: 0, rolloverEnabled: false };
+                const isEnabled = Boolean(b.enabled);
+                const defaultBaseBudget = Number(b.monthlyTotal || 0);
+                const defaultRolloverEnabled = Boolean(b.rolloverEnabled);
+
+                let baseBudget = defaultBaseBudget;
+                let rolloverEnabled = defaultRolloverEnabled;
+
+                if (option === 'fresh') {
+                    baseBudget = 0;
+                    rolloverEnabled = false;
+                } else if (option === 'review') {
+                    if (customAdjustments[mKey] && customAdjustments[mKey][code]) {
+                        if (typeof customAdjustments[mKey][code].baseBudget !== 'undefined') {
+                            baseBudget = Number(customAdjustments[mKey][code].baseBudget);
+                        }
+                        if (typeof customAdjustments[mKey][code].rolloverEnabled !== 'undefined') {
+                            rolloverEnabled = Boolean(customAdjustments[mKey][code].rolloverEnabled);
+                        }
+                    }
+                }
+                // 'continue' reuses defaultBaseBudget and defaultRolloverEnabled
+
+                const carryoverPrior = (option === 'fresh') ? 0 : runningCarryover[code];
+                const totalAvailable = baseBudget + carryoverPrior;
+
+                // Total actual expenses recorded in this month for this country
+                const spent = (this.state.transactions || [])
+                    .filter(tx => tx.type === 'expense' && tx.region === code && (tx.date || '').startsWith(mKey))
+                    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+
+                let rolloverAdded = 0;
+                if (rolloverEnabled && (isEnabled || option === 'review' || option === 'continue')) {
+                    const unspent = totalAvailable - spent;
+                    if (unspent > 0) {
+                        rolloverAdded = (code === 'JP') ? Math.round(unspent) : Math.round(unspent * 100) / 100;
+                    }
+                }
+
+                // Update running carryover for the subsequent month
+                runningCarryover[code] = (option === 'fresh') ? 0 : rolloverAdded;
+
+                monthData.countries[code] = {
+                    countryCode: code,
+                    baseBudget,
+                    carryoverPrior,
+                    spent,
+                    totalAvailable,
+                    rolloverEnabled,
+                    rolloverAdded,
+                    isConfigured: isEnabled || baseBudget > 0 || spent > 0
+                };
+            });
+
+            monthsPreview.push(monthData);
+        });
+
+        // Summary for current active month
+        const activeMonthSummary = {
+            monthKey: actualMonth,
+            countries: {}
+        };
+        supportedCountries.forEach(code => {
+            const b = (this.state.budgets && this.state.budgets[code]) || { monthlyTotal: 0, enabled: false };
+            const baseBudget = Number(b.monthlyTotal || 0);
+            const resultingCarryover = (option === 'fresh') ? 0 : runningCarryover[code];
+            activeMonthSummary.countries[code] = {
+                countryCode: code,
+                baseBudget,
+                carryover: resultingCarryover,
+                totalAvailable: baseBudget + resultingCarryover,
+                isConfigured: Boolean(b.enabled) || baseBudget > 0
+            };
+        });
+
+        const stateToken = `${this.state._updatedAt || ''}_${(this.state.transactions || []).length}`;
+
+        return {
+            success: true,
+            option,
+            unfinalizedMonths: unfinalized,
+            monthsPreview,
+            activeMonthSummary,
+            stateToken
+        };
+    }
+
+    /**
+     * Atomically commit the approved budget recovery plan.
+     * All unfinalized months are finalized sequentially, audit metadata recorded, and active month updated.
+     *
+     * @param {string} option 'review' | 'continue' | 'fresh'
+     * @param {Object} customAdjustments Per-month adjustments
+     * @param {string|null} previewStateToken Token returned by getBudgetRecoveryPreview to guard against stale writes
+     * @returns {Object} Result { success: boolean, reconciledMonths?: string[], error?: string }
+     */
+    commitBudgetRecovery(option = 'review', customAdjustments = {}, previewStateToken = null) {
+        const unfinalized = this.detectUnfinalizedMonths();
+        if (unfinalized.length === 0) {
+            this.budgetRecoveryState = 'RESOLVED';
+            this.state.budgetRecoveryState = 'RESOLVED';
+            this.saveData();
+            return { success: true, reconciledMonths: [] };
+        }
+
+        // Stale plan concurrency guard
+        const currentStateToken = `${this.state._updatedAt || ''}_${(this.state.transactions || []).length}`;
+        if (previewStateToken && previewStateToken !== currentStateToken) {
+            return {
+                success: false,
+                error: 'Underlying transactions or data changed while reviewing. Please refresh the reconciliation preview.'
+            };
+        }
+
+        const preview = this.getBudgetRecoveryPreview(option, customAdjustments);
+        if (!preview.success) {
+            return { success: false, error: 'Failed to generate reconciliation plan.' };
+        }
+
+        if (!this.state.closedMonths) {
+            this.state.closedMonths = {};
+        }
+
+        const supportedCountries = ['JP', 'IN', 'DE'];
+
+        // Commit Phase: Sequential creation of immutable closed month snapshots
+        preview.monthsPreview.forEach(m => {
+            const snapshot = {
+                monthKey: m.monthKey,
+                label: m.monthKey,
+                closedAt: new Date().toISOString(),
+                reason: `Budget Recovery: ${option}`,
+                walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets || {})),
+                status: 'closed'
+            };
+
+            supportedCountries.forEach(code => {
+                const cData = m.countries[code];
+                snapshot[`${code}TotalBudget`] = cData.baseBudget;
+                snapshot[`${code}CarryoverPrior`] = cData.carryoverPrior;
+                snapshot[`${code}Spent`] = cData.spent;
+                snapshot[`${code}RolloverAdded`] = cData.rolloverAdded;
+            });
+
+            // Legacy backward-compatibility
+            snapshot.jpTotalBudget = snapshot.JPTotalBudget || 0;
+            snapshot.jpRolloverAdded = snapshot.JPRolloverAdded || 0;
+
+            this.state.closedMonths[m.monthKey] = snapshot;
+        });
+
+        // Update active month carryover in state.budgets
+        supportedCountries.forEach(code => {
+            if (!this.state.budgets) {
+                this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+            }
+            if (!this.state.budgets[code]) {
+                this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
+            }
+            this.state.budgets[code].carryover = preview.activeMonthSummary.countries[code].carryover;
+        });
+
+        const actualMonth = this.getCurrentMonthKey();
+        this.state.currentMonthKey = actualMonth;
+
+        // Stamp comprehensive recovery audit metadata
+        this.state.recoveryMetadata = {
+            id: `recovery_${Date.now()}`,
+            reconciledAt: new Date().toISOString(),
+            periodStart: unfinalized[0],
+            periodEnd: unfinalized[unfinalized.length - 1],
+            activeMonth: actualMonth,
+            option: option,
+            countries: supportedCountries,
+            reconciledMonths: unfinalized
+        };
+
+        // Re-derive history view from closedMonths
+        this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+        this._attachHistoryGetters(this.state);
+
+        // Transition workflow state to RESOLVED
+        this.budgetRecoveryState = 'RESOLVED';
+        this.unfinalizedMonths = [];
+        this.state.budgetRecoveryState = 'RESOLVED';
+        this.state.unfinalizedMonths = [];
+
+        this.saveData();
+        return { success: true, reconciledMonths: unfinalized };
     }
 
     closeCurrentMonth(reason = "Manual Close", targetMonthKey = null) {
@@ -1365,6 +1680,9 @@ class StorageManager {
         // Derive history view directly from closedMonths so they share identical object references
         this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
         this._attachHistoryGetters(this.state);
+
+        // Re-evaluate unfinalized months
+        this.detectUnfinalizedMonths();
 
         // GUARD: Continuous Ledger must NEVER clear this.state.transactions!
         // All transactions remain in the continuous collection.
