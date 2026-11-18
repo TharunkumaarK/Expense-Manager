@@ -20,9 +20,9 @@ const defaultState = {
         theme: 'dark'
     },
     budgets: {
-        JP: { enabled: true, monthlyTotal: 0, rolloverEnabled: true },
-        IN: { enabled: false, monthlyTotal: 0, rolloverEnabled: false },
-        DE: { enabled: false, monthlyTotal: 0, rolloverEnabled: false }
+        JP: { enabled: true, monthlyTotal: 0, rolloverEnabled: true, carryover: 0 },
+        IN: { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 },
+        DE: { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 }
     },
     wallets: {
         'Salary Account': { id: 'Salary Account', type: 'bank', region: 'JP', balance: 0, currency: '¥', color: '#009944' },
@@ -552,29 +552,37 @@ class StorageManager {
                     JP: {
                         enabled: true,
                         monthlyTotal: jpVal,
-                        rolloverEnabled: state.jpBudgetRolloverEnabled !== undefined ? Boolean(state.jpBudgetRolloverEnabled) : true
+                        rolloverEnabled: state.jpBudgetRolloverEnabled !== undefined ? Boolean(state.jpBudgetRolloverEnabled) : true,
+                        carryover: 0
                     },
                     IN: {
                         enabled: inVal > 0 || hasInWallets,
                         monthlyTotal: inVal,
-                        rolloverEnabled: state.inBudgetRolloverEnabled !== undefined ? Boolean(state.inBudgetRolloverEnabled) : false
+                        rolloverEnabled: state.inBudgetRolloverEnabled !== undefined ? Boolean(state.inBudgetRolloverEnabled) : false,
+                        carryover: 0
                     },
                     DE: {
                         enabled: false,
                         monthlyTotal: 0,
-                        rolloverEnabled: false
+                        rolloverEnabled: false,
+                        carryover: 0
                     }
                 };
             } else {
                 if (!state.budgets.JP) {
-                    state.budgets.JP = { enabled: true, monthlyTotal: Number(state.jpTotalBudget) || 0, rolloverEnabled: true };
+                    state.budgets.JP = { enabled: true, monthlyTotal: Number(state.jpTotalBudget) || 0, rolloverEnabled: true, carryover: 0 };
                 }
                 if (!state.budgets.IN) {
-                    state.budgets.IN = { enabled: (Number(state.inTotalBudget) || 0) > 0, monthlyTotal: Number(state.inTotalBudget) || 0, rolloverEnabled: false };
+                    state.budgets.IN = { enabled: (Number(state.inTotalBudget) || 0) > 0, monthlyTotal: Number(state.inTotalBudget) || 0, rolloverEnabled: false, carryover: 0 };
                 }
                 if (!state.budgets.DE) {
-                    state.budgets.DE = { enabled: false, monthlyTotal: 0, rolloverEnabled: false };
+                    state.budgets.DE = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
                 }
+                ['JP', 'IN', 'DE'].forEach(c => {
+                    if (state.budgets[c] && typeof state.budgets[c].carryover !== 'number') {
+                        state.budgets[c].carryover = 0;
+                    }
+                });
             }
 
             // Reconcile legacy direct assignments if present before attaching accessors
@@ -1285,50 +1293,68 @@ class StorageManager {
         }
     }
 
-    closeCurrentMonth() {
+    closeCurrentMonth(reason = "Manual Close") {
         const monthKey = this.state.currentMonthKey;
-
-        // --- Rollover Calculation ---
-        // Pool all positive JP category savings into the overall budget cushion.
-        // Individual category budgets stay fixed; only jpTotalBudget grows.
-        let totalRollover = 0;
-        if (this.state.categories && Array.isArray(this.state.categories.JP)) {
-            this.state.categories.JP.forEach(cat => {
-                if (!cat.budget || cat.budget <= 0) return;
-                const spent = this.state.transactions
-                    .filter(tx => tx.type === 'expense' && tx.region === 'JP' && tx.categoryId === cat.id && (tx.date || '').startsWith(monthKey))
-                    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-                const saving = cat.budget - spent;
-                if (saving > 0) totalRollover += saving;
-            });
-        }
 
         if (!this.state.closedMonths) {
             this.state.closedMonths = {};
         }
 
-        // Record month snapshot in closedMonths
-        this.state.closedMonths[monthKey] = {
+        const snapshot = {
             monthKey: monthKey,
             label: monthKey,
             closedAt: new Date().toISOString(),
-            walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets)),
-            jpTotalBudget: this.state.jpTotalBudget,
-            jpRolloverAdded: Math.round(totalRollover),
+            reason: reason,
+            walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets || {})),
             status: 'closed'
         };
+
+        const supportedCountries = ['JP', 'IN', 'DE'];
+        supportedCountries.forEach(code => {
+            if (!this.state.budgets) {
+                this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+            }
+            if (!this.state.budgets[code]) {
+                this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
+            }
+            const b = this.state.budgets[code];
+            const isEnabled = Boolean(b.enabled);
+            const isRollover = Boolean(b.rolloverEnabled);
+            const baseBudget = Number(b.monthlyTotal || 0);
+            const currentCarryover = Number(b.carryover || 0);
+            const totalAvailable = baseBudget + currentCarryover;
+
+            // Compute total expense spent in monthKey for this country
+            const spent = (this.state.transactions || [])
+                .filter(tx => tx.type === 'expense' && tx.region === code && (tx.date || '').startsWith(monthKey))
+                .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+
+            let nextCarryover = 0;
+            if (isEnabled && isRollover) {
+                const unspent = totalAvailable - spent;
+                if (unspent > 0) {
+                    nextCarryover = (code === 'JP') ? Math.round(unspent) : Math.round(unspent * 100) / 100;
+                }
+            }
+
+            snapshot[`${code}TotalBudget`] = baseBudget;
+            snapshot[`${code}CarryoverPrior`] = currentCarryover;
+            snapshot[`${code}Spent`] = spent;
+            snapshot[`${code}RolloverAdded`] = nextCarryover;
+
+            // Update carryover for subsequent month (does not mutate recurring base monthlyTotal)
+            b.carryover = nextCarryover;
+        });
+
+        // Legacy compatibility properties
+        snapshot.jpTotalBudget = this.state.jpTotalBudget || snapshot.JPTotalBudget || 0;
+        snapshot.jpRolloverAdded = snapshot.JPRolloverAdded || 0;
+
+        this.state.closedMonths[monthKey] = snapshot;
 
         // Derive history view directly from closedMonths so they share identical object references
         this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
         this._attachHistoryGetters(this.state);
-
-        // Add savings to next month's overall budget as cushion
-        if (totalRollover > 0) {
-            this.state.jpTotalBudget += Math.round(totalRollover);
-            if (this.state.budgets && this.state.budgets.JP) {
-                this.state.budgets.JP.monthlyTotal = this.state.jpTotalBudget;
-            }
-        }
 
         // GUARD: Continuous Ledger must NEVER clear this.state.transactions!
         // All transactions remain in the continuous collection.
@@ -1655,16 +1681,59 @@ class StorageManager {
     }
 
     /**
+     * Get unspent rollover carryover from previous closed month for a country.
+     * @param {string} countryCode
+     * @returns {number}
+     */
+    getCarryover(countryCode) {
+        if (!countryCode || !this.state.budgets) return 0;
+        const code = countryCode.toUpperCase();
+        return Number(this.state.budgets[code]?.carryover || 0);
+    }
+
+    /**
+     * Set rollover carryover for a country.
+     * @param {string} countryCode
+     * @param {number} amount
+     */
+    setCarryover(countryCode, amount) {
+        if (!countryCode) return;
+        const code = countryCode.toUpperCase();
+        if (!this.state.budgets) {
+            this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+        }
+        if (!this.state.budgets[code]) {
+            this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
+        }
+        this.state.budgets[code].carryover = Math.max(0, Number(amount) || 0);
+        this.saveData();
+    }
+
+    /**
+     * Get total available spending budget for the active month (base budget + carryover).
+     * @param {string} countryCode
+     * @returns {number}
+     */
+    getTotalAvailableBudget(countryCode) {
+        const code = (countryCode || 'JP').toUpperCase();
+        const base = this.getTotalBudget(code);
+        const carry = this.getCarryover(code);
+        return base + carry;
+    }
+
+    /**
      * Get budget preference summary for a country.
      * @param {string} countryCode
-     * @returns {{enabled: boolean, monthlyTotal: number, rolloverEnabled: boolean}}
+     * @returns {{enabled: boolean, monthlyTotal: number, rolloverEnabled: boolean, carryover: number, totalAvailable: number}}
      */
     getBudgetPreference(countryCode) {
         const code = (countryCode || 'JP').toUpperCase();
         return {
             enabled: this.isBudgetEnabled(code),
             monthlyTotal: this.getTotalBudget(code),
-            rolloverEnabled: this.isBudgetRolloverEnabled(code)
+            rolloverEnabled: this.isBudgetRolloverEnabled(code),
+            carryover: this.getCarryover(code),
+            totalAvailable: this.getTotalAvailableBudget(code)
         };
     }
 
@@ -1708,7 +1777,7 @@ class StorageManager {
             this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
         }
         if (!this.state.budgets[code]) {
-            this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false };
+            this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
         }
 
         this.state.budgets[code].enabled = Boolean(enabled);
@@ -1717,6 +1786,12 @@ class StorageManager {
         }
         if (rolloverEnabled !== null) {
             this.state.budgets[code].rolloverEnabled = Boolean(rolloverEnabled);
+        }
+        if (typeof this.state.budgets[code].carryover !== 'number') {
+            this.state.budgets[code].carryover = 0;
+        }
+        if (!this.state.budgets[code].enabled || !this.state.budgets[code].rolloverEnabled) {
+            this.state.budgets[code].carryover = 0;
         }
 
         // Keep legacy properties in sync

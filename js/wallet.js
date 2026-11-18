@@ -75,7 +75,8 @@ class WalletManager {
                 const dc = (tx.destCurrency || '').toUpperCase();
                 return c === cur || sc === cur || dc === cur ||
                     (cur === 'JPY' && (c === '¥' || sc === '¥')) ||
-                    (cur === 'INR' && (c === '₹' || dc === '₹'));
+                    (cur === 'INR' && (c === '₹' || dc === '₹')) ||
+                    (cur === 'EUR' && (c === '€' || sc === '€' || dc === '€'));
             });
         }
 
@@ -164,6 +165,16 @@ class WalletManager {
         }
     }
 
+    // Generate strictly unique monotonic timestamp ID to prevent collisions in high-frequency ops
+    generateTransactionId() {
+        let ts = Date.now();
+        if (this._lastTxIdTime && ts <= this._lastTxIdTime) {
+            ts = this._lastTxIdTime + 1;
+        }
+        this._lastTxIdTime = ts;
+        return ts.toString();
+    }
+
     // Check if a month is closed/sealed
     isMonthClosed(monthKey) {
         if (!monthKey || !storage.state || !storage.state.closedMonths) return false;
@@ -185,7 +196,7 @@ class WalletManager {
         wallet.balance -= Number(amount);
 
         const tx = {
-            id: Date.now().toString(),
+            id: this.generateTransactionId(),
             type: 'expense',
             walletId,
             region: wallet.region,
@@ -216,7 +227,7 @@ class WalletManager {
         wallet.balance += Number(amount);
 
         const tx = {
-            id: Date.now().toString(),
+            id: this.generateTransactionId(),
             type: 'income',
             walletId,
             region: wallet.region,
@@ -232,6 +243,134 @@ class WalletManager {
         return true;
     }
 
+    // Validate numeric amount and decimal precision according to currency
+    isValidAmount(amount, currency) {
+        if (typeof amount !== 'number' || isNaN(amount) || !isFinite(amount) || amount <= 0) {
+            return false;
+        }
+        const cur = (currency || '').toUpperCase();
+        if (cur === '¥' || cur === 'JPY') {
+            return Math.abs(amount - Math.round(amount)) < 1e-6;
+        }
+        // INR and EUR: max 2 decimal places
+        const rounded = Math.round(amount * 100) / 100;
+        return Math.abs(amount - rounded) < 1e-6;
+    }
+
+    // Pure calculation preview for domestic and international transfers (zero side effects)
+    getTransferPreview(type, sourceId, destId, amt1, amt2 = null) {
+        const preview = {
+            valid: false,
+            error: '',
+            type,
+            source: null,
+            dest: null,
+            debitedAmount: 0,
+            creditedAmount: 0,
+            effectiveRate: null,
+            rateFormatted: ''
+        };
+
+        if (!storage.state || !storage.state.wallets) {
+            preview.error = 'Wallets not available.';
+            return preview;
+        }
+
+        const source = storage.state.wallets[sourceId];
+        const dest = storage.state.wallets[destId];
+
+        if (!source || !dest) {
+            preview.error = 'Please select valid source and destination accounts.';
+            return preview;
+        }
+
+        if (sourceId === destId) {
+            preview.error = 'Source and destination accounts must be different.';
+            return preview;
+        }
+
+        const num1 = Number(amt1);
+        const num2 = Number(amt2);
+
+        if (type === 'transfer') {
+            if (source.currency !== dest.currency) {
+                preview.error = 'Domestic transfer accounts must have the same currency.';
+                return preview;
+            }
+            if (!amt1 || isNaN(num1) || num1 <= 0) {
+                preview.error = 'Please enter a positive transfer amount.';
+                return preview;
+            }
+            if (!this.isValidAmount(num1, source.currency)) {
+                preview.error = `Invalid precision for ${source.currency}. Whole numbers for JPY; up to 2 decimal places for EUR/INR.`;
+                return preview;
+            }
+
+            preview.valid = true;
+            preview.debitedAmount = num1;
+            preview.creditedAmount = num1;
+            preview.source = {
+                id: sourceId,
+                name: sourceId,
+                currency: source.currency,
+                currentBalance: source.balance || 0,
+                newBalance: (source.balance || 0) - num1
+            };
+            preview.dest = {
+                id: destId,
+                name: destId,
+                currency: dest.currency,
+                currentBalance: dest.balance || 0,
+                newBalance: (dest.balance || 0) + num1
+            };
+            return preview;
+        }
+
+        if (type === 'remittance') {
+            if (source.currency === dest.currency) {
+                preview.error = 'International transfer requires accounts with different currencies.';
+                return preview;
+            }
+            if (!amt1 || isNaN(num1) || num1 <= 0 || !amt2 || isNaN(num2) || num2 <= 0) {
+                preview.error = 'Please enter positive amounts for both sent and received.';
+                return preview;
+            }
+            if (!this.isValidAmount(num1, source.currency)) {
+                preview.error = `Invalid precision for sent amount (${source.currency}).`;
+                return preview;
+            }
+            if (!this.isValidAmount(num2, dest.currency)) {
+                preview.error = `Invalid precision for received amount (${dest.currency}).`;
+                return preview;
+            }
+
+            const effectiveRate = Number((num2 / num1).toFixed(6));
+            preview.valid = true;
+            preview.debitedAmount = num1;
+            preview.creditedAmount = num2;
+            preview.effectiveRate = effectiveRate;
+            preview.rateFormatted = `1 ${source.currency} = ${(num2 / num1).toFixed(4)} ${dest.currency}`;
+            preview.source = {
+                id: sourceId,
+                name: sourceId,
+                currency: source.currency,
+                currentBalance: source.balance || 0,
+                newBalance: (source.balance || 0) - num1
+            };
+            preview.dest = {
+                id: destId,
+                name: destId,
+                currency: dest.currency,
+                currentBalance: dest.balance || 0,
+                newBalance: (dest.balance || 0) + num2
+            };
+            return preview;
+        }
+
+        preview.error = 'Unknown transfer type.';
+        return preview;
+    }
+
     // Transfer between wallets (same currency)
     transfer(sourceId, destId, amount, note, date = new Date().toISOString().split('T')[0]) {
         const monthKey = (date || '').slice(0, 7);
@@ -240,22 +379,27 @@ class WalletManager {
             return false;
         }
 
+        const preview = this.getTransferPreview('transfer', sourceId, destId, amount);
+        if (!preview.valid) {
+            console.warn(`[WalletManager] Transfer rejected: ${preview.error}`);
+            return false;
+        }
+
+        const numAmount = Number(amount);
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
 
-        if (!source || !dest) return false;
-
-        source.balance -= Number(amount);
-        dest.balance += Number(amount);
+        source.balance -= numAmount;
+        dest.balance += numAmount;
 
         const tx = {
-            id: Date.now().toString(),
+            id: this.generateTransactionId(),
             type: 'transfer',
             sourceId,
             destId,
-            amount: Number(amount),
+            amount: numAmount,
             currency: source.currency,
-            note,
+            note: note || '',
             date
         };
 
@@ -265,7 +409,7 @@ class WalletManager {
         return true;
     }
 
-    // Remittance (cross currency)
+    // Remittance (cross currency international money transfer)
     remittance(sourceId, destId, sourceAmount, destAmount, note, date = new Date().toISOString().split('T')[0]) {
         const monthKey = (date || '').slice(0, 7);
         if (this.isMonthClosed(monthKey)) {
@@ -273,25 +417,31 @@ class WalletManager {
             return false;
         }
 
+        const preview = this.getTransferPreview('remittance', sourceId, destId, sourceAmount, destAmount);
+        if (!preview.valid) {
+            console.warn(`[WalletManager] International transfer rejected: ${preview.error}`);
+            return false;
+        }
+
+        const numSource = Number(sourceAmount);
+        const numDest = Number(destAmount);
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
 
-        if (!source || !dest) return false;
-
-        source.balance -= Number(sourceAmount);
-        dest.balance += Number(destAmount);
+        source.balance -= numSource;
+        dest.balance += numDest;
 
         const tx = {
-            id: Date.now().toString(),
+            id: this.generateTransactionId(),
             type: 'remittance',
             sourceId,
             destId,
-            sourceAmount: Number(sourceAmount),
-            destAmount: Number(destAmount),
+            sourceAmount: numSource,
+            destAmount: numDest,
             sourceCurrency: source.currency,
             destCurrency: dest.currency,
-            exchangeRate: (Number(destAmount) / Number(sourceAmount)).toFixed(4),
-            note,
+            exchangeRate: (numDest / numSource).toFixed(6),
+            note: note || '',
             date
         };
 
@@ -397,7 +547,7 @@ class WalletManager {
         }
     }
 
-    // In-place update preserving transaction ID and metadata
+    // In-place update preserving transaction ID and metadata with atomic rollback safety
     updateTransaction(txId, updatedData) {
         const found = this.findTransaction(txId);
         if (!found) return false;
@@ -411,6 +561,42 @@ class WalletManager {
         if (updatedData.date && this.isMonthClosed(updatedData.date.slice(0, 7))) {
             console.warn(`[WalletManager] Target month ${updatedData.date.slice(0, 7)} is closed. Cannot move transaction.`);
             return false;
+        }
+
+        // Validate proposed changes BEFORE mutating anything
+        const targetDate = updatedData.date || tx.date;
+        if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+            console.warn(`[WalletManager] Invalid date format: ${targetDate}`);
+            return false;
+        }
+
+        if (tx.type === 'expense') {
+            const wId = updatedData.walletId || tx.walletId;
+            const wallet = storage.state.wallets[wId];
+            if (!wallet) return false;
+            const amt = (typeof updatedData.amount !== 'undefined') ? Number(updatedData.amount) : tx.amount;
+            if (!this.isValidAmount(amt, wallet.currency)) return false;
+            const catId = updatedData.categoryId || tx.categoryId;
+            if (!catId) return false;
+        } else if (tx.type === 'income') {
+            const wId = updatedData.walletId || tx.walletId;
+            const wallet = storage.state.wallets[wId];
+            if (!wallet) return false;
+            const amt = (typeof updatedData.amount !== 'undefined') ? Number(updatedData.amount) : tx.amount;
+            if (!this.isValidAmount(amt, wallet.currency)) return false;
+        } else if (tx.type === 'transfer') {
+            const sId = updatedData.sourceId || tx.sourceId;
+            const dId = updatedData.destId || tx.destId;
+            const amt = (typeof updatedData.amount !== 'undefined') ? Number(updatedData.amount) : tx.amount;
+            const preview = this.getTransferPreview('transfer', sId, dId, amt);
+            if (!preview.valid) return false;
+        } else if (tx.type === 'remittance') {
+            const sId = updatedData.sourceId || tx.sourceId;
+            const dId = updatedData.destId || tx.destId;
+            const sAmt = (typeof updatedData.sourceAmount !== 'undefined') ? Number(updatedData.sourceAmount) : tx.sourceAmount;
+            const dAmt = (typeof updatedData.destAmount !== 'undefined') ? Number(updatedData.destAmount) : tx.destAmount;
+            const preview = this.getTransferPreview('remittance', sId, dId, sAmt, dAmt);
+            if (!preview.valid) return false;
         }
 
         // 1. Reverse old financial balance impacts
@@ -454,7 +640,7 @@ class WalletManager {
             if (source) tx.sourceCurrency = source.currency;
             if (dest) tx.destCurrency = dest.currency;
             if (tx.sourceAmount > 0 && tx.destAmount > 0) {
-                tx.exchangeRate = (tx.destAmount / tx.sourceAmount).toFixed(4);
+                tx.exchangeRate = (tx.destAmount / tx.sourceAmount).toFixed(6);
             }
         }
 

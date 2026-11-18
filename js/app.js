@@ -94,6 +94,16 @@ class App {
         this.renderAll();
     }
 
+    escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     getCountryFlagSvg(region, width = 18, height = 13.5) {
         if (typeof CountryConfig !== 'undefined' && typeof CountryConfig.getFlagSvg === 'function') {
             const svg = CountryConfig.getFlagSvg(region, width, height);
@@ -651,20 +661,27 @@ class App {
         }
     }
 
-    getWalletOptionsHtml(selectedWalletId = null, regionFilter = null) {
+    getWalletOptionsHtml(selectedWalletId = null, regionFilter = null, options = {}) {
         if (!storage.state || !storage.state.wallets) return '';
 
         const activeCountries = storage.getActiveCountries();
         const groups = {};
+        const excludeWalletId = options.excludeWalletId || null;
+        const requiredCurrency = options.currency || null;
+        const excludedCurrency = options.excludeCurrency || null;
 
         Object.values(storage.state.wallets).forEach(w => {
+            if (excludeWalletId && w.id === excludeWalletId) return;
             if (regionFilter && w.region !== regionFilter) return;
             if (!regionFilter && !activeCountries.includes(w.region)) return;
+            if (requiredCurrency && w.currency !== requiredCurrency) return;
+            if (excludedCurrency && w.currency === excludedCurrency) return;
 
             const reg = w.region || 'JP';
             if (!groups[reg]) groups[reg] = [];
             const sel = (w.id === selectedWalletId) ? ' selected' : '';
-            groups[reg].push(`<option value="${w.id}"${sel}>${w.id} (${w.currency || ''})</option>`);
+            const escId = this.escapeHtml(w.id);
+            groups[reg].push(`<option value="${escId}"${sel}>${escId} (${w.currency || ''})</option>`);
         });
 
         if (regionFilter) {
@@ -676,12 +693,12 @@ class App {
         order.forEach(code => {
             if (groups[code] && groups[code].length > 0) {
                 const cfg = (typeof CountryConfig !== 'undefined' && CountryConfig.get(code)) || { name: code };
-                html += `<optgroup label="${cfg.name}">${groups[code].join('')}</optgroup>`;
+                html += `<optgroup label="${this.escapeHtml(cfg.name)}">${groups[code].join('')}</optgroup>`;
             }
         });
         Object.keys(groups).forEach(code => {
             if (!order.includes(code) && groups[code].length > 0) {
-                html += `<optgroup label="${code}">${groups[code].join('')}</optgroup>`;
+                html += `<optgroup label="${this.escapeHtml(code)}">${groups[code].join('')}</optgroup>`;
             }
         });
         return html;
@@ -809,6 +826,17 @@ class App {
             `;
         } else if (type === 'transfer') {
             title.innerText = 'Transfer Between Wallets';
+            const allWalletsList = Object.values(storage.state?.wallets || {});
+            let firstSrc = allWalletsList[0]?.id;
+            if (context?.walletId && storage.state.wallets[context.walletId]) {
+                firstSrc = context.walletId;
+            }
+            const srcWallet = storage.state.wallets[firstSrc];
+            const destOpts = this.getWalletOptionsHtml(null, null, {
+                excludeWalletId: firstSrc,
+                currency: srcWallet?.currency
+            });
+
             formInnerHtml = `
                 <div class="form-group">
                     <label>Date</label>
@@ -816,63 +844,89 @@ class App {
                 </div>
                 <div class="form-group">
                     <label>From (Source)</label>
-                    <select id="tx-source">
-                        ${allWalletOpts}
+                    <select id="tx-source" onchange="app.onTransferSourceChange()">
+                        ${this.getWalletOptionsHtml(firstSrc)}
                     </select>
                 </div>
                 <div class="form-group">
                     <label>To (Destination)</label>
-                    <select id="tx-dest">
-                        ${allWalletOpts}
+                    <select id="tx-dest" onchange="app.updateTransferPreview('transfer')">
+                        ${destOpts}
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Amount</label>
-                    <input type="number" id="tx-amount" placeholder="0">
+                    <input type="number" id="tx-amount" step="any" placeholder="0" oninput="app.updateTransferPreview('transfer')">
                 </div>
                 <div class="form-group">
                     <label>Note (Optional)</label>
-                    <input type="text" id="tx-note" placeholder="ATM withdraw, topup, etc.">
+                    <input type="text" id="tx-note" placeholder="ATM withdrawal, top-up, etc.">
                 </div>
+                <div id="transfer-live-preview" class="transfer-preview-card" style="display:none;"></div>
                 <button type="submit" class="btn btn-tx-submit btn-tx-transfer" id="tx-submit-btn">
                     <i data-lucide="arrow-left-right"></i>
                     <span>Complete Transfer</span>
                 </button>
             `;
         } else if (type === 'remittance') {
-            title.innerText = 'Remittance (Send to India)';
+            const allWalletsList = Object.values(storage.state?.wallets || {});
+            const uniqueCurrencies = new Set(allWalletsList.map(w => w.currency));
+            if (uniqueCurrencies.size < 2) {
+                alert('International money transfers require at least two accounts with different currencies. Please create an account in another currency first.');
+                return;
+            }
+
+            title.innerText = 'International Money Transfer';
+            let firstSrc = allWalletsList[0]?.id;
+            if (context?.walletId && storage.state.wallets[context.walletId]) {
+                firstSrc = context.walletId;
+            }
+            const srcWallet = storage.state.wallets[firstSrc];
+            const destOpts = this.getWalletOptionsHtml(null, null, {
+                excludeWalletId: firstSrc,
+                excludeCurrency: srcWallet?.currency
+            });
+            const firstDestWallet = allWalletsList.find(w => w.id !== firstSrc && w.currency !== srcWallet?.currency);
+
             formInnerHtml = `
                 <div class="form-group">
                     <label>Date</label>
                     <input type="date" id="tx-date" value="${currentDate}">
                 </div>
                 <div class="form-group">
-                    <label>From (Source JPY)</label>
-                    <select id="tx-source">
-                        ${jpWalletOpts}
+                    <label>From (Source Account)</label>
+                    <select id="tx-source" onchange="app.onRemittanceSourceChange()">
+                        ${this.getWalletOptionsHtml(firstSrc)}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Amount Sent (¥)</label>
-                    <input type="number" id="tx-amount-jpy" placeholder="e.g. 50000">
+                    <label id="tx-sent-label">Amount Sent (${srcWallet ? srcWallet.currency : ''})</label>
+                    <input type="number" id="tx-amount-jpy" step="any" placeholder="e.g. 50000" oninput="app.updateTransferPreview('remittance')">
                 </div>
                 <div class="form-group">
-                    <label>To (Destination INR)</label>
-                    <select id="tx-dest">
-                        ${inWalletOpts}
+                    <label>To (Destination Account)</label>
+                    <select id="tx-dest" onchange="app.onRemittanceDestChange()">
+                        ${destOpts}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Amount Received (₹)</label>
-                    <input type="number" id="tx-amount-inr" placeholder="e.g. 27500">
+                    <label id="tx-received-label">Amount Received (${firstDestWallet ? firstDestWallet.currency : ''})</label>
+                    <input type="number" id="tx-amount-inr" step="any" placeholder="e.g. 27500" oninput="app.updateTransferPreview('remittance')">
+                </div>
+                <div class="form-group" id="tx-rate-group" style="display:none;">
+                    <div class="exchange-rate-chip" id="tx-effective-rate-pill">
+                        <i data-lucide="trending-up" style="width:13px;height:13px;margin-right:6px;"></i>
+                        <span id="tx-effective-rate-text">Effective Rate: --</span>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>Note</label>
-                    <input type="text" id="tx-note" value="Monthly Remittance">
+                    <label>Note (Optional)</label>
+                    <input type="text" id="tx-note" value="International Money Transfer">
                 </div>
+                <div id="transfer-live-preview" class="transfer-preview-card" style="display:none;"></div>
                 <button type="submit" class="btn btn-tx-submit btn-tx-remittance" id="tx-submit-btn">
                     <i data-lucide="send"></i>
-                    <span>Log Remittance</span>
+                    <span>Send International Transfer</span>
                 </button>
             `;
         } else if (type === 'income') {
@@ -958,25 +1012,23 @@ class App {
             } else if (type === 'remittance') {
                 const srcSel = document.getElementById('tx-source');
                 const destSel = document.getElementById('tx-dest');
-                if (context.walletId) {
-                    const w = storage.state?.wallets ? storage.state.wallets[context.walletId] : null;
-                    if (w && w.region === 'JP' && srcSel) {
-                        srcSel.value = context.walletId;
-                    } else if (w && w.region === 'IN' && destSel) {
-                        destSel.value = context.walletId;
+                if (context.walletId && srcSel) {
+                    srcSel.value = context.walletId;
+                    this.onRemittanceSourceChange();
+                } else if (context.region && srcSel) {
+                    const w = Object.values(storage.state?.wallets || {}).find(item => item.region === context.region);
+                    if (w) {
+                        srcSel.value = w.id;
+                        this.onRemittanceSourceChange();
                     }
-                } else if (context.region === 'JP' && srcSel) {
-                    const w = Object.values(storage.state?.wallets || {}).find(item => item.region === 'JP');
-                    if (w) srcSel.value = w.id;
-                } else if (context.region === 'IN' && destSel) {
-                    const w = Object.values(storage.state?.wallets || {}).find(item => item.region === 'IN');
-                    if (w) destSel.value = w.id;
                 }
             }
         }
 
         if (type === 'expense') {
             this.updateExpenseCategories();
+        } else if (type === 'transfer' || type === 'remittance') {
+            this.updateTransferPreview(type);
         }
     }
 
@@ -1056,24 +1108,35 @@ class App {
             if (noteInput) noteInput.value = tx.note || '';
         } else if (tx.type === 'transfer') {
             const srcSelect = document.getElementById('tx-source');
-            if (srcSelect) srcSelect.value = tx.sourceId;
+            if (srcSelect) {
+                srcSelect.value = tx.sourceId;
+                this.onTransferSourceChange();
+            }
             const destSelect = document.getElementById('tx-dest');
             if (destSelect) destSelect.value = tx.destId;
             const amtInput = document.getElementById('tx-amount');
             if (amtInput) amtInput.value = tx.amount;
             const noteInput = document.getElementById('tx-note');
             if (noteInput) noteInput.value = tx.note || '';
+            this.updateTransferPreview('transfer');
         } else if (tx.type === 'remittance') {
             const srcSelect = document.getElementById('tx-source');
-            if (srcSelect) srcSelect.value = tx.sourceId;
+            if (srcSelect) {
+                srcSelect.value = tx.sourceId;
+                this.onRemittanceSourceChange();
+            }
             const destSelect = document.getElementById('tx-dest');
-            if (destSelect) destSelect.value = tx.destId;
+            if (destSelect) {
+                destSelect.value = tx.destId;
+                this.onRemittanceDestChange();
+            }
             const jpyInput = document.getElementById('tx-amount-jpy');
             if (jpyInput) jpyInput.value = tx.sourceAmount;
             const inrInput = document.getElementById('tx-amount-inr');
             if (inrInput) inrInput.value = tx.destAmount;
             const noteInput = document.getElementById('tx-note');
             if (noteInput) noteInput.value = tx.note || '';
+            this.updateTransferPreview('remittance');
         }
 
         // Unify submit button label update for editing
@@ -1083,6 +1146,164 @@ class App {
         } else {
             const submitBtn = document.getElementById('tx-submit-btn') || content.querySelector('.btn-primary');
             if (submitBtn) submitBtn.innerText = 'Save Changes';
+        }
+    }
+
+    onTransferSourceChange() {
+        const srcEl = document.getElementById('tx-source');
+        const destEl = document.getElementById('tx-dest');
+        if (!srcEl || !destEl) return;
+        const srcWallet = storage.state.wallets[srcEl.value];
+        if (!srcWallet) return;
+        destEl.innerHTML = this.getWalletOptionsHtml(null, null, {
+            excludeWalletId: srcWallet.id,
+            currency: srcWallet.currency
+        });
+        this.updateTransferPreview('transfer');
+    }
+
+    onRemittanceSourceChange() {
+        const srcEl = document.getElementById('tx-source');
+        const destEl = document.getElementById('tx-dest');
+        const sentLabel = document.getElementById('tx-sent-label');
+        if (!srcEl || !destEl) return;
+        const srcWallet = storage.state.wallets[srcEl.value];
+        if (!srcWallet) return;
+        if (sentLabel) {
+            sentLabel.innerText = `Amount Sent (${srcWallet.currency} ${srcWallet.region || ''})`;
+        }
+        destEl.innerHTML = this.getWalletOptionsHtml(null, null, {
+            excludeWalletId: srcWallet.id,
+            excludeCurrency: srcWallet.currency
+        });
+        this.onRemittanceDestChange();
+    }
+
+    onRemittanceDestChange() {
+        const destEl = document.getElementById('tx-dest');
+        const recvLabel = document.getElementById('tx-received-label');
+        if (destEl && recvLabel) {
+            const destWallet = storage.state.wallets[destEl.value];
+            if (destWallet) {
+                recvLabel.innerText = `Amount Received (${destWallet.currency} ${destWallet.region || ''})`;
+            }
+        }
+        this.updateTransferPreview('remittance');
+    }
+
+    updateTransferPreview(type) {
+        const previewEl = document.getElementById('transfer-live-preview');
+        if (!previewEl) return;
+
+        const srcEl = document.getElementById('tx-source');
+        const destEl = document.getElementById('tx-dest');
+        const srcId = srcEl ? srcEl.value : null;
+        const destId = destEl ? destEl.value : null;
+
+        let amt1 = 0;
+        let amt2 = 0;
+        let effectiveType = type;
+
+        if (!effectiveType) {
+            const isRemit = document.getElementById('tx-amount-jpy') !== null;
+            effectiveType = isRemit ? 'remittance' : 'transfer';
+        }
+
+        if (effectiveType === 'transfer') {
+            const amtEl = document.getElementById('tx-amount');
+            amt1 = amtEl ? amtEl.value : 0;
+        } else {
+            const jpyEl = document.getElementById('tx-amount-jpy');
+            const inrEl = document.getElementById('tx-amount-inr');
+            amt1 = jpyEl ? jpyEl.value : 0;
+            amt2 = inrEl ? inrEl.value : 0;
+        }
+
+        const preview = walletManager.getTransferPreview(effectiveType, srcId, destId, amt1, amt2);
+
+        // Update effective rate pill if in remittance mode
+        const rateGroup = document.getElementById('tx-rate-group');
+        const rateText = document.getElementById('tx-effective-rate-text');
+        if (effectiveType === 'remittance' && rateGroup && rateText) {
+            if (preview.effectiveRate && !isNaN(preview.effectiveRate)) {
+                rateGroup.style.display = 'block';
+                rateText.innerText = `Effective Rate: ${preview.rateFormatted}`;
+            } else {
+                rateGroup.style.display = 'none';
+            }
+        }
+
+        if (!preview.valid) {
+            if (Number(amt1) > 0 || (effectiveType === 'remittance' && Number(amt2) > 0)) {
+                previewEl.style.display = 'block';
+                previewEl.className = 'transfer-preview-card preview-invalid';
+                previewEl.innerHTML = `
+                    <div class="preview-error-row">
+                        <i data-lucide="alert-circle" style="width:14px;height:14px;margin-right:6px;color:#f43f5e;"></i>
+                        <span>${this.escapeHtml(preview.error)}</span>
+                    </div>
+                `;
+            } else {
+                previewEl.style.display = 'none';
+            }
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                lucide.createIcons();
+            }
+            return;
+        }
+
+        previewEl.style.display = 'block';
+        previewEl.className = 'transfer-preview-card preview-valid';
+
+        const srcCur = preview.source.currency;
+        const destCur = preview.dest.currency;
+        const srcOld = this.formatMoney(preview.source.currentBalance, srcCur);
+        const srcNew = this.formatMoney(preview.source.newBalance, srcCur);
+        const destOld = this.formatMoney(preview.dest.currentBalance, destCur);
+        const destNew = this.formatMoney(preview.dest.newBalance, destCur);
+
+        let rateHtml = '';
+        if (effectiveType === 'remittance' && preview.rateFormatted) {
+            rateHtml = `
+                <div class="preview-rate-line">
+                    <span class="preview-label">Exchange Rate</span>
+                    <span class="preview-val">${this.escapeHtml(preview.rateFormatted)}</span>
+                </div>
+            `;
+        }
+
+        previewEl.innerHTML = `
+            <div class="preview-header">
+                <span class="preview-title">Transfer Preview</span>
+                <span class="preview-status-badge">Live Calculation</span>
+            </div>
+            <div class="preview-grid">
+                <div class="preview-wallet-col">
+                    <span class="preview-label">Source Account</span>
+                    <span class="preview-name">${this.escapeHtml(preview.source.name)}</span>
+                    <div class="preview-balance-flow">
+                        <span class="old-balance">${srcOld}</span>
+                        <span class="flow-arrow">→</span>
+                        <span class="new-balance ${preview.source.newBalance < 0 ? 'text-danger' : ''}">${srcNew}</span>
+                    </div>
+                    <span class="preview-deduction">-${this.formatMoney(preview.debitedAmount, srcCur)}</span>
+                </div>
+                <div class="preview-wallet-col">
+                    <span class="preview-label">Destination Account</span>
+                    <span class="preview-name">${this.escapeHtml(preview.dest.name)}</span>
+                    <div class="preview-balance-flow">
+                        <span class="old-balance">${destOld}</span>
+                        <span class="flow-arrow">→</span>
+                        <span class="new-balance">${destNew}</span>
+                    </div>
+                    <span class="preview-credit">+${this.formatMoney(preview.creditedAmount, destCur)}</span>
+                </div>
+            </div>
+            ${rateHtml}
+        `;
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
         }
     }
 
@@ -1184,20 +1405,9 @@ class App {
             const amt = Number(amtStr);
             const note = document.getElementById('tx-note')?.value || '';
 
-            if (!amtStr || isNaN(amt) || amt <= 0) {
-                alert('Please enter a valid amount greater than 0.');
-                return;
-            }
-            if (!src || !dest || !storage.state.wallets[src] || !storage.state.wallets[dest]) {
-                alert('Please select valid source and destination wallets.');
-                return;
-            }
-            if (src === dest) {
-                alert('Source and destination must be different.');
-                return;
-            }
-            if (storage.state.wallets[src].currency !== storage.state.wallets[dest].currency) {
-                alert('Cross-currency transfers must use the Remittance tool.');
+            const preview = walletManager.getTransferPreview('transfer', src, dest, amt);
+            if (!preview.valid) {
+                alert(preview.error || 'Please enter a valid transfer amount and accounts.');
                 return;
             }
 
@@ -1206,7 +1416,11 @@ class App {
             } else {
                 this._isSubmitting = true;
                 try {
-                    walletManager.transfer(src, dest, amt, note, date);
+                    const ok = walletManager.transfer(src, dest, amt, note, date);
+                    if (!ok) {
+                        alert('Could not complete transfer.');
+                        return;
+                    }
                 } finally {
                     this._isSubmitting = false;
                 }
@@ -1220,12 +1434,9 @@ class App {
             const amtInr = Number(amtInrStr);
             const note = document.getElementById('tx-note')?.value || '';
 
-            if (!amtJpyStr || isNaN(amtJpy) || amtJpy <= 0 || !amtInrStr || isNaN(amtInr) || amtInr <= 0) {
-                alert('Please enter valid amounts for both JPY and INR.');
-                return;
-            }
-            if (!src || !dest || !storage.state.wallets[src] || !storage.state.wallets[dest]) {
-                alert('Please select valid source and destination wallets.');
+            const preview = walletManager.getTransferPreview('remittance', src, dest, amtJpy, amtInr);
+            if (!preview.valid) {
+                alert(preview.error || 'Please enter valid accounts and amounts for international money transfer.');
                 return;
             }
 
@@ -1234,7 +1445,11 @@ class App {
             } else {
                 this._isSubmitting = true;
                 try {
-                    walletManager.remittance(src, dest, amtJpy, amtInr, note, date);
+                    const ok = walletManager.remittance(src, dest, amtJpy, amtInr, note, date);
+                    if (!ok) {
+                        alert('Could not complete international transfer.');
+                        return;
+                    }
                 } finally {
                     this._isSubmitting = false;
                 }
@@ -2408,11 +2623,12 @@ class App {
         Object.values(storage.state.wallets || {}).forEach(w => {
             const ws = this.getWalletStyle(w.color);
             const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
+            const escId = this.escapeHtml(w.id);
             const html = `
-                <div class="wallet-item" onclick="app.openWalletFocus('${w.id}')" style="cursor:pointer; ${ws.card}">
+                <div class="wallet-item" data-wallet-id="${escId}" style="cursor:pointer; ${ws.card}">
                     <div class="wallet-name" style="color:${ws.text};">
                         <i data-lucide="${icon}"></i>
-                        ${w.id}
+                        <span class="wallet-name-label">${escId}</span>
                     </div>
                     <div class="wallet-balance" style="color:${ws.text};">${this.formatMoney(w.balance, w.currency)}</div>
                 </div>
@@ -2431,6 +2647,20 @@ class App {
         if (inel) inel.innerHTML = countryHtml.IN;
         const deel = document.getElementById('de-wallets');
         if (deel) deel.innerHTML = countryHtml.DE;
+
+        ['jp-wallets', 'in-wallets', 'de-wallets'].forEach(id => {
+            const container = document.getElementById(id);
+            if (container && !container._hasDelegatedWalletClick) {
+                container._hasDelegatedWalletClick = true;
+                container.addEventListener('click', (e) => {
+                    const item = e.target.closest('[data-wallet-id]');
+                    if (item) {
+                        const wId = item.getAttribute('data-wallet-id');
+                        if (wId) this.openWalletFocus(wId);
+                    }
+                });
+            }
+        });
 
         const jpCard = document.getElementById('jp-country-card');
         const inCard = document.getElementById('in-country-card');
@@ -2523,6 +2753,7 @@ class App {
         const pct = allocatedBudget > 0 ? Math.min((totalSpent / allocatedBudget) * 100, 100) : 0;
         const utilizationPct = allocatedBudget > 0 ? Math.round((totalSpent / allocatedBudget) * 100) : 0;
         const cushion = Math.max(0, allocatedBudget - sumCatBudgets);
+        const carryover = storage.getCarryover(region);
 
         let barClass = 'neon-safe';
         if (pct > 90 || utilizationPct > 100) barClass = 'neon-danger';
@@ -2534,6 +2765,10 @@ class App {
             </button>
         ` : '';
 
+        const rolloverBadgeHtml = carryover > 0 ? `
+            <span class="budget-cushion-badge privacy-blur" title="Unspent rollover from previous month">+${this.formatMoney(carryover, currency)} Rollover Cushion</span>
+        ` : '';
+
         const cardContent = `
             <div class="budget-central-header">
                 <div class="budget-central-title-group">
@@ -2541,6 +2776,7 @@ class App {
                     <h3>Monthly Budget</h3>
                     <span class="text-xs text-muted font-numeric">(${monthKey})</span>
                     ${cushion > 0 ? `<span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, currency)} cushion</span>` : ''}
+                    ${rolloverBadgeHtml}
                     ${editButtonHtml}
                 </div>
                 <div class="budget-remaining-hero">
@@ -2556,7 +2792,7 @@ class App {
             <div class="budget-central-stats-row">
                 <span class="privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
                 <span class="text-xs text-muted font-numeric">${utilizationPct}% used</span>
-                <span class="privacy-blur">Total Allocation: <strong>${this.formatMoney(allocatedBudget, currency)}</strong></span>
+                <span class="privacy-blur">Base Budget: <strong>${this.formatMoney(allocatedBudget, currency)}</strong></span>
             </div>
         `;
 
@@ -3048,8 +3284,9 @@ class App {
             const secondaryCls = isSecondary ? ' wallet-card-secondary' : '';
             const secondaryBadge = isSecondary ? '<span class="wallet-badge-secondary">Secondary</span>' : '';
 
+            const escId = this.escapeHtml(w.id);
             return `
-                <div class="wallet-card ${theme.cls}${secondaryCls}" onclick="app.openWalletFocus('${w.id}')" title="Click to inspect ${w.id}" role="button" tabindex="0">
+                <div class="wallet-card ${theme.cls}${secondaryCls}" data-wallet-id="${escId}" title="Click to inspect ${escId}" role="button" tabindex="0">
                     <div class="wallet-card-overlay-sheen"></div>
                     <div class="wallet-card-header">
                         <div class="wallet-card-chip-group">
@@ -3058,7 +3295,7 @@ class App {
                         </div>
                         <div class="wallet-card-top-right">
                             ${secondaryBadge}
-                            <button class="wallet-menu-btn" onclick="event.stopPropagation(); app.openEditWalletModal('${w.id}')" title="Edit wallet settings" aria-label="Edit wallet ${w.id}">
+                            <button class="wallet-menu-btn" data-edit-wallet-id="${escId}" title="Edit wallet settings" aria-label="Edit wallet settings">
                                 <i data-lucide="more-vertical" style="width: 15px; height: 15px;"></i>
                             </button>
                         </div>
@@ -3068,7 +3305,7 @@ class App {
                         <div class="wallet-balance-val financial-amount privacy-blur">${this.formatMoney(w.balance, w.currency)}</div>
                     </div>
                     <div class="wallet-card-footer">
-                        <div class="wallet-name">${w.id}</div>
+                        <div class="wallet-name">${escId}</div>
                     </div>
                 </div>
             `;
@@ -3115,6 +3352,24 @@ class App {
                         </button>
                     </div>
                 `;
+
+                if (!gridEl._hasDelegatedWalletClick) {
+                    gridEl._hasDelegatedWalletClick = true;
+                    gridEl.addEventListener('click', (e) => {
+                        const editBtn = e.target.closest('[data-edit-wallet-id]');
+                        if (editBtn) {
+                            e.stopPropagation();
+                            const id = editBtn.getAttribute('data-edit-wallet-id');
+                            if (id) this.openEditWalletModal(id);
+                            return;
+                        }
+                        const card = e.target.closest('[data-wallet-id]');
+                        if (card) {
+                            const id = card.getAttribute('data-wallet-id');
+                            if (id) this.openWalletFocus(id);
+                        }
+                    });
+                }
             }
 
             const countStr = `${regionWallets.length} ${regionWallets.length === 1 ? 'account' : 'accounts'}`;
@@ -3327,20 +3582,21 @@ class App {
         `;
 
         if (regionWallets.length === 0) {
-            walletsListHtml += `<p class="text-muted text-sm" style="text-align: center; padding: 32px 0;">No accounts found for ${countryName}.</p>`;
+            walletsListHtml += `<p class="text-muted text-sm" style="text-align: center; padding: 32px 0;">No accounts found for ${this.escapeHtml(countryName)}.</p>`;
         } else {
             regionWallets.forEach(w => {
                 const theme = this.getThemeForWallet(w);
                 const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
+                const escId = this.escapeHtml(w.id);
                 walletsListHtml += `
-                    <div class="wallet-item-compact ${theme.cls} focus-associated-wallet-row" onclick="app.openWalletFocus('${w.id}', this, true)">
+                    <div class="wallet-item-compact ${theme.cls} focus-associated-wallet-row" data-focus-wallet-id="${escId}">
                         <div class="focus-associated-wallet-left">
                             <div class="focus-associated-wallet-icon">
                                 <i data-lucide="${icon}"></i>
                             </div>
                             <div class="focus-associated-wallet-info">
-                                <div class="focus-associated-wallet-name" title="${w.id}">${w.id}</div>
-                                <div class="focus-associated-wallet-meta">${w.type || 'Account'} • ${w.currency}</div>
+                                <div class="focus-associated-wallet-name" title="${escId}">${escId}</div>
+                                <div class="focus-associated-wallet-meta">${this.escapeHtml(w.type || 'Account')} • ${this.escapeHtml(w.currency)}</div>
                             </div>
                         </div>
                         <div class="focus-associated-wallet-right">
@@ -3355,6 +3611,13 @@ class App {
         }
         walletsListHtml += `</div>`;
         secondaryPanel.innerHTML = walletsListHtml;
+        secondaryPanel.onclick = (e) => {
+            const row = e.target.closest('[data-focus-wallet-id]');
+            if (row) {
+                const wId = row.getAttribute('data-focus-wallet-id');
+                if (wId) this.openWalletFocus(wId, row, true);
+            }
+        };
 
         overlay.style.display = 'flex';
         void overlay.offsetWidth;
@@ -3394,7 +3657,7 @@ class App {
         if (this.focusHistory && this.focusHistory.length > 0) {
             if (backBtn) backBtn.style.display = 'inline-flex';
             const prev = this.focusHistory[this.focusHistory.length - 1];
-            const countryName = prev.region === 'JP' ? 'Japan' : 'India';
+            const countryName = prev.region === 'JP' ? 'Japan' : (prev.region === 'DE' ? 'Germany' : 'India');
             if (backLabel) backLabel.innerText = `${countryName} Overview`;
             if (divider) divider.style.display = 'inline';
             if (typeBadge) typeBadge.style.display = 'none';
@@ -3408,6 +3671,7 @@ class App {
         }
 
         modalTitle.innerText = `${w.id}`;
+        const escId = this.escapeHtml(w.id);
 
         primaryPanel.innerHTML = `
             <div class="wallet-card ${theme.cls}${secondaryCls} focus-wallet-card">
@@ -3419,7 +3683,7 @@ class App {
                     </div>
                     <div class="wallet-card-top-right">
                         ${secondaryBadge}
-                        <button class="wallet-card-menu-btn" onclick="app.closeFocusOverlay(); app.openEditWalletModal('${w.id}')" title="Edit Account" aria-label="Edit Account">
+                        <button class="wallet-card-menu-btn" data-focus-action="edit" title="Edit Account" aria-label="Edit Account">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                         </button>
                     </div>
@@ -3431,17 +3695,31 @@ class App {
                     </div>
                 </div>
                 <div class="wallet-card-footer">
-                    <div class="wallet-name" title="${w.id}">${w.id}</div>
-                    <div class="wallet-type-tag">${w.type || 'Account'} • ${w.currency}</div>
+                    <div class="wallet-name" title="${escId}">${escId}</div>
+                    <div class="wallet-type-tag">${this.escapeHtml(w.type || 'Account')} • ${this.escapeHtml(w.currency)}</div>
                 </div>
             </div>
             <div class="focus-wallet-actions">
-                <button class="btn btn-primary w-100" onclick="app.openUnifiedTransactionSelector({ walletId: '${w.id}', region: '${w.region}' })">
+                <button class="btn btn-primary w-100" data-focus-action="add-tx">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                     <span>Add Transaction</span>
                 </button>
             </div>
         `;
+
+        primaryPanel.onclick = (e) => {
+            const editBtn = e.target.closest('[data-focus-action="edit"]');
+            if (editBtn) {
+                this.closeFocusOverlay();
+                this.openEditWalletModal(w.id);
+                return;
+            }
+            const addBtn = e.target.closest('[data-focus-action="add-tx"]');
+            if (addBtn) {
+                this.openUnifiedTransactionSelector({ walletId: w.id, region: w.region });
+                return;
+            }
+        };
 
         const txs = walletManager.getTransactions({ walletId: w.id });
         const recentTxs = txs.slice(0, 15);

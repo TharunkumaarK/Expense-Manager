@@ -54,8 +54,8 @@ async def run_focused_tests():
     with open(SW_JS_PATH, 'r', encoding='utf-8') as f:
         sw_content = f.read()
 
-    has_v122_cache = "const CACHE_NAME = 'em-v122';" in sw_content
-    static_checks.append(('PWA', "sw.js CACHE_NAME is bumped to 'em-v122'", has_v122_cache))
+    has_v122_cache = ("const CACHE_NAME = 'em-v122';" in sw_content) or ("const CACHE_NAME = 'em-v123';" in sw_content)
+    static_checks.append(('PWA', "sw.js CACHE_NAME is bumped to 'em-v122' or later", has_v122_cache))
 
     # Check 2: sw.js ASSETS contains modern scripts
     required_assets = [
@@ -76,8 +76,8 @@ async def run_focused_tests():
     with open(INDEX_HTML_PATH, 'r', encoding='utf-8') as f:
         index_content = f.read()
 
-    has_index_v122 = 'js/onboarding.js?v=20261117_v122' in index_content and 'js/storage.js?v=20261117_v122' in index_content
-    static_checks.append(('PWA', "index.html script tags use ?v=20261117_v122", has_index_v122))
+    has_index_v122 = ('js/onboarding.js?v=20261117_v122' in index_content or 'js/onboarding.js?v=20261118_v123' in index_content) and ('js/storage.js?v=20261117_v122' in index_content or 'js/storage.js?v=20261118_v123' in index_content)
+    static_checks.append(('PWA', "index.html script tags use ?v=20261117_v122 or later", has_index_v122))
 
     # Check 4: #sync-error-screen present in index.html
     has_sync_screen = 'id="sync-error-screen"' in index_content and 'id="sync-retry-btn"' in index_content

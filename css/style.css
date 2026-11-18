@@ -4184,6 +4184,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         opacity: 0;
         transform: translateY(6px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -4191,6 +4192,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     .focus-primary-panel,
     .focus-secondary-panel {
         animation: none !important;
@@ -6250,6 +6252,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 @media (max-width: 420px) {
+
     #analytics-jp-workspace .analytics-kpi-grid,
     .analytics-kpi-grid {
         grid-template-columns: 1fr !important;
@@ -12013,11 +12016,11 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.onboarding-toggle-switch input:checked + .onboarding-toggle-slider {
+.onboarding-toggle-switch input:checked+.onboarding-toggle-slider {
     background-color: #2563eb;
 }
 
-.onboarding-toggle-switch input:checked + .onboarding-toggle-slider:before {
+.onboarding-toggle-switch input:checked+.onboarding-toggle-slider:before {
     transform: translateX(20px);
 }
 
@@ -12303,4 +12306,163 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     border-color: rgba(59, 130, 246, 0.45) !important;
     box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35), 0 22px 48px rgba(37, 99, 235, 0.22), 0 22px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
     transform: translateY(-3px);
+}
+
+/* ==========================================================================
+   Phase 5: Financial Transfers & Budget Rollover Styles
+   ========================================================================== */
+
+.transfer-preview-card {
+    background: #111219;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 14px 0 16px 0;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.transfer-preview-card.preview-invalid {
+    border-color: rgba(244, 63, 94, 0.32);
+    background: rgba(244, 63, 94, 0.04);
+}
+
+.preview-error-row {
+    display: flex;
+    align-items: center;
+    color: #f43f5e;
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+
+.transfer-preview-card.preview-valid {
+    border-color: rgba(16, 185, 129, 0.28);
+    background: linear-gradient(180deg, #13151f 0%, #0d0f16 100%);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.preview-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+}
+
+.preview-status-badge {
+    font-size: 0.7rem;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    font-weight: 500;
+}
+
+.preview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.preview-wallet-col {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.preview-label {
+    font-size: 0.68rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.preview-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #f1f5f9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-balance-flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    margin-top: 2px;
+}
+
+.preview-balance-flow .old-balance {
+    color: #94a3b8;
+    text-decoration: line-through;
+    opacity: 0.7;
+    font-size: 0.76rem;
+}
+
+.preview-balance-flow .flow-arrow {
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+.preview-balance-flow .new-balance {
+    color: #f8fafc;
+    font-weight: 600;
+}
+
+.preview-deduction {
+    font-size: 0.78rem;
+    color: #f43f5e;
+    font-weight: 500;
+    margin-top: 1px;
+}
+
+.preview-credit {
+    font-size: 0.78rem;
+    color: #10b981;
+    font-weight: 500;
+    margin-top: 1px;
+}
+
+.preview-rate-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.07);
+    font-size: 0.8rem;
+}
+
+.exchange-rate-chip {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    color: #cbd5e1;
+}
+
+.budget-cushion-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 4px;
+    padding: 2px 8px;
+    background: rgba(16, 185, 129, 0.09);
+    border: 1px solid rgba(16, 185, 129, 0.22);
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #34d399;
 }
