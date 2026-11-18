@@ -193,7 +193,13 @@ class WalletManager {
         const wallet = storage.state.wallets[walletId];
         if (!wallet) return false;
 
-        wallet.balance -= Number(amount);
+        const numAmount = Number(amount);
+        if (!this.isValidAmount(numAmount, wallet.currency)) {
+            console.warn(`[WalletManager] Invalid expense amount or precision: ${amount} for ${wallet.currency}`);
+            return false;
+        }
+
+        wallet.balance = this.roundCurrency(wallet.balance - numAmount, wallet.currency);
 
         const tx = {
             id: this.generateTransactionId(),
@@ -201,7 +207,7 @@ class WalletManager {
             walletId,
             region: wallet.region,
             categoryId,
-            amount: Number(amount),
+            amount: numAmount,
             currency: wallet.currency,
             note,
             date
@@ -224,14 +230,20 @@ class WalletManager {
         const wallet = storage.state.wallets[walletId];
         if (!wallet) return false;
 
-        wallet.balance += Number(amount);
+        const numAmount = Number(amount);
+        if (!this.isValidAmount(numAmount, wallet.currency)) {
+            console.warn(`[WalletManager] Invalid income amount or precision: ${amount} for ${wallet.currency}`);
+            return false;
+        }
+
+        wallet.balance = this.roundCurrency(wallet.balance + numAmount, wallet.currency);
 
         const tx = {
             id: this.generateTransactionId(),
             type: 'income',
             walletId,
             region: wallet.region,
-            amount: Number(amount),
+            amount: numAmount,
             currency: wallet.currency,
             note,
             date
@@ -243,9 +255,23 @@ class WalletManager {
         return true;
     }
 
+    // Currency precision rounding helper: whole integers for JPY, 2 decimal places for INR/EUR
+    roundCurrency(amount, currency) {
+        if (typeof amount !== 'number' || isNaN(amount) || !isFinite(amount)) return 0;
+        const cur = (currency || '').toUpperCase();
+        if (cur === '¥' || cur === 'JPY') {
+            return Math.round(amount);
+        }
+        return Math.round(amount * 100) / 100;
+    }
+
     // Validate numeric amount and decimal precision according to currency
     isValidAmount(amount, currency) {
         if (typeof amount !== 'number' || isNaN(amount) || !isFinite(amount) || amount <= 0) {
+            return false;
+        }
+        // Guard against unsafe arithmetic magnitudes / overflow
+        if (amount > 1e12) {
             return false;
         }
         const cur = (currency || '').toUpperCase();
@@ -314,14 +340,14 @@ class WalletManager {
                 name: sourceId,
                 currency: source.currency,
                 currentBalance: source.balance || 0,
-                newBalance: (source.balance || 0) - num1
+                newBalance: this.roundCurrency((source.balance || 0) - num1, source.currency)
             };
             preview.dest = {
                 id: destId,
                 name: destId,
                 currency: dest.currency,
                 currentBalance: dest.balance || 0,
-                newBalance: (dest.balance || 0) + num1
+                newBalance: this.roundCurrency((dest.balance || 0) + num1, dest.currency)
             };
             return preview;
         }
@@ -355,14 +381,14 @@ class WalletManager {
                 name: sourceId,
                 currency: source.currency,
                 currentBalance: source.balance || 0,
-                newBalance: (source.balance || 0) - num1
+                newBalance: this.roundCurrency((source.balance || 0) - num1, source.currency)
             };
             preview.dest = {
                 id: destId,
                 name: destId,
                 currency: dest.currency,
                 currentBalance: dest.balance || 0,
-                newBalance: (dest.balance || 0) + num2
+                newBalance: this.roundCurrency((dest.balance || 0) + num2, dest.currency)
             };
             return preview;
         }
@@ -389,8 +415,8 @@ class WalletManager {
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
 
-        source.balance -= numAmount;
-        dest.balance += numAmount;
+        source.balance = this.roundCurrency(source.balance - numAmount, source.currency);
+        dest.balance = this.roundCurrency(dest.balance + numAmount, dest.currency);
 
         const tx = {
             id: this.generateTransactionId(),
@@ -428,8 +454,8 @@ class WalletManager {
         const source = storage.state.wallets[sourceId];
         const dest = storage.state.wallets[destId];
 
-        source.balance -= numSource;
-        dest.balance += numDest;
+        source.balance = this.roundCurrency(source.balance - numSource, source.currency);
+        dest.balance = this.roundCurrency(dest.balance + numDest, dest.currency);
 
         const tx = {
             id: this.generateTransactionId(),
@@ -491,60 +517,203 @@ class WalletManager {
         return null;
     }
 
-    // Reverse financial balance impacts of a transaction
-    reverseTransactionEffects(tx) {
-        if (!tx || !storage.state.wallets) return;
-        if (tx.type === 'expense') {
-            if (storage.state.wallets[tx.walletId]) {
-                storage.state.wallets[tx.walletId].balance += Number(tx.amount);
-            }
-        } else if (tx.type === 'income') {
-            if (storage.state.wallets[tx.walletId]) {
-                storage.state.wallets[tx.walletId].balance -= Number(tx.amount);
-            }
-        } else if (tx.type === 'transfer') {
-            if (storage.state.wallets[tx.sourceId]) {
-                storage.state.wallets[tx.sourceId].balance += Number(tx.amount);
-            }
-            if (storage.state.wallets[tx.destId]) {
-                storage.state.wallets[tx.destId].balance -= Number(tx.amount);
-            }
-        } else if (tx.type === 'remittance') {
-            if (storage.state.wallets[tx.sourceId]) {
-                storage.state.wallets[tx.sourceId].balance += Number(tx.sourceAmount);
-            }
-            if (storage.state.wallets[tx.destId]) {
-                storage.state.wallets[tx.destId].balance -= Number(tx.destAmount);
-            }
+    // Two-Phase Validation: Verify that all referenced wallets and amounts exist and are valid for reversal
+    validateTransactionForReversal(tx) {
+        if (!tx || typeof tx !== 'object') {
+            return { valid: false, error: 'Transaction object is required.' };
         }
+        if (!storage.state || !storage.state.wallets) {
+            return { valid: false, error: 'Wallets state not available.' };
+        }
+
+        if (tx.type === 'expense' || tx.type === 'income') {
+            const w = storage.state.wallets[tx.walletId];
+            if (!w || typeof w !== 'object') {
+                return { valid: false, error: `Referenced wallet '${tx.walletId}' does not exist.` };
+            }
+            if (typeof w.balance !== 'number' || !isFinite(w.balance)) {
+                return { valid: false, error: `Referenced wallet '${tx.walletId}' has nonfinite balance.` };
+            }
+            if (typeof tx.amount !== 'number' || !isFinite(tx.amount) || tx.amount <= 0) {
+                return { valid: false, error: `Transaction amount is invalid: ${tx.amount}` };
+            }
+            return { valid: true };
+        }
+
+        if (tx.type === 'transfer') {
+            const s = storage.state.wallets[tx.sourceId];
+            const d = storage.state.wallets[tx.destId];
+            if (!s || typeof s !== 'object') {
+                return { valid: false, error: `Source wallet '${tx.sourceId}' does not exist.` };
+            }
+            if (!d || typeof d !== 'object') {
+                return { valid: false, error: `Destination wallet '${tx.destId}' does not exist.` };
+            }
+            if (typeof s.balance !== 'number' || !isFinite(s.balance)) {
+                return { valid: false, error: `Source wallet '${tx.sourceId}' has nonfinite balance.` };
+            }
+            if (typeof d.balance !== 'number' || !isFinite(d.balance)) {
+                return { valid: false, error: `Destination wallet '${tx.destId}' has nonfinite balance.` };
+            }
+            if (typeof tx.amount !== 'number' || !isFinite(tx.amount) || tx.amount <= 0) {
+                return { valid: false, error: `Transfer amount is invalid: ${tx.amount}` };
+            }
+            return { valid: true };
+        }
+
+        if (tx.type === 'remittance') {
+            const s = storage.state.wallets[tx.sourceId];
+            const d = storage.state.wallets[tx.destId];
+            if (!s || typeof s !== 'object') {
+                return { valid: false, error: `Source wallet '${tx.sourceId}' does not exist.` };
+            }
+            if (!d || typeof d !== 'object') {
+                return { valid: false, error: `Destination wallet '${tx.destId}' does not exist.` };
+            }
+            if (typeof s.balance !== 'number' || !isFinite(s.balance)) {
+                return { valid: false, error: `Source wallet '${tx.sourceId}' has nonfinite balance.` };
+            }
+            if (typeof d.balance !== 'number' || !isFinite(d.balance)) {
+                return { valid: false, error: `Destination wallet '${tx.destId}' has nonfinite balance.` };
+            }
+            if (typeof tx.sourceAmount !== 'number' || !isFinite(tx.sourceAmount) || tx.sourceAmount <= 0) {
+                return { valid: false, error: `Sent amount is invalid: ${tx.sourceAmount}` };
+            }
+            if (typeof tx.destAmount !== 'number' || !isFinite(tx.destAmount) || tx.destAmount <= 0) {
+                return { valid: false, error: `Received amount is invalid: ${tx.destAmount}` };
+            }
+            return { valid: true };
+        }
+
+        return { valid: false, error: `Unknown transaction type '${tx.type}'` };
     }
 
-    // Apply financial balance impacts of a transaction
-    applyTransactionEffects(tx) {
-        if (!tx || !storage.state.wallets) return;
-        if (tx.type === 'expense') {
-            if (storage.state.wallets[tx.walletId]) {
-                storage.state.wallets[tx.walletId].balance -= Number(tx.amount);
-            }
-        } else if (tx.type === 'income') {
-            if (storage.state.wallets[tx.walletId]) {
-                storage.state.wallets[tx.walletId].balance += Number(tx.amount);
-            }
-        } else if (tx.type === 'transfer') {
-            if (storage.state.wallets[tx.sourceId]) {
-                storage.state.wallets[tx.sourceId].balance -= Number(tx.amount);
-            }
-            if (storage.state.wallets[tx.destId]) {
-                storage.state.wallets[tx.destId].balance += Number(tx.amount);
-            }
-        } else if (tx.type === 'remittance') {
-            if (storage.state.wallets[tx.sourceId]) {
-                storage.state.wallets[tx.sourceId].balance -= Number(tx.sourceAmount);
-            }
-            if (storage.state.wallets[tx.destId]) {
-                storage.state.wallets[tx.destId].balance += Number(tx.destAmount);
-            }
+    // Two-Phase Validation: Verify that all referenced wallets and amounts are valid for applying
+    validateTransactionForApplication(tx) {
+        if (!tx || typeof tx !== 'object') {
+            return { valid: false, error: 'Transaction object is required.' };
         }
+        if (!storage.state || !storage.state.wallets) {
+            return { valid: false, error: 'Wallets state not available.' };
+        }
+
+        if (tx.type === 'expense' || tx.type === 'income') {
+            const w = storage.state.wallets[tx.walletId];
+            if (!w || typeof w !== 'object') {
+                return { valid: false, error: `Referenced wallet '${tx.walletId}' does not exist.` };
+            }
+            if (typeof w.balance !== 'number' || !isFinite(w.balance)) {
+                return { valid: false, error: `Referenced wallet '${tx.walletId}' has nonfinite balance.` };
+            }
+            const amt = Number(tx.amount);
+            if (!this.isValidAmount(amt, w.currency)) {
+                return { valid: false, error: `Amount ${tx.amount} violates precision or magnitude bounds for ${w.currency}.` };
+            }
+            if (tx.type === 'expense' && !tx.categoryId) {
+                return { valid: false, error: 'Expense category is required.' };
+            }
+            return { valid: true };
+        }
+
+        if (tx.type === 'transfer') {
+            const s = storage.state.wallets[tx.sourceId];
+            const d = storage.state.wallets[tx.destId];
+            if (!s || !d) {
+                return { valid: false, error: 'Source and destination accounts must exist.' };
+            }
+            if (tx.sourceId === tx.destId) {
+                return { valid: false, error: 'Source and destination must be different.' };
+            }
+            if (s.currency !== d.currency) {
+                return { valid: false, error: 'Domestic transfer accounts must have matching currencies.' };
+            }
+            const amt = Number(tx.amount);
+            if (!this.isValidAmount(amt, s.currency)) {
+                return { valid: false, error: `Transfer amount violates precision for ${s.currency}.` };
+            }
+            return { valid: true };
+        }
+
+        if (tx.type === 'remittance') {
+            const s = storage.state.wallets[tx.sourceId];
+            const d = storage.state.wallets[tx.destId];
+            if (!s || !d) {
+                return { valid: false, error: 'Source and destination accounts must exist.' };
+            }
+            if (tx.sourceId === tx.destId) {
+                return { valid: false, error: 'Source and destination must be different.' };
+            }
+            if (s.currency === d.currency) {
+                return { valid: false, error: 'International transfer requires accounts with different currencies.' };
+            }
+            const sAmt = Number(tx.sourceAmount);
+            const dAmt = Number(tx.destAmount);
+            if (!this.isValidAmount(sAmt, s.currency)) {
+                return { valid: false, error: `Sent amount violates precision for ${s.currency}.` };
+            }
+            if (!this.isValidAmount(dAmt, d.currency)) {
+                return { valid: false, error: `Received amount violates precision for ${d.currency}.` };
+            }
+            return { valid: true };
+        }
+
+        return { valid: false, error: `Unknown transaction type '${tx.type}'` };
+    }
+
+    // Reverse financial balance impacts of a transaction with atomic validation and precision rounding
+    reverseTransactionEffects(tx) {
+        const check = this.validateTransactionForReversal(tx);
+        if (!check.valid) {
+            console.warn(`[WalletManager] reverseTransactionEffects aborted: ${check.error}`);
+            return false;
+        }
+
+        if (tx.type === 'expense') {
+            const w = storage.state.wallets[tx.walletId];
+            w.balance = this.roundCurrency(w.balance + Number(tx.amount), w.currency);
+        } else if (tx.type === 'income') {
+            const w = storage.state.wallets[tx.walletId];
+            w.balance = this.roundCurrency(w.balance - Number(tx.amount), w.currency);
+        } else if (tx.type === 'transfer') {
+            const s = storage.state.wallets[tx.sourceId];
+            const d = storage.state.wallets[tx.destId];
+            s.balance = this.roundCurrency(s.balance + Number(tx.amount), s.currency);
+            d.balance = this.roundCurrency(d.balance - Number(tx.amount), d.currency);
+        } else if (tx.type === 'remittance') {
+            const s = storage.state.wallets[tx.sourceId];
+            const d = storage.state.wallets[tx.destId];
+            s.balance = this.roundCurrency(s.balance + Number(tx.sourceAmount), s.currency);
+            d.balance = this.roundCurrency(d.balance - Number(tx.destAmount), d.currency);
+        }
+        return true;
+    }
+
+    // Apply financial balance impacts of a transaction with atomic validation and precision rounding
+    applyTransactionEffects(tx) {
+        const check = this.validateTransactionForApplication(tx);
+        if (!check.valid) {
+            console.warn(`[WalletManager] applyTransactionEffects aborted: ${check.error}`);
+            return false;
+        }
+
+        if (tx.type === 'expense') {
+            const w = storage.state.wallets[tx.walletId];
+            w.balance = this.roundCurrency(w.balance - Number(tx.amount), w.currency);
+        } else if (tx.type === 'income') {
+            const w = storage.state.wallets[tx.walletId];
+            w.balance = this.roundCurrency(w.balance + Number(tx.amount), w.currency);
+        } else if (tx.type === 'transfer') {
+            const s = storage.state.wallets[tx.sourceId];
+            const d = storage.state.wallets[tx.destId];
+            s.balance = this.roundCurrency(s.balance - Number(tx.amount), s.currency);
+            d.balance = this.roundCurrency(d.balance + Number(tx.amount), d.currency);
+        } else if (tx.type === 'remittance') {
+            const s = storage.state.wallets[tx.sourceId];
+            const d = storage.state.wallets[tx.destId];
+            s.balance = this.roundCurrency(s.balance - Number(tx.sourceAmount), s.currency);
+            d.balance = this.roundCurrency(d.balance + Number(tx.destAmount), d.currency);
+        }
+        return true;
     }
 
     // In-place update preserving transaction ID and metadata with atomic rollback safety
@@ -563,99 +732,86 @@ class WalletManager {
             return false;
         }
 
-        // Validate proposed changes BEFORE mutating anything
+        // Validate date format
         const targetDate = updatedData.date || tx.date;
         if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
             console.warn(`[WalletManager] Invalid date format: ${targetDate}`);
             return false;
         }
 
-        if (tx.type === 'expense') {
-            const wId = updatedData.walletId || tx.walletId;
-            const wallet = storage.state.wallets[wId];
-            if (!wallet) return false;
-            const amt = (typeof updatedData.amount !== 'undefined') ? Number(updatedData.amount) : tx.amount;
-            if (!this.isValidAmount(amt, wallet.currency)) return false;
-            const catId = updatedData.categoryId || tx.categoryId;
-            if (!catId) return false;
-        } else if (tx.type === 'income') {
-            const wId = updatedData.walletId || tx.walletId;
-            const wallet = storage.state.wallets[wId];
-            if (!wallet) return false;
-            const amt = (typeof updatedData.amount !== 'undefined') ? Number(updatedData.amount) : tx.amount;
-            if (!this.isValidAmount(amt, wallet.currency)) return false;
-        } else if (tx.type === 'transfer') {
-            const sId = updatedData.sourceId || tx.sourceId;
-            const dId = updatedData.destId || tx.destId;
-            const amt = (typeof updatedData.amount !== 'undefined') ? Number(updatedData.amount) : tx.amount;
-            const preview = this.getTransferPreview('transfer', sId, dId, amt);
-            if (!preview.valid) return false;
-        } else if (tx.type === 'remittance') {
-            const sId = updatedData.sourceId || tx.sourceId;
-            const dId = updatedData.destId || tx.destId;
-            const sAmt = (typeof updatedData.sourceAmount !== 'undefined') ? Number(updatedData.sourceAmount) : tx.sourceAmount;
-            const dAmt = (typeof updatedData.destAmount !== 'undefined') ? Number(updatedData.destAmount) : tx.destAmount;
-            const preview = this.getTransferPreview('remittance', sId, dId, sAmt, dAmt);
-            if (!preview.valid) return false;
+        // 1. Prepare phase: Validate that existing transaction CAN be reversed
+        const revCheck = this.validateTransactionForReversal(tx);
+        if (!revCheck.valid) {
+            console.warn(`[WalletManager] Update aborted - existing transaction cannot be reversed: ${revCheck.error}`);
+            return false;
         }
 
-        // 1. Reverse old financial balance impacts
+        // 2. Prepare phase: Build prospective updated transaction clone
+        const prospectiveTx = JSON.parse(JSON.stringify(tx));
+        if (updatedData.date) prospectiveTx.date = updatedData.date;
+        if (typeof updatedData.note !== 'undefined') prospectiveTx.note = updatedData.note;
+
+        if (tx.type === 'expense') {
+            if (updatedData.walletId) prospectiveTx.walletId = updatedData.walletId;
+            const wallet = storage.state.wallets[prospectiveTx.walletId];
+            if (wallet) {
+                prospectiveTx.currency = wallet.currency;
+                prospectiveTx.region = wallet.region;
+            }
+            if (updatedData.categoryId) prospectiveTx.categoryId = updatedData.categoryId;
+            if (typeof updatedData.amount !== 'undefined') prospectiveTx.amount = Number(updatedData.amount);
+        } else if (tx.type === 'income') {
+            if (updatedData.walletId) prospectiveTx.walletId = updatedData.walletId;
+            const wallet = storage.state.wallets[prospectiveTx.walletId];
+            if (wallet) {
+                prospectiveTx.currency = wallet.currency;
+                prospectiveTx.region = wallet.region;
+            }
+            if (typeof updatedData.amount !== 'undefined') prospectiveTx.amount = Number(updatedData.amount);
+        } else if (tx.type === 'transfer') {
+            if (updatedData.sourceId) prospectiveTx.sourceId = updatedData.sourceId;
+            if (updatedData.destId) prospectiveTx.destId = updatedData.destId;
+            if (typeof updatedData.amount !== 'undefined') prospectiveTx.amount = Number(updatedData.amount);
+            const source = storage.state.wallets[prospectiveTx.sourceId];
+            if (source) prospectiveTx.currency = source.currency;
+        } else if (tx.type === 'remittance') {
+            if (updatedData.sourceId) prospectiveTx.sourceId = updatedData.sourceId;
+            if (updatedData.destId) prospectiveTx.destId = updatedData.destId;
+            if (typeof updatedData.sourceAmount !== 'undefined') prospectiveTx.sourceAmount = Number(updatedData.sourceAmount);
+            if (typeof updatedData.destAmount !== 'undefined') prospectiveTx.destAmount = Number(updatedData.destAmount);
+            const source = storage.state.wallets[prospectiveTx.sourceId];
+            const dest = storage.state.wallets[prospectiveTx.destId];
+            if (source) prospectiveTx.sourceCurrency = source.currency;
+            if (dest) prospectiveTx.destCurrency = dest.currency;
+            if (prospectiveTx.sourceAmount > 0 && prospectiveTx.destAmount > 0) {
+                prospectiveTx.exchangeRate = (prospectiveTx.destAmount / prospectiveTx.sourceAmount).toFixed(6);
+            }
+        }
+
+        // 3. Prepare phase: Validate prospective updated clone before modifying ANY state
+        const applyCheck = this.validateTransactionForApplication(prospectiveTx);
+        if (!applyCheck.valid) {
+            console.warn(`[WalletManager] Update aborted - proposed transaction invalid: ${applyCheck.error}`);
+            return false;
+        }
+
+        // 4. Commit phase: Reverse old financial impacts
         this.reverseTransactionEffects(tx);
 
-        // 2. Update transaction fields in place
-        if (updatedData.date) tx.date = updatedData.date;
-        if (typeof updatedData.note !== 'undefined') tx.note = updatedData.note;
+        // 5. Commit phase: Apply field updates in place (preserving tx ID and metadata)
+        Object.assign(tx, prospectiveTx);
         tx.updatedAt = new Date().toISOString();
 
-        if (tx.type === 'expense') {
-            if (updatedData.walletId) tx.walletId = updatedData.walletId;
-            const wallet = storage.state.wallets[tx.walletId];
-            if (wallet) {
-                tx.currency = wallet.currency;
-                tx.region = wallet.region;
-            }
-            if (updatedData.categoryId) tx.categoryId = updatedData.categoryId;
-            if (typeof updatedData.amount !== 'undefined') tx.amount = Number(updatedData.amount);
-        } else if (tx.type === 'income') {
-            if (updatedData.walletId) tx.walletId = updatedData.walletId;
-            const wallet = storage.state.wallets[tx.walletId];
-            if (wallet) {
-                tx.currency = wallet.currency;
-                tx.region = wallet.region;
-            }
-            if (typeof updatedData.amount !== 'undefined') tx.amount = Number(updatedData.amount);
-        } else if (tx.type === 'transfer') {
-            if (updatedData.sourceId) tx.sourceId = updatedData.sourceId;
-            if (updatedData.destId) tx.destId = updatedData.destId;
-            if (typeof updatedData.amount !== 'undefined') tx.amount = Number(updatedData.amount);
-            const source = storage.state.wallets[tx.sourceId];
-            if (source) tx.currency = source.currency;
-        } else if (tx.type === 'remittance') {
-            if (updatedData.sourceId) tx.sourceId = updatedData.sourceId;
-            if (updatedData.destId) tx.destId = updatedData.destId;
-            if (typeof updatedData.sourceAmount !== 'undefined') tx.sourceAmount = Number(updatedData.sourceAmount);
-            if (typeof updatedData.destAmount !== 'undefined') tx.destAmount = Number(updatedData.destAmount);
-            const source = storage.state.wallets[tx.sourceId];
-            const dest = storage.state.wallets[tx.destId];
-            if (source) tx.sourceCurrency = source.currency;
-            if (dest) tx.destCurrency = dest.currency;
-            if (tx.sourceAmount > 0 && tx.destAmount > 0) {
-                tx.exchangeRate = (tx.destAmount / tx.sourceAmount).toFixed(6);
-            }
-        }
-
-        // 3. Apply new financial balance impacts
+        // 6. Commit phase: Apply new financial impacts
         this.applyTransactionEffects(tx);
 
-        // 4. In Continuous Ledger: Keep chronological sort descending
+        // 7. Commit phase: Re-sort continuous transactions & persist atomically
         this._sortContinuousTransactions();
-
-        // 5. Persist once atomically
         storage.saveData();
         return true;
     }
 
-    // Delete a transaction and reverse its effects
+    // Delete a transaction and reverse its effects with atomicity and wallet existence guarantees
     deleteTransaction(txId) {
         const found = this.findTransaction(txId);
         if (!found) return false;
@@ -666,7 +822,16 @@ class WalletManager {
             return false;
         }
 
-        this.reverseTransactionEffects(found.tx);
+        // Validate that transaction CAN be reversed before touching anything
+        const revCheck = this.validateTransactionForReversal(found.tx);
+        if (!revCheck.valid) {
+            console.warn(`[WalletManager] Cannot delete transaction due to invalid or missing wallet reference: ${revCheck.error}`);
+            return false;
+        }
+
+        // Execute reversal
+        const reversed = this.reverseTransactionEffects(found.tx);
+        if (!reversed) return false;
 
         // 1. Remove from canonical continuous transactions if present
         let deleted = false;

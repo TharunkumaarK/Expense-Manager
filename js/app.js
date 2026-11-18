@@ -918,6 +918,7 @@ class App {
                         <i data-lucide="trending-up" style="width:13px;height:13px;margin-right:6px;"></i>
                         <span id="tx-effective-rate-text">Effective Rate: --</span>
                     </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Calculated from entered amounts sent and received (market rates and transfer fees deferred).</div>
                 </div>
                 <div class="form-group">
                     <label>Note (Optional)</label>

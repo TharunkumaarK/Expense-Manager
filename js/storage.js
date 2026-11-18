@@ -1287,17 +1287,27 @@ class StorageManager {
         }
 
         if (this.state.currentMonthKey !== actualMonth) {
-            this.closeCurrentMonth("Auto Rollover");
+            const previousMonth = this.state.currentMonthKey;
+            // Only auto-close previous month if it has not already been finalized
+            if (!this.state.closedMonths || !this.state.closedMonths[previousMonth] || this.state.closedMonths[previousMonth].status !== 'closed') {
+                this.closeCurrentMonth("Auto Rollover", previousMonth);
+            }
             this.state.currentMonthKey = actualMonth;
             this.saveData();
         }
     }
 
-    closeCurrentMonth(reason = "Manual Close") {
-        const monthKey = this.state.currentMonthKey;
+    closeCurrentMonth(reason = "Manual Close", targetMonthKey = null) {
+        const monthKey = targetMonthKey || this.state.currentMonthKey || this.getCurrentMonthKey();
 
         if (!this.state.closedMonths) {
             this.state.closedMonths = {};
+        }
+
+        // Idempotency Safeguard: An already-closed month must never produce duplicate carryover or alter finalized snapshot
+        if (this.state.closedMonths[monthKey] && this.state.closedMonths[monthKey].status === 'closed') {
+            console.warn(`[StorageManager] Month ${monthKey} is already finalized and closed. Skipping duplicate rollover.`);
+            return this.state.closedMonths[monthKey];
         }
 
         const snapshot = {
@@ -1359,9 +1369,14 @@ class StorageManager {
         // GUARD: Continuous Ledger must NEVER clear this.state.transactions!
         // All transactions remain in the continuous collection.
         this.saveData();
+        return snapshot;
     }
 
     deleteLedger(monthKey) {
+        if (this.state.closedMonths && this.state.closedMonths[monthKey] && this.state.closedMonths[monthKey].status === 'closed') {
+            console.warn(`[StorageManager] Closed month ${monthKey} is permanently sealed. Deletion is prohibited.`);
+            return false;
+        }
         if (this.state.closedMonths) {
             delete this.state.closedMonths[monthKey];
             this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
@@ -1370,6 +1385,12 @@ class StorageManager {
         }
         this._attachHistoryGetters(this.state);
         this.saveData();
+        return true;
+    }
+
+    reopenMonth(monthKey) {
+        console.warn(`[StorageManager] Month ${monthKey} is permanently closed and sealed. Reopening is prohibited.`);
+        return false;
     }
 
     exportJSON() {
