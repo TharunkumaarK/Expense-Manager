@@ -4184,7 +4184,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         opacity: 0;
         transform: translateY(6px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);
@@ -4192,7 +4191,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
     .focus-primary-panel,
     .focus-secondary-panel {
         animation: none !important;
@@ -6252,7 +6250,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 @media (max-width: 420px) {
-
     #analytics-jp-workspace .analytics-kpi-grid,
     .analytics-kpi-grid {
         grid-template-columns: 1fr !important;
@@ -12016,11 +12013,11 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.onboarding-toggle-switch input:checked+.onboarding-toggle-slider {
+.onboarding-toggle-switch input:checked + .onboarding-toggle-slider {
     background-color: #2563eb;
 }
 
-.onboarding-toggle-switch input:checked+.onboarding-toggle-slider:before {
+.onboarding-toggle-switch input:checked + .onboarding-toggle-slider:before {
     transform: translateX(20px);
 }
 
