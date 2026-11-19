@@ -587,7 +587,8 @@
 
                     <div class="header-right">
                         <!-- Desktop Sync Status Indicator -->
-                        <div id="desktop-sync-status-pill" class="sync-status-pill sync-pill-synced" title="All changes saved locally and confirmed in cloud">
+                        <div id="desktop-sync-status-pill" class="sync-status-pill sync-pill-synced"
+                            title="All changes saved locally and confirmed in cloud">
                             <span class="sync-pill-dot"></span>
                             <span class="sync-pill-text">Synced</span>
                         </div>
@@ -617,10 +618,12 @@
                             </div>
                             <div class="recovery-banner-text">
                                 <strong id="recovery-banner-title">Budget Reconciliation Required</strong>
-                                <span id="recovery-banner-desc">Unfinalized accounting months detected. New transactions and automatic rollover are paused until budget history is reconciled.</span>
+                                <span id="recovery-banner-desc">Unfinalized accounting months detected. New transactions
+                                    and automatic rollover are paused until budget history is reconciled.</span>
                             </div>
                         </div>
-                        <button class="btn btn-sm btn-primary recovery-banner-btn" onclick="app.openBudgetRecoveryModal()">
+                        <button class="btn btn-sm btn-primary recovery-banner-btn"
+                            onclick="app.openBudgetRecoveryModal()">
                             <span>Review & Reconcile</span>
                             <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i>
                         </button>
@@ -3175,7 +3178,8 @@
                     </div>
                     <div class="action-type-info">
                         <span class="action-type-name">International Money Transfer</span>
-                        <span class="action-type-desc">Cross-border transfer between accounts with different currencies</span>
+                        <span class="action-type-desc">Cross-border transfer between accounts with different
+                            currencies</span>
                     </div>
                     <i data-lucide="chevron-right" class="action-chevron"></i>
                 </button>
@@ -3355,7 +3359,8 @@
                         We found some months that haven't been finalized. Review your budget history before continuing.
                     </p>
                 </div>
-                <button class="icon-btn" onclick="app.closeBudgetRecoveryModal()" title="Remind me later (read-only mode)">
+                <button class="icon-btn" onclick="app.closeBudgetRecoveryModal()"
+                    title="Remind me later (read-only mode)">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -3602,7 +3607,8 @@
             </div>
             <div class="modal-body" style="padding: 20px 24px;">
                 <p class="text-sm text-secondary" style="margin-top: 0; line-height: 1.45;">
-                    While this device was offline or editing, newer financial transactions were committed from another device.
+                    While this device was offline or editing, newer financial transactions were committed from another
+                    device.
                     To preserve financial integrity, please choose how you would like to resolve this conflict:
                 </p>
                 <div class="conflict-summary-comparison" id="conflict-summary-comparison">
@@ -3613,30 +3619,40 @@
                         <div class="conflict-option-radio"></div>
                         <div class="conflict-option-info">
                             <strong>Accept Cloud & Download Local Backup</strong>
-                            <p class="text-xs text-muted">Adopt the authoritative cloud state while immediately downloading an archival JSON backup of your local unpushed transactions so no records are lost.</p>
+                            <p class="text-xs text-muted">Adopt the authoritative cloud state while immediately
+                                downloading an archival JSON backup of your local unpushed transactions so no records
+                                are lost.</p>
                         </div>
                     </div>
                     <div class="conflict-option-card" onclick="app.resolveSyncConflict('overwrite_cloud')">
                         <div class="conflict-option-radio"></div>
                         <div class="conflict-option-info">
                             <strong>Overwrite Cloud with Local Edits</strong>
-                            <p class="text-xs text-muted">Force-push your local transactions and balances as the new authoritative version, advancing the cloud revision.</p>
+                            <p class="text-xs text-muted">Force-push your local transactions and balances as the new
+                                authoritative version, advancing the cloud revision.</p>
                         </div>
                     </div>
-                    <div class="conflict-option-card disabled" style="opacity: 0.55; cursor: not-allowed; border-style: dashed; pointer-events: none;">
+                    <div class="conflict-option-card disabled"
+                        style="opacity: 0.55; cursor: not-allowed; border-style: dashed; pointer-events: none;">
                         <div class="conflict-option-radio" style="opacity: 0.3;"></div>
                         <div class="conflict-option-info">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <strong>Merge Transactions</strong>
-                                <span style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Disabled for Safety</span>
+                                <span
+                                    style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Disabled
+                                    for Safety</span>
                             </div>
-                            <p class="text-xs text-muted" style="margin-top: 4px;">Automated transaction merging without 3-way balance reconstruction baseline is disabled to prevent wallet balance corruption.</p>
+                            <p class="text-xs text-muted" style="margin-top: 4px;">Automated transaction merging without
+                                3-way balance reconstruction baseline is disabled to prevent wallet balance corruption.
+                            </p>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer" style="padding: 14px 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.15);">
-                <button class="btn btn-secondary btn-sm" onclick="app.closeModal('conflict-resolution-modal')">Review Later</button>
+            <div class="modal-footer"
+                style="padding: 14px 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.15);">
+                <button class="btn btn-secondary btn-sm" onclick="app.closeModal('conflict-resolution-modal')">Review
+                    Later</button>
             </div>
         </div>
     </div>

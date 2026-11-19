@@ -117,12 +117,59 @@ class StorageManager {
         this._attachBudgetAccessors(this.state);
         this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
         this.tabId = 'tab_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
-        this.lastConfirmedCloudRevision = Number(this.state?.revision) || 1;
+        this.lastConfirmedCloudFingerprint = null;
+        this.lastConfirmedCloudRevision = this._loadConfirmedCloudRevision();
         this.activeConflict = null;
         this.syncChannel = null;
         this._inExclusiveTransaction = false;
         this._isSyncWorkerRunning = false;
+        this._lastReloadError = null;
         this.initSyncChannel();
+    }
+
+    /**
+     * Account-scoped synchronization metadata key.
+     */
+    _getSyncMetaKey() {
+        return `${this.getActiveStorageKey()}_sync_meta`;
+    }
+
+    /**
+     * Restore persisted server-confirmed cloud revision for active authenticated account.
+     * Prevents initializing blindly from unconfirmed local revisions.
+     */
+    _loadConfirmedCloudRevision() {
+        if (typeof localStorage !== 'undefined') {
+            try {
+                const raw = localStorage.getItem(this._getSyncMetaKey());
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (typeof parsed?.lastConfirmedCloudRevision === 'number') {
+                        this.lastConfirmedCloudFingerprint = parsed.lastConfirmedFingerprint || null;
+                        return parsed.lastConfirmedCloudRevision;
+                    }
+                }
+            } catch (e) { }
+        }
+        this.lastConfirmedCloudFingerprint = null;
+        return 0;
+    }
+
+    /**
+     * Durably persist server-confirmed cloud revision per authenticated account.
+     */
+    _persistConfirmedCloudRevision(rev, fingerprint = null) {
+        this.lastConfirmedCloudRevision = Number(rev) || 0;
+        this.lastConfirmedCloudFingerprint = fingerprint || (this.state ? this.computeFinancialFingerprint(this.state) : null);
+        if (typeof localStorage !== 'undefined') {
+            try {
+                localStorage.setItem(this._getSyncMetaKey(), JSON.stringify({
+                    lastConfirmedCloudRevision: this.lastConfirmedCloudRevision,
+                    lastConfirmedFingerprint: this.lastConfirmedCloudFingerprint,
+                    lastConfirmedAt: new Date().toISOString()
+                }));
+            } catch (e) { }
+        }
     }
 
     /**
@@ -142,28 +189,77 @@ class StorageManager {
 
     /**
      * Reload authoritative state from local storage.
+     * Fails closed if authoritative state is missing, corrupted, or malformed for established accounts.
      * Guarantees that in-flight mutations always operate against the freshest persisted state.
+     *
+     * @param {Object} [options]
+     * @param {boolean} [options.isInitialization]
+     * @returns {Object|boolean} Truthy state info on success, false on failure (sets this._lastReloadError).
      */
-    reloadAuthoritativeLocalState() {
-        if (typeof localStorage === 'undefined') return false;
-        try {
-            const raw = localStorage.getItem(this.getActiveStorageKey());
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed && typeof parsed === 'object' && parsed.wallets && Array.isArray(parsed.transactions)) {
-                    this.state = parsed;
-                    if (typeof this.state.revision !== 'number') {
-                        this.state.revision = 1;
-                    }
-                    this._attachHistoryGetters(this.state);
-                    this._attachBudgetAccessors(this.state);
-                    return true;
-                }
-            }
-        } catch (e) {
-            console.error('[StorageManager] Failed to reload authoritative local state:', e);
+    reloadAuthoritativeLocalState(options = {}) {
+        this._lastReloadError = null;
+        if (typeof localStorage === 'undefined') {
+            return { ok: true, isMemoryOnly: true };
         }
-        return false;
+        let raw;
+        try {
+            raw = localStorage.getItem(this.getActiveStorageKey());
+        } catch (storageErr) {
+            console.error('[StorageManager] Failed to reload authoritative local state (access error):', storageErr);
+            this._lastReloadError = {
+                ok: false,
+                code: 'STORAGE_UNAVAILABLE',
+                error: `Authoritative local storage access error: ${storageErr.message || String(storageErr)}`
+            };
+            return false;
+        }
+
+        const isEstablished = this.isEstablishedLegacyFinancialData(this.state) ||
+            (this.state && (Number(this.state.revision) > 1 || (Array.isArray(this.state.transactions) && this.state.transactions.length > 0)));
+
+        if (raw === null || raw === undefined || raw.trim() === '') {
+            if (isEstablished && !options.isInitialization) {
+                console.error('[StorageManager] Authoritative local state unexpectedly missing for established account.');
+                this._lastReloadError = {
+                    ok: false,
+                    code: 'STORAGE_UNAVAILABLE',
+                    error: 'Authoritative local storage value is missing for an established account.'
+                };
+                return false;
+            }
+            return { ok: true, isNew: true };
+        }
+
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (jsonErr) {
+            console.error('[StorageManager] Authoritative local state malformed JSON:', jsonErr);
+            this._lastReloadError = {
+                ok: false,
+                code: 'INVALID_STORED_STATE',
+                error: `Authoritative stored data is malformed JSON: ${jsonErr.message || String(jsonErr)}`
+            };
+            return false;
+        }
+
+        if (!parsed || typeof parsed !== 'object' || !parsed.wallets || !Array.isArray(parsed.transactions)) {
+            console.error('[StorageManager] Authoritative local state lacks valid financial structures.');
+            this._lastReloadError = {
+                ok: false,
+                code: 'INVALID_STORED_STATE',
+                error: 'Authoritative stored state lacks valid financial structures.'
+            };
+            return false;
+        }
+
+        this.state = parsed;
+        if (typeof this.state.revision !== 'number') {
+            this.state.revision = 1;
+        }
+        this._attachHistoryGetters(this.state);
+        this._attachBudgetAccessors(this.state);
+        return { ok: true, state: parsed };
     }
 
     /**
@@ -203,8 +299,16 @@ class StorageManager {
         const lockName = this.getLockScopeName();
 
         const pipeline = async () => {
-            // 1. Reload latest authoritative local state
-            this.reloadAuthoritativeLocalState();
+            // 1. Reload latest authoritative local state and fail-closed if corrupted or missing
+            const reloadOk = this.reloadAuthoritativeLocalState(options);
+            if (!reloadOk) {
+                const errObj = this._lastReloadError || {};
+                return {
+                    success: false,
+                    code: errObj.code || 'STORAGE_UNAVAILABLE',
+                    error: errObj.error || 'Authoritative local storage is unavailable or invalid.'
+                };
+            }
 
             // 2. Validate revision if specified
             if (options.expectedRevision !== undefined && this.state.revision !== options.expectedRevision) {
@@ -239,6 +343,17 @@ class StorageManager {
                 return result;
             }
 
+            // Invariant validation: ensure financial state structure remains sound
+            if (!this.state || typeof this.state !== 'object' || !this.state.wallets || !Array.isArray(this.state.transactions)) {
+                this.state = preMutationSnapshot;
+                this._inExclusiveTransaction = false;
+                return {
+                    success: false,
+                    code: 'INVALID_STATE',
+                    error: 'Mutation produced invalid financial invariants.'
+                };
+            }
+
             // 4. Advance revision and timestamp exactly once
             this.state.revision = (Number(this.state.revision) || 0) + 1;
             this.state._updatedAt = new Date().toISOString();
@@ -256,14 +371,15 @@ class StorageManager {
             // 6. Broadcast update event to all other tabs exactly once
             this.broadcastStateChange({
                 type: 'FINANCIAL_STATE_MUTATED',
+                storageKey: this.getActiveStorageKey(),
                 revision: this.state.revision,
                 fingerprint: this.computeFinancialFingerprint(this.state),
                 sourceTabId: this.tabId,
                 timestamp: this.state._updatedAt
             });
 
-            // 7. Enqueue into serialized cloud synchronization queue
-            if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
+            // 7. Enqueue into serialized cloud synchronization queue (unless caller explicitly opted out, e.g. local backup restore)
+            if (!options.skipCloudSync && this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
                 this.enqueueCloudSync(this.state.revision);
             }
 
@@ -333,9 +449,20 @@ class StorageManager {
         try {
             while (typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
                 if (this.cloudSyncStatus === 'CONFLICT') break;
+
+                // Account isolation guard: ensure active session matches StorageManager authenticated context
+                const sessionUserId = supabaseClient.session.user.id;
+                if (!this.currentUserId || this.currentUserId !== sessionUserId) {
+                    console.warn('[Sync Queue] Session user does not match authenticated StorageManager context. Halting worker.');
+                    break;
+                }
+
                 const targetRev = Number(this.state.revision) || 1;
                 const currentConfirmed = Number(this.lastConfirmedCloudRevision) || 0;
-                if (currentConfirmed >= targetRev) {
+                const currentFingerprint = this.computeFinancialFingerprint(this.state);
+
+                // Only confirm if revision AND fingerprint match verified server state
+                if (currentConfirmed >= targetRev && this.lastConfirmedCloudFingerprint === currentFingerprint) {
                     this.cloudSyncStatus = 'CONFIRMED';
                     if (typeof localStorage !== 'undefined') {
                         localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
@@ -448,7 +575,7 @@ class StorageManager {
                 console.warn('[StorageManager] BroadcastChannel unavailable, using storage event fallback:', e);
             }
         }
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
             window.addEventListener('storage', (e) => {
                 if (e.key === `${this.getActiveStorageKey()}_sync_event` && e.newValue) {
                     try {
@@ -490,21 +617,26 @@ class StorageManager {
      */
     handleSyncMessage(data) {
         if (!data || data.sourceTabId === this.tabId) return;
+        if (data.storageKey && data.storageKey !== this.getActiveStorageKey()) return;
+        if (typeof data.revision === 'number' && data.revision <= this.state.revision) return;
+
         if (data.type === 'FINANCIAL_STATE_MUTATED') {
             console.log(`[StorageManager] Cross-tab financial update received (Rev ${data.revision}) from ${data.sourceTabId}`);
             if (typeof app !== 'undefined' && typeof app.isAnyModalDirty === 'function' && app.isAnyModalDirty()) {
                 app.showInModalConflictWarning(data.revision);
             } else {
-                if (data.state && typeof data.state === 'object' && data.state.wallets) {
-                    this.state = data.state;
-                    this._attachHistoryGetters(this.state);
-                    this._attachBudgetAccessors(this.state);
-                } else {
-                    this.reloadAuthoritativeLocalState();
-                }
+                // Prefer reloading authoritative committed local state rather than blindly adopting arbitrary broadcast payload
+                this.reloadAuthoritativeLocalState();
                 if (typeof app !== 'undefined') {
                     if (typeof app.renderAll === 'function') app.renderAll();
-                    if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('SYNCED', 'Synced');
+                    if (typeof app.updateTransferPreview === 'function') app.updateTransferPreview();
+                    // Receiving local broadcast does NOT prove cloud save succeeded: reflect actual pending queue state
+                    if (typeof app.updateSyncStatusPill === 'function') {
+                        const pillStatus = (typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id)
+                            ? 'SYNC_PENDING'
+                            : 'LOCAL_ONLY';
+                        app.updateSyncStatusPill(pillStatus);
+                    }
                 }
             }
         }
@@ -512,6 +644,7 @@ class StorageManager {
 
     /**
      * Handle network recovery.
+     * Routes retries strictly through the serialized cloud queue coordinator.
      */
     onNetworkOnline() {
         console.log('[StorageManager] Network online detected. Attempting pending cloud synchronization...');
@@ -520,7 +653,7 @@ class StorageManager {
             app.updateSyncStatusPill('SYNC_PENDING');
         }
         if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
-            this.pushToSupabase();
+            this.enqueueCloudSync(this.state.revision);
         }
     }
 
@@ -628,8 +761,8 @@ class StorageManager {
             ) + 1;
             this.state._updatedAt = new Date().toISOString();
             this._saveDataDirect();
-            this.lastConfirmedCloudRevision = currentServerRev;
-            const pushed = await this.pushToSupabase({ force: true });
+            // Perform atomic revision-conditional update matching currentServerRev
+            const pushed = await this.pushToSupabase({ expectedRemoteRevision: currentServerRev });
             if (pushed) {
                 this.activeConflict = null;
                 if (typeof localStorage !== 'undefined') {
@@ -641,7 +774,11 @@ class StorageManager {
                 }
                 return { success: true, strategy: 'overwrite_cloud' };
             }
-            return { success: false, error: 'Failed to push local state to Supabase.' };
+            return {
+                success: false,
+                conflict: true,
+                error: 'Server revision advanced during resolution. Server modified by another device. Fresh conflict stashed.'
+            };
         } else if (strategy === 'accept_cloud') {
             console.log('[StorageManager] Accepting cloud state and archiving local draft.');
             // 1. Create durable local backup in localStorage and verify persistence
@@ -682,6 +819,7 @@ class StorageManager {
             }
             this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
             this.lastConfirmedCloudRevision = Number(this.state.revision) || 1;
+            this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision);
             this.cloudSyncStatus = 'CONFIRMED';
             this.activeConflict = null;
             if (typeof localStorage !== 'undefined') {
@@ -816,7 +954,11 @@ class StorageManager {
             this.accountStatus = 'UNRESOLVED';
             this.cloudSyncStatus = 'IDLE';
             this.syncError = null;
+            this.activeConflict = null;
+            this._isSyncWorkerRunning = false;
             this.state = this.loadData();
+            this.lastConfirmedCloudFingerprint = null;
+            this.lastConfirmedCloudRevision = this._loadConfirmedCloudRevision();
             this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
         }
     }
@@ -833,6 +975,10 @@ class StorageManager {
         this.cloudSyncStatus = 'IDLE';
         this.syncError = null;
         this.isFirstLoad = true;
+        this.lastConfirmedCloudRevision = 0;
+        this.lastConfirmedCloudFingerprint = null;
+        this.activeConflict = null;
+        this._isSyncWorkerRunning = false;
         this.state = JSON.parse(JSON.stringify(defaultState));
         this._attachBudgetAccessors(this.state);
     }
@@ -1652,7 +1798,7 @@ class StorageManager {
                             this.state.preferences.onboardingCompleted = true;
                         }
                         this.initialSyncDone = true;
-                        const pushed = await this.pushToSupabase({ force: true });
+                        const pushed = await this.pushToSupabase({ isInitialization: true });
                         this.cloudSyncStatus = pushed ? 'CONFIRMED' : 'FAILED';
                     } else if (isDraft) {
                         console.log('[Sync] Incomplete onboarding draft detected locally. Preserving local draft, deferring cloud push.');
@@ -1694,7 +1840,7 @@ class StorageManager {
                         this.accountStatus = 'EXISTING_USER';
                         this.cloudSyncStatus = 'SYNCING';
                         this.initialSyncDone = true;
-                        const pushed = await this.pushToSupabase({ force: true });
+                        const pushed = await this.pushToSupabase({ isInitialization: true });
                         this.cloudSyncStatus = pushed ? 'CONFIRMED' : 'FAILED';
                     } else if (isDraft) {
                         this.accountStatus = 'ONBOARDING_INCOMPLETE';
@@ -1736,6 +1882,7 @@ class StorageManager {
                 if (localFingerprint === remoteFingerprint) {
                     console.log('[Sync] Local and remote fingerprints match. System in sync.');
                     this.lastConfirmedCloudRevision = Math.max(localRev, remoteRev);
+                    this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision);
                     this.accountStatus = 'EXISTING_USER';
                     this.cloudSyncStatus = 'CONFIRMED';
                     this.initialSyncDone = true;
@@ -1746,12 +1893,12 @@ class StorageManager {
                 }
 
                 // Check pending local edits vs fresh device
-                const localTxCount = this.getUniqueTransactionCount(this.state);
-                const hasPendingLocalEdits = localRev > lastConfirmedRev && !this.isFirstLoad && localTxCount > 0;
+                const hasEstablished = this.hasEstablishedFinancialData(this.state) || this.isEstablishedLegacyFinancialData(this.state);
+                const hasPendingLocalEdits = localRev > lastConfirmedRev && hasEstablished;
 
                 let shouldUseRemote = false;
-                if (this.isFirstLoad || localTxCount === 0) {
-                    // Fresh device / returning user without local transactions adopting cloud
+                if (!hasEstablished) {
+                    // Fresh device / returning user without local data adopting cloud
                     shouldUseRemote = true;
                 } else if (!hasPendingLocalEdits && remoteRev >= localRev) {
                     // Clean fast-forward: cloud has advanced and local has no unpushed edits
@@ -1796,13 +1943,14 @@ class StorageManager {
                     }
 
                     this.lastConfirmedCloudRevision = remoteRev;
+                    this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision);
                     this.isFirstLoad = false;
                     this.initialSyncDone = true;
                     this.checkRollover();
 
                     // Push migrated v3 state to Supabase only after successful validation
                     if (remoteNeedsMigration) {
-                        await this.pushToSupabase({ force: true });
+                        await this.pushToSupabase({ expectedRemoteRevision: remoteRev });
                     }
 
                     if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
@@ -1868,26 +2016,49 @@ class StorageManager {
         }
 
         try {
-            if (options.force) {
-                const { error } = await supabaseClient.client
+            if (options.isInitialization) {
+                // Initial creation of cloud row for a new user / first cloud backup
+                // Uses insert to ensure two devices initializing concurrently cannot overwrite each other
+                const { error: insertErr } = await supabaseClient.client
                     .from('app_state')
-                    .upsert({
+                    .insert({
                         user_id: userId,
                         state: this.state,
                         updated_at: new Date().toISOString()
-                    }, { onConflict: 'user_id' });
+                    });
 
-                if (error) {
-                    console.error("[Sync] Failed to push to Supabase (forced):", error);
-                    this.syncError = error.message || String(error);
+                if (insertErr) {
+                    // If unique constraint violation, another device created the row first
+                    if (insertErr.code === '23505' || String(insertErr.message || '').includes('duplicate key') || String(insertErr.details || '').includes('already exists')) {
+                        console.warn('[Sync] Cloud row already initialized concurrently by another device. Fetching remote row to resolve...');
+                        const { data: remoteRow } = await supabaseClient.client
+                            .from('app_state')
+                            .select('state, updated_at')
+                            .eq('user_id', userId)
+                            .single();
+                        if (remoteRow && remoteRow.state) {
+                            this.stashConflictState(this.state, remoteRow.state);
+                            this.cloudSyncStatus = 'CONFLICT';
+                            if (typeof app !== 'undefined') {
+                                if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                                if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
+                            }
+                        }
+                        return false;
+                    }
+                    console.error("[Sync] Initial cloud row insert failed:", insertErr);
+                    this.syncError = insertErr.message || String(insertErr);
                     this.cloudSyncStatus = 'FAILED';
                     if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
                         app.updateSyncStatusPill('SYNC_FAILED');
                     }
                     return false;
                 }
+
                 this.syncError = null;
                 this.lastConfirmedCloudRevision = Number(this.state.revision) || 1;
+                this.lastConfirmedCloudFingerprint = this.computeFinancialFingerprint(this.state);
+                this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision, this.lastConfirmedCloudFingerprint);
                 this.cloudSyncStatus = 'CONFIRMED';
                 if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
                     app.updateSyncStatusPill('SYNCED');
@@ -1896,33 +2067,12 @@ class StorageManager {
             }
 
             const tableQuery = supabaseClient.client.from('app_state');
-            if (typeof tableQuery.update !== 'function') {
-                const { error } = await tableQuery.upsert({
-                    user_id: userId,
-                    state: this.state,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
 
-                if (error) {
-                    console.error("[Sync] Failed to push to Supabase (upsert fallback):", error);
-                    this.syncError = error.message || String(error);
-                    this.cloudSyncStatus = 'FAILED';
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNC_FAILED');
-                    }
-                    return false;
-                }
-                this.syncError = null;
-                this.lastConfirmedCloudRevision = Number(this.state.revision) || 1;
-                this.cloudSyncStatus = 'CONFIRMED';
-                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                    app.updateSyncStatusPill('SYNCED');
-                }
-                return true;
-            }
+            // Revision-conditional CAS update matching state->>revision
+            const expectedRev = options.expectedRemoteRevision !== undefined
+                ? Number(options.expectedRemoteRevision)
+                : (Number(this.lastConfirmedCloudRevision) || 1);
 
-            // Dual-Layer CAS conditional update matching state->>revision
-            const expectedRev = Number(this.lastConfirmedCloudRevision) || 1;
             const { data, error } = await tableQuery
                 .update({
                     state: this.state,
@@ -1965,6 +2115,8 @@ class StorageManager {
 
             this.syncError = null;
             this.lastConfirmedCloudRevision = Number(this.state.revision) || expectedRev + 1;
+            this.lastConfirmedCloudFingerprint = this.computeFinancialFingerprint(this.state);
+            this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision, this.lastConfirmedCloudFingerprint);
             this.cloudSyncStatus = 'CONFIRMED';
             if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
                 app.updateSyncStatusPill('SYNCED');
@@ -1985,31 +2137,39 @@ class StorageManager {
         const remoteIsValid = remoteState && remoteState.wallets && Array.isArray(remoteState.transactions);
         if (!remoteIsValid) return false;
 
-        // Check the internal timestamp generated by the client that pushed the data
-        const incomingInnerTimestamp = remoteState._updatedAt;
-        const localTimestamp = this.state._updatedAt;
+        const localRev = Number(this.state?.revision || 1);
+        const lastConfirmedRev = Number(this.lastConfirmedCloudRevision || 0);
+        const remoteRev = Number(remoteState.revision || 0);
 
-        // If the timestamps are exactly the same, this is an echo of our own save. Ignore it.
-        if (incomingInnerTimestamp === localTimestamp) {
+        // If local has unconfirmed local edits, never overwrite silently via realtime!
+        if (localRev > lastConfirmedRev) {
+            console.warn('[Realtime] Local has unconfirmed edits. Stashing conflicting remote state.');
+            this.stashConflictState(this.state, remoteState);
+            this.cloudSyncStatus = 'CONFLICT';
+            if (typeof app !== 'undefined') {
+                if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
+            }
             return false;
         }
 
-        const remoteTime = incomingInnerTimestamp ? new Date(incomingInnerTimestamp) : null;
-        const localTime = localTimestamp ? new Date(localTimestamp) : null;
-
-        // If the incoming data is strictly newer than our local state, apply it.
-        if (remoteTime && localTime && remoteTime > localTime) {
-            console.log('[Realtime] Incoming update is newer. Applying...');
-            const preview = this.previewContinuousLedgerMigration(remoteState);
-            if (!preview.success) {
-                console.error('[Realtime] Incoming update failed migration preview:', preview.error);
-                return false;
-            }
-            this.applyContinuousLedgerMigration(preview);
-            this.checkRollover();
-            return true; // signals caller to re-render
+        // If remote revision is not ahead, ignore it
+        if (remoteRev <= localRev) {
+            return false;
         }
-        return false;
+
+        console.log(`[Realtime] Remote state is newer (Rev ${remoteRev} vs local ${localRev}). Applying...`);
+        const preview = this.previewContinuousLedgerMigration(remoteState);
+        if (!preview.success) {
+            console.error('[Realtime] Incoming update failed migration preview:', preview.error);
+            return false;
+        }
+        this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
+        this.lastConfirmedCloudRevision = remoteRev;
+        this.lastConfirmedCloudFingerprint = this.computeFinancialFingerprint(this.state);
+        this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision, this.lastConfirmedCloudFingerprint);
+        this.checkRollover();
+        return true; // signals caller to re-render
     }
 
     saveData() {
@@ -2041,6 +2201,7 @@ class StorageManager {
             }
             this.broadcastStateChange({
                 type: 'FINANCIAL_STATE_MUTATED',
+                storageKey: this.getActiveStorageKey(),
                 revision: this.state.revision,
                 fingerprint: this.computeFinancialFingerprint(this.state),
                 sourceTabId: this.tabId,
@@ -2692,6 +2853,12 @@ class StorageManager {
     }
 
     closeCurrentMonth(reason = "Manual Close", targetMonthKey = null) {
+        if (!this.isInsideExclusiveTransaction()) {
+            return this.runExclusive(async () => {
+                return this.closeCurrentMonth(reason, targetMonthKey);
+            });
+        }
+
         const monthKey = targetMonthKey || this.state.currentMonthKey || this.getCurrentMonthKey();
 
         if (!this.state.closedMonths) {
@@ -2710,6 +2877,7 @@ class StorageManager {
             closedAt: new Date().toISOString(),
             reason: reason,
             walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets || {})),
+            categoriesSnapshot: JSON.parse(JSON.stringify(this.state.categories || {})),
             status: 'closed'
         };
 
@@ -2770,6 +2938,12 @@ class StorageManager {
     }
 
     deleteLedger(monthKey) {
+        if (!this.isInsideExclusiveTransaction()) {
+            return this.runExclusive(async () => {
+                return this.deleteLedger(monthKey);
+            });
+        }
+
         if (this.state.closedMonths && this.state.closedMonths[monthKey] && this.state.closedMonths[monthKey].status === 'closed') {
             console.warn(`[StorageManager] Closed month ${monthKey} is permanently sealed. Deletion is prohibited.`);
             return false;
@@ -2838,7 +3012,7 @@ class StorageManager {
 
     importJSON(file, callback) {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const parsed = JSON.parse(e.target.result);
                 const validation = this.validateBackupData(parsed);
@@ -2849,20 +3023,66 @@ class StorageManager {
 
                 const targetData = validation.normalizedData || this.normalizeBackupPayload(parsed);
 
-                // Migrate to continuous ledger if needed via Two-Phase pipeline
+                // Migrate to continuous ledger if needed via Two-Phase pipeline within exclusive coordinator
                 const preview = this.previewContinuousLedgerMigration(targetData);
                 if (!preview.success) {
                     callback(false, preview.error);
                     return;
                 }
-                this.applyContinuousLedgerMigration(preview);
-                this.saveData();
-                callback(true, null, validation);
+                const res = await this.runExclusive(async (state) => {
+                    return this.applyContinuousLedgerMigration(preview);
+                }, { skipCloudSync: true });
+                if (res && res.success !== false) {
+                    // Reset confirmed cloud metadata so imported data does not falsely claim cloud confirmation
+                    // and will never automatically overwrite newer cloud data without explicit conflict review
+                    this.lastConfirmedCloudRevision = 0;
+                    this.lastConfirmedCloudFingerprint = null;
+                    this._persistConfirmedCloudRevision(0, null);
+                    this.cloudSyncStatus = 'LOCAL_SAVED';
+                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                        app.updateSyncStatusPill('LOCAL_SAVED', 'Restored Locally');
+                    }
+                    callback(true, null, validation);
+                } else {
+                    callback(false, res?.error || 'Failed to apply backup migration within coordinator lock.');
+                }
             } catch (err) {
                 callback(false, 'Malformed JSON file: ' + err.message);
             }
         };
         reader.readAsText(file);
+    }
+
+    /**
+     * Safely update a wallet's opening balance within the coordinated mutation boundary.
+     * @param {string} walletId
+     * @param {number} balance
+     * @returns {Promise<boolean>|boolean}
+     */
+    setWalletOpeningBalance(walletId, balance) {
+        if (!walletId || balance === undefined) return false;
+        let num = Number(balance);
+        if (isNaN(num) || !isFinite(num) || Math.abs(num) > 1e12) return false;
+
+        const mutate = (state) => {
+            if (state.wallets && state.wallets[walletId]) {
+                const w = state.wallets[walletId];
+                const cur = (w.currency || '').toUpperCase();
+                if (cur === '¥' || cur === 'JPY') {
+                    num = Math.round(num);
+                } else {
+                    num = Math.round(num * 100) / 100;
+                }
+                w.balance = num;
+                return true;
+            }
+            return false;
+        };
+
+        if (this.isInsideExclusiveTransaction()) {
+            return mutate(this.state);
+        }
+        return this.runExclusive(async (state) => mutate(state));
     }
 
     // ===== Phase 2: User Preferences & Account Configuration API =====
@@ -3190,38 +3410,44 @@ class StorageManager {
      */
     setBudgetEnabled(countryCode, enabled, monthlyTotal = null, rolloverEnabled = null) {
         if (!countryCode) return;
-        const code = countryCode.toUpperCase();
-        if (!this.state.budgets) {
-            this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
-        }
-        if (!this.state.budgets[code]) {
-            this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
-        }
+        const mutate = (state) => {
+            const code = countryCode.toUpperCase();
+            if (!state.budgets) {
+                state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+            }
+            if (!state.budgets[code]) {
+                state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
+            }
 
-        this.state.budgets[code].enabled = Boolean(enabled);
-        if (monthlyTotal !== null && !isNaN(Number(monthlyTotal))) {
-            this.state.budgets[code].monthlyTotal = Number(monthlyTotal);
-        }
-        if (rolloverEnabled !== null) {
-            this.state.budgets[code].rolloverEnabled = Boolean(rolloverEnabled);
-        }
-        if (typeof this.state.budgets[code].carryover !== 'number') {
-            this.state.budgets[code].carryover = 0;
-        }
-        if (!this.state.budgets[code].enabled || !this.state.budgets[code].rolloverEnabled) {
-            this.state.budgets[code].carryover = 0;
-        }
+            state.budgets[code].enabled = Boolean(enabled);
+            if (monthlyTotal !== null && !isNaN(Number(monthlyTotal))) {
+                state.budgets[code].monthlyTotal = Number(monthlyTotal);
+            }
+            if (rolloverEnabled !== null) {
+                state.budgets[code].rolloverEnabled = Boolean(rolloverEnabled);
+            }
+            if (typeof state.budgets[code].carryover !== 'number') {
+                state.budgets[code].carryover = 0;
+            }
+            if (!state.budgets[code].enabled || !state.budgets[code].rolloverEnabled) {
+                state.budgets[code].carryover = 0;
+            }
 
-        // Keep legacy properties in sync
-        if (code === 'JP') {
-            this.state.jpTotalBudget = this.state.budgets.JP.monthlyTotal;
-            this.state.jpBudgetRolloverEnabled = this.state.budgets.JP.rolloverEnabled;
-        } else if (code === 'IN') {
-            this.state.inTotalBudget = this.state.budgets.IN.monthlyTotal;
-            this.state.inBudgetRolloverEnabled = this.state.budgets.IN.rolloverEnabled;
-        }
+            // Keep legacy properties in sync
+            if (code === 'JP') {
+                state.jpTotalBudget = state.budgets.JP.monthlyTotal;
+                state.jpBudgetRolloverEnabled = state.budgets.JP.rolloverEnabled;
+            } else if (code === 'IN') {
+                state.inTotalBudget = state.budgets.IN.monthlyTotal;
+                state.inBudgetRolloverEnabled = state.budgets.IN.rolloverEnabled;
+            }
+            return true;
+        };
 
-        this.saveData();
+        if (this.isInsideExclusiveTransaction()) {
+            return mutate(this.state);
+        }
+        return this.runExclusive(async (state) => mutate(state));
     }
 
     /**
@@ -3236,18 +3462,28 @@ class StorageManager {
         const code = (key === 'jpTotalBudget' || key === 'JP' || key === 'JPY') ? 'JP' :
             (key === 'inTotalBudget' || key === 'IN' || key === 'INR') ? 'IN' :
                 (key === 'DE' || key === 'EUR') ? 'DE' : key.toUpperCase();
-        const num = Number(amount) || 0;
+        let num = Number(amount) || 0;
+        if (code === 'JP') num = Math.round(num);
+        else num = Math.round(num * 100) / 100;
 
-        if (!this.state.budgets) {
-            this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
-        }
-        if (!this.state.budgets[code]) {
-            this.state.budgets[code] = { enabled: true, monthlyTotal: num, rolloverEnabled: code === 'JP' };
-        } else {
-            this.state.budgets[code].monthlyTotal = num;
-        }
+        const mutate = (state) => {
+            if (!state.budgets) {
+                state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+            }
+            if (!state.budgets[code]) {
+                state.budgets[code] = { enabled: true, monthlyTotal: num, rolloverEnabled: code === 'JP' };
+            } else {
+                state.budgets[code].monthlyTotal = num;
+            }
+            if (code === 'JP') state.jpTotalBudget = num;
+            else if (code === 'IN') state.inTotalBudget = num;
+            return true;
+        };
 
-        this.saveData();
+        if (this.isInsideExclusiveTransaction()) {
+            return mutate(this.state);
+        }
+        return this.runExclusive(async (state) => mutate(state));
     }
 
     /**
@@ -3264,22 +3500,29 @@ class StorageManager {
      * @param {Object} [options]
      */
     setLoanTrackingEnabled(enabled, options = {}) {
-        if (!this.state.loanConfig) {
-            this.state.loanConfig = JSON.parse(JSON.stringify(defaultState.loanConfig));
+        const mutate = (state) => {
+            if (!state.loanConfig) {
+                state.loanConfig = JSON.parse(JSON.stringify(defaultState.loanConfig));
+            }
+            state.loanConfig.enabled = Boolean(enabled);
+            if (options && typeof options === 'object') {
+                if (options.country) state.loanConfig.country = options.country;
+                if (options.currency) state.loanConfig.currency = options.currency;
+                if (typeof options.totalPrincipal === 'number') state.loanConfig.totalPrincipal = options.totalPrincipal;
+                if (typeof options.principalLeft === 'number') state.loanConfig.principalLeft = options.principalLeft;
+                if (typeof options.emi === 'number') state.loanConfig.emi = options.emi;
+                if (typeof options.annualInterestRate === 'number') state.loanConfig.annualInterestRate = options.annualInterestRate;
+                if (typeof options.emiDrawDate === 'number') state.loanConfig.emiDrawDate = options.emiDrawDate;
+                if (typeof options.totalDues === 'number') state.loanConfig.totalDues = options.totalDues;
+                if (typeof options.duesPaid === 'number') state.loanConfig.duesPaid = options.duesPaid;
+            }
+            return true;
+        };
+
+        if (this.isInsideExclusiveTransaction()) {
+            return mutate(this.state);
         }
-        this.state.loanConfig.enabled = Boolean(enabled);
-        if (options && typeof options === 'object') {
-            if (options.country) this.state.loanConfig.country = options.country;
-            if (options.currency) this.state.loanConfig.currency = options.currency;
-            if (typeof options.totalPrincipal === 'number') this.state.loanConfig.totalPrincipal = options.totalPrincipal;
-            if (typeof options.principalLeft === 'number') this.state.loanConfig.principalLeft = options.principalLeft;
-            if (typeof options.emi === 'number') this.state.loanConfig.emi = options.emi;
-            if (typeof options.annualInterestRate === 'number') this.state.loanConfig.annualInterestRate = options.annualInterestRate;
-            if (typeof options.emiDrawDate === 'number') this.state.loanConfig.emiDrawDate = options.emiDrawDate;
-            if (typeof options.totalDues === 'number') this.state.loanConfig.totalDues = options.totalDues;
-            if (typeof options.duesPaid === 'number') this.state.loanConfig.duesPaid = options.duesPaid;
-        }
-        this.saveData();
+        return this.runExclusive(async (state) => mutate(state));
     }
 
     /**
@@ -3328,7 +3571,12 @@ class StorageManager {
         }
 
         // 3. Attempt cloud synchronization
-        const pushSuccess = await this.pushToSupabase({ allowOnboardingPersist: true, force: true });
+        const isInit = this.isFirstLoad || !this.lastConfirmedCloudRevision;
+        const pushSuccess = await this.pushToSupabase({
+            allowOnboardingPersist: true,
+            isInitialization: isInit,
+            expectedRemoteRevision: !isInit ? this.lastConfirmedCloudRevision : undefined
+        });
         if (pushSuccess) {
             this.accountStatus = 'EXISTING_USER';
             this.cloudSyncStatus = 'CONFIRMED';
@@ -3369,7 +3617,12 @@ class StorageManager {
         }
 
         this.cloudSyncStatus = 'SYNCING';
-        const pushSuccess = await this.pushToSupabase({ allowOnboardingPersist: true, force: true });
+        const isInitRetry = this.isFirstLoad || !this.lastConfirmedCloudRevision;
+        const pushSuccess = await this.pushToSupabase({
+            allowOnboardingPersist: true,
+            isInitialization: isInitRetry,
+            expectedRemoteRevision: !isInitRetry ? this.lastConfirmedCloudRevision : undefined
+        });
         if (pushSuccess) {
             this.accountStatus = 'EXISTING_USER';
             this.cloudSyncStatus = 'CONFIRMED';

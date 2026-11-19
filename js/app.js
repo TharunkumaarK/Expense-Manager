@@ -1576,6 +1576,27 @@ class App {
             return true;
         }
 
+        // 4. Wallet configuration modals
+        const editWalletModal = document.getElementById('edit-wallet-modal');
+        if (isModalOpen(editWalletModal)) {
+            return true;
+        }
+        const addWalletModal = document.getElementById('add-wallet-modal');
+        if (isModalOpen(addWalletModal)) {
+            const name = document.getElementById('add-wallet-name')?.value;
+            if (name && name.trim() !== '') return true;
+        }
+
+        // 5. Category manage and Quick edit modals
+        const catModal = document.getElementById('category-manage-modal');
+        if (isModalOpen(catModal)) {
+            return true;
+        }
+        const qeModal = document.getElementById('quick-edit-modal');
+        if (isModalOpen(qeModal)) {
+            return true;
+        }
+
         return false;
     }
 
@@ -1586,6 +1607,14 @@ class App {
      */
     showInModalConflictWarning(newRevision) {
         const isModalOpen = (el) => el && (el.classList.contains('active') || (el.style.display && el.style.display !== 'none'));
+        const bannerHtml = `
+            <i data-lucide="alert-triangle"></i>
+            <div class="modal-conflict-text">
+                <strong>Financial Update in Another Window (Rev #${newRevision})</strong>
+                <span>Ledger balances were updated elsewhere. Your inputs are preserved. Click Save to re-validate and apply against current balances.</span>
+            </div>
+        `;
+
         const txModal = document.getElementById('transaction-modal');
         if (isModalOpen(txModal)) {
             let banner = document.getElementById('tx-modal-conflict-banner');
@@ -1594,18 +1623,43 @@ class App {
                 banner.id = 'tx-modal-conflict-banner';
                 banner.className = 'modal-conflict-banner';
                 const content = document.getElementById('modal-content');
-                if (content) {
-                    content.insertBefore(banner, content.firstChild);
-                }
+                if (content) content.insertBefore(banner, content.firstChild);
             }
-            banner.innerHTML = `
-                <i data-lucide="alert-triangle"></i>
-                <div class="modal-conflict-text">
-                    <strong>Financial Update in Another Window (Rev #${newRevision})</strong>
-                    <span>Ledger balances were updated elsewhere. Your inputs are preserved. Click Save to re-validate and apply against current balances.</span>
-                </div>
-            `;
+            banner.innerHTML = bannerHtml;
             if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+            return;
+        }
+
+        const editWalletModal = document.getElementById('edit-wallet-modal');
+        if (isModalOpen(editWalletModal)) {
+            let banner = document.getElementById('edit-wallet-conflict-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'edit-wallet-conflict-banner';
+                banner.className = 'modal-conflict-banner';
+                banner.style.margin = '10px 16px';
+                const content = editWalletModal.querySelector('.sheet-content');
+                if (content) content.insertBefore(banner, content.firstChild);
+            }
+            banner.innerHTML = bannerHtml;
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+            return;
+        }
+
+        const ovModal = document.getElementById('overall-budget-modal');
+        if (isModalOpen(ovModal)) {
+            let banner = document.getElementById('overall-budget-conflict-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'overall-budget-conflict-banner';
+                banner.className = 'modal-conflict-banner';
+                banner.style.margin = '10px 16px';
+                const body = ovModal.querySelector('.modal-body') || ovModal.firstElementChild;
+                if (body) body.insertBefore(banner, body.firstChild);
+            }
+            banner.innerHTML = bannerHtml;
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+            return;
         }
     }
 
@@ -1704,10 +1758,26 @@ class App {
     }
 
     /**
-     * Resolve cloud conflict through user selection.
+     * Resolve cloud conflict through user selection with explicit confirmation.
      * @param {'overwrite_cloud' | 'accept_cloud'} strategy
      */
     async resolveSyncConflict(strategy) {
+        if (strategy === 'overwrite_cloud') {
+            const confirmed = confirm(
+                'Are you sure you want to overwrite cloud records with local edits?\n\n' +
+                'This will replace cloud transactions and balances with the version from this device.\n' +
+                'A complete backup of the replaced cloud state will be safely saved in local storage before overwriting.'
+            );
+            if (!confirmed) return;
+        } else if (strategy === 'accept_cloud') {
+            const confirmed = confirm(
+                'Are you sure you want to adopt the cloud version?\n\n' +
+                'This will replace your local edits with the cloud records.\n' +
+                'A complete archival backup of your local edits will be saved before adopting cloud data.'
+            );
+            if (!confirmed) return;
+        }
+
         const res = await storage.resolveConflict(strategy);
         if (res && res.success) {
             this.closeModal('conflict-resolution-modal');
@@ -1759,7 +1829,7 @@ class App {
         document.getElementById('quick-edit-modal').classList.add('active');
     }
 
-    saveQuickEdit() {
+    async saveQuickEdit() {
         const type = document.getElementById('quick-edit-type').value;
         const id = document.getElementById('quick-edit-id').value;
         const region = document.getElementById('quick-edit-region').value;
@@ -1768,14 +1838,10 @@ class App {
         if (isNaN(amt)) return;
 
         if (type === 'wallet') {
-            this.updateWalletBalance(id, amt);
+            await this.updateWalletBalance(id, amt);
         } else if (type === 'category') {
-            const cat = storage.state.categories[region].find(c => c.id === id);
-            if (cat) {
-                cat.budget = amt;
-                storage.saveData();
-                this.renderAll();
-            }
+            await this.updateCategoryBudget(id, amt);
+            this.renderAll();
         }
 
         this.closeModal('quick-edit-modal');
@@ -2198,20 +2264,22 @@ class App {
         this.renderSettingsPage();
     }
 
-    updateLoanPref(field, value) {
-        if (!storage.state.loanConfig) storage.state.loanConfig = { enabled: false };
-        if (field === 'enabled') {
-            storage.state.loanConfig.enabled = Boolean(value);
-            if (storage.state.preferences?.loanTracking) {
-                storage.state.preferences.loanTracking.enabled = Boolean(value);
+    async updateLoanPref(field, value) {
+        await storage.runExclusive(async (state) => {
+            if (!state.loanConfig) state.loanConfig = { enabled: false };
+            if (field === 'enabled') {
+                state.loanConfig.enabled = Boolean(value);
+                if (state.preferences?.loanTracking) {
+                    state.preferences.loanTracking.enabled = Boolean(value);
+                }
+            } else {
+                const num = parseFloat(value);
+                if (!isNaN(num)) {
+                    state.loanConfig[field] = num;
+                }
             }
-        } else {
-            const num = parseFloat(value);
-            if (!isNaN(num)) {
-                storage.state.loanConfig[field] = num;
-            }
-        }
-        storage.saveData();
+            return true;
+        });
         this.renderLoanTracker();
         this.renderSettingsPage();
     }
@@ -2263,29 +2331,35 @@ class App {
         if (menu) menu.classList.remove('active');
     }
 
-    updateUserProfile(field, value) {
-        if (!storage.state.userProfile) storage.state.userProfile = {};
-        storage.state.userProfile[field] = value.trim();
-        storage.saveData();
+    async updateUserProfile(field, value) {
+        await storage.runExclusive(async (state) => {
+            if (!state.userProfile) state.userProfile = {};
+            state.userProfile[field] = (value || '').trim();
+            return true;
+        });
         this.updateDesktopAccountInfo();
     }
 
-    updateRegionalPreference(field, value) {
-        if (!storage.state.regionalPreferences) {
-            storage.state.regionalPreferences = { ...defaultState.regionalPreferences };
-        }
-        storage.state.regionalPreferences[field] = value;
-        storage.saveData();
+    async updateRegionalPreference(field, value) {
+        await storage.runExclusive(async (state) => {
+            if (!state.regionalPreferences) {
+                state.regionalPreferences = { ...defaultState.regionalPreferences };
+            }
+            state.regionalPreferences[field] = value;
+            return true;
+        });
         // Changing regional presentation does NOT rewrite historical ledger amounts or wallet currencies
         this.renderAll();
     }
 
-    updatePrivacyPreference(field, value) {
-        if (!storage.state.privacyPreferences) {
-            storage.state.privacyPreferences = { ...defaultState.privacyPreferences };
-        }
-        storage.state.privacyPreferences[field] = value;
-        storage.saveData();
+    async updatePrivacyPreference(field, value) {
+        await storage.runExclusive(async (state) => {
+            if (!state.privacyPreferences) {
+                state.privacyPreferences = { ...defaultState.privacyPreferences };
+            }
+            state.privacyPreferences[field] = value;
+            return true;
+        });
 
         if (field === 'timeoutMinutes') {
             const mins = Number(value);
@@ -2427,7 +2501,7 @@ class App {
         if (previewContainer) previewContainer.style.display = 'none';
     }
 
-    confirmRestore() {
+    async confirmRestore() {
         if (!this._pendingRestoreData) {
             alert('No valid backup data selected.');
             return;
@@ -2436,38 +2510,76 @@ class App {
         if (!confirmed) return;
 
         try {
-            const migrated = storage.migrateToContinuousLedger(this._pendingRestoreData);
-            storage._attachHistoryGetters(migrated);
-            storage.state = migrated;
-            storage.saveData();
-            this._pendingRestoreData = null;
-            this.cancelRestore();
-            alert('Backup successfully restored! Refreshing workspace...');
-            this.init();
-            this.renderAll();
+            const backupToRestore = this._pendingRestoreData;
+            const res = await storage.runExclusive(async (state) => {
+                const preview = storage.previewContinuousLedgerMigration(backupToRestore);
+                if (!preview.success) {
+                    return { success: false, error: preview.error || 'Backup validation failed.' };
+                }
+                const migrated = preview.migratedState;
+                storage._attachHistoryGetters(migrated);
+                storage._attachBudgetAccessors(migrated);
+                storage.state = migrated;
+                return true;
+            }, { skipCloudSync: true });
+
+            if (res && res.success !== false) {
+                this._pendingRestoreData = null;
+                this.cancelRestore();
+                // Reset confirmed cloud metadata so restored data never automatically overwrites cloud
+                storage.lastConfirmedCloudRevision = 0;
+                storage.lastConfirmedCloudFingerprint = null;
+                storage._persistConfirmedCloudRevision(0, null);
+                storage.cloudSyncStatus = 'LOCAL_SAVED';
+                this.updateSyncStatusPill('LOCAL_SAVED', 'Restored Locally');
+                alert('Backup successfully restored! Refreshing workspace...');
+                this.init();
+                this.renderAll();
+            } else {
+                alert('Restoration error: ' + (res?.error || 'Failed to restore backup.'));
+            }
         } catch (err) {
             alert('Restoration error: ' + err.message);
         }
     }
 
-    updateWalletBalance(id, val) {
+    async updateWalletBalance(id, val) {
         if (val === '' || isNaN(val)) return;
-        if (storage.state.wallets[id]) {
-            storage.state.wallets[id].balance = Number(val);
-            storage.saveData();
+        let numVal = Number(val);
+        if (!isFinite(numVal) || Math.abs(numVal) > 1e12) return;
+        const res = await storage.runExclusive(async (state) => {
+            if (state.wallets && state.wallets[id]) {
+                const w = state.wallets[id];
+                const cur = (w.currency || '').toUpperCase();
+                if (cur === '¥' || cur === 'JPY') numVal = Math.round(numVal);
+                else numVal = Math.round(numVal * 100) / 100;
+                w.balance = numVal;
+                return true;
+            }
+            return false;
+        });
+        if (res && res.success !== false) {
+            this.renderAll();
             this.renderWallets();
         }
     }
 
-    removeCategory(region, id) {
+    async removeCategory(region, id) {
         if (!confirm('Remove this category?')) return;
-        storage.state.categories[region] = storage.state.categories[region].filter(c => c.id !== id);
-        storage.saveData();
-        this.renderSettings();
-        lucide.createIcons();
+        const res = await storage.runExclusive(async (state) => {
+            if (state.categories && state.categories[region]) {
+                state.categories[region] = state.categories[region].filter(c => c.id !== id);
+                return true;
+            }
+            return false;
+        });
+        if (res && res.success !== false) {
+            this.renderSettings();
+            if (window.lucide && lucide.createIcons) lucide.createIcons();
+        }
     }
 
-    addCategory(region) {
+    async addCategory(region) {
         const nameEl = document.getElementById(`new-cat-name-${region}`);
         const name = nameEl ? nameEl.value.trim() : '';
         if (!name) return alert('Please enter a category name.');
@@ -2480,19 +2592,35 @@ class App {
             newCat.budget = budgetEl ? Number(budgetEl.value) || 0 : 0;
         }
 
-        storage.state.categories[region].push(newCat);
-        storage.saveData();
-        this.renderSettings();
-        lucide.createIcons();
+        const res = await storage.runExclusive(async (state) => {
+            if (!state.categories) state.categories = {};
+            if (!state.categories[region]) state.categories[region] = [];
+            state.categories[region].push(newCat);
+            return true;
+        });
+
+        if (res && res.success !== false) {
+            this.renderSettings();
+            if (window.lucide && lucide.createIcons) lucide.createIcons();
+        }
     }
 
-    updateCategoryBudget(id, val) {
+    async updateCategoryBudget(id, val) {
         if (val === '' || isNaN(val)) return;
-        const cat = storage.state.categories.JP.find(c => c.id === id);
-        if (cat) {
-            cat.budget = Number(val);
-            storage.saveData();
-        }
+        const numVal = Number(val);
+        if (!isFinite(numVal) || numVal < 0 || numVal > 1e12) return;
+        await storage.runExclusive(async (state) => {
+            let found = null;
+            for (const r of ['JP', 'IN', 'DE']) {
+                const cat = (state.categories?.[r] || []).find(c => c.id === id);
+                if (cat) {
+                    cat.budget = (r === 'JP') ? Math.round(numVal) : Math.round(numVal * 100) / 100;
+                    found = cat;
+                    break;
+                }
+            }
+            return Boolean(found);
+        });
     }
 
     // Converts a hex color into inline gradient styles for wallet cards
@@ -2511,7 +2639,7 @@ class App {
         };
     }
 
-    addWallet() {
+    async addWallet() {
         const name = (document.getElementById('new-wallet-name').value || '').trim();
         if (!name) return alert('Please enter a wallet name.');
         if (storage.state.wallets[name]) return alert('A wallet with this name already exists.');
@@ -2519,37 +2647,90 @@ class App {
         const type = document.getElementById('new-wallet-type').value;
         const region = document.getElementById('new-wallet-region').value;
         const color = document.getElementById('new-wallet-color').value || WALLET_COLORS[0];
-        const currency = region === 'JP' ? '¥' : '₹';
+        const currency = region === 'JP' ? '¥' : (region === 'DE' ? '€' : '₹');
 
-        storage.state.wallets[name] = { id: name, type, region, balance: 0, currency, color };
-        storage.saveData();
-        this.renderAll();
-        this.renderSettings();
-        lucide.createIcons();
+        const res = await storage.runExclusive(async (state) => {
+            if (state.wallets[name]) {
+                return { success: false, error: 'A wallet with this name already exists.' };
+            }
+            state.wallets[name] = { id: name, type, region, balance: 0, currency, color };
+            return true;
+        });
+
+        if (res && res.success !== false) {
+            this.renderAll();
+            this.renderSettings();
+            if (window.lucide && lucide.createIcons) lucide.createIcons();
+        } else {
+            alert(res?.error || 'Failed to add wallet.');
+        }
     }
 
-    removeWallet(id) {
-        const txCount = storage.state.transactions.filter(tx =>
-            tx.walletId === id || tx.sourceId === id || tx.destId === id
-        ).length;
-        const msg = txCount > 0
-            ? `"${id}" has ${txCount} transaction(s). They stay in history but wallet will be removed. Continue?`
-            : `Remove wallet "${id}"?`;
-        if (!confirm(msg)) return;
-        delete storage.state.wallets[id];
-        storage.saveData();
-        this.renderAll();
-        this.renderSettings();
-        lucide.createIcons();
+    /**
+     * Check if a wallet is referenced anywhere in continuous transactions or historical archives.
+     * Prevents destructive deletion of wallets referenced in past records.
+     */
+    isWalletReferenced(state, walletId) {
+        if (!state || !walletId) return false;
+        if (Array.isArray(state.transactions)) {
+            if (state.transactions.some(tx => tx.walletId === walletId || tx.sourceId === walletId || tx.destId === walletId)) {
+                return true;
+            }
+        }
+        if (state.closedMonths) {
+            for (const m of Object.values(state.closedMonths)) {
+                if (Array.isArray(m?.transactions) && m.transactions.some(tx => tx.walletId === walletId || tx.sourceId === walletId || tx.destId === walletId)) {
+                    return true;
+                }
+            }
+        }
+        if (Array.isArray(state.history)) {
+            for (const h of state.history) {
+                if (Array.isArray(h?.transactions) && h.transactions.some(tx => tx.walletId === walletId || tx.sourceId === walletId || tx.destId === walletId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
-    updateWalletColor(id, color) {
-        if (storage.state.wallets[id]) {
-            storage.state.wallets[id].color = color;
-            storage.saveData();
+    async removeWallet(id) {
+        if (this.isWalletReferenced(storage.state, id)) {
+            alert(`Cannot delete wallet "${id}" because it is referenced by historical transactions, transfers, or remittances. Deleting it would leave orphaned references and break financial accounting. You may set its balance to 0 instead.`);
+            return;
+        }
+
+        if (!confirm(`Remove wallet "${id}"?`)) return;
+
+        const res = await storage.runExclusive(async (state) => {
+            if (this.isWalletReferenced(state, id)) {
+                return { success: false, error: `Cannot delete wallet "${id}" because it is referenced by historical records.` };
+            }
+            delete state.wallets[id];
+            return true;
+        });
+
+        if (res && res.success !== false) {
+            this.renderAll();
+            this.renderSettings();
+            if (window.lucide && lucide.createIcons) lucide.createIcons();
+        } else {
+            alert(res?.error || 'Failed to remove wallet.');
+        }
+    }
+
+    async updateWalletColor(id, color) {
+        const res = await storage.runExclusive(async (state) => {
+            if (state.wallets && state.wallets[id]) {
+                state.wallets[id].color = color;
+                return true;
+            }
+            return false;
+        });
+        if (res && res.success !== false) {
             this.renderWallets();
             this.renderSettings();
-            lucide.createIcons();
+            if (window.lucide && lucide.createIcons) lucide.createIcons();
         }
     }
 
@@ -2619,39 +2800,44 @@ class App {
         });
     }
 
-    reorderWallets(draggedId, targetId) {
-        const keys = Object.keys(storage.state.wallets);
-        const draggedIndex = keys.indexOf(draggedId);
-        const targetIndex = keys.indexOf(targetId);
+    async reorderWallets(draggedId, targetId) {
+        await storage.runExclusive(async (state) => {
+            const keys = Object.keys(state.wallets || {});
+            const draggedIndex = keys.indexOf(draggedId);
+            const targetIndex = keys.indexOf(targetId);
 
-        if (draggedIndex === -1 || targetIndex === -1) return;
+            if (draggedIndex === -1 || targetIndex === -1) return false;
 
-        keys.splice(draggedIndex, 1);
-        keys.splice(targetIndex, 0, draggedId);
+            keys.splice(draggedIndex, 1);
+            keys.splice(targetIndex, 0, draggedId);
 
-        const newWallets = {};
-        keys.forEach(k => newWallets[k] = storage.state.wallets[k]);
-        storage.state.wallets = newWallets;
+            const newWallets = {};
+            keys.forEach(k => newWallets[k] = state.wallets[k]);
+            state.wallets = newWallets;
+            return true;
+        });
 
-        storage.saveData();
         this.renderAll();
         this.renderSettings();
-        lucide.createIcons();
+        if (window.lucide && lucide.createIcons) lucide.createIcons();
     }
 
-    reorderCategories(region, draggedId, targetId) {
-        const cats = storage.state.categories[region];
-        const draggedIndex = cats.findIndex(c => c.id === draggedId);
-        const targetIndex = cats.findIndex(c => c.id === targetId);
+    async reorderCategories(region, draggedId, targetId) {
+        await storage.runExclusive(async (state) => {
+            const cats = state.categories?.[region];
+            if (!cats) return false;
+            const draggedIndex = cats.findIndex(c => c.id === draggedId);
+            const targetIndex = cats.findIndex(c => c.id === targetId);
 
-        if (draggedIndex === -1 || targetIndex === -1) return;
+            if (draggedIndex === -1 || targetIndex === -1) return false;
 
-        const [draggedItem] = cats.splice(draggedIndex, 1);
-        cats.splice(targetIndex, 0, draggedItem);
+            const [draggedItem] = cats.splice(draggedIndex, 1);
+            cats.splice(targetIndex, 0, draggedItem);
+            return true;
+        });
 
-        storage.saveData();
         this.renderSettings();
-        lucide.createIcons();
+        if (window.lucide && lucide.createIcons) lucide.createIcons();
     }
 
 
@@ -3513,7 +3699,7 @@ class App {
                         </div>
                         <div class="wallet-card-top-right">
                             ${secondaryBadge}
-                            <button class="wallet-menu-btn" data-edit-wallet-id="${escId}" title="Edit wallet settings" aria-label="Edit wallet settings">
+                            <button class="wallet-menu-btn" data-edit-wallet-id="${escId}" onclick="event.stopPropagation(); app.openEditWalletModal('${escId}')" title="Edit wallet settings" aria-label="Edit wallet settings">
                                 <i data-lucide="more-vertical" style="width: 15px; height: 15px;"></i>
                             </button>
                         </div>
@@ -4121,7 +4307,7 @@ class App {
         this.populateThemePicker('add-wallet-theme-picker', defaultTheme);
     }
 
-    saveAddWallet() {
+    async saveAddWallet() {
         const name = document.getElementById('add-wallet-name').value.trim();
         const region = document.getElementById('add-wallet-region').value;
         const type = document.getElementById('add-wallet-type').value;
@@ -4133,34 +4319,54 @@ class App {
             return;
         }
 
-        if (storage.state.wallets[name]) {
+        if (storage.state.wallets && storage.state.wallets[name]) {
             alert('A wallet with this name already exists.');
             return;
         }
 
-        const balance = Number(balInput) || 0;
+        let balance = Number(balInput);
+        if (balInput !== '' && (isNaN(balance) || !isFinite(balance) || Math.abs(balance) > 1e12)) {
+            alert('Please enter a valid numeric balance.');
+            return;
+        }
+        if (isNaN(balance)) balance = 0;
+        if (region === 'JP') balance = Math.round(balance);
+        else balance = Math.round(balance * 100) / 100;
+
         const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
             || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
         const chosenTheme = WALLET_THEMES.find(t => t.id === theme) || WALLET_THEMES[0];
 
-        storage.state.wallets[name] = {
-            id: name,
-            type: type,
-            region: region,
-            balance: balance,
-            currency: currency,
-            color: chosenTheme.color,
-            theme: chosenTheme.id
-        };
+        const res = await storage.runExclusive(async (state) => {
+            if (!state.wallets) state.wallets = {};
+            if (state.wallets[name]) {
+                return { success: false, error: 'A wallet with this name already exists.' };
+            }
+            state.wallets[name] = {
+                id: name,
+                type: type,
+                region: region,
+                balance: balance,
+                currency: currency,
+                color: chosenTheme.color,
+                theme: chosenTheme.id
+            };
+            return true;
+        });
 
-        storage.saveData();
-        this.renderAll();
-        this.closeModal('add-wallet-modal');
+        if (res && res.success !== false) {
+            this.renderAll();
+            this.closeModal('add-wallet-modal');
+        } else {
+            alert(res?.error || 'Failed to add wallet.');
+        }
     }
 
     openEditWalletModal(walletId) {
         const w = storage.state.wallets[walletId];
         if (!w) return;
+
+        this._editWalletBaseRev = storage.state?.revision;
 
         // Synchronously set all form fields before revealing modal to prevent data flash
         document.getElementById('edit-wallet-id').value = w.id;
@@ -4179,59 +4385,98 @@ class App {
         lucide.createIcons();
     }
 
-    saveEditWallet() {
+    async saveEditWallet() {
         const id = document.getElementById('edit-wallet-id').value;
         const type = document.getElementById('edit-wallet-type').value;
-        const balance = Number(document.getElementById('edit-wallet-balance').value);
+        const balStr = document.getElementById('edit-wallet-balance').value;
         const themeId = document.getElementById('edit-wallet-theme-val').value;
 
-        const w = storage.state.wallets[id];
-        if (!w) return;
+        if (!id || !storage.state.wallets || !storage.state.wallets[id]) return;
 
-        if (!isNaN(balance)) {
-            w.balance = balance;
+        let balance = Number(balStr);
+        if (balStr !== '' && (isNaN(balance) || !isFinite(balance) || Math.abs(balance) > 1e12)) {
+            alert('Please enter a valid numeric balance.');
+            return;
         }
-        w.type = type;
-        w.theme = themeId;
+
+        const wRef = storage.state.wallets[id];
+        const cur = (wRef?.currency || '').toUpperCase();
+        if (balStr !== '' && !isNaN(balance)) {
+            if (cur === '¥' || cur === 'JPY') balance = Math.round(balance);
+            else balance = Math.round(balance * 100) / 100;
+        }
+
         const chosenTheme = WALLET_THEMES.find(t => t.id === themeId);
-        if (chosenTheme) {
-            w.color = chosenTheme.color;
+
+        const res = await storage.runExclusive(async (state) => {
+            const w = state.wallets?.[id];
+            if (!w) return { success: false, error: 'Wallet not found.' };
+
+            if (!isNaN(balance)) {
+                w.balance = balance;
+            }
+            w.type = type;
+            w.theme = themeId;
+            if (chosenTheme) {
+                w.color = chosenTheme.color;
+            }
+            return true;
+        }, { expectedRevision: this._editWalletBaseRev });
+
+        if (res && res.conflict) {
+            alert('Financial records were modified in another window while editing. Please reopen the wallet to review current details.');
+            return;
         }
 
-        storage.saveData();
-        this.renderAll();
-        this.renderWalletsPage();
-        this.closeModal('edit-wallet-modal');
+        if (res && res.success !== false) {
+            this.renderAll();
+            this.renderWalletsPage();
+            this.closeModal('edit-wallet-modal');
 
-        const overlay = document.getElementById('focus-overlay');
-        if (overlay && (overlay.classList.contains('active') || overlay.style.display !== 'none')) {
-            const title = document.getElementById('focus-modal-title');
-            if (title && title.innerText === id) {
-                this.openWalletFocus(id);
+            const overlay = document.getElementById('focus-overlay');
+            if (overlay && (overlay.classList.contains('active') || overlay.style.display !== 'none')) {
+                const title = document.getElementById('focus-modal-title');
+                if (title && title.innerText === id) {
+                    this.openWalletFocus(id);
+                }
             }
+        } else {
+            alert(res?.error || 'Failed to update wallet.');
         }
     }
 
-    deleteWalletFromModal() {
+    async deleteWalletFromModal() {
         const id = document.getElementById('edit-wallet-id').value;
-        if (!id || !storage.state.wallets[id]) return;
+        if (!id || !storage.state.wallets || !storage.state.wallets[id]) return;
 
-        const txs = walletManager.getTransactions({ walletId: id });
-        if (txs.length > 0) {
-            if (!confirm(`Wallet "${id}" has ${txs.length} recorded transactions in the ledger. Deleting it will keep the transaction ledger history, but remove the account from your wallet list. Are you sure you want to proceed?`)) {
-                return;
-            }
-        } else {
-            if (!confirm(`Are you sure you want to delete the wallet "${id}"?`)) {
-                return;
-            }
+        if (this.isWalletReferenced(storage.state, id)) {
+            alert(`Cannot delete wallet "${id}" because it is referenced by historical transactions, transfers, or remittances. Deleting it would leave orphaned references and break financial accounting. You may set its balance to 0 instead.`);
+            return;
         }
 
-        delete storage.state.wallets[id];
-        storage.saveData();
-        this.renderAll();
-        this.closeModal('edit-wallet-modal');
-        this.closeFocusOverlay();
+        if (!confirm(`Are you sure you want to delete the wallet "${id}"?`)) {
+            return;
+        }
+
+        const res = await storage.runExclusive(async (state) => {
+            if (this.isWalletReferenced(state, id)) {
+                return { success: false, error: `Cannot delete wallet "${id}" because it is referenced by historical transactions.` };
+            }
+            if (state.wallets && state.wallets[id]) {
+                delete state.wallets[id];
+                return true;
+            }
+            return false;
+        });
+
+        if (res && res.success !== false) {
+            this.renderAll();
+            this.renderWalletsPage();
+            this.closeModal('edit-wallet-modal');
+            this.closeFocusOverlay();
+        } else {
+            alert(res?.error || 'Failed to delete wallet.');
+        }
     }
 
     getTransactionHtml(tx, editable = false, showDateInMeta = true) {
@@ -4552,60 +4797,59 @@ class App {
         document.querySelectorAll('.nav-item')[3].classList.add('active'); // Settings tab
     }
 
-    updateSetting(key, val) {
+    async updateSetting(key, val) {
         if (key === 'jpTotalBudget') {
             if (typeof storage.setTotalBudget === 'function') {
                 storage.setTotalBudget('JP', val);
             } else {
-                storage.state.jpTotalBudget = Number(val);
-                storage.saveData();
+                await storage.runExclusive(async (state) => {
+                    state.jpTotalBudget = Number(val);
+                    return true;
+                });
             }
             return;
         }
-        storage.saveData();
+        await storage.runExclusive(async (state) => {
+            state[key] = val;
+            return true;
+        });
     }
 
-    toggleLoanVisibility() {
-        if (storage.state.loanConfig) {
-            storage.state.loanConfig.enabled = (storage.state.loanConfig.enabled === false);
-            storage.saveData();
-            this.renderSettings();
-            lucide.createIcons();
-            this.renderLoanTracker();
-        }
-    }
-
-    updateLoanSetting(key, value) {
-        if (!storage.state.loanConfig) return;
-
-        if (key === 'enabled') {
-            storage.state.loanConfig[key] = value === true || value === 'true';
-        } else {
-            let numValue = parseFloat(value);
-            if (!isNaN(numValue)) {
-                storage.state.loanConfig[key] = numValue;
+    async toggleLoanVisibility() {
+        await storage.runExclusive(async (state) => {
+            if (state.loanConfig) {
+                state.loanConfig.enabled = (state.loanConfig.enabled === false);
             }
+            if (state.preferences?.loanTracking) {
+                state.preferences.loanTracking.enabled = Boolean(state.loanConfig?.enabled);
+            }
+            return true;
+        });
+        this.renderSettings();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            lucide.createIcons();
         }
-        storage.saveData();
         this.renderLoanTracker();
     }
 
-    updateWalletBalance(id, val) {
-        if (!val || isNaN(val)) return;
-        if (storage.state.wallets[id]) {
-            storage.state.wallets[id].balance = Number(val);
-            storage.saveData();
-            this.renderAll();
-        }
-    }
+    async updateLoanSetting(key, value) {
+        await storage.runExclusive(async (state) => {
+            if (!state.loanConfig) return false;
 
-    updateLoanSetting(key, val) {
-        if (!val || isNaN(val)) return;
-        if (storage.state.loanConfig) {
-            storage.state.loanConfig[key] = Number(val);
-            storage.saveData();
-            this.renderAll();
-        }
+            if (key === 'enabled') {
+                state.loanConfig[key] = value === true || value === 'true';
+            } else {
+                let numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                    state.loanConfig[key] = numValue;
+                }
+            }
+            if (state.preferences?.loanTracking && key === 'enabled') {
+                state.preferences.loanTracking.enabled = state.loanConfig.enabled;
+            }
+            return true;
+        });
+        this.renderLoanTracker();
     }
 
     renderLoanTracker() {
@@ -4672,14 +4916,19 @@ class App {
         }
     }
 
-    deleteLoan(event) {
-        event.stopPropagation();
+    async deleteLoan(event) {
+        if (event) event.stopPropagation();
         if (confirm("Are you sure you want to remove the Loan Tracker? You can re-enable it in Settings.")) {
-            if (storage.state.loanConfig) {
-                storage.state.loanConfig.enabled = false;
-                storage.saveData();
-                this.renderLoanTracker();
-            }
+            await storage.runExclusive(async (state) => {
+                if (state.loanConfig) {
+                    state.loanConfig.enabled = false;
+                }
+                if (state.preferences?.loanTracking) {
+                    state.preferences.loanTracking.enabled = false;
+                }
+                return true;
+            });
+            this.renderLoanTracker();
         }
     }
 
@@ -6409,18 +6658,18 @@ class App {
         }
     }
 
-    toggleCategoryExclusion(catId) {
+    async toggleCategoryExclusion(catId) {
         if (this.jpExclusions.has(catId)) {
             this.jpExclusions.delete(catId);
         } else {
             this.jpExclusions.add(catId);
         }
 
-        // Persist safely in state without modifying ledger or balances
-        if (storage.state) {
-            storage.state.analyticsExclusions = Array.from(this.jpExclusions);
-            storage.saveData();
-        }
+        const exclusionsArr = Array.from(this.jpExclusions);
+        await storage.runExclusive(async (state) => {
+            state.analyticsExclusions = exclusionsArr;
+            return true;
+        });
 
         this.renderJapanAnalytics();
     }
@@ -6636,7 +6885,7 @@ class App {
         this.renderReportsPage();
     }
 
-    refreshReportSnapshot() {
+    async refreshReportSnapshot() {
         const cacheKey = `${this.reportRegion}_${this.reportMonthKey}`;
         const now = new Date().toLocaleString();
 
@@ -6682,8 +6931,11 @@ class App {
             if (entry.log.length > 10) entry.log.pop();
         }
 
-        storage.state.reportSnapshots = this.reportSnapshotsCache;
-        storage.saveData();
+        const cache = this.reportSnapshotsCache;
+        await storage.runExclusive(async (state) => {
+            state.reportSnapshots = cache;
+            return true;
+        });
         this.renderReportsPage();
     }
 
@@ -7259,7 +7511,7 @@ class App {
                 log: [`Initial calculation generated at ${now} (${reportTxs.length} transactions)`]
             };
             storage.state.reportSnapshots = this.reportSnapshotsCache;
-            storage.saveData();
+            // Kept in-memory and synchronized during mutation cycles without triggering saveData during view render
         }
         const snapshotMeta = this.reportSnapshotsCache[cacheKey];
 
@@ -8605,7 +8857,7 @@ class App {
         return typeof walletManager !== 'undefined' ? walletManager.isMonthClosed(monthKey) : false;
     }
 
-    executeMonthlyClosing() {
+    async executeMonthlyClosing() {
         const curMonth = this.closingWizardState.monthKey;
         const nextMonth = this.closingWizardState.nextMonthKey;
 
@@ -8621,49 +8873,44 @@ class App {
             nextJpBudget = this.closingWizardState.customJpBudget || 0;
         }
 
-        if (!storage.state.closedMonths) {
-            storage.state.closedMonths = {};
-        }
+        const res = await storage.runExclusive(async (state) => {
+            if (walletManager.isMonthClosed(curMonth)) {
+                return { success: false, error: `Month ${curMonth} is already closed.` };
+            }
 
-        // Record permanent month snapshot in closedMonths with category configuration snapshot
-        storage.state.closedMonths[curMonth] = {
-            monthKey: curMonth,
-            label: curMonth,
-            closedAt: new Date().toISOString(),
-            walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets)),
-            categoriesSnapshot: JSON.parse(JSON.stringify(storage.state.categories)),
-            jpTotalBudget: storage.state.jpTotalBudget,
-            status: 'closed'
-        };
+            // Close month authoritatively with multi-country rollover & carryover calculation
+            const snapshot = storage.closeCurrentMonth("Monthly Closing Wizard", curMonth);
+            if (!snapshot) {
+                return { success: false, error: "Failed to finalize month snapshot." };
+            }
 
-        // Derive history view directly from closedMonths
-        storage.state.history = Object.values(storage.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-        if (typeof storage._attachHistoryGetters === 'function') {
-            storage._attachHistoryGetters(storage.state);
-        }
+            // Advance current month key and set next allocated budget limit
+            state.currentMonthKey = nextMonth;
+            if (typeof storage.setTotalBudget === 'function') {
+                storage.setTotalBudget('JP', nextJpBudget);
+            } else {
+                state.jpTotalBudget = nextJpBudget;
+            }
+            return true;
+        });
 
-        // Advance current month key and set next allocated budget limit
-        storage.state.currentMonthKey = nextMonth;
-        if (typeof storage.setTotalBudget === 'function') {
-            storage.setTotalBudget('JP', nextJpBudget);
+        if (res && res.success !== false) {
+            // Close wizard modal
+            this.closeClosingWizard();
+
+            // Refresh all application views
+            this.renderAll();
+            if (this.currentView === 'reports-view') {
+                this.reportMonthKey = nextMonth;
+                this.renderReportsPage();
+            } else if (this.currentView === 'budgets-view') {
+                this.renderBudgetsPage();
+            }
+
+            alert(`Month ${curMonth} successfully closed! Next month ${nextMonth} is now active with Japan budget limit ${this.formatMoney(nextJpBudget, '¥')}.`);
         } else {
-            storage.state.jpTotalBudget = nextJpBudget;
-            storage.saveData();
+            alert(res?.error || 'Failed to close month.');
         }
-
-        // Close wizard modal
-        this.closeClosingWizard();
-
-        // Refresh all application views
-        this.renderAll();
-        if (this.currentView === 'reports-view') {
-            this.reportMonthKey = nextMonth;
-            this.renderReportsPage();
-        } else if (this.currentView === 'budgets-view') {
-            this.renderBudgetsPage();
-        }
-
-        alert(`Month ${curMonth} successfully closed! Next month ${nextMonth} is now active with Japan budget limit ${this.formatMoney(nextJpBudget, '¥')}.`);
     }
 
     // =========================================================================
@@ -9045,7 +9292,7 @@ class App {
         }
     }
 
-    saveOverallBudget() {
+    async saveOverallBudget() {
         const region = this.overallBudgetModalRegion || 'JP';
         const input = document.getElementById('overall-budget-input');
         const err = document.getElementById('overall-budget-error');
@@ -9070,16 +9317,18 @@ class App {
             return;
         }
 
-        if (typeof storage.setTotalBudget === 'function') {
-            storage.setTotalBudget(region, numVal);
-        } else {
-            if (region === 'JP') {
-                storage.state.jpTotalBudget = numVal;
-            } else if (region === 'IN') {
-                storage.state.inTotalBudget = numVal;
+        await storage.runExclusive(async (state) => {
+            if (typeof storage.setTotalBudget === 'function') {
+                storage.setTotalBudget(region, numVal);
+            } else {
+                if (region === 'JP') {
+                    state.jpTotalBudget = numVal;
+                } else if (region === 'IN') {
+                    state.inTotalBudget = numVal;
+                }
             }
-            storage.saveData();
-        }
+            return true;
+        });
 
         // Update settings inputs if present
         const jpBudEl = document.getElementById('setting-jp-budget');
@@ -9359,7 +9608,7 @@ class App {
         }
     }
 
-    saveCategoryConfig() {
+    async saveCategoryConfig() {
         const idInput = document.getElementById('cat-edit-id');
         const nameInput = document.getElementById('cat-edit-name');
         const countrySelect = document.getElementById('cat-edit-country');
@@ -9380,75 +9629,93 @@ class App {
         const isActive = activeToggle ? activeToggle.checked : true;
         const hiddenFromOverview = overviewToggle ? !overviewToggle.checked : false;
         const contributesToTotal = contributeToggle ? contributeToggle.checked : true;
+        const chosenIcon = this.selectedCatIcon;
+        const origRegion = this.editingCatRegion || targetRegion;
 
-        if (!storage.state.categories[targetRegion]) {
-            storage.state.categories[targetRegion] = [];
-        }
-
-        if (catId) {
-            // Edit existing category
-            const origRegion = this.editingCatRegion || targetRegion;
-            let cat = (storage.state.categories[origRegion] || []).find(c => c.id === catId);
-
-            if (cat) {
-                cat.name = catName;
-                cat.icon = this.selectedCatIcon;
-                cat.budget = budgetAmt;
-                cat.isActive = isActive;
-                cat.hiddenFromBudgetOverview = hiddenFromOverview;
-                cat.contributesToTotalBudget = contributesToTotal;
-
-                // Handle region migration if region changed
-                if (origRegion !== targetRegion && targetRegion !== 'ALL') {
-                    storage.state.categories[origRegion] = storage.state.categories[origRegion].filter(c => c.id !== catId);
-                    storage.state.categories[targetRegion].push(cat);
-                }
+        const res = await storage.runExclusive(async (state) => {
+            if (!state.categories) {
+                state.categories = {};
             }
-        } else {
-            // Create new category
-            const newId = `${targetRegion.toLowerCase()}-${catName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString().slice(-4)}`;
-            storage.state.categories[targetRegion].push({
-                id: newId,
-                name: catName,
-                icon: this.selectedCatIcon,
-                budget: budgetAmt,
-                isActive: isActive,
-                hiddenFromBudgetOverview: hiddenFromOverview,
-                contributesToTotalBudget: contributesToTotal
-            });
-        }
+            if (!state.categories[targetRegion]) {
+                state.categories[targetRegion] = [];
+            }
 
-        storage.saveData();
-        this.closeCategoryManageModal();
-        this.renderAll();
-        if (this.currentView === 'budgets-view') {
-            this.renderBudgetsPage();
+            if (catId) {
+                // Edit existing category
+                let cat = (state.categories[origRegion] || []).find(c => c.id === catId);
+
+                if (cat) {
+                    cat.name = catName;
+                    cat.icon = chosenIcon;
+                    cat.budget = budgetAmt;
+                    cat.isActive = isActive;
+                    cat.hiddenFromBudgetOverview = hiddenFromOverview;
+                    cat.contributesToTotalBudget = contributesToTotal;
+
+                    // Handle region migration if region changed
+                    if (origRegion !== targetRegion && targetRegion !== 'ALL') {
+                        state.categories[origRegion] = state.categories[origRegion].filter(c => c.id !== catId);
+                        state.categories[targetRegion].push(cat);
+                    }
+                }
+            } else {
+                // Create new category
+                const newId = `${targetRegion.toLowerCase()}-${catName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString().slice(-4)}`;
+                state.categories[targetRegion].push({
+                    id: newId,
+                    name: catName,
+                    icon: chosenIcon,
+                    budget: budgetAmt,
+                    isActive: isActive,
+                    hiddenFromBudgetOverview: hiddenFromOverview,
+                    contributesToTotalBudget: contributesToTotal
+                });
+            }
+            return true;
+        });
+
+        if (res && res.success !== false) {
+            this.closeCategoryManageModal();
+            this.renderAll();
+            if (this.currentView === 'budgets-view') {
+                this.renderBudgetsPage();
+            }
+            this.updateExpenseCategories();
+        } else {
+            alert(res?.error || 'Failed to save category configuration.');
         }
-        this.updateExpenseCategories();
     }
 
-    toggleCategoryArchive() {
+    async toggleCategoryArchive() {
         if (!this.editingCatId) return;
         const targetRegion = this.editingCatRegion || document.getElementById('cat-edit-country')?.value || 'JP';
-        let cat = (storage.state.categories[targetRegion] || []).find(c => c.id === this.editingCatId);
+        const editingCatId = this.editingCatId;
 
-        if (!cat) {
-            for (const r of ['JP', 'IN']) {
-                const found = (storage.state.categories[r] || []).find(c => c.id === this.editingCatId);
-                if (found) { cat = found; break; }
+        const res = await storage.runExclusive(async (state) => {
+            if (!state.categories) return false;
+            let cat = (state.categories[targetRegion] || []).find(c => c.id === editingCatId);
+
+            if (!cat) {
+                for (const r of ['JP', 'IN', 'DE']) {
+                    const found = (state.categories[r] || []).find(c => c.id === editingCatId);
+                    if (found) { cat = found; break; }
+                }
             }
-        }
 
-        if (!cat) return;
+            if (!cat) return false;
 
-        cat.isActive = !(cat.isActive !== false);
-        storage.saveData();
-        this.closeCategoryManageModal();
-        this.renderAll();
-        if (this.currentView === 'budgets-view') {
-            this.renderBudgetsPage();
+            cat.isActive = !(cat.isActive !== false);
+            return true;
+        });
+
+        if (res && res.success !== false) {
+            this.closeCategoryManageModal();
+            this.renderAll();
+            if (this.currentView === 'budgets-view') {
+                this.renderBudgetsPage();
+            }
+            this.updateExpenseCategories();
         }
-        this.updateExpenseCategories();
     }
 }
 const app = new App();
