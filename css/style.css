@@ -1180,6 +1180,15 @@ button {
     border-color: var(--accent);
 }
 
+.conflict-option-card.disabled,
+.conflict-option-card.disabled:hover {
+    background: rgba(255, 255, 255, 0.01);
+    border-color: rgba(255, 255, 255, 0.06);
+    cursor: not-allowed;
+    pointer-events: none;
+    opacity: 0.55;
+}
+
 .conflict-option-radio {
     width: 16px;
     height: 16px;

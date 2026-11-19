@@ -120,7 +120,17 @@ class StorageManager {
         this.lastConfirmedCloudRevision = Number(this.state?.revision) || 1;
         this.activeConflict = null;
         this.syncChannel = null;
+        this._inExclusiveTransaction = false;
+        this._isSyncWorkerRunning = false;
         this.initSyncChannel();
+    }
+
+    /**
+     * Check if currently running within an exclusive coordinator transaction.
+     * @returns {boolean}
+     */
+    isInsideExclusiveTransaction() {
+        return Boolean(this._inExclusiveTransaction);
     }
 
     /**
@@ -206,23 +216,44 @@ class StorageManager {
                 };
             }
 
-            // 3. Execute proposed mutation
-            const result = await mutationFn(this.state);
+            // Snapshot state for atomic rollback on failure
+            const preMutationSnapshot = JSON.parse(JSON.stringify(this.state));
+
+            // Set coordinator context flag to suppress nested duplicate saves
+            this._inExclusiveTransaction = true;
+            let result;
+            try {
+                // 3. Execute proposed mutation in-memory
+                result = await mutationFn(this.state);
+            } catch (err) {
+                // Atomic rollback on exception
+                this.state = preMutationSnapshot;
+                this._inExclusiveTransaction = false;
+                throw err;
+            }
+
             if (result === false || (result && typeof result === 'object' && result.success === false)) {
+                // Atomic rollback on failure result
+                this.state = preMutationSnapshot;
+                this._inExclusiveTransaction = false;
                 return result;
             }
 
-            // 4. Advance revision and timestamp
+            // 4. Advance revision and timestamp exactly once
             this.state.revision = (Number(this.state.revision) || 0) + 1;
             this.state._updatedAt = new Date().toISOString();
 
-            // 5. Persist to local storage
+            // Allow the single authoritative commit
+            this._inExclusiveTransaction = false;
+
+            // 5. Persist to local storage exactly once
             const saved = this._saveDataDirect();
             if (!saved) {
+                this.state = preMutationSnapshot;
                 throw new Error("Local persistence failed (storage quota or access error).");
             }
 
-            // 6. Broadcast update event to all other tabs
+            // 6. Broadcast update event to all other tabs exactly once
             this.broadcastStateChange({
                 type: 'FINANCIAL_STATE_MUTATED',
                 revision: this.state.revision,
@@ -231,9 +262,9 @@ class StorageManager {
                 timestamp: this.state._updatedAt
             });
 
-            // 7. Schedule cloud synchronization
+            // 7. Enqueue into serialized cloud synchronization queue
             if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
-                this.pushToSupabase();
+                this.enqueueCloudSync(this.state.revision);
             }
 
             return result !== undefined ? result : true;
@@ -242,7 +273,102 @@ class StorageManager {
         if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
             return await navigator.locks.request(lockName, { mode: 'exclusive' }, pipeline);
         } else {
+            // Check if multi-tab browser context without Web Locks API
+            const isMultiTabBrowser = (typeof window !== 'undefined' && typeof window.BroadcastChannel !== 'undefined');
+            if (isMultiTabBrowser) {
+                return {
+                    success: false,
+                    code: 'LOCK_UNAVAILABLE',
+                    error: 'Exclusive Web Locks API is unavailable in this browser environment. Concurrent financial writes refused for safety.'
+                };
+            }
             return await this._runWithFallbackLock(lockName, pipeline);
+        }
+    }
+
+    /**
+     * Enqueue a pending state revision into the serialized cloud sync queue.
+     * Guarantees monotonic, ordered, non-overlapping cloud pushes.
+     * @param {number} targetRevision
+     */
+    enqueueCloudSync(targetRevision) {
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session?.user?.id) {
+            this.cloudSyncStatus = 'LOCAL_SAVED';
+            if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                app.updateSyncStatusPill('LOCAL_ONLY');
+            }
+            return;
+        }
+        if (this.cloudSyncStatus === 'CONFLICT') {
+            console.warn('[Sync] Queue halted: active conflict detected.');
+            return;
+        }
+        const userId = supabaseClient.session.user.id;
+        if (typeof localStorage !== 'undefined') {
+            try {
+                localStorage.setItem(`${this.getActiveStorageKey()}_pending_sync`, JSON.stringify({
+                    userId,
+                    targetRevision: Number(targetRevision) || this.state.revision,
+                    timestamp: Date.now()
+                }));
+            } catch (e) { }
+        }
+        this.cloudSyncStatus = 'SYNC_PENDING';
+        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+            app.updateSyncStatusPill('SYNC_PENDING');
+        }
+        this._drainSyncQueue();
+    }
+
+    /**
+     * Drain the cloud synchronization queue sequentially.
+     * Ensures only one in-flight push occurs per client and revisions advance monotonically.
+     */
+    async _drainSyncQueue() {
+        if (this._isSyncWorkerRunning) return;
+        if (typeof supabaseClient === 'undefined' || !supabaseClient.session?.user?.id) return;
+        if (this.cloudSyncStatus === 'CONFLICT') return;
+
+        this._isSyncWorkerRunning = true;
+        try {
+            while (typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
+                if (this.cloudSyncStatus === 'CONFLICT') break;
+                const targetRev = Number(this.state.revision) || 1;
+                const currentConfirmed = Number(this.lastConfirmedCloudRevision) || 0;
+                if (currentConfirmed >= targetRev) {
+                    this.cloudSyncStatus = 'CONFIRMED';
+                    if (typeof localStorage !== 'undefined') {
+                        localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
+                    }
+                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                        app.updateSyncStatusPill('SYNCED');
+                    }
+                    break;
+                }
+
+                this.cloudSyncStatus = 'SYNCING';
+                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                    app.updateSyncStatusPill('SYNCING');
+                }
+
+                const pushOk = await this.pushToSupabase();
+                if (pushOk) {
+                    if (this.state.revision <= this.lastConfirmedCloudRevision) {
+                        this.cloudSyncStatus = 'CONFIRMED';
+                        if (typeof localStorage !== 'undefined') {
+                            localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
+                        }
+                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                            app.updateSyncStatusPill('SYNCED');
+                        }
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        } finally {
+            this._isSyncWorkerRunning = false;
         }
     }
 
@@ -306,7 +432,7 @@ class StorageManager {
                         localStorage.removeItem(lockKey);
                     }
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
     }
 
@@ -327,7 +453,7 @@ class StorageManager {
                 if (e.key === `${this.getActiveStorageKey()}_sync_event` && e.newValue) {
                     try {
                         this.handleSyncMessage(JSON.parse(e.newValue));
-                    } catch (err) {}
+                    } catch (err) { }
                 }
             });
             window.addEventListener('online', () => this.onNetworkOnline());
@@ -346,7 +472,7 @@ class StorageManager {
         if (this.syncChannel) {
             try {
                 this.syncChannel.postMessage(fullPayload);
-            } catch (e) {}
+            } catch (e) { }
         }
         try {
             if (typeof localStorage !== 'undefined') {
@@ -356,7 +482,7 @@ class StorageManager {
                     _nonce: Math.random()
                 }));
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     /**
@@ -447,7 +573,7 @@ class StorageManager {
         if (!this.activeConflict && typeof localStorage !== 'undefined') {
             const raw = localStorage.getItem(`${this.getActiveStorageKey()}_conflict_stash`);
             if (raw) {
-                try { this.activeConflict = JSON.parse(raw); } catch (e) {}
+                try { this.activeConflict = JSON.parse(raw); } catch (e) { }
             }
         }
         if (!this.activeConflict) {
@@ -456,12 +582,53 @@ class StorageManager {
 
         if (strategy === 'overwrite_cloud') {
             console.log('[StorageManager] Overwriting cloud with local state.');
+            // 1. Create durable backup of the remote state before overwriting
+            const remoteBackupKey = `${this.getActiveStorageKey()}_remote_backup_${Date.now()}`;
+            if (typeof localStorage !== 'undefined') {
+                try {
+                    localStorage.setItem(remoteBackupKey, JSON.stringify(this.activeConflict.remoteState));
+                    if (!localStorage.getItem(remoteBackupKey)) {
+                        return { success: false, error: 'Failed to verify durable remote backup before overwriting cloud.' };
+                    }
+                } catch (e) {
+                    return { success: false, error: `Remote backup failed: ${e.message}` };
+                }
+            }
+
+            // 2. Re-check current server revision to ensure server has not advanced again
+            let currentServerRev = Number(this.activeConflict.remoteRevision || 0);
+            if (typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
+                try {
+                    const { data: latestRemote } = await supabaseClient.client
+                        .from('app_state')
+                        .select('state, updated_at')
+                        .eq('user_id', supabaseClient.session.user.id)
+                        .single();
+                    if (latestRemote && latestRemote.state) {
+                        const actualRemoteRev = Number(latestRemote.state.revision || 0);
+                        if (actualRemoteRev !== currentServerRev) {
+                            // Server moved again! Refresh conflict and abort overwrite
+                            console.warn(`[StorageManager] Server revision moved from ${currentServerRev} to ${actualRemoteRev} during conflict review.`);
+                            this.stashConflictState(this.state, latestRemote.state);
+                            return {
+                                success: false,
+                                conflict: true,
+                                error: 'Server revision advanced during review. Conflict stash refreshed with latest cloud state.'
+                            };
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[StorageManager] Server pre-flight check failed, proceeding cautiously:', err);
+                }
+            }
+
             this.state.revision = Math.max(
-                Number(this.activeConflict.remoteRevision || 0),
+                currentServerRev,
                 Number(this.activeConflict.localRevision || 0)
             ) + 1;
             this.state._updatedAt = new Date().toISOString();
             this._saveDataDirect();
+            this.lastConfirmedCloudRevision = currentServerRev;
             const pushed = await this.pushToSupabase({ force: true });
             if (pushed) {
                 this.activeConflict = null;
@@ -477,8 +644,21 @@ class StorageManager {
             return { success: false, error: 'Failed to push local state to Supabase.' };
         } else if (strategy === 'accept_cloud') {
             console.log('[StorageManager] Accepting cloud state and archiving local draft.');
-            // 1. Download local backup JSON file
-            const localPayload = JSON.stringify(this.activeConflict.localState, null, 2);
+            // 1. Create durable local backup in localStorage and verify persistence
+            const localPayload = JSON.stringify(this.activeConflict.localState || this.state, null, 2);
+            const localBackupKey = `${this.getActiveStorageKey()}_local_backup_${Date.now()}`;
+            if (typeof localStorage !== 'undefined') {
+                try {
+                    localStorage.setItem(localBackupKey, localPayload);
+                    if (!localStorage.getItem(localBackupKey)) {
+                        return { success: false, error: 'Failed to verify durable local backup in storage before adopting cloud state.' };
+                    }
+                } catch (e) {
+                    return { success: false, error: `Local backup failed: ${e.message}` };
+                }
+            }
+
+            // Optional browser file download if supported
             if (typeof window !== 'undefined' && typeof document !== 'undefined') {
                 try {
                     const blob = new Blob([localPayload], { type: 'application/json' });
@@ -495,7 +675,7 @@ class StorageManager {
                 }
             }
 
-            // 2. Adopt remote state safely
+            // 2. Validate and adopt remote state safely
             const preview = this.previewContinuousLedgerMigration(this.activeConflict.remoteState);
             if (!preview.success) {
                 return { success: false, error: `Remote state migration failed: ${preview.error}` };
@@ -513,36 +693,12 @@ class StorageManager {
             }
             return { success: true, strategy: 'accept_cloud' };
         } else if (strategy === 'merge_nonconflicting') {
-            console.log('[StorageManager] Merging non-conflicting transactions from cloud.');
-            const remoteTxs = this.activeConflict.remoteState?.transactions || [];
-            const localTxs = this.state.transactions || [];
-            const localIds = new Set(localTxs.map(t => t.id));
-            const mergedTxs = localTxs.slice();
-            remoteTxs.forEach(rtx => {
-                if (!localIds.has(rtx.id)) {
-                    mergedTxs.push(JSON.parse(JSON.stringify(rtx)));
-                }
-            });
-            this.state.transactions = mergedTxs;
-            this.state.revision = Math.max(
-                Number(this.activeConflict.remoteRevision || 0),
-                Number(this.activeConflict.localRevision || 0)
-            ) + 1;
-            this.state._updatedAt = new Date().toISOString();
-            this._saveDataDirect();
-            const pushed = await this.pushToSupabase({ force: true });
-            if (pushed) {
-                this.activeConflict = null;
-                if (typeof localStorage !== 'undefined') {
-                    localStorage.removeItem(`${this.getActiveStorageKey()}_conflict_stash`);
-                }
-                if (typeof app !== 'undefined') {
-                    app.updateSyncStatusPill('SYNCED');
-                    app.renderAll();
-                }
-                return { success: true, strategy: 'merge_nonconflicting' };
-            }
-            return { success: false, error: 'Failed to push merged state to Supabase.' };
+            console.warn('[StorageManager] Automated merge requested, but disabled for financial safety.');
+            return {
+                success: false,
+                code: 'MERGE_DISABLED',
+                error: 'Automated transaction merging without 3-way balance reconstruction baseline is disabled for financial safety.'
+            };
         }
 
         return { success: false, error: `Unknown conflict strategy: ${strategy}` };
@@ -1563,12 +1719,12 @@ class StorageManager {
                     return false;
                 }
 
-                const remoteUpdatedAt = data.updated_at ? new Date(data.updated_at) : null;
-                const localUpdatedAt = this.state._updatedAt ? new Date(this.state._updatedAt) : null;
-
-                // Count unique transactions as richness tiebreaker without getter double-counting
-                const remoteTxCount = this.getUniqueTransactionCount(remote);
-                const localTxCount = this.getUniqueTransactionCount(this.state);
+                // Strict Revision-Lineage Sync
+                const localFingerprint = this.computeFinancialFingerprint(this.state);
+                const remoteFingerprint = this.computeFinancialFingerprint(remote);
+                const localRev = Number(this.state.revision || 1);
+                const remoteRev = Number(remote.revision || 1);
+                const lastConfirmedRev = Number(this.lastConfirmedCloudRevision || 0);
 
                 const remoteNeedsMigration = remote && (!remote.schemaVersion || remote.schemaVersion < 3 ||
                     (Array.isArray(remote.history) && remote.history.some(h => {
@@ -1576,22 +1732,51 @@ class StorageManager {
                         return desc && Array.isArray(desc.value) && desc.value.length > 0;
                     })) || !remote.preferences || !remote.budgets);
 
+                // Case 1: Identical financial state
+                if (localFingerprint === remoteFingerprint) {
+                    console.log('[Sync] Local and remote fingerprints match. System in sync.');
+                    this.lastConfirmedCloudRevision = Math.max(localRev, remoteRev);
+                    this.accountStatus = 'EXISTING_USER';
+                    this.cloudSyncStatus = 'CONFIRMED';
+                    this.initialSyncDone = true;
+                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                        app.updateSyncStatusPill('SYNCED');
+                    }
+                    return false;
+                }
+
+                // Check pending local edits vs fresh device
+                const localTxCount = this.getUniqueTransactionCount(this.state);
+                const hasPendingLocalEdits = localRev > lastConfirmedRev && !this.isFirstLoad && localTxCount > 0;
+
                 let shouldUseRemote = false;
-                if (this.isFirstLoad) {
-                    // Fresh device / returning user on new device loads remote
-                    console.log('[Sync] Fresh device/account detected. Using authoritative remote state.');
+                if (this.isFirstLoad || localTxCount === 0) {
+                    // Fresh device / returning user without local transactions adopting cloud
                     shouldUseRemote = true;
-                } else if (remoteUpdatedAt && localUpdatedAt) {
-                    shouldUseRemote = remoteUpdatedAt > localUpdatedAt;
-                } else if (remoteUpdatedAt && !localUpdatedAt) {
+                } else if (!hasPendingLocalEdits && remoteRev >= localRev) {
+                    // Clean fast-forward: cloud has advanced and local has no unpushed edits
                     shouldUseRemote = true;
+                } else if (hasPendingLocalEdits && remoteRev <= lastConfirmedRev) {
+                    // Local is ahead, remote has not moved since lastConfirmedRev
+                    shouldUseRemote = false;
                 } else {
-                    shouldUseRemote = remoteTxCount >= localTxCount;
+                    // Branch divergence: Both local and remote have advanced past lastConfirmedRev!
+                    // Do NOT allow either side to silently overwrite! Stash conflict and require resolution.
+                    console.warn(`[Sync] Branch divergence detected! Local rev ${localRev}, Remote rev ${remoteRev}, Last confirmed rev ${lastConfirmedRev}.`);
+                    this.stashConflictState(this.state, remote);
+                    this.accountStatus = 'EXISTING_USER';
+                    this.cloudSyncStatus = 'CONFLICT';
+                    this.syncError = 'Both local and cloud states have divergent modifications.';
+                    this.initialSyncDone = true;
+                    if (typeof app !== 'undefined') {
+                        if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                        if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
+                    }
+                    return false;
                 }
 
                 if (shouldUseRemote) {
-                    console.log(`[Sync] Remote state accepted (${remoteTxCount} txs vs local ${localTxCount} txs). Applying...`);
-
+                    console.log(`[Sync] Remote state accepted (Rev ${remoteRev} vs local ${localRev}). Applying...`);
                     const persisted = this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
                     if (!persisted) {
                         this.accountStatus = 'SYNC_FAILED';
@@ -1610,6 +1795,7 @@ class StorageManager {
                         this.cloudSyncStatus = 'CONFIRMED';
                     }
 
+                    this.lastConfirmedCloudRevision = remoteRev;
                     this.isFirstLoad = false;
                     this.initialSyncDone = true;
                     this.checkRollover();
@@ -1619,14 +1805,16 @@ class StorageManager {
                         await this.pushToSupabase({ force: true });
                     }
 
-                    return true; // signal caller to re-render
+                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                        app.updateSyncStatusPill('SYNCED');
+                    }
+                    return true;
                 } else {
-                    console.log(`[Sync] Local state wins (${localTxCount} txs vs remote ${remoteTxCount} txs). Pushing up...`);
+                    console.log(`[Sync] Local state is ahead (Rev ${localRev} vs remote ${remoteRev}). Enqueuing conditional upload...`);
                     this.accountStatus = 'EXISTING_USER';
-                    this.cloudSyncStatus = 'SYNCING';
+                    this.cloudSyncStatus = 'SYNC_PENDING';
                     this.initialSyncDone = true;
-                    const pushed = await this.pushToSupabase({ force: true });
-                    this.cloudSyncStatus = pushed ? 'CONFIRMED' : 'FAILED';
+                    this.enqueueCloudSync(this.state.revision);
                     return false;
                 }
             }
@@ -1825,6 +2013,14 @@ class StorageManager {
     }
 
     saveData() {
+        if (this._inExclusiveTransaction) {
+            // Context-Aware Persistence Ownership:
+            // Mutation is currently executing within an authoritative coordinator transaction (runExclusive).
+            // Intermediate persistence, revision advancement, and cloud sync are owned exclusively
+            // by the coordinator boundary to guarantee exactly-once persistence.
+            return true;
+        }
+
         if (this.state._haltedMigration || this.migrationError) {
             console.warn('[Storage] saveData blocked because migration is in halted safety state.');
             return false;
@@ -1836,9 +2032,13 @@ class StorageManager {
             }
             if (typeof this.state.revision !== 'number') {
                 this.state.revision = 1;
+            } else {
+                this.state.revision = Number(this.state.revision) + 1;
             }
             this.state._updatedAt = new Date().toISOString();
-            localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
+            }
             this.broadcastStateChange({
                 type: 'FINANCIAL_STATE_MUTATED',
                 revision: this.state.revision,
@@ -1846,10 +2046,9 @@ class StorageManager {
                 sourceTabId: this.tabId,
                 timestamp: this.state._updatedAt
             });
-            // Only push to Supabase after the initial sync has run.
-            // This prevents a fresh device from overwriting real cloud data.
+            // Serialized cloud synchronization queue
             if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
-                this.pushToSupabase();
+                this.enqueueCloudSync(this.state.revision);
             }
             return true;
         } catch (e) {
@@ -2310,8 +2509,8 @@ class StorageManager {
             };
         }
 
-        // Cross-tab lock acquisition
-        if (!this.acquireRecoveryLock(5000)) {
+        // Cross-tab lock acquisition (unified coordinator or fallback lease)
+        if (!this.isInsideExclusiveTransaction() && !this.acquireRecoveryLock(5000)) {
             return {
                 success: false,
                 code: 'STATE_CONFLICT',

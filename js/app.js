@@ -4699,11 +4699,17 @@ class App {
         });
     }
 
-    closeMonth() {
+    async closeMonth() {
         if (confirm("Are you sure you want to close this month and create a snapshot?")) {
-            storage.closeCurrentMonth();
-            alert("Month archived!");
-            this.init();
+            const res = await storage.runExclusive(async () => {
+                return storage.closeCurrentMonth();
+            });
+            if (res && res.success !== false) {
+                alert("Month archived!");
+                this.init();
+            } else {
+                alert(res?.error || "Failed to close month.");
+            }
         }
     }
 
@@ -8355,28 +8361,30 @@ class App {
         }, 4000);
     }
 
-    confirmBudgetRecovery() {
+    async confirmBudgetRecovery() {
         const preview = this.budgetRecoveryState.preview || storage.getBudgetRecoveryPreview(
             this.budgetRecoveryState.option,
             this.budgetRecoveryState.customAdjustments
         );
 
-        const result = storage.commitBudgetRecovery(
-            this.budgetRecoveryState.option,
-            this.budgetRecoveryState.customAdjustments,
-            preview?.stateToken
-        );
+        const result = await storage.runExclusive(async () => {
+            return storage.commitBudgetRecovery(
+                this.budgetRecoveryState.option,
+                this.budgetRecoveryState.customAdjustments,
+                preview?.stateToken
+            );
+        });
 
-        if (result.success) {
+        if (result && result.success) {
             this.closeBudgetRecoveryModal();
             this.updateBudgetRecoveryBanner();
             this.renderAll();
             this.showToast(`Budget history successfully reconciled for ${result.reconciledMonths.join(', ')}.`);
         } else {
-            if (result.conflict) {
+            if (result?.conflict) {
                 this.showToast(`Financial state changed in another session. Recovery preview refreshed.`, 'warning');
             } else {
-                this.showToast(`Reconciliation could not be applied: ${result.error}`, 'error');
+                this.showToast(`Reconciliation could not be applied: ${result?.error || 'Unknown error'}`, 'error');
             }
             this.budgetRecoveryState.preview = storage.getBudgetRecoveryPreview(
                 this.budgetRecoveryState.option,

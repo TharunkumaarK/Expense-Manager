@@ -707,6 +707,8 @@ async def main():
                 const txIds = storage.state.transactions.map(t => t.id);
                 return {
                     success: res.success,
+                    code: res.code,
+                    error: res.error,
                     hasCloudTx: txIds.includes('tx_cloud_1'),
                     hasLocalTx: txIds.includes('tx_local_1'),
                     totalTx: txIds.length,
@@ -717,14 +719,11 @@ async def main():
         """)
 
         passed9 = (
-            resolve_merge['success'] is True and
-            resolve_merge['hasCloudTx'] is True and
-            resolve_merge['hasLocalTx'] is True and
-            resolve_merge['newRev'] >= 11 and
-            (resolve_merge['syncStatus'] == 'CONFIRMED' or resolve_merge['syncStatus'] == 'SYNCED')
+            resolve_merge['success'] is False and
+            resolve_merge.get('code') == 'MERGE_DISABLED'
         )
-        dynamic_results.append(("Conflict Resolution merge", "Merges unique transactions from both branches, advances revision to 11, syncs successfully", passed9))
-        print(f"  Result 9: success={resolve_merge['success']}, hasCloudTx={resolve_merge['hasCloudTx']}, hasLocalTx={resolve_merge['hasLocalTx']}, rev={resolve_merge['newRev']} -> {'✅ PASS' if passed9 else '❌ FAIL'}")
+        dynamic_results.append(("Conflict Resolution merge", "Safely disabled automated transaction merge to prevent balance corruption (MERGE_DISABLED)", passed9))
+        print(f"  Result 9: success={resolve_merge['success']}, code={resolve_merge.get('code')}, error={resolve_merge.get('error')} -> {'✅ PASS' if passed9 else '❌ FAIL'}")
 
         # Reset any test auth
         await tab1.eval_js("""
