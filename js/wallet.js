@@ -190,7 +190,7 @@ class WalletManager {
             return false;
         }
 
-        const wallet = storage.state.wallets[walletId];
+        const wallet = storage.state?.wallets?.[walletId];
         if (!wallet) return false;
 
         const numAmount = Number(amount);
@@ -199,8 +199,15 @@ class WalletManager {
             return false;
         }
 
+        const tentativeBalance = this.roundCurrency(wallet.balance - numAmount, wallet.currency);
+        if (!isFinite(tentativeBalance)) {
+            console.warn('[WalletManager] Invalid resulting balance for expense.');
+            return false;
+        }
+
+        // Capture complete relevant pre-operation state for atomic rollback guarantee
         const preBalance = wallet.balance;
-        wallet.balance = this.roundCurrency(wallet.balance - numAmount, wallet.currency);
+        const preCommitTransactions = Array.isArray(storage.state.transactions) ? storage.state.transactions.slice() : [];
 
         const tx = {
             id: this.generateTransactionId(),
@@ -214,16 +221,22 @@ class WalletManager {
             date
         };
 
-        storage.state.transactions.unshift(tx);
-        this._sortContinuousTransactions();
-        const saved = storage.saveData();
-        if (saved === false) {
-            console.error('[WalletManager] addExpense persistence failed. Rolling back...');
+        try {
+            wallet.balance = tentativeBalance;
+            storage.state.transactions.unshift(tx);
+            this._sortContinuousTransactions();
+
+            const saved = storage.saveData();
+            if (saved === false) {
+                throw new Error("Local persistence failed.");
+            }
+            return true;
+        } catch (err) {
+            console.error('[WalletManager] addExpense failed. Rolling back completely...', err);
             wallet.balance = preBalance;
-            storage.state.transactions.shift();
+            storage.state.transactions = preCommitTransactions;
             return false;
         }
-        return true;
     }
 
     // Add income (credit)
@@ -234,7 +247,7 @@ class WalletManager {
             return false;
         }
 
-        const wallet = storage.state.wallets[walletId];
+        const wallet = storage.state?.wallets?.[walletId];
         if (!wallet) return false;
 
         const numAmount = Number(amount);
@@ -243,8 +256,15 @@ class WalletManager {
             return false;
         }
 
+        const tentativeBalance = this.roundCurrency(wallet.balance + numAmount, wallet.currency);
+        if (!isFinite(tentativeBalance)) {
+            console.warn('[WalletManager] Invalid resulting balance for income.');
+            return false;
+        }
+
+        // Capture complete relevant pre-operation state for atomic rollback guarantee
         const preBalance = wallet.balance;
-        wallet.balance = this.roundCurrency(wallet.balance + numAmount, wallet.currency);
+        const preCommitTransactions = Array.isArray(storage.state.transactions) ? storage.state.transactions.slice() : [];
 
         const tx = {
             id: this.generateTransactionId(),
@@ -257,16 +277,22 @@ class WalletManager {
             date
         };
 
-        storage.state.transactions.unshift(tx);
-        this._sortContinuousTransactions();
-        const saved = storage.saveData();
-        if (saved === false) {
-            console.error('[WalletManager] addIncome persistence failed. Rolling back...');
+        try {
+            wallet.balance = tentativeBalance;
+            storage.state.transactions.unshift(tx);
+            this._sortContinuousTransactions();
+
+            const saved = storage.saveData();
+            if (saved === false) {
+                throw new Error("Local persistence failed.");
+            }
+            return true;
+        } catch (err) {
+            console.error('[WalletManager] addIncome failed. Rolling back completely...', err);
             wallet.balance = preBalance;
-            storage.state.transactions.shift();
+            storage.state.transactions = preCommitTransactions;
             return false;
         }
-        return true;
     }
 
     // Currency precision rounding helper: whole integers for JPY, 2 decimal places for INR/EUR
@@ -440,6 +466,7 @@ class WalletManager {
 
         // Commit phase: apply state mutation atomically with rollback protection
         const preCommit = { [sourceId]: source.balance, [destId]: dest.balance };
+        const preCommitTransactions = Array.isArray(storage.state.transactions) ? storage.state.transactions.slice() : [];
         let createdTx = null;
         try {
             source.balance = tentativeSource;
@@ -464,13 +491,10 @@ class WalletManager {
             }
             return true;
         } catch (err) {
-            console.error('[WalletManager] Transfer commit failed. Rolling back...', err);
+            console.error('[WalletManager] Transfer commit failed. Rolling back completely...', err);
             source.balance = preCommit[sourceId];
             dest.balance = preCommit[destId];
-            if (createdTx && Array.isArray(storage.state.transactions)) {
-                const idx = storage.state.transactions.findIndex(t => t.id === createdTx.id);
-                if (idx !== -1) storage.state.transactions.splice(idx, 1);
-            }
+            storage.state.transactions = preCommitTransactions;
             return false;
         }
     }
@@ -504,6 +528,7 @@ class WalletManager {
 
         // Commit phase: apply state mutation atomically with rollback protection
         const preCommit = { [sourceId]: source.balance, [destId]: dest.balance };
+        const preCommitTransactions = Array.isArray(storage.state.transactions) ? storage.state.transactions.slice() : [];
         let createdTx = null;
         try {
             source.balance = tentativeSource;
@@ -531,13 +556,10 @@ class WalletManager {
             }
             return true;
         } catch (err) {
-            console.error('[WalletManager] Remittance commit failed. Rolling back...', err);
+            console.error('[WalletManager] Remittance commit failed. Rolling back completely...', err);
             source.balance = preCommit[sourceId];
             dest.balance = preCommit[destId];
-            if (createdTx && Array.isArray(storage.state.transactions)) {
-                const idx = storage.state.transactions.findIndex(t => t.id === createdTx.id);
-                if (idx !== -1) storage.state.transactions.splice(idx, 1);
-            }
+            storage.state.transactions = preCommitTransactions;
             return false;
         }
     }

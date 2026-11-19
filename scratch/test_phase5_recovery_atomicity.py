@@ -103,7 +103,7 @@ async def run_recovery_atomicity_tests():
     static_checks.append(('WALLET', "deleteTransaction snapshots preCommitTransactions and preCommitHistory",
         "preCommitTransactions" in wallet_content and "deleteTransaction" in wallet_content))
     static_checks.append(('WALLET', "addExpense & addIncome check saveData() and rollback",
-        "this.state.transactions.splice(idx, 1)" in wallet_content or "storage.state.transactions.splice(idx, 1)" in wallet_content))
+        "storage.state.transactions = preCommitTransactions" in wallet_content or "this.state.transactions.splice(idx, 1)" in wallet_content or "storage.state.transactions.splice(idx, 1)" in wallet_content))
 
     # Priority 5: Provenance & UX
     static_checks.append(('STORAGE', "getBudgetRecoveryPreview annotates provenance for countries",

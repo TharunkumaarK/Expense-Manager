@@ -115,6 +115,56 @@ class StorageManager {
         this.state = this.loadData();
         this._attachBudgetAccessors(this.state);
         this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
+        this.tabId = 'tab_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+    }
+
+    /**
+     * Acquire a cooperative cross-tab lease lock for recovery operations.
+     * Prevents competing tabs from simultaneously committing divergent recovery plans.
+     * @param {number} [leaseDurationMs=5000]
+     * @returns {boolean} True if lock was acquired, false if held by another live tab.
+     */
+    acquireRecoveryLock(leaseDurationMs = 5000) {
+        if (typeof localStorage === 'undefined') return true;
+        const lockKey = `${this.getActiveStorageKey()}_recovery_lock`;
+        const now = Date.now();
+        try {
+            const raw = localStorage.getItem(lockKey);
+            if (raw) {
+                const lock = JSON.parse(raw);
+                if (lock && typeof lock.expiresAt === 'number' && lock.expiresAt > now && lock.owner !== this.tabId) {
+                    return false; // Actively held by another tab
+                }
+            }
+            localStorage.setItem(lockKey, JSON.stringify({
+                owner: this.tabId,
+                acquiredAt: now,
+                expiresAt: now + leaseDurationMs
+            }));
+            return true;
+        } catch (e) {
+            // Fail closed on storage error during lock attempt
+            return false;
+        }
+    }
+
+    /**
+     * Release the cross-tab lease lock if owned by this tab.
+     */
+    releaseRecoveryLock() {
+        if (typeof localStorage === 'undefined') return;
+        const lockKey = `${this.getActiveStorageKey()}_recovery_lock`;
+        try {
+            const raw = localStorage.getItem(lockKey);
+            if (raw) {
+                const lock = JSON.parse(raw);
+                if (lock && lock.owner === this.tabId) {
+                    localStorage.removeItem(lockKey);
+                }
+            }
+        } catch (e) {
+            // Ignore errors on release
+        }
     }
 
     /**
@@ -1381,33 +1431,82 @@ class StorageManager {
     }
 
     /**
-     * Compute a deterministic financial revision fingerprint covering all financial information
-     * that materially influences recovery calculations: currentMonthKey, budgets, wallet balances,
-     * closedMonths snapshots, preferences, and transaction signatures.
+     * Compute a deterministic financial revision fingerprint covering 100% of financial information
+     * that materially influences recovery calculations: currentMonthKey, workflow status, budgets,
+     * wallet balances, closedMonths snapshots, preferences, and all transaction signatures.
+     * Uses a dual 32-bit FNV-1a (64-bit composite hex hash) with stable-order canonical serialization.
+     *
      * @param {Object} state
-     * @returns {string} Hexadecimal fingerprint hash.
+     * @returns {string} 16-character hexadecimal composite fingerprint hash.
      */
     computeFinancialFingerprint(state = this.state) {
-        if (!state || typeof state !== 'object') return '0';
+        if (!state || typeof state !== 'object') return '0000000000000000';
         try {
-            const relevant = {
-                m: state.currentMonthKey || '',
-                b: state.budgets || {},
-                w: Object.keys(state.wallets || {}).sort().map(k => `${k}:${state.wallets[k]?.balance}`),
-                c: Object.keys(state.closedMonths || {}).sort().map(k => `${k}:${state.closedMonths[k]?.status}:${state.closedMonths[k]?.JPRolloverAdded || 0}`),
-                p: state.preferences?.countries || [],
-                txLen: Array.isArray(state.transactions) ? state.transactions.length : 0,
-                txSig: Array.isArray(state.transactions)
-                    ? state.transactions.slice(0, 30).map(t => `${t.id}:${t.amount}:${t.date}:${t.walletId || ''}`).join('|')
-                    : ''
+            // Dual FNV-1a hash accumulators (64 bits total entropy)
+            let h1 = 2166136261;
+            let h2 = 2166136269;
+            const updateHash = (str) => {
+                if (!str) return;
+                for (let i = 0; i < str.length; i++) {
+                    const c = str.charCodeAt(i);
+                    h1 ^= c;
+                    h1 = Math.imul(h1, 16777619);
+                    h2 ^= c;
+                    h2 = Math.imul(h2, 16777627);
+                }
             };
-            const str = JSON.stringify(relevant);
-            let hash = 2166136261;
-            for (let i = 0; i < str.length; i++) {
-                hash ^= str.charCodeAt(i);
-                hash = Math.imul(hash, 16777619);
+
+            // 1. Authoritative accounting calendar month
+            updateHash(`M:${state.currentMonthKey || ''};`);
+
+            // 2. Multi-country recurring budgets (stable country key sorting)
+            const b = state.budgets || {};
+            const budgetKeys = Object.keys(b).sort();
+            for (const k of budgetKeys) {
+                const bk = b[k] || {};
+                const bkAmount = (typeof bk.amount !== 'undefined') ? bk.amount : (bk.monthlyTotal || 0);
+                updateHash(`B:${k}:${bk.enabled ? 1 : 0}:${bkAmount}:${bk.monthlyTotal || 0}:${bk.rolloverEnabled ? 1 : 0}:${bk.carryover || 0};`);
             }
-            return (hash >>> 0).toString(16);
+
+            // 3. Wallets collection (sorted by wallet ID)
+            const w = state.wallets || {};
+            const walletKeys = Object.keys(w).sort();
+            for (const k of walletKeys) {
+                const wk = w[k] || {};
+                updateHash(`W:${k}:${wk.name || ''}:${wk.currency || ''}:${wk.region || ''}:${wk.type || ''}:${wk.balance || 0};`);
+            }
+
+            // 4. Closed month snapshots (sorted chronologically)
+            const c = state.closedMonths || {};
+            const closedKeys = Object.keys(c).sort();
+            for (const k of closedKeys) {
+                const ck = c[k] || {};
+                updateHash(`C:${k}:${ck.status || ''}:${ck.baseBudget || 0}:${ck.spent || 0}:${ck.carryoverPrior || 0}:${ck.rolloverAdded || 0}:${ck.JPRolloverAdded || 0}:${ck.INRolloverAdded || 0}:${ck.DERolloverAdded || 0};`);
+                if (ck.walletsSnapshot && typeof ck.walletsSnapshot === 'object') {
+                    const snapKeys = Object.keys(ck.walletsSnapshot).sort();
+                    for (const sk of snapKeys) {
+                        updateHash(`CW:${sk}:${ck.walletsSnapshot[sk]?.balance || 0};`);
+                    }
+                }
+            }
+
+            // 5. User preferences relevant to accounting and budgeting
+            const p = state.preferences || {};
+            const pCountries = Array.isArray(p.countries) ? p.countries.slice().sort().join(',') : '';
+            updateHash(`P:${pCountries}:${p.primaryCountry || ''}:${p.onboardingCompleted ? 1 : 0};`);
+
+            // 6. Complete transaction ledger (100% of transactions in collection order)
+            const txs = Array.isArray(state.transactions) ? state.transactions : [];
+            updateHash(`TL:${txs.length};`);
+            for (let i = 0; i < txs.length; i++) {
+                const t = txs[i];
+                if (!t) continue;
+                updateHash(`T:${t.id || ''}:${t.type || ''}:${t.date || ''}:${t.amount || 0}:${t.currency || ''}:${t.region || ''}:${t.walletId || ''}:${t.categoryId || ''}:${t.sourceId || ''}:${t.destId || ''}:${t.sourceAmount || ''}:${t.destAmount || ''}:${t.exchangeRate || ''};`);
+            }
+
+            const hex1 = (h1 >>> 0).toString(16).padStart(8, '0');
+            const hex2 = (h2 >>> 0).toString(16).padStart(8, '0');
+            return `${hex1}${hex2}`;
         } catch (e) {
             return String(Date.now());
         }
@@ -1415,36 +1514,44 @@ class StorageManager {
 
     /**
      * Validate all user-entered budget recovery inputs before generating preview or committing.
-     * Rejects negative amounts, NaN, Infinity, unknown country codes, excessive precision, and unsafe bounds.
+     * Rejects negative amounts, NaN, Infinity, unknown country codes, excessive precision, malformed months, and unsafe bounds.
      * @param {Object} customAdjustments
      * @param {string[]} unfinalizedMonths
      * @returns {{ valid: boolean, error?: string }}
      */
     validateRecoveryAdjustments(customAdjustments, unfinalizedMonths = []) {
-        if (!customAdjustments || typeof customAdjustments !== 'object') {
+        if (!customAdjustments || typeof customAdjustments !== 'object' || Array.isArray(customAdjustments)) {
             return { valid: false, error: 'Adjustments payload must be an object.' };
         }
         const validMonths = new Set(unfinalizedMonths || []);
         const validCountries = new Set(['JP', 'IN', 'DE']);
 
         for (const [mKey, countriesObj] of Object.entries(customAdjustments)) {
-            if (!/^\d{4}-\d{2}$/.test(mKey)) {
-                return { valid: false, error: `Invalid month key format '${mKey}'. Expected YYYY-MM.` };
+            // Strict calendar month validation rejecting 2026-00, 2026-13, 2026-99
+            if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mKey)) {
+                return { valid: false, error: `Invalid month key format '${mKey}'. Expected YYYY-MM with calendar month between 01 and 12.` };
+            }
+            const year = parseInt(mKey.split('-')[0], 10);
+            if (isNaN(year) || year < 2000 || year > 2099) {
+                return { valid: false, error: `Year in month key '${mKey}' out of valid range (2000-2099).` };
             }
             if (validMonths.size > 0 && !validMonths.has(mKey)) {
                 return { valid: false, error: `Month '${mKey}' is not in the unfinalized months list.` };
             }
-            if (!countriesObj || typeof countriesObj !== 'object') {
+            if (!countriesObj || typeof countriesObj !== 'object' || Array.isArray(countriesObj)) {
                 return { valid: false, error: `Adjustments for month '${mKey}' must be an object.` };
             }
             for (const [code, adj] of Object.entries(countriesObj)) {
                 if (!validCountries.has(code)) {
                     return { valid: false, error: `Unsupported country code '${code}' in month '${mKey}'.` };
                 }
-                if (!adj || typeof adj !== 'object') {
+                if (!adj || typeof adj !== 'object' || Array.isArray(adj)) {
                     return { valid: false, error: `Adjustment for '${code}' in month '${mKey}' must be an object.` };
                 }
                 if (typeof adj.baseBudget !== 'undefined') {
+                    if (adj.baseBudget === null || adj.baseBudget === '' || typeof adj.baseBudget === 'boolean') {
+                        return { valid: false, error: `Base budget for ${code} in month ${mKey} cannot be null, empty, or boolean.` };
+                    }
                     const amt = Number(adj.baseBudget);
                     if (typeof amt !== 'number' || isNaN(amt) || !isFinite(amt) || amt < 0 || amt > 1e12) {
                         return { valid: false, error: `Invalid base budget amount '${adj.baseBudget}' for ${code} in month ${mKey}. Must be a finite number between 0 and 1e12.` };
@@ -1664,130 +1771,191 @@ class StorageManager {
         if (previewStateToken && previewStateToken !== currentFingerprint) {
             return {
                 success: false,
-                error: 'Financial state or transactions changed elsewhere. Please refresh the reconciliation preview.'
+                code: 'STATE_CONFLICT',
+                conflict: true,
+                error: 'Financial state conflict detected: transactions or state changed elsewhere. Please refresh the reconciliation preview.'
             };
         }
 
-        // Concurrency Guard 2: Authoritative local storage cross-tab check
+        // Cross-tab lock acquisition
+        if (!this.acquireRecoveryLock(5000)) {
+            return {
+                success: false,
+                code: 'STATE_CONFLICT',
+                conflict: true,
+                error: 'Another browser session is currently committing budget recovery. Please wait or refresh.'
+            };
+        }
+
         try {
-            const storedRaw = localStorage.getItem(this.getActiveStorageKey());
-            if (storedRaw) {
-                const storedState = JSON.parse(storedRaw);
-                const storedFingerprint = this.computeFinancialFingerprint(storedState);
-                if (storedFingerprint !== currentFingerprint) {
+            // Concurrency Guard 2: Fail-closed authoritative local storage verification
+            if (typeof localStorage !== 'undefined') {
+                let storedRaw;
+                try {
+                    storedRaw = localStorage.getItem(this.getActiveStorageKey());
+                } catch (storageErr) {
                     return {
                         success: false,
-                        conflict: true,
-                        error: 'Financial state changed in another tab or session. Please refresh your recovery plan.'
+                        code: 'STORAGE_UNAVAILABLE',
+                        error: `Authoritative local storage access error: ${storageErr.message || String(storageErr)}`
                     };
                 }
+
+                if (storedRaw === null || storedRaw === undefined || storedRaw.trim() === '') {
+                    if (!this.isFirstLoad) {
+                        return {
+                            success: false,
+                            code: 'STORAGE_UNAVAILABLE',
+                            error: 'Authoritative local storage value is missing.'
+                        };
+                    }
+                } else {
+                    let storedState;
+                    try {
+                        storedState = JSON.parse(storedRaw);
+                    } catch (jsonErr) {
+                        return {
+                            success: false,
+                            code: 'INVALID_STORED_STATE',
+                            error: `Authoritative stored data is malformed JSON: ${jsonErr.message || String(jsonErr)}`
+                        };
+                    }
+
+                    if (!storedState || typeof storedState !== 'object' || !storedState.wallets || !Array.isArray(storedState.transactions)) {
+                        return {
+                            success: false,
+                            code: 'INVALID_STORED_STATE',
+                            error: 'Authoritative stored state lacks valid financial structures.'
+                        };
+                    }
+
+                    const storedFingerprint = this.computeFinancialFingerprint(storedState);
+                    if (storedFingerprint !== currentFingerprint) {
+                        return {
+                            success: false,
+                            code: 'STATE_CONFLICT',
+                            conflict: true,
+                            error: 'Financial state conflict detected: transactions or balances were modified in another tab. Please refresh the reconciliation preview.'
+                        };
+                    }
+                }
             }
-        } catch (e) {
-            // Storage access check handled gracefully
-        }
 
-        const preview = this.getBudgetRecoveryPreview(option, customAdjustments);
-        if (!preview.success) {
-            return { success: false, error: preview.error || 'Failed to generate reconciliation plan.' };
-        }
-
-        // Snapshot authoritative pre-commit state for 100% complete rollback guarantee
-        const preCommitStateSnapshot = JSON.parse(JSON.stringify(this.state));
-        const preCommitRecoveryState = this.budgetRecoveryState;
-
-        try {
-            if (!this.state.closedMonths) {
-                this.state.closedMonths = {};
+            const preview = this.getBudgetRecoveryPreview(option, customAdjustments);
+            if (!preview.success) {
+                return {
+                    success: false,
+                    code: 'INVALID_ADJUSTMENTS',
+                    error: preview.error || 'Failed to generate reconciliation plan.'
+                };
             }
 
-            const supportedCountries = ['JP', 'IN', 'DE'];
+            // Snapshot authoritative pre-commit state for 100% complete rollback guarantee
+            const preCommitStateSnapshot = JSON.parse(JSON.stringify(this.state));
+            const preCommitRecoveryState = this.budgetRecoveryState;
+            const preCommitUnfinalized = Array.isArray(this.unfinalizedMonths) ? this.unfinalizedMonths.slice() : [];
 
-            // Commit Phase: Sequential creation of immutable closed month snapshots
-            preview.monthsPreview.forEach(m => {
-                if (this.state.closedMonths[m.monthKey] && this.state.closedMonths[m.monthKey].status === 'closed') {
-                    throw new Error(`Month ${m.monthKey} is already finalized and closed. Skipping duplicate rollover.`);
+            try {
+                if (!this.state.closedMonths) {
+                    this.state.closedMonths = {};
                 }
 
-                const snapshot = {
-                    monthKey: m.monthKey,
-                    label: m.monthKey,
-                    closedAt: new Date().toISOString(),
-                    reason: `Budget Recovery: ${option}`,
-                    walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets || {})),
-                    status: 'closed'
-                };
+                const supportedCountries = ['JP', 'IN', 'DE'];
 
-                supportedCountries.forEach(code => {
-                    const cData = m.countries[code];
-                    snapshot[`${code}TotalBudget`] = cData.baseBudget;
-                    snapshot[`${code}CarryoverPrior`] = cData.carryoverPrior;
-                    snapshot[`${code}Spent`] = cData.spent;
-                    snapshot[`${code}RolloverAdded`] = cData.rolloverAdded;
-                    snapshot[`${code}Provenance`] = cData.provenance;
+                // Commit Phase: Sequential creation of immutable closed month snapshots
+                preview.monthsPreview.forEach(m => {
+                    if (this.state.closedMonths[m.monthKey] && this.state.closedMonths[m.monthKey].status === 'closed') {
+                        throw new Error(`Month ${m.monthKey} is already finalized and closed. Skipping duplicate rollover.`);
+                    }
+
+                    const snapshot = {
+                        monthKey: m.monthKey,
+                        label: m.monthKey,
+                        closedAt: new Date().toISOString(),
+                        reason: `Budget Recovery: ${option}`,
+                        walletsSnapshot: JSON.parse(JSON.stringify(this.state.wallets || {})),
+                        status: 'closed'
+                    };
+
+                    supportedCountries.forEach(code => {
+                        const cData = m.countries[code];
+                        snapshot[`${code}TotalBudget`] = cData.baseBudget;
+                        snapshot[`${code}CarryoverPrior`] = cData.carryoverPrior;
+                        snapshot[`${code}Spent`] = cData.spent;
+                        snapshot[`${code}RolloverAdded`] = cData.rolloverAdded;
+                        snapshot[`${code}Provenance`] = cData.provenance;
+                    });
+
+                    // Legacy backward-compatibility
+                    snapshot.jpTotalBudget = snapshot.JPTotalBudget || 0;
+                    snapshot.jpRolloverAdded = snapshot.JPRolloverAdded || 0;
+
+                    this.state.closedMonths[m.monthKey] = snapshot;
                 });
 
-                // Legacy backward-compatibility
-                snapshot.jpTotalBudget = snapshot.JPTotalBudget || 0;
-                snapshot.jpRolloverAdded = snapshot.JPRolloverAdded || 0;
+                // Update active month carryover in state.budgets
+                supportedCountries.forEach(code => {
+                    if (!this.state.budgets) {
+                        this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+                    }
+                    if (!this.state.budgets[code]) {
+                        this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
+                    }
+                    this.state.budgets[code].carryover = preview.activeMonthSummary.countries[code].carryover;
+                });
 
-                this.state.closedMonths[m.monthKey] = snapshot;
-            });
+                const actualMonth = this.getCurrentMonthKey();
+                this.state.currentMonthKey = actualMonth;
 
-            // Update active month carryover in state.budgets
-            supportedCountries.forEach(code => {
-                if (!this.state.budgets) {
-                    this.state.budgets = JSON.parse(JSON.stringify(defaultState.budgets));
+                // Stamp comprehensive recovery audit metadata including provenance summary
+                this.state.recoveryMetadata = {
+                    id: `recovery_${Date.now()}`,
+                    reconciledAt: new Date().toISOString(),
+                    periodStart: unfinalized[0],
+                    periodEnd: unfinalized[unfinalized.length - 1],
+                    activeMonth: actualMonth,
+                    option: option,
+                    countries: supportedCountries,
+                    reconciledMonths: unfinalized,
+                    provenanceSummary: preview.monthsPreview.map(m => ({
+                        monthKey: m.monthKey,
+                        countries: Object.fromEntries(
+                            supportedCountries.map(c => [c, m.countries[c]?.provenance || 'unknown'])
+                        )
+                    }))
+                };
+
+                // Re-derive history view from closedMonths
+                this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+                this._attachHistoryGetters(this.state);
+
+                // Transition workflow state to RESOLVED
+                this.budgetRecoveryState = 'RESOLVED';
+                this.unfinalizedMonths = [];
+                this.state.budgetRecoveryState = 'RESOLVED';
+                this.state.unfinalizedMonths = [];
+
+                const saved = this.saveData();
+                if (saved === false) {
+                    throw new Error("Local persistence failed (storage quota or access error).");
                 }
-                if (!this.state.budgets[code]) {
-                    this.state.budgets[code] = { enabled: false, monthlyTotal: 0, rolloverEnabled: false, carryover: 0 };
-                }
-                this.state.budgets[code].carryover = preview.activeMonthSummary.countries[code].carryover;
-            });
 
-            const actualMonth = this.getCurrentMonthKey();
-            this.state.currentMonthKey = actualMonth;
-
-            // Stamp comprehensive recovery audit metadata including provenance summary
-            this.state.recoveryMetadata = {
-                id: `recovery_${Date.now()}`,
-                reconciledAt: new Date().toISOString(),
-                periodStart: unfinalized[0],
-                periodEnd: unfinalized[unfinalized.length - 1],
-                activeMonth: actualMonth,
-                option: option,
-                countries: supportedCountries,
-                reconciledMonths: unfinalized,
-                provenanceSummary: preview.monthsPreview.map(m => ({
-                    monthKey: m.monthKey,
-                    countries: Object.fromEntries(
-                        supportedCountries.map(c => [c, m.countries[c]?.provenance || 'unknown'])
-                    )
-                }))
-            };
-
-            // Re-derive history view from closedMonths
-            this.state.history = Object.values(this.state.closedMonths).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-            this._attachHistoryGetters(this.state);
-
-            // Transition workflow state to RESOLVED
-            this.budgetRecoveryState = 'RESOLVED';
-            this.unfinalizedMonths = [];
-            this.state.budgetRecoveryState = 'RESOLVED';
-            this.state.unfinalizedMonths = [];
-
-            const saved = this.saveData();
-            if (saved === false) {
-                throw new Error("Local persistence failed (storage quota or access error).");
+                return { success: true, reconciledMonths: unfinalized };
+            } catch (commitErr) {
+                console.error('[StorageManager] commitBudgetRecovery failed during commit. Rolling back completely...', commitErr);
+                this.state = preCommitStateSnapshot;
+                this.budgetRecoveryState = preCommitRecoveryState;
+                this.unfinalizedMonths = preCommitUnfinalized;
+                this._attachBudgetAccessors(this.state);
+                this._attachHistoryGetters(this.state);
+                return {
+                    success: false,
+                    code: commitErr.message && commitErr.message.includes('Local persistence failed') ? 'PERSISTENCE_FAILED' : 'COMMIT_FAILED',
+                    error: commitErr.message || 'Recovery commit failed.'
+                };
             }
-
-            return { success: true, reconciledMonths: unfinalized };
-        } catch (commitErr) {
-            console.error('[StorageManager] commitBudgetRecovery failed during commit. Rolling back completely...', commitErr);
-            this.state = preCommitStateSnapshot;
-            this.budgetRecoveryState = preCommitRecoveryState;
-            this._attachBudgetAccessors(this.state);
-            this._attachHistoryGetters(this.state);
-            return { success: false, error: commitErr.message || 'Recovery commit failed.' };
+        } finally {
+            this.releaseRecoveryLock();
         }
     }
 
