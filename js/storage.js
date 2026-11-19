@@ -6,6 +6,7 @@ const BASE_STORAGE_KEY = window.SUPABASE_CONFIG.storageKey;
 
 const defaultState = {
     schemaVersion: 3,
+    revision: 1,
     currentMonthKey: "",
     jpTotalBudget: 0,
     inTotalBudget: 0,
@@ -116,6 +117,435 @@ class StorageManager {
         this._attachBudgetAccessors(this.state);
         this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
         this.tabId = 'tab_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+        this.lastConfirmedCloudRevision = Number(this.state?.revision) || 1;
+        this.activeConflict = null;
+        this.syncChannel = null;
+        this.initSyncChannel();
+    }
+
+    /**
+     * Compute the scoped lock name for the authenticated user and active storage key.
+     */
+    getLockScopeName() {
+        return `em_lock_${this.currentUserId || this.getActiveStorageKey()}`;
+    }
+
+    /**
+     * Reload authoritative state from local storage.
+     * Guarantees that in-flight mutations always operate against the freshest persisted state.
+     */
+    reloadAuthoritativeLocalState() {
+        if (typeof localStorage === 'undefined') return false;
+        try {
+            const raw = localStorage.getItem(this.getActiveStorageKey());
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object' && parsed.wallets && Array.isArray(parsed.transactions)) {
+                    this.state = parsed;
+                    if (typeof this.state.revision !== 'number') {
+                        this.state.revision = 1;
+                    }
+                    this._attachHistoryGetters(this.state);
+                    this._attachBudgetAccessors(this.state);
+                    return true;
+                }
+            }
+        } catch (e) {
+            console.error('[StorageManager] Failed to reload authoritative local state:', e);
+        }
+        return false;
+    }
+
+    /**
+     * Direct synchronous write to localStorage without triggering recursion or external locks.
+     */
+    _saveDataDirect() {
+        if (this.state._haltedMigration || this.migrationError) {
+            console.warn('[Storage] _saveDataDirect blocked because migration is in halted safety state.');
+            return false;
+        }
+        try {
+            if (this.state.budgets) {
+                this.state.jpTotalBudget = this.state.budgets.JP?.monthlyTotal || 0;
+                this.state.inTotalBudget = this.state.budgets.IN?.monthlyTotal || 0;
+            }
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
+            }
+            return true;
+        } catch (e) {
+            console.error('[StorageManager] _saveDataDirect failed:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Execute an asynchronous financial mutation within an exclusive cross-tab lock.
+     * Uses the browser Web Locks API (navigator.locks) where available, falling back
+     * to a robust cooperative localStorage spin-lock with exponential backoff.
+     *
+     * @param {Function} mutationFn (state) => any
+     * @param {Object} [options]
+     * @param {number} [options.expectedRevision]
+     * @returns {Promise<any>}
+     */
+    async runExclusive(mutationFn, options = {}) {
+        const lockName = this.getLockScopeName();
+
+        const pipeline = async () => {
+            // 1. Reload latest authoritative local state
+            this.reloadAuthoritativeLocalState();
+
+            // 2. Validate revision if specified
+            if (options.expectedRevision !== undefined && this.state.revision !== options.expectedRevision) {
+                return {
+                    success: false,
+                    code: 'STATE_CONFLICT',
+                    conflict: true,
+                    error: `Financial revision changed in another window (expected ${options.expectedRevision}, found ${this.state.revision}).`
+                };
+            }
+
+            // 3. Execute proposed mutation
+            const result = await mutationFn(this.state);
+            if (result === false || (result && typeof result === 'object' && result.success === false)) {
+                return result;
+            }
+
+            // 4. Advance revision and timestamp
+            this.state.revision = (Number(this.state.revision) || 0) + 1;
+            this.state._updatedAt = new Date().toISOString();
+
+            // 5. Persist to local storage
+            const saved = this._saveDataDirect();
+            if (!saved) {
+                throw new Error("Local persistence failed (storage quota or access error).");
+            }
+
+            // 6. Broadcast update event to all other tabs
+            this.broadcastStateChange({
+                type: 'FINANCIAL_STATE_MUTATED',
+                revision: this.state.revision,
+                fingerprint: this.computeFinancialFingerprint(this.state),
+                sourceTabId: this.tabId,
+                timestamp: this.state._updatedAt
+            });
+
+            // 7. Schedule cloud synchronization
+            if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
+                this.pushToSupabase();
+            }
+
+            return result !== undefined ? result : true;
+        };
+
+        if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
+            return await navigator.locks.request(lockName, { mode: 'exclusive' }, pipeline);
+        } else {
+            return await this._runWithFallbackLock(lockName, pipeline);
+        }
+    }
+
+    /**
+     * Fallback lock coordination for environments without navigator.locks.
+     * Uses cooperative localStorage lease with monotonic timestamp and exponential backoff.
+     */
+    async _runWithFallbackLock(lockName, fn) {
+        if (typeof localStorage === 'undefined') {
+            return await fn();
+        }
+        const lockKey = `${lockName}_lease`;
+        const timeoutMs = 8000;
+        const startTime = Date.now();
+        let acquired = false;
+
+        while (Date.now() - startTime < timeoutMs) {
+            const now = Date.now();
+            const raw = localStorage.getItem(lockKey);
+            let canTake = false;
+            if (!raw) {
+                canTake = true;
+            } else {
+                try {
+                    const lockObj = JSON.parse(raw);
+                    if (typeof lockObj.expiresAt === 'number' && (lockObj.expiresAt < now || lockObj.owner === this.tabId)) {
+                        canTake = true;
+                    }
+                } catch (e) {
+                    canTake = true;
+                }
+            }
+            if (canTake) {
+                try {
+                    localStorage.setItem(lockKey, JSON.stringify({
+                        owner: this.tabId,
+                        acquiredAt: now,
+                        expiresAt: now + 5000
+                    }));
+                    acquired = true;
+                    break;
+                } catch (e) {
+                    // Retry
+                }
+            }
+            await new Promise(r => setTimeout(r, 20 + Math.random() * 30));
+        }
+
+        if (!acquired) {
+            throw new Error(`Failed to acquire exclusive coordination lock: ${lockName}`);
+        }
+
+        try {
+            return await fn();
+        } finally {
+            try {
+                const cur = localStorage.getItem(lockKey);
+                if (cur) {
+                    const lockObj = JSON.parse(cur);
+                    if (lockObj.owner === this.tabId) {
+                        localStorage.removeItem(lockKey);
+                    }
+                }
+            } catch (e) {}
+        }
+    }
+
+    /**
+     * Initialize cross-tab synchronization channel and storage event fallback.
+     */
+    initSyncChannel() {
+        if (typeof BroadcastChannel !== 'undefined') {
+            try {
+                this.syncChannel = new BroadcastChannel('expense_manager_sync');
+                this.syncChannel.onmessage = (event) => this.handleSyncMessage(event.data);
+            } catch (e) {
+                console.warn('[StorageManager] BroadcastChannel unavailable, using storage event fallback:', e);
+            }
+        }
+        if (typeof window !== 'undefined') {
+            window.addEventListener('storage', (e) => {
+                if (e.key === `${this.getActiveStorageKey()}_sync_event` && e.newValue) {
+                    try {
+                        this.handleSyncMessage(JSON.parse(e.newValue));
+                    } catch (err) {}
+                }
+            });
+            window.addEventListener('online', () => this.onNetworkOnline());
+            window.addEventListener('offline', () => this.onNetworkOffline());
+        }
+    }
+
+    /**
+     * Broadcast an authoritative financial state change to all other tabs and windows.
+     */
+    broadcastStateChange(payload) {
+        const fullPayload = {
+            ...payload,
+            state: this.state
+        };
+        if (this.syncChannel) {
+            try {
+                this.syncChannel.postMessage(fullPayload);
+            } catch (e) {}
+        }
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(`${this.getActiveStorageKey()}_sync_event`, JSON.stringify({
+                    ...payload,
+                    state: this.state,
+                    _nonce: Math.random()
+                }));
+            }
+        } catch (e) {}
+    }
+
+    /**
+     * Handle incoming cross-tab synchronization events.
+     */
+    handleSyncMessage(data) {
+        if (!data || data.sourceTabId === this.tabId) return;
+        if (data.type === 'FINANCIAL_STATE_MUTATED') {
+            console.log(`[StorageManager] Cross-tab financial update received (Rev ${data.revision}) from ${data.sourceTabId}`);
+            if (typeof app !== 'undefined' && typeof app.isAnyModalDirty === 'function' && app.isAnyModalDirty()) {
+                app.showInModalConflictWarning(data.revision);
+            } else {
+                if (data.state && typeof data.state === 'object' && data.state.wallets) {
+                    this.state = data.state;
+                    this._attachHistoryGetters(this.state);
+                    this._attachBudgetAccessors(this.state);
+                } else {
+                    this.reloadAuthoritativeLocalState();
+                }
+                if (typeof app !== 'undefined') {
+                    if (typeof app.renderAll === 'function') app.renderAll();
+                    if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('SYNCED', 'Synced');
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle network recovery.
+     */
+    onNetworkOnline() {
+        console.log('[StorageManager] Network online detected. Attempting pending cloud synchronization...');
+        this.cloudSyncStatus = 'SYNCING';
+        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+            app.updateSyncStatusPill('SYNC_PENDING');
+        }
+        if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
+            this.pushToSupabase();
+        }
+    }
+
+    /**
+     * Handle network drop.
+     */
+    onNetworkOffline() {
+        console.log('[StorageManager] Network offline detected. Switching to local persistence mode.');
+        this.cloudSyncStatus = 'FAILED';
+        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+            app.updateSyncStatusPill('SYNC_FAILED', 'Offline');
+        }
+    }
+
+    /**
+     * Stash local uncommitted state and conflicting remote state into an isolated recovery slot.
+     */
+    stashConflictState(localState, remoteState) {
+        if (arguments.length === 1) {
+            remoteState = localState;
+            localState = this.state;
+        }
+        localState = localState || this.state;
+        remoteState = remoteState || {};
+        const conflictRecord = {
+            conflictId: `conflict_${Date.now()}`,
+            detectedAt: new Date().toISOString(),
+            localRevision: localState?.revision || 1,
+            remoteRevision: remoteState?.revision || 1,
+            localState: localState ? JSON.parse(JSON.stringify(localState)) : null,
+            remoteState: remoteState ? JSON.parse(JSON.stringify(remoteState)) : null,
+            detected: true
+        };
+        this.activeConflict = conflictRecord;
+        if (typeof localStorage !== 'undefined') {
+            try {
+                localStorage.setItem(`${this.getActiveStorageKey()}_conflict_stash`, JSON.stringify(conflictRecord));
+            } catch (e) {
+                console.error('[StorageManager] Failed to persist conflict stash:', e);
+            }
+        }
+        return conflictRecord;
+    }
+
+    /**
+     * Resolve a detected cloud concurrency conflict according to the chosen strategy.
+     * @param {'overwrite_cloud' | 'accept_cloud' | 'merge_nonconflicting'} strategy
+     */
+    async resolveConflict(strategy) {
+        if (!this.activeConflict && typeof localStorage !== 'undefined') {
+            const raw = localStorage.getItem(`${this.getActiveStorageKey()}_conflict_stash`);
+            if (raw) {
+                try { this.activeConflict = JSON.parse(raw); } catch (e) {}
+            }
+        }
+        if (!this.activeConflict) {
+            return { success: false, error: 'No active conflict record found.' };
+        }
+
+        if (strategy === 'overwrite_cloud') {
+            console.log('[StorageManager] Overwriting cloud with local state.');
+            this.state.revision = Math.max(
+                Number(this.activeConflict.remoteRevision || 0),
+                Number(this.activeConflict.localRevision || 0)
+            ) + 1;
+            this.state._updatedAt = new Date().toISOString();
+            this._saveDataDirect();
+            const pushed = await this.pushToSupabase({ force: true });
+            if (pushed) {
+                this.activeConflict = null;
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.removeItem(`${this.getActiveStorageKey()}_conflict_stash`);
+                }
+                if (typeof app !== 'undefined') {
+                    app.updateSyncStatusPill('SYNCED');
+                    app.renderAll();
+                }
+                return { success: true, strategy: 'overwrite_cloud' };
+            }
+            return { success: false, error: 'Failed to push local state to Supabase.' };
+        } else if (strategy === 'accept_cloud') {
+            console.log('[StorageManager] Accepting cloud state and archiving local draft.');
+            // 1. Download local backup JSON file
+            const localPayload = JSON.stringify(this.activeConflict.localState, null, 2);
+            if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+                try {
+                    const blob = new Blob([localPayload], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `ExpenseManager_LocalConflict_Backup_${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    console.warn('[StorageManager] Could not trigger download directly:', e);
+                }
+            }
+
+            // 2. Adopt remote state safely
+            const preview = this.previewContinuousLedgerMigration(this.activeConflict.remoteState);
+            if (!preview.success) {
+                return { success: false, error: `Remote state migration failed: ${preview.error}` };
+            }
+            this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
+            this.lastConfirmedCloudRevision = Number(this.state.revision) || 1;
+            this.cloudSyncStatus = 'CONFIRMED';
+            this.activeConflict = null;
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem(`${this.getActiveStorageKey()}_conflict_stash`);
+            }
+            if (typeof app !== 'undefined') {
+                app.updateSyncStatusPill('SYNCED');
+                app.renderAll();
+            }
+            return { success: true, strategy: 'accept_cloud' };
+        } else if (strategy === 'merge_nonconflicting') {
+            console.log('[StorageManager] Merging non-conflicting transactions from cloud.');
+            const remoteTxs = this.activeConflict.remoteState?.transactions || [];
+            const localTxs = this.state.transactions || [];
+            const localIds = new Set(localTxs.map(t => t.id));
+            const mergedTxs = localTxs.slice();
+            remoteTxs.forEach(rtx => {
+                if (!localIds.has(rtx.id)) {
+                    mergedTxs.push(JSON.parse(JSON.stringify(rtx)));
+                }
+            });
+            this.state.transactions = mergedTxs;
+            this.state.revision = Math.max(
+                Number(this.activeConflict.remoteRevision || 0),
+                Number(this.activeConflict.localRevision || 0)
+            ) + 1;
+            this.state._updatedAt = new Date().toISOString();
+            this._saveDataDirect();
+            const pushed = await this.pushToSupabase({ force: true });
+            if (pushed) {
+                this.activeConflict = null;
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.removeItem(`${this.getActiveStorageKey()}_conflict_stash`);
+                }
+                if (typeof app !== 'undefined') {
+                    app.updateSyncStatusPill('SYNCED');
+                    app.renderAll();
+                }
+                return { success: true, strategy: 'merge_nonconflicting' };
+            }
+            return { success: false, error: 'Failed to push merged state to Supabase.' };
+        }
+
+        return { success: false, error: `Unknown conflict strategy: ${strategy}` };
     }
 
     /**
@@ -1186,7 +1616,7 @@ class StorageManager {
 
                     // Push migrated v3 state to Supabase only after successful validation
                     if (remoteNeedsMigration) {
-                        await this.pushToSupabase();
+                        await this.pushToSupabase({ force: true });
                     }
 
                     return true; // signal caller to re-render
@@ -1250,24 +1680,115 @@ class StorageManager {
         }
 
         try {
-            const { error } = await supabaseClient.client
-                .from('app_state')
-                .upsert({
+            if (options.force) {
+                const { error } = await supabaseClient.client
+                    .from('app_state')
+                    .upsert({
+                        user_id: userId,
+                        state: this.state,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id' });
+
+                if (error) {
+                    console.error("[Sync] Failed to push to Supabase (forced):", error);
+                    this.syncError = error.message || String(error);
+                    this.cloudSyncStatus = 'FAILED';
+                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                        app.updateSyncStatusPill('SYNC_FAILED');
+                    }
+                    return false;
+                }
+                this.syncError = null;
+                this.lastConfirmedCloudRevision = Number(this.state.revision) || 1;
+                this.cloudSyncStatus = 'CONFIRMED';
+                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                    app.updateSyncStatusPill('SYNCED');
+                }
+                return true;
+            }
+
+            const tableQuery = supabaseClient.client.from('app_state');
+            if (typeof tableQuery.update !== 'function') {
+                const { error } = await tableQuery.upsert({
                     user_id: userId,
                     state: this.state,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
 
+                if (error) {
+                    console.error("[Sync] Failed to push to Supabase (upsert fallback):", error);
+                    this.syncError = error.message || String(error);
+                    this.cloudSyncStatus = 'FAILED';
+                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                        app.updateSyncStatusPill('SYNC_FAILED');
+                    }
+                    return false;
+                }
+                this.syncError = null;
+                this.lastConfirmedCloudRevision = Number(this.state.revision) || 1;
+                this.cloudSyncStatus = 'CONFIRMED';
+                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                    app.updateSyncStatusPill('SYNCED');
+                }
+                return true;
+            }
+
+            // Dual-Layer CAS conditional update matching state->>revision
+            const expectedRev = Number(this.lastConfirmedCloudRevision) || 1;
+            const { data, error } = await tableQuery
+                .update({
+                    state: this.state,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('user_id', userId)
+                .eq('state->>revision', String(expectedRev))
+                .select('state, updated_at');
+
             if (error) {
-                console.error("[Sync] Failed to push to Supabase:", error);
+                console.error("[Sync] Conditional CAS update failed:", error);
                 this.syncError = error.message || String(error);
+                this.cloudSyncStatus = 'FAILED';
+                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                    app.updateSyncStatusPill('SYNC_FAILED');
+                }
                 return false;
             }
+
+            // If 0 rows updated, server revision differs from expectedRev!
+            if (!data || data.length === 0) {
+                console.warn(`[Sync] Supabase CAS conflict! Expected remote revision ${expectedRev}, but cloud row was modified.`);
+                const { data: remoteRow, error: fetchErr } = await supabaseClient.client
+                    .from('app_state')
+                    .select('state, updated_at')
+                    .eq('user_id', userId)
+                    .single();
+
+                if (remoteRow && remoteRow.state) {
+                    this.stashConflictState(this.state, remoteRow.state);
+                    this.cloudSyncStatus = 'CONFLICT';
+                    this.syncError = 'Cloud state was modified on another device.';
+                    if (typeof app !== 'undefined') {
+                        if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                        if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
+                    }
+                }
+                return false;
+            }
+
             this.syncError = null;
+            this.lastConfirmedCloudRevision = Number(this.state.revision) || expectedRev + 1;
+            this.cloudSyncStatus = 'CONFIRMED';
+            if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                app.updateSyncStatusPill('SYNCED');
+            }
             return true;
         } catch (e) {
             console.error("[Sync] Push to Supabase failed:", e);
             this.syncError = e.message || String(e);
+            this.cloudSyncStatus = 'FAILED';
+            if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                app.updateSyncStatusPill('SYNC_FAILED');
+            }
             return false;
         }
     }
@@ -1309,10 +1830,22 @@ class StorageManager {
             return false;
         }
         try {
-            if (this.initialSyncDone || typeof supabaseClient === 'undefined' || !supabaseClient.session) {
-                this.state._updatedAt = new Date().toISOString();
+            if (this.state.budgets) {
+                this.state.jpTotalBudget = this.state.budgets.JP?.monthlyTotal || 0;
+                this.state.inTotalBudget = this.state.budgets.IN?.monthlyTotal || 0;
             }
+            if (typeof this.state.revision !== 'number') {
+                this.state.revision = 1;
+            }
+            this.state._updatedAt = new Date().toISOString();
             localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
+            this.broadcastStateChange({
+                type: 'FINANCIAL_STATE_MUTATED',
+                revision: this.state.revision,
+                fingerprint: this.computeFinancialFingerprint(this.state),
+                sourceTabId: this.tabId,
+                timestamp: this.state._updatedAt
+            });
             // Only push to Supabase after the initial sync has run.
             // This prevents a fresh device from overwriting real cloud data.
             if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {

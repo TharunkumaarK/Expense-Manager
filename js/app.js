@@ -1331,7 +1331,7 @@ class App {
         }
     }
 
-    handleFormSubmit(event, editId = null, type) {
+    async handleFormSubmit(event, editId = null, type) {
         if (event && typeof event.preventDefault === 'function') {
             event.preventDefault();
         }
@@ -1391,7 +1391,9 @@ class App {
             } else {
                 this._isSubmitting = true;
                 try {
-                    walletManager.addExpense(walletId, cat, amt, note, date);
+                    await storage.runExclusive(async () => {
+                        return walletManager.addExpense(walletId, cat, amt, note, date);
+                    });
                 } finally {
                     this._isSubmitting = false;
                 }
@@ -1417,7 +1419,9 @@ class App {
             } else {
                 this._isSubmitting = true;
                 try {
-                    walletManager.addIncome(walletId, amt, note, date);
+                    await storage.runExclusive(async () => {
+                        return walletManager.addIncome(walletId, amt, note, date);
+                    });
                 } finally {
                     this._isSubmitting = false;
                 }
@@ -1440,8 +1444,10 @@ class App {
             } else {
                 this._isSubmitting = true;
                 try {
-                    const ok = walletManager.transfer(src, dest, amt, note, date);
-                    if (!ok) {
+                    const res = await storage.runExclusive(async () => {
+                        return walletManager.transfer(src, dest, amt, note, date);
+                    });
+                    if (res === false || (res && res.success === false)) {
                         alert('Could not complete transfer.');
                         return;
                     }
@@ -1469,8 +1475,10 @@ class App {
             } else {
                 this._isSubmitting = true;
                 try {
-                    const ok = walletManager.remittance(src, dest, amtJpy, amtInr, note, date);
-                    if (!ok) {
+                    const res = await storage.runExclusive(async () => {
+                        return walletManager.remittance(src, dest, amtJpy, amtInr, note, date);
+                    });
+                    if (res === false || (res && res.success === false)) {
                         alert('Could not complete international transfer.');
                         return;
                     }
@@ -1483,8 +1491,10 @@ class App {
         if (editId) {
             this._isSubmitting = true;
             try {
-                const ok = walletManager.updateTransaction(editId, updatedData);
-                if (!ok) {
+                const res = await storage.runExclusive(async () => {
+                    return walletManager.updateTransaction(editId, updatedData);
+                });
+                if (res === false || (res && res.success === false)) {
                     alert('Could not update transaction.');
                     return;
                 }
@@ -1508,7 +1518,7 @@ class App {
         this.handleFormSubmit(null, id, type);
     }
 
-    deleteTx(id) {
+    async deleteTx(id) {
         const found = walletManager.findTransaction(id);
         if (found && walletManager.isMonthClosed((found.tx.date || '').slice(0, 7))) {
             alert(`Cannot delete transaction in closed month ${(found.tx.date || '').slice(0, 7)}. This historical period is permanently sealed.`);
@@ -1516,7 +1526,9 @@ class App {
         }
 
         if (confirm("Are you sure you want to delete this transaction?")) {
-            walletManager.deleteTransaction(id);
+            await storage.runExclusive(async () => {
+                return walletManager.deleteTransaction(id);
+            });
             this.closeModal('transaction-modal');
             this.renderAll();
             if (this.currentView === 'transactions-view') {
@@ -1526,6 +1538,188 @@ class App {
             } else if (this.currentView === 'history-view') {
                 this.renderHistory();
             }
+        }
+    }
+
+    /**
+     * Check if any transaction or configuration modal currently holds uncommitted user input.
+     * Prevents cross-tab silent overwrite while user is actively composing or editing.
+     * @returns {boolean}
+     */
+    isAnyModalDirty() {
+        const isModalOpen = (el) => {
+            if (!el) return false;
+            return el.classList.contains('active') || (el.style.display && el.style.display !== 'none');
+        };
+
+        // 1. Transaction creation / edit modal
+        const txModal = document.getElementById('transaction-modal');
+        if (isModalOpen(txModal)) {
+            const amt = document.getElementById('tx-amount')?.value;
+            const amtJpy = document.getElementById('tx-amount-jpy')?.value;
+            const amtInr = document.getElementById('tx-amount-inr')?.value;
+            const note = document.getElementById('tx-note')?.value;
+            if ((amt && amt.trim() !== '') || (amtJpy && amtJpy.trim() !== '') || (amtInr && amtInr.trim() !== '') || (note && note.trim() !== '')) {
+                return true;
+            }
+        }
+
+        // 2. Budget recovery modal
+        const recModal = document.getElementById('budget-recovery-modal');
+        if (isModalOpen(recModal)) {
+            return true;
+        }
+
+        // 3. Overall budget modal
+        const ovModal = document.getElementById('overall-budget-modal');
+        if (isModalOpen(ovModal)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Display a non-destructive conflict warning banner within an open, dirty modal.
+     * Informs the user of concurrent updates while preserving their entered inputs.
+     * @param {number} newRevision
+     */
+    showInModalConflictWarning(newRevision) {
+        const isModalOpen = (el) => el && (el.classList.contains('active') || (el.style.display && el.style.display !== 'none'));
+        const txModal = document.getElementById('transaction-modal');
+        if (isModalOpen(txModal)) {
+            let banner = document.getElementById('tx-modal-conflict-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'tx-modal-conflict-banner';
+                banner.className = 'modal-conflict-banner';
+                const content = document.getElementById('modal-content');
+                if (content) {
+                    content.insertBefore(banner, content.firstChild);
+                }
+            }
+            banner.innerHTML = `
+                <i data-lucide="alert-triangle"></i>
+                <div class="modal-conflict-text">
+                    <strong>Financial Update in Another Window (Rev #${newRevision})</strong>
+                    <span>Ledger balances were updated elsewhere. Your inputs are preserved. Click Save to re-validate and apply against current balances.</span>
+                </div>
+            `;
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        }
+    }
+
+    /**
+     * Update the desktop header synchronization status indicator.
+     * Renders minimal, unobtrusive states: Synced, Saved locally, Syncing..., Offline, Sync Conflict.
+     * @param {string} [status]
+     * @param {string} [customLabel]
+     */
+    updateSyncStatusPill(status = storage.cloudSyncStatus, customLabel = null) {
+        const pill = document.getElementById('desktop-sync-status-pill');
+        if (!pill) return;
+
+        pill.className = 'sync-status-pill';
+        let iconHtml = '<span class="sync-pill-dot"></span>';
+        let label = customLabel || 'Synced';
+
+        switch (status) {
+            case 'SYNCED':
+            case 'CONFIRMED':
+                pill.classList.add('sync-pill-synced');
+                pill.title = 'All changes saved locally and confirmed in cloud';
+                label = customLabel || 'Synced';
+                pill.onclick = null;
+                break;
+            case 'LOCAL_SAVED':
+                pill.classList.add('sync-pill-local');
+                pill.title = 'Saved locally on this device; cloud synchronization queued';
+                label = customLabel || 'Saved locally';
+                pill.onclick = null;
+                break;
+            case 'SYNC_PENDING':
+            case 'SYNCING':
+                pill.classList.add('sync-pill-pending');
+                pill.title = 'Synchronizing with cloud...';
+                iconHtml = '<i data-lucide="refresh-cw" class="spin-icon" style="width:12px;height:12px;"></i>';
+                label = customLabel || 'Syncing...';
+                pill.onclick = null;
+                break;
+            case 'CONFLICT':
+            case 'CONFLICT_DETECTED':
+                pill.classList.add('sync-pill-conflict');
+                pill.title = 'Cloud state modified elsewhere. Click to review and resolve conflict.';
+                iconHtml = '<i data-lucide="alert-triangle" style="width:12px;height:12px;"></i>';
+                label = customLabel || 'Sync Conflict';
+                pill.onclick = () => this.openConflictResolutionModal();
+                break;
+            case 'SYNC_FAILED':
+            case 'FAILED':
+            default:
+                pill.classList.add('sync-pill-failed');
+                pill.title = 'Offline or cloud sync error. Data is safely stored locally. Click to retry.';
+                iconHtml = '<i data-lucide="cloud-off" style="width:12px;height:12px;"></i>';
+                label = customLabel || 'Offline';
+                pill.onclick = () => storage.pushToSupabase();
+                break;
+        }
+
+        pill.innerHTML = `${iconHtml}<span class="sync-pill-text">${label}</span>`;
+        if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    }
+
+    /**
+     * Open the Conflict Resolution Modal displaying local vs cloud comparison.
+     */
+    openConflictResolutionModal() {
+        const modal = document.getElementById('conflict-resolution-modal');
+        if (!modal) return;
+
+        const comparisonEl = document.getElementById('conflict-summary-comparison');
+        if (comparisonEl && storage.activeConflict) {
+            const loc = storage.activeConflict.localState || {};
+            const rem = storage.activeConflict.remoteState || {};
+            const locTx = Array.isArray(loc.transactions) ? loc.transactions.length : 0;
+            const remTx = Array.isArray(rem.transactions) ? rem.transactions.length : 0;
+            comparisonEl.innerHTML = `
+                <div class="conflict-comparison-row">
+                    <div class="conflict-col">
+                        <span class="conflict-badge-label">This Device (Local)</span>
+                        <strong>Revision #${storage.activeConflict.localRevision || 1}</strong>
+                        <span>${locTx} transactions</span>
+                    </div>
+                    <div class="conflict-col-vs">vs</div>
+                    <div class="conflict-col">
+                        <span class="conflict-badge-label">Cloud (Other Device)</span>
+                        <strong>Revision #${storage.activeConflict.remoteRevision || 1}</strong>
+                        <span>${remTx} transactions</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+        if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    }
+
+    /**
+     * Resolve cloud conflict through user selection.
+     * @param {'overwrite_cloud' | 'accept_cloud'} strategy
+     */
+    async resolveSyncConflict(strategy) {
+        const res = await storage.resolveConflict(strategy);
+        if (res && res.success) {
+            this.closeModal('conflict-resolution-modal');
+            this.updateSyncStatusPill('SYNCED');
+            this.renderAll();
+            if (typeof this.showToast === 'function') {
+                this.showToast('Conflict resolved successfully.', 'success');
+            } else {
+                alert('Conflict resolved successfully.');
+            }
+        } else {
+            alert((res && res.error) || 'Failed to resolve conflict.');
         }
     }
 

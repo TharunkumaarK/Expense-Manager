@@ -586,6 +586,12 @@
                     </div>
 
                     <div class="header-right">
+                        <!-- Desktop Sync Status Indicator -->
+                        <div id="desktop-sync-status-pill" class="sync-status-pill sync-pill-synced" title="All changes saved locally and confirmed in cloud">
+                            <span class="sync-pill-dot"></span>
+                            <span class="sync-pill-text">Synced</span>
+                        </div>
+
                         <!-- Monetary Concealment Toggle (Icon-Only Control) -->
                         <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
                             aria-label="Toggle monetary concealment" title="Toggle monetary concealment">
@@ -3578,6 +3584,49 @@
                     <i data-lucide="check" style="width: 14px; height: 14px;"></i>
                     <span>Save Overall Budget</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conflict Resolution Modal -->
+    <div class="modal-overlay" id="conflict-resolution-modal" style="display: none; z-index: 10000;">
+        <div class="modal-card conflict-modal-card">
+            <div class="modal-header">
+                <div class="conflict-header-title">
+                    <i data-lucide="alert-triangle"></i>
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Cloud Sync Conflict</h3>
+                </div>
+                <button class="icon-btn" onclick="app.closeModal('conflict-resolution-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 20px 24px;">
+                <p class="text-sm text-secondary" style="margin-top: 0; line-height: 1.45;">
+                    While this device was offline or editing, newer financial transactions were committed from another device.
+                    To preserve financial integrity, please choose how you would like to resolve this conflict:
+                </p>
+                <div class="conflict-summary-comparison" id="conflict-summary-comparison">
+                    <!-- Populated dynamically: Local vs Cloud revisions, tx count, and balances -->
+                </div>
+                <div class="conflict-resolution-options">
+                    <div class="conflict-option-card" onclick="app.resolveSyncConflict('accept_cloud')">
+                        <div class="conflict-option-radio"></div>
+                        <div class="conflict-option-info">
+                            <strong>Accept Cloud & Download Local Backup</strong>
+                            <p class="text-xs text-muted">Adopt the authoritative cloud state while immediately downloading an archival JSON backup of your local unpushed transactions so no records are lost.</p>
+                        </div>
+                    </div>
+                    <div class="conflict-option-card" onclick="app.resolveSyncConflict('overwrite_cloud')">
+                        <div class="conflict-option-radio"></div>
+                        <div class="conflict-option-info">
+                            <strong>Overwrite Cloud with Local Edits</strong>
+                            <p class="text-xs text-muted">Force-push your local transactions and balances as the new authoritative version, advancing the cloud revision.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 14px 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: flex-end; background: rgba(0, 0, 0, 0.15);">
+                <button class="btn btn-secondary btn-sm" onclick="app.closeModal('conflict-resolution-modal')">Review Later</button>
             </div>
         </div>
     </div>

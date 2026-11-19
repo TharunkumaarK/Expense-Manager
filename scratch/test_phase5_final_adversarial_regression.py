@@ -181,6 +181,19 @@ async def run_adversarial_regression():
                 raise RuntimeError(f"JS Evaluation Error: {res['exceptionDetails']}")
             return res.get('result', {}).get('value')
 
+        for _ in range(50):
+            try:
+                res = await send_cdp('Runtime.evaluate', {
+                    'expression': "typeof storage !== 'undefined' && typeof walletManager !== 'undefined'",
+                    'returnByValue': True,
+                    'awaitPromise': True
+                })
+                if res.get('result', {}).get('value') is True:
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(0.2)
+
         dynamic_tests = []
 
         # =========================================================================
