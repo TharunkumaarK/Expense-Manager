@@ -638,7 +638,7 @@
                                     <i data-lucide="${typeIcon}"></i>
                                 </div>
                                 <div class="onboarding-wallet-row-info">
-                                    <span class="onboarding-wallet-row-name">${escapedName}</span>
+                                    <span class="onboarding-wallet-row-name" title="${escapedName}">${escapedName}</span>
                                     <span class="onboarding-wallet-row-type">${escapedType}</span>
                                 </div>
                             </div>
@@ -960,7 +960,7 @@
                 if (code === 'JP') {
                     const bal = getBal('JP');
                     html += `
-                        <div class="auth-card-preview auth-card-jp" style="${posStyle}" data-country="JP">
+                        <div class="auth-card-preview auth-card-jp" style="${posStyle}" data-country="JP" data-card-index="${idx}">
                             <div class="auth-card-top">
                                 <div class="auth-card-chip">
                                     <div class="chip-line"></div>
@@ -984,7 +984,7 @@
                 } else if (code === 'IN') {
                     const bal = getBal('IN');
                     html += `
-                        <div class="auth-card-preview auth-card-in" style="${posStyle}" data-country="IN">
+                        <div class="auth-card-preview auth-card-in" style="${posStyle}" data-country="IN" data-card-index="${idx}">
                             <div class="auth-card-top">
                                 <div class="auth-card-chip">
                                     <div class="chip-line"></div>
@@ -1008,7 +1008,7 @@
                 } else if (code === 'DE') {
                     const bal = getBal('DE');
                     html += `
-                        <div class="auth-card-preview auth-card-de" style="${posStyle}" data-country="DE">
+                        <div class="auth-card-preview auth-card-de" style="${posStyle}" data-country="DE" data-card-index="${idx}">
                             <div class="auth-card-top">
                                 <div class="auth-card-chip">
                                     <div class="chip-line"></div>

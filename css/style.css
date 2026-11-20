@@ -1026,8 +1026,13 @@ button {
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .sync-pill-failed {
@@ -1046,8 +1051,15 @@ button {
 }
 
 @keyframes conflictPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
-    50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1); }
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+    }
 }
 
 /* In-Modal Non-Destructive Conflict Warning Banner */
@@ -12139,18 +12151,20 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     border-radius: 14px;
     padding: 16px 18px;
     cursor: pointer;
-    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: background-color 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 160ms cubic-bezier(0.23, 1, 0.32, 1), transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
     user-select: none;
     -webkit-tap-highlight-color: transparent;
 }
 
-.onboarding-country-card:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.18);
+@media (hover: hover) and (pointer: fine) {
+    .onboarding-country-card:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.18);
+    }
 }
 
 .onboarding-country-card:active {
-    transform: scale(0.99);
+    transform: scale(0.98);
 }
 
 .onboarding-country-card:focus-visible {
@@ -12214,7 +12228,7 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.15s ease;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
     flex-shrink: 0;
 }
 
@@ -12333,11 +12347,11 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.onboarding-toggle-switch input:checked + .onboarding-toggle-slider {
+.onboarding-toggle-switch input:checked+.onboarding-toggle-slider {
     background-color: #2563eb;
 }
 
-.onboarding-toggle-switch input:checked + .onboarding-toggle-slider:before {
+.onboarding-toggle-switch input:checked+.onboarding-toggle-slider:before {
     transform: translateX(20px);
 }
 
@@ -12397,22 +12411,24 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
 }
 
 .onboarding-btn-add-wallet {
-    font-size: 0.82rem !important;
-    padding: 6px 12px !important;
-    height: 34px !important;
-    min-height: 34px;
-    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    padding: 8px 16px !important;
+    height: 40px !important;
+    min-height: 40px;
+    border-radius: 9px !important;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-.onboarding-btn-add-wallet:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
+@media (hover: hover) and (pointer: fine) {
+    .onboarding-btn-add-wallet:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
 }
 
 .onboarding-btn-add-wallet:active {
@@ -12444,11 +12460,13 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     background: rgba(0, 0, 0, 0.32);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 12px;
-    transition: all 0.16s ease;
+    transition: border-color 160ms ease, background-color 160ms ease;
 }
 
-.onboarding-wallet-row:hover {
-    border-color: rgba(255, 255, 255, 0.12);
+@media (hover: hover) and (pointer: fine) {
+    .onboarding-wallet-row:hover {
+        border-color: rgba(255, 255, 255, 0.12);
+    }
 }
 
 .onboarding-wallet-row-left {
@@ -12488,9 +12506,12 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     font-size: 0.88rem;
     font-weight: 500;
     color: #ffffff;
-    white-space: nowrap;
+    line-height: 1.35;
+    word-break: break-word;
     overflow: hidden;
-    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
 .onboarding-wallet-row-type {
@@ -12524,19 +12545,21 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     border: none;
     color: var(--text-faint);
     cursor: pointer;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+    transition: color 140ms ease, background-color 140ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
     flex-shrink: 0;
 }
 
-.onboarding-wallet-delete-btn:hover {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.1);
+@media (hover: hover) and (pointer: fine) {
+    .onboarding-wallet-delete-btn:hover {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+    }
 }
 
 .onboarding-wallet-delete-btn:active {
@@ -12605,7 +12628,7 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.04);
     border-radius: 10px;
-    transition: all 0.15s ease;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
 }
 
 .onboarding-summary-label {
@@ -12646,17 +12669,19 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-.onboarding-btn-back:hover {
-    background: rgba(255, 255, 255, 0.09);
-    border-color: rgba(255, 255, 255, 0.22);
-    color: #ffffff;
+@media (hover: hover) and (pointer: fine) {
+    .onboarding-btn-back:hover {
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255, 255, 255, 0.22);
+        color: #ffffff;
+    }
 }
 
 .onboarding-btn-back:active {
-    transform: scale(0.98);
+    transform: scale(0.97);
 }
 
 .onboarding-btn-back:focus-visible {
@@ -12676,11 +12701,11 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     align-items: center;
     gap: 8px;
     margin-left: auto;
-    transition: all 0.15s ease, transform 0.1s ease;
+    transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .onboarding-btn-next:active {
-    transform: scale(0.98);
+    transform: scale(0.97);
 }
 
 .onboarding-btn-next:focus-visible {
@@ -12764,6 +12789,92 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
 
     .onboarding-step-pill-mobile {
         display: inline-flex;
+    }
+}
+
+/* Compact Desktop & Landscape Tablet (1024px - 1199px): Zero Overlap Split Layout */
+@media (min-width: 1024px) and (max-width: 1199px) {
+    .onboarding-container {
+        grid-template-columns: minmax(340px, 1fr) auto minmax(430px, 1.15fr) !important;
+        width: 100% !important;
+        max-width: 1080px !important;
+        padding: 0 16px !important;
+        margin: 0 auto;
+        gap: 0;
+    }
+
+    /* Prevent auth-divider from being hidden by global max-width: 1024px rule */
+    .onboarding-container .auth-divider {
+        display: block !important;
+        width: 1px !important;
+        height: 420px !important;
+        margin: 0 clamp(14px, 2vw, 24px) !important;
+        background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.15) 20%, rgba(255, 255, 255, 0.15) 80%, transparent) !important;
+    }
+
+    .onboarding-preview-pane {
+        display: flex !important;
+        padding-right: 12px !important;
+        min-width: 0 !important;
+    }
+
+    .onboarding-wallet-showcase {
+        max-width: 360px !important;
+        height: 240px !important;
+        min-height: 240px !important;
+        margin-bottom: 20px !important;
+    }
+
+    /* Scaled showcase cards ensuring strict containment and 0px overlap with form card */
+    .onboarding-wallet-showcase .auth-card-preview {
+        width: 300px !important;
+        height: 168px !important;
+        padding: 18px 20px !important;
+    }
+
+    .onboarding-wallet-showcase .auth-card-preview:nth-child(1),
+    .onboarding-wallet-showcase .auth-card-preview[data-card-index="0"] {
+        top: 0 !important;
+        left: 0 !important;
+        z-index: 3 !important;
+    }
+
+    .onboarding-wallet-showcase .auth-card-preview:nth-child(2),
+    .onboarding-wallet-showcase .auth-card-preview[data-card-index="1"] {
+        top: 22px !important;
+        left: 20px !important;
+        z-index: 2 !important;
+    }
+
+    .onboarding-wallet-showcase .auth-card-preview:nth-child(3),
+    .onboarding-wallet-showcase .auth-card-preview[data-card-index="2"] {
+        top: 44px !important;
+        left: 40px !important;
+        z-index: 1 !important;
+    }
+
+    .onboarding-wallet-showcase .auth-card-preview .auth-card-name {
+        font-size: 0.72rem !important;
+    }
+
+    .onboarding-wallet-showcase .auth-card-preview .auth-card-num {
+        font-size: 0.8rem !important;
+        letter-spacing: 1.5px !important;
+    }
+
+    .onboarding-wallet-showcase .auth-card-preview .auth-card-bal-val {
+        font-size: 1.15rem !important;
+    }
+
+    .onboarding-form-pane {
+        min-width: 0 !important;
+    }
+
+    .onboarding-card {
+        padding: 28px 24px !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 }
 
@@ -12877,11 +12988,15 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
         font-size: 0.9rem;
     }
 
+    /* Add Account button satisfying touch target standard (>= 44px) */
     .onboarding-btn-add-wallet {
-        font-size: 0.76rem !important;
-        padding: 4px 10px !important;
-        height: 32px !important;
-        min-height: 32px;
+        font-size: 0.86rem !important;
+        padding: 10px 16px !important;
+        height: 44px !important;
+        min-height: 44px !important;
+        border-radius: 10px !important;
+        width: 100%;
+        justify-content: center;
     }
 
     /* Adaptive Wallet Rows: 2-tier layout preventing clipping */
@@ -12889,7 +13004,7 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
-        padding: 10px 12px;
+        padding: 12px;
         min-width: 0;
         max-width: 100%;
         box-sizing: border-box;
@@ -12905,16 +13020,21 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     .onboarding-wallet-row-info {
         min-width: 0;
         max-width: 100%;
+        flex: 1 1 auto;
         overflow: hidden;
     }
 
+    /* Multi-line wrapping for wallet names without aggressive truncation */
     .onboarding-wallet-row-name {
-        font-size: 0.86rem;
+        font-size: 0.88rem;
+        line-height: 1.35;
         min-width: 0;
         max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow: visible !important;
+        display: block !important;
+        -webkit-line-clamp: unset !important;
     }
 
     .onboarding-wallet-row-right {
@@ -12940,13 +13060,14 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     }
 
     .onboarding-wallet-delete-btn {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
         flex-shrink: 0;
     }
 
-    /* Footer buttons */
+    /* Footer buttons with accessible touch targets */
     .onboarding-actions {
         margin-top: 22px;
         padding-top: 16px;
@@ -12954,15 +13075,15 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     }
 
     .onboarding-btn-back {
-        height: 44px;
-        min-height: 44px;
+        height: 44px !important;
+        min-height: 44px !important;
         padding: 0 14px;
         font-size: 13.5px;
     }
 
     .onboarding-btn-next {
-        height: 44px;
-        min-height: 44px;
+        height: 44px !important;
+        min-height: 44px !important;
         padding: 0 18px;
         font-size: 13.5px;
         flex: 1 1 auto;
@@ -12973,7 +13094,7 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
 /* Minimum Supported Viewport (320px) */
 @media (max-width: 340px) {
     #onboarding-screen.auth-viewport {
-        padding: 8px 6px 12px 6px;
+        padding: 8px 6px 14px 6px;
     }
 
     .onboarding-card {
@@ -13023,8 +13144,48 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     }
 }
 
-/* Accessibility: Respect Reduced Motion */
+/* Short-Height Viewports (< 700px height): Ensure Action Buttons Remain Reachable */
+@media (max-height: 700px) {
+    #onboarding-screen.auth-viewport {
+        padding-top: max(12px, env(safe-area-inset-top)) !important;
+        padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+        align-items: flex-start !important;
+        overflow-y: auto !important;
+    }
+
+    .onboarding-card {
+        padding-top: 18px !important;
+        padding-bottom: 18px !important;
+    }
+
+    .onboarding-title-row {
+        margin-bottom: 12px !important;
+    }
+
+    .onboarding-country-list {
+        gap: 8px !important;
+    }
+
+    .onboarding-country-card {
+        padding: 10px 14px !important;
+    }
+
+    .onboarding-actions {
+        margin-top: 16px !important;
+        padding-top: 12px !important;
+        padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
+    }
+
+    .onboarding-btn-back,
+    .onboarding-btn-next {
+        height: 42px !important;
+        min-height: 42px !important;
+    }
+}
+
+/* Accessibility: Respect Reduced Motion (Emil Kowalski Philosophy: keep gentle color/opacity, remove transforms) */
 @media (prefers-reduced-motion: reduce) {
+
     .onboarding-progress-bar,
     .onboarding-country-card,
     .onboarding-toggle-slider,
@@ -13032,8 +13193,11 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     .onboarding-wallet-row,
     .onboarding-btn-back,
     .onboarding-btn-next,
+    .onboarding-btn-add-wallet,
+    .onboarding-wallet-delete-btn,
+    .onboarding-summary-item,
     .onboarding-wallet-showcase .auth-card-preview {
-        transition: none !important;
+        transition: opacity 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease !important;
         animation: none !important;
         transform: none !important;
     }
@@ -13294,7 +13458,7 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 10px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
     display: flex;
     flex-direction: column;
     gap: 4px;
