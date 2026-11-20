@@ -1026,13 +1026,8 @@ button {
 }
 
 @keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .sync-pill-failed {
@@ -1051,15 +1046,8 @@ button {
 }
 
 @keyframes conflictPulse {
-
-    0%,
-    100% {
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2);
-    }
-
-    50% {
-        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
-    }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
+    50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1); }
 }
 
 /* In-Modal Non-Destructive Conflict Warning Banner */
@@ -12453,11 +12441,11 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.onboarding-toggle-switch input:checked+.onboarding-toggle-slider {
+.onboarding-toggle-switch input:checked + .onboarding-toggle-slider {
     background-color: #2563eb;
 }
 
-.onboarding-toggle-switch input:checked+.onboarding-toggle-slider:before {
+.onboarding-toggle-switch input:checked + .onboarding-toggle-slider:before {
     transform: translateX(20px);
 }
 
@@ -12800,7 +12788,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
         opacity: 0;
         transform: scale(0.96) translateY(4px);
     }
-
     to {
         opacity: 1;
         transform: scale(1) translateY(0);
@@ -12891,7 +12878,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
         padding: 12px !important;
         align-items: flex-end !important;
     }
-
     .onboarding-modal-card {
         border-bottom-left-radius: 0 !important;
         border-bottom-right-radius: 0 !important;
@@ -12899,12 +12885,10 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
         max-width: 100% !important;
         box-sizing: border-box !important;
     }
-
     .onboarding-modal-footer {
         flex-direction: column-reverse;
         gap: 8px;
     }
-
     .onboarding-modal-cancel-btn,
     .onboarding-modal-submit-btn {
         width: 100%;
@@ -13520,7 +13504,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
 
 /* Accessibility: Respect Reduced Motion (Emil Kowalski Philosophy: keep gentle color/opacity, remove transforms) */
 @media (prefers-reduced-motion: reduce) {
-
     .onboarding-progress-bar,
     .onboarding-country-card,
     .onboarding-toggle-slider,
