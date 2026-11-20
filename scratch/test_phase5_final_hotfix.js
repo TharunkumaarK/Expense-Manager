@@ -620,6 +620,7 @@ async function runHotfixTests() {
         sm.currentUserId = 'user_test_revs';
         sm.initialSyncDone = true;
         sm.state.preferences.onboardingCompleted = true;
+        sm.state.currentMonthKey = sm.getCurrentMonthKey();
         sm.state.wallets = {
             'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 50000, currency: '¥' }
         };
@@ -1223,6 +1224,524 @@ async function runHotfixTests() {
     }
 
     console.log('--- TEST GROUP B COMPLETE: All concurrency and acknowledgment assertions passed ---\n');
+
+    // =========================================================================
+    // TEST GROUP C: NOTE-ONLY SYNCHRONIZATION AND STATE EQUALITY
+    // =========================================================================
+    console.log('--- TEST GROUP C: Note-Only Synchronization and State Equality ---');
+
+    // C1: MANDATORY TEST 1 — Offline note-only edit
+    {
+        console.log('  Running C1: Offline Note-Only Edit & Safe Conditional Upload');
+        const { sm, context } = setupSyncEnvironment();
+        sm.state.currentMonthKey = sm.getCurrentMonthKey();
+        sm.state.wallets = {
+            'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 50000, currency: '¥' }
+        };
+        sm.state.transactions = [
+            { id: 'tx_001', type: 'expense', walletId: 'Cash', amount: 1000, date: '2026-11-20', note: 'Lunch' }
+        ];
+        sm.state.revision = 10;
+        sm.lastConfirmedCloudRevision = 10;
+        sm.lastConfirmedCloudFingerprint = sm.computeFinancialFingerprint(sm.state);
+        sm._persistConfirmedCloudRevision(10, sm.lastConfirmedCloudFingerprint);
+        sm._saveDataDirect();
+
+        const remoteRev10 = JSON.parse(JSON.stringify(sm.state));
+
+        // Step 1: Device goes offline and edits note to 'Lunch with colleague'
+        sm.state.revision = 11;
+        sm.state.transactions[0].note = 'Lunch with colleague';
+        sm._saveDataDirect();
+
+        // Step 2: Verify financial fingerprints match (the exact reproduction condition)
+        const localFp = sm.computeFinancialFingerprint(sm.state);
+        const remoteFp = sm.computeFinancialFingerprint(remoteRev10);
+        assert(localFp === remoteFp, 'C1: Financial fingerprints match between revision 11 and revision 10 despite note difference');
+        assert(sm.arePersistedStatesEqual(sm.state, remoteRev10) === false, 'C1: arePersistedStatesEqual recognizes persisted difference');
+
+        // Step 3: Setup mock Supabase returning remote revision 10 and accepting conditional update
+        let interceptedOutboundPayload = null;
+        let interceptedExpectedRev = null;
+        let updateExecuted = false;
+
+        context.supabaseClient = {
+            session: { user: { id: 'user_test_revs' } },
+            client: {
+                from: (table) => ({
+                    select: () => ({
+                        eq: () => ({
+                            single: () => Promise.resolve({
+                                data: { state: JSON.parse(JSON.stringify(remoteRev10)), updated_at: new Date().toISOString() },
+                                error: null
+                            })
+                        })
+                    }),
+                    update: (payload) => {
+                        interceptedOutboundPayload = JSON.parse(JSON.stringify(payload.state));
+                        return {
+                            eq: (field1, val1) => ({
+                                eq: (field2, val2) => {
+                                    if (field2 === 'state->>revision') interceptedExpectedRev = val2;
+                                    return {
+                                        select: () => {
+                                            updateExecuted = true;
+                                            return Promise.resolve({
+                                                data: [{ state: { revision: 11 }, updated_at: new Date().toISOString() }],
+                                                error: null
+                                            });
+                                        }
+                                    };
+                                }
+                            })
+                        };
+                    }
+                })
+            }
+        };
+
+        // Step 4: Run syncFromSupabase()
+        const syncReturned = await sm.syncFromSupabase();
+
+        // Assert 1: Does not mark the states as synced upon syncFromSupabase()
+        assert(syncReturned === false, 'C1.1: syncFromSupabase does not return true (does not adopt stale remote or declare synced)');
+        assert(sm.cloudSyncStatus === 'SYNC_PENDING' || sm.cloudSyncStatus === 'SYNCING', `C1.1: Does not mark states as synced (actual status: ${sm.cloudSyncStatus})`);
+
+        // Assert 2: Preserves the new local note
+        assert(sm.state.transactions[0].note === 'Lunch with colleague', 'C1.2: Preserves the new local note');
+
+        // Assert 3: Retains pending synchronization metadata
+        assert(sm.lastConfirmedCloudRevision === 10, `C1.3: Retains pending synchronization metadata before ack (actual: ${sm.lastConfirmedCloudRevision})`);
+
+        // Step 5: Drain sync queue to allow conditional upload
+        await sm._drainSyncQueue();
+
+        // Assert 4: Initiates a safe conditional upload with updated note
+        assert(updateExecuted === true, 'C1.4: Initiates cloud upload for pending local revision');
+        assert(interceptedOutboundPayload !== null && interceptedOutboundPayload.revision === 11, 'C1.4: Outbound payload has revision 11');
+        assert(interceptedOutboundPayload.transactions[0].note === 'Lunch with colleague', 'C1.4: Server-bound payload contains the updated note');
+
+        // Assert 5: Does not overwrite remote state without CAS protection
+        assert(interceptedExpectedRev === '10', `C1.5: Outbound CAS protection uses expected remote revision 10 (actual: ${interceptedExpectedRev})`);
+
+        // Assert 6 & 7: Reports CONFIRMED only after revision 11 is actually acknowledged
+        assert(sm.lastConfirmedCloudRevision === 11, `C1.7: Confirmed cloud revision is 11 after acknowledgment (actual: ${sm.lastConfirmedCloudRevision})`);
+        assert(sm.cloudSyncStatus === 'CONFIRMED', `C1.7: Reports CONFIRMED only after revision 11 acknowledged (actual: ${sm.cloudSyncStatus})`);
+    }
+
+    // C2: MANDATORY TEST 2 — Remote note-only update
+    {
+        console.log('  Running C2: Remote Note-Only Update Safely Adopted');
+        const { sm, context } = setupSyncEnvironment();
+        sm.state.currentMonthKey = sm.getCurrentMonthKey();
+        sm.state.wallets = {
+            'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 50000, currency: '¥' }
+        };
+        sm.state.transactions = [
+            { id: 'tx_002', type: 'expense', walletId: 'Cash', amount: 2000, date: '2026-11-20', note: 'Dinner' }
+        ];
+        sm.state.revision = 10;
+        sm.lastConfirmedCloudRevision = 10;
+        sm.lastConfirmedCloudFingerprint = sm.computeFinancialFingerprint(sm.state);
+        sm._persistConfirmedCloudRevision(10, sm.lastConfirmedCloudFingerprint);
+        sm._saveDataDirect();
+
+        // Server has advanced to revision 11 with note 'Dinner with team'
+        const remoteState = JSON.parse(JSON.stringify(sm.state));
+        remoteState.revision = 11;
+        remoteState.transactions[0].note = 'Dinner with team';
+
+        // Financial fingerprints match because amounts/wallets are unchanged
+        assert(sm.computeFinancialFingerprint(sm.state) === sm.computeFinancialFingerprint(remoteState), 'C2: Financial fingerprints match between clean local and updated remote');
+
+        context.supabaseClient = {
+            session: { user: { id: 'user_test_revs' } },
+            client: {
+                from: () => ({
+                    select: () => ({
+                        eq: () => ({
+                            single: () => Promise.resolve({
+                                data: { state: remoteState, updated_at: new Date().toISOString() },
+                                error: null
+                            })
+                        })
+                    })
+                })
+            }
+        };
+
+        const adopted = await sm.syncFromSupabase();
+
+        assert(adopted === true, 'C2.1: syncFromSupabase returns true indicating remote state adopted');
+        assert(sm.state.revision === 11, `C2.2: Local state updated to remote revision 11 (actual: ${sm.state.revision})`);
+        assert(sm.state.transactions[0].note === 'Dinner with team', `C2.3: Newer server note was adopted (actual: ${sm.state.transactions[0].note})`);
+        assert(sm.lastConfirmedCloudRevision === 11, `C2.4: Confirmed cloud revision updated to 11 (actual: ${sm.lastConfirmedCloudRevision})`);
+        assert(sm.cloudSyncStatus === 'CONFIRMED', `C2.5: Cloud sync status is CONFIRMED (actual: ${sm.cloudSyncStatus})`);
+    }
+
+    // C3: MANDATORY TEST 3 — Independent note-only edits (Conflict Detection)
+    {
+        console.log('  Running C3: Independent Note-Only Edits Produce Safe Conflict Stash');
+        const { sm, context } = setupSyncEnvironment();
+        sm.state.currentMonthKey = sm.getCurrentMonthKey();
+        sm.state.wallets = {
+            'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 50000, currency: '¥' }
+        };
+        sm.state.transactions = [
+            { id: 'tx_003', type: 'expense', walletId: 'Cash', amount: 3000, date: '2026-11-20', note: 'Taxi' }
+        ];
+        sm.state.revision = 10;
+        sm.lastConfirmedCloudRevision = 10;
+        sm.lastConfirmedCloudFingerprint = sm.computeFinancialFingerprint(sm.state);
+        sm._persistConfirmedCloudRevision(10, sm.lastConfirmedCloudFingerprint);
+        sm._saveDataDirect();
+
+        // Local edits note to 'Taxi to client office' (rev 11)
+        sm.state.revision = 11;
+        sm.state.transactions[0].note = 'Taxi to client office';
+        sm._saveDataDirect();
+
+        // Remote edits note to 'Taxi to airport' (rev 11)
+        const remoteConflicted = JSON.parse(JSON.stringify(sm.state));
+        remoteConflicted.revision = 11;
+        remoteConflicted.transactions[0].note = 'Taxi to airport';
+
+        // Financial fingerprints match across both diverged branches
+        assert(sm.computeFinancialFingerprint(sm.state) === sm.computeFinancialFingerprint(remoteConflicted), 'C3: Financial fingerprints match despite independent divergent note edits');
+
+        context.supabaseClient = {
+            session: { user: { id: 'user_test_revs' } },
+            client: {
+                from: () => ({
+                    select: () => ({
+                        eq: () => ({
+                            single: () => Promise.resolve({
+                                data: { state: remoteConflicted, updated_at: new Date().toISOString() },
+                                error: null
+                            })
+                        })
+                    })
+                })
+            }
+        };
+
+        const syncResult = await sm.syncFromSupabase();
+
+        assert(syncResult === false, 'C3.1: syncFromSupabase returns false on branch divergence');
+        assert(sm.cloudSyncStatus === 'CONFLICT', `C3.2: Sync status transitioned to CONFLICT (actual: ${sm.cloudSyncStatus})`);
+        assert(sm.activeConflict !== null, 'C3.3: Conflict stash created preserving both versions');
+        assert(sm.activeConflict.localState.transactions[0].note === 'Taxi to client office', 'C3.4: Local version preserved in conflict stash');
+        assert(sm.activeConflict.remoteState.transactions[0].note === 'Taxi to airport', 'C3.5: Remote version preserved in conflict stash');
+        assert(sm.lastConfirmedCloudRevision === 10, 'C3.6: Confirmed revision not blindly advanced on conflict');
+        assert(sm.state.transactions[0].note === 'Taxi to client office', 'C3.7: Live local state not overwritten automatically');
+    }
+
+    // C4: MANDATORY TEST 4 — Equal revision, different content
+    {
+        console.log('  Running C4: Equal Revision with Different Content Detects Divergence');
+        const { sm, context } = setupSyncEnvironment();
+        sm.state.currentMonthKey = sm.getCurrentMonthKey();
+        sm.state.wallets = {
+            'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 50000, currency: '¥' }
+        };
+        sm.state.transactions = [
+            { id: 'tx_004', type: 'expense', walletId: 'Cash', amount: 4000, date: '2026-11-20', note: 'Meeting Note A' }
+        ];
+        sm.state.revision = 10;
+        sm.lastConfirmedCloudRevision = 10;
+        sm.lastConfirmedCloudFingerprint = sm.computeFinancialFingerprint(sm.state);
+        sm._persistConfirmedCloudRevision(10, sm.lastConfirmedCloudFingerprint);
+        sm._saveDataDirect();
+
+        const remoteEqualRev = JSON.parse(JSON.stringify(sm.state));
+        remoteEqualRev.revision = 10; // Same revision number!
+        remoteEqualRev.transactions[0].note = 'Meeting Note B'; // Different persisted content!
+
+        // Financial fingerprints match
+        assert(sm.computeFinancialFingerprint(sm.state) === sm.computeFinancialFingerprint(remoteEqualRev), 'C4: Financial fingerprints match for equal revision differing notes');
+        assert(sm.arePersistedStatesEqual(sm.state, remoteEqualRev) === false, 'C4: arePersistedStatesEqual detects differing content');
+
+        context.supabaseClient = {
+            session: { user: { id: 'user_test_revs' } },
+            client: {
+                from: () => ({
+                    select: () => ({
+                        eq: () => ({
+                            single: () => Promise.resolve({
+                                data: { state: remoteEqualRev, updated_at: new Date().toISOString() },
+                                error: null
+                            })
+                        })
+                    })
+                })
+            }
+        };
+
+        const res = await sm.syncFromSupabase();
+
+        assert(res === false, 'C4.1: syncFromSupabase returns false on equal revision content conflict');
+        assert(sm.cloudSyncStatus === 'CONFLICT', `C4.2: Status is CONFLICT for equal revision differing content (actual: ${sm.cloudSyncStatus})`);
+        assert(sm.activeConflict !== null, 'C4.3: Conflict stash created');
+        assert(sm.activeConflict.localState.transactions[0].note === 'Meeting Note A', 'C4.4: Local content preserved');
+        assert(sm.activeConflict.remoteState.transactions[0].note === 'Meeting Note B', 'C4.5: Remote content preserved');
+    }
+
+    // C5: MANDATORY TEST 5 — Restart and reconnection
+    {
+        console.log('  Running C5: Restart and Reconnection Resumes Sync Without Data Loss');
+        const env = createMockEnvironment({ storageKey: 'em_test_restart_c5' });
+        const { context } = env;
+
+        // Establish initial synced state
+        const sm1 = context.storage;
+        sm1.currentUserId = 'user_restart_test';
+        sm1.initialSyncDone = true;
+        sm1.state.preferences.onboardingCompleted = true;
+        sm1.state.wallets = {
+            'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 50000, currency: '¥' }
+        };
+        sm1.state.transactions = [
+            { id: 'tx_005', type: 'expense', walletId: 'Cash', amount: 500, date: '2026-11-20', note: 'Original Note' }
+        ];
+        sm1.state.revision = 10;
+        sm1.lastConfirmedCloudRevision = 10;
+        sm1._persistConfirmedCloudRevision(10);
+        sm1._saveDataDirect();
+
+        const remoteServerState = JSON.parse(JSON.stringify(sm1.state));
+
+        // Perform local note-only edit offline
+        sm1.state.revision = 11;
+        sm1.state.transactions[0].note = 'Edited Offline Note';
+        sm1._saveDataDirect();
+
+        assert(sm1.state.revision === 11, 'C5: Local revision advanced to 11');
+        assert(sm1.lastConfirmedCloudRevision === 10, 'C5: Confirmed revision remains 10');
+
+        // Simulate browser restart: instantiate new StorageManager reading from localStorage
+        if (sm1.syncChannel) sm1.syncChannel.close();
+
+        let committedOnServer = null;
+        const mockSupabaseAfterRestart = {
+            session: { user: { id: 'user_restart_test' } },
+            client: {
+                from: () => ({
+                    select: () => ({
+                        eq: () => ({
+                            single: () => Promise.resolve({
+                                data: { state: JSON.parse(JSON.stringify(remoteServerState)), updated_at: new Date().toISOString() },
+                                error: null
+                            })
+                        })
+                    }),
+                    update: (payload) => {
+                        committedOnServer = JSON.parse(JSON.stringify(payload.state));
+                        return {
+                            eq: () => ({
+                                eq: () => ({
+                                    select: () => Promise.resolve({
+                                        data: [{ state: { revision: 11 }, updated_at: new Date().toISOString() }],
+                                        error: null
+                                    })
+                                })
+                            })
+                        };
+                    }
+                })
+            }
+        };
+        context.supabaseClient = mockSupabaseAfterRestart;
+
+        const smRestarted = vm.runInContext('new StorageManager()', context);
+        smRestarted.onUserLogin('user_restart_test');
+
+        assert(smRestarted.state.revision === 11, 'C5: Restored local revision is 11 across restart');
+        assert(smRestarted.lastConfirmedCloudRevision === 10, 'C5: Restored confirmed cloud revision is 10 across restart');
+        assert(smRestarted.state.transactions[0].note === 'Edited Offline Note', 'C5: Offline edited note preserved across restart');
+
+        // Reconnect: run syncFromSupabase()
+        await smRestarted.syncFromSupabase();
+        // Wait for queued upload to drain
+        await smRestarted._drainSyncQueue();
+
+        assert(smRestarted.lastConfirmedCloudRevision === 11, `C5.1: Confirmed cloud revision is 11 after reconnect (actual: ${smRestarted.lastConfirmedCloudRevision})`);
+        assert(smRestarted.cloudSyncStatus === 'CONFIRMED', `C5.2: Sync status confirmed after reconnect drain (actual: ${smRestarted.cloudSyncStatus})`);
+        assert(smRestarted.state.transactions[0].note === 'Edited Offline Note', 'C5.3: Updated note persisted locally');
+        assert(committedOnServer !== null && committedOnServer.transactions[0].note === 'Edited Offline Note', 'C5.4: Server received updated note');
+        assert(committedOnServer.revision === 11, 'C5.5: Server committed revision 11');
+
+        if (smRestarted.syncChannel) smRestarted.syncChannel.close();
+    }
+
+    // C6: MANDATORY TEST 6 — Existing cloud acknowledgment regression (Delayed Ack under Note Mutation)
+    {
+        console.log('  Running C6: Delayed Cloud Acknowledgment Under Note Mutation');
+        const { sm, context } = setupSyncEnvironment();
+        sm.state.currentMonthKey = sm.getCurrentMonthKey();
+        sm.state.wallets = {
+            'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 50000, currency: '¥' }
+        };
+        sm.state.transactions = [
+            { id: 'tx_006', type: 'expense', walletId: 'Cash', amount: 600, date: '2026-11-20', note: 'Flight note 10' }
+        ];
+        sm.state.revision = 9;
+        sm.lastConfirmedCloudRevision = 9;
+        sm._persistConfirmedCloudRevision(9);
+
+        // Advance to 10
+        sm.state.revision = 10;
+        sm._saveDataDirect();
+
+        const deferredReq10 = createDeferred();
+        let interceptedSnapshot10 = null;
+
+        context.supabaseClient = {
+            session: { user: { id: 'user_test_revs' } },
+            client: {
+                from: () => ({
+                    update: (p) => {
+                        interceptedSnapshot10 = JSON.parse(JSON.stringify(p.state));
+                        return {
+                            eq: () => ({
+                                eq: () => ({
+                                    select: () => deferredReq10.promise
+                                })
+                            })
+                        };
+                    }
+                })
+            }
+        };
+
+        const pushPromise10 = sm.pushToSupabase({ expectedRemoteRevision: 9 });
+
+        // While request 10 is in flight, user mutates note only -> revision 11
+        sm.state.revision = 11;
+        sm.state.transactions[0].note = 'Mutated during flight 11';
+        sm._saveDataDirect();
+
+        // Verify outbound snapshot was isolated
+        assert(interceptedSnapshot10.transactions[0].note === 'Flight note 10', 'C6.1: Outbound snapshot was isolated from live in-flight note edit');
+        assert(interceptedSnapshot10.revision === 10, 'C6.1: Outbound snapshot has revision 10');
+
+        // Resolve request 10
+        deferredReq10.resolve({
+            data: [{ state: { revision: 10 }, updated_at: new Date().toISOString() }],
+            error: null
+        });
+        const pushResult10 = await pushPromise10;
+
+        assert(pushResult10 === true, 'C6.2: Push request 10 resolved true');
+        assert(sm.lastConfirmedCloudRevision === 10, `C6.3: ONLY revision 10 confirmed, not mutated revision 11 (actual: ${sm.lastConfirmedCloudRevision})`);
+        assert(sm.cloudSyncStatus === 'SYNC_PENDING', `C6.4: Sync status remains SYNC_PENDING because local revision 11 has unconfirmed note edit (actual: ${sm.cloudSyncStatus})`);
+    }
+
+    // C7: Realtime WebSocket Echo of In-Flight Note Mutation (NO False Conflict)
+    {
+        console.log('  Running C7: Realtime WebSocket Echo of In-Flight Note Mutation');
+        const { sm, context } = setupSyncEnvironment();
+        sm.state.currentMonthKey = sm.getCurrentMonthKey();
+        sm.state.wallets = {
+            'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 50000, currency: '¥' }
+        };
+        sm.state.transactions = [
+            { id: 'tx_007', type: 'expense', walletId: 'Cash', amount: 750, date: '2026-11-20', note: 'Original Note 10' }
+        ];
+        sm.state.revision = 10;
+        sm.lastConfirmedCloudRevision = 10;
+        sm._persistConfirmedCloudRevision(10);
+        sm._saveDataDirect();
+
+        // User edits note locally to revision 11
+        sm.state.revision = 11;
+        sm.state.transactions[0].note = 'Updated Note 11';
+        sm._saveDataDirect();
+
+        // While HTTP CAS response is in flight, Supabase Realtime broadcast arrives with revision 11 and identical note
+        const broadcastRemoteState = JSON.parse(JSON.stringify(sm.state));
+        broadcastRemoteState.revision = 11;
+
+        // Apply realtime update
+        let modalOpened = false;
+        context.app = {
+            updateSyncStatusPill: () => {},
+            openConflictResolutionModal: () => { modalOpened = true; }
+        };
+
+        const realtimeHandled = sm.applyRealtimeUpdate(broadcastRemoteState, new Date().toISOString());
+
+        assert(sm.cloudSyncStatus === 'CONFIRMED', `C7.1: Realtime echo of identical content transitions to CONFIRMED (actual: ${sm.cloudSyncStatus})`);
+        assert(sm.activeConflict === null, 'C7.2: Realtime echo does not create a conflict stash');
+        assert(modalOpened === false, 'C7.3: Realtime echo does not trigger conflict resolution modal');
+        assert(sm.lastConfirmedCloudRevision === 11, `C7.4: Confirmed cloud revision updated to 11 via realtime (actual: ${sm.lastConfirmedCloudRevision})`);
+        assert(sm.state.transactions[0].note === 'Updated Note 11', 'C7.5: Updated note is preserved');
+    }
+
+    // C8: Deterministic Multi-Property Sorting in canonicalizePersistedState
+    {
+        console.log('  Running C8: Deterministic Multi-Property Sorting in canonicalizePersistedState');
+        const { sm } = setupSyncEnvironment();
+        const baseStateA = {
+            preferences: { activeCountries: ['JP'], defaultCountry: 'JP' },
+            budgets: { JP: { enabled: true, monthlyTotal: 100000 } },
+            wallets: { Cash: { id: 'Cash', balance: 50000, currency: '¥' } },
+            transactions: [
+                { id: '', date: '2026-11-20', type: 'expense', amount: 100, note: 'Coffee' },
+                { id: '', date: '2026-11-20', type: 'expense', amount: 200, note: 'Book' }
+            ]
+        };
+        // Permuted transaction order
+        const baseStateB = {
+            preferences: { activeCountries: ['JP'], defaultCountry: 'JP' },
+            budgets: { JP: { enabled: true, monthlyTotal: 100000 } },
+            wallets: { Cash: { id: 'Cash', balance: 50000, currency: '¥' } },
+            transactions: [
+                { id: '', date: '2026-11-20', type: 'expense', amount: 200, note: 'Book' },
+                { id: '', date: '2026-11-20', type: 'expense', amount: 100, note: 'Coffee' }
+            ]
+        };
+
+        const canonA = sm.canonicalizePersistedState(baseStateA);
+        const canonB = sm.canonicalizePersistedState(baseStateB);
+        assert(canonA === canonB, 'C8.1: Canonical state representation identical across transaction order permutations lacking IDs');
+        assert(sm.arePersistedStatesEqual(baseStateA, baseStateB) === true, 'C8.2: arePersistedStatesEqual returns true for permuted transactions lacking IDs');
+
+        const fpA = sm.computePersistedStateFingerprint(baseStateA);
+        const fpB = sm.computePersistedStateFingerprint(baseStateB);
+        assert(fpA === fpB, 'C8.3: Composite persisted fingerprints match across permuted transactions');
+    }
+
+    // C9: Full-State Persisted Fingerprint Verification in _drainSyncQueue
+    {
+        console.log('  Running C9: Full-State Persisted Fingerprint Verification in _drainSyncQueue');
+        const { sm } = setupSyncEnvironment();
+        sm.state.currentMonthKey = sm.getCurrentMonthKey();
+        sm.state.wallets = {
+            'Cash': { id: 'Cash', type: 'cash', region: 'JP', balance: 50000, currency: '¥' }
+        };
+        sm.state.transactions = [
+            { id: 'tx_009', type: 'expense', walletId: 'Cash', amount: 900, date: '2026-11-20', note: 'Confirmed Note 10' }
+        ];
+        sm.state.revision = 10;
+        sm.lastConfirmedCloudRevision = 10;
+        sm.lastConfirmedCloudFingerprint = sm.computeFinancialFingerprint(sm.state);
+        sm.lastConfirmedCloudPersistedFingerprint = sm.computePersistedStateFingerprint(sm.state);
+        sm._persistConfirmedCloudRevision(10, sm.lastConfirmedCloudFingerprint, sm.lastConfirmedCloudPersistedFingerprint);
+
+        // Edit note locally while leaving revision at 10 (simulating unincremented note divergence)
+        sm.state.transactions[0].note = 'Unconfirmed Edited Note';
+
+        // Notice: Financial fingerprints match!
+        assert(sm.computeFinancialFingerprint(sm.state) === sm.lastConfirmedCloudFingerprint, 'C9.1: Financial fingerprint matches despite divergent note');
+        assert(sm.computePersistedStateFingerprint(sm.state) !== sm.lastConfirmedCloudPersistedFingerprint, 'C9.2: Persisted state fingerprint differs due to edited note');
+
+        // Verify that persisted state check prevents false confirmation
+        const currentPersistedFp = sm.computePersistedStateFingerprint(sm.state);
+        const isMatch = !sm.lastConfirmedCloudPersistedFingerprint || sm.lastConfirmedCloudPersistedFingerprint === currentPersistedFp;
+        assert(isMatch === false, 'C9.3: Persisted state guard blocks false confirmation');
+    }
+
+    console.log('--- TEST GROUP C COMPLETE: All note-only synchronization assertions passed ---\n');
 
     console.log('================================================================================');
     console.log(`FINAL RESULTS: ${passedAssertions}/${totalAssertions} assertions passed (0 failures).`);

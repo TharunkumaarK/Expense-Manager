@@ -118,6 +118,7 @@ class StorageManager {
         this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
         this.tabId = 'tab_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
         this.lastConfirmedCloudFingerprint = null;
+        this.lastConfirmedCloudPersistedFingerprint = null;
         this.lastConfirmedCloudRevision = this._loadConfirmedCloudRevision();
         this.activeConflict = null;
         this.syncChannel = null;
@@ -146,26 +147,30 @@ class StorageManager {
                     const parsed = JSON.parse(raw);
                     if (typeof parsed?.lastConfirmedCloudRevision === 'number') {
                         this.lastConfirmedCloudFingerprint = parsed.lastConfirmedFingerprint || null;
+                        this.lastConfirmedCloudPersistedFingerprint = parsed.lastConfirmedPersistedFingerprint || null;
                         return parsed.lastConfirmedCloudRevision;
                     }
                 }
             } catch (e) { }
         }
         this.lastConfirmedCloudFingerprint = null;
+        this.lastConfirmedCloudPersistedFingerprint = null;
         return 0;
     }
 
     /**
      * Durably persist server-confirmed cloud revision per authenticated account.
      */
-    _persistConfirmedCloudRevision(rev, fingerprint = null) {
+    _persistConfirmedCloudRevision(rev, fingerprint = null, persistedFingerprint = null) {
         this.lastConfirmedCloudRevision = Number(rev) || 0;
         this.lastConfirmedCloudFingerprint = fingerprint || (this.state ? this.computeFinancialFingerprint(this.state) : null);
+        this.lastConfirmedCloudPersistedFingerprint = persistedFingerprint || (this.state ? this.computePersistedStateFingerprint(this.state) : null);
         if (typeof localStorage !== 'undefined') {
             try {
                 localStorage.setItem(this._getSyncMetaKey(), JSON.stringify({
                     lastConfirmedCloudRevision: this.lastConfirmedCloudRevision,
                     lastConfirmedFingerprint: this.lastConfirmedCloudFingerprint,
+                    lastConfirmedPersistedFingerprint: this.lastConfirmedCloudPersistedFingerprint,
                     lastConfirmedAt: new Date().toISOString()
                 }));
             } catch (e) { }
@@ -463,9 +468,11 @@ class StorageManager {
                 const targetRev = Number(this.state.revision) || 1;
                 const currentConfirmed = Number(this.lastConfirmedCloudRevision) || 0;
                 const currentFingerprint = this.computeFinancialFingerprint(this.state);
+                const currentPersistedFingerprint = this.computePersistedStateFingerprint(this.state);
 
-                // Only confirm if revision AND fingerprint match verified server state
-                if (currentConfirmed >= targetRev && this.lastConfirmedCloudFingerprint === currentFingerprint) {
+                // Only confirm if revision AND fingerprints match verified server state
+                const isPersistedMatch = !this.lastConfirmedCloudPersistedFingerprint || this.lastConfirmedCloudPersistedFingerprint === currentPersistedFingerprint;
+                if (currentConfirmed >= targetRev && isPersistedMatch && this.lastConfirmedCloudFingerprint === currentFingerprint) {
                     this.cloudSyncStatus = 'CONFIRMED';
                     if (typeof localStorage !== 'undefined') {
                         localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
@@ -486,7 +493,9 @@ class StorageManager {
                     const freshTargetRev = Number(this.state.revision) || 1;
                     const freshConfirmed = Number(this.lastConfirmedCloudRevision) || 0;
                     const freshFingerprint = this.computeFinancialFingerprint(this.state);
-                    if (freshConfirmed >= freshTargetRev && this.lastConfirmedCloudFingerprint === freshFingerprint) {
+                    const freshPersistedFingerprint = this.computePersistedStateFingerprint(this.state);
+                    const isFreshPersistedMatch = !this.lastConfirmedCloudPersistedFingerprint || this.lastConfirmedCloudPersistedFingerprint === freshPersistedFingerprint;
+                    if (freshConfirmed >= freshTargetRev && isFreshPersistedMatch && this.lastConfirmedCloudFingerprint === freshFingerprint) {
                         this.cloudSyncStatus = 'CONFIRMED';
                         if (typeof localStorage !== 'undefined') {
                             localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
@@ -964,6 +973,7 @@ class StorageManager {
             this._isSyncWorkerRunning = false;
             this.state = this.loadData();
             this.lastConfirmedCloudFingerprint = null;
+            this.lastConfirmedCloudPersistedFingerprint = null;
             this.lastConfirmedCloudRevision = this._loadConfirmedCloudRevision();
             this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
         }
@@ -983,6 +993,7 @@ class StorageManager {
         this.isFirstLoad = true;
         this.lastConfirmedCloudRevision = 0;
         this.lastConfirmedCloudFingerprint = null;
+        this.lastConfirmedCloudPersistedFingerprint = null;
         this.activeConflict = null;
         this._isSyncWorkerRunning = false;
         this.state = JSON.parse(JSON.stringify(defaultState));
@@ -1872,8 +1883,7 @@ class StorageManager {
                 }
 
                 // Strict Revision-Lineage Sync
-                const localFingerprint = this.computeFinancialFingerprint(this.state);
-                const remoteFingerprint = this.computeFinancialFingerprint(remote);
+                const normalizedRemote = preview.migratedState;
                 const localRev = Number(this.state.revision || 1);
                 const remoteRev = Number(remote.revision || 1);
                 const lastConfirmedRev = Number(this.lastConfirmedCloudRevision || 0);
@@ -1884,52 +1894,12 @@ class StorageManager {
                         return desc && Array.isArray(desc.value) && desc.value.length > 0;
                     })) || !remote.preferences || !remote.budgets);
 
-                // Case 1: Identical financial state
-                if (localFingerprint === remoteFingerprint) {
-                    console.log('[Sync] Local and remote fingerprints match. System in sync.');
-                    this.lastConfirmedCloudRevision = Math.max(localRev, remoteRev);
-                    this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision);
-                    this.accountStatus = 'EXISTING_USER';
-                    this.cloudSyncStatus = 'CONFIRMED';
-                    this.initialSyncDone = true;
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNCED');
-                    }
-                    return false;
-                }
-
-                // Check pending local edits vs fresh device
                 const hasEstablished = this.hasEstablishedFinancialData(this.state) || this.isEstablishedLegacyFinancialData(this.state);
-                const hasPendingLocalEdits = localRev > lastConfirmedRev && hasEstablished;
+                const isContentIdentical = this.arePersistedStatesEqual(this.state, normalizedRemote);
 
-                let shouldUseRemote = false;
                 if (!hasEstablished) {
                     // Fresh device / returning user without local data adopting cloud
-                    shouldUseRemote = true;
-                } else if (!hasPendingLocalEdits && remoteRev >= localRev) {
-                    // Clean fast-forward: cloud has advanced and local has no unpushed edits
-                    shouldUseRemote = true;
-                } else if (hasPendingLocalEdits && remoteRev <= lastConfirmedRev) {
-                    // Local is ahead, remote has not moved since lastConfirmedRev
-                    shouldUseRemote = false;
-                } else {
-                    // Branch divergence: Both local and remote have advanced past lastConfirmedRev!
-                    // Do NOT allow either side to silently overwrite! Stash conflict and require resolution.
-                    console.warn(`[Sync] Branch divergence detected! Local rev ${localRev}, Remote rev ${remoteRev}, Last confirmed rev ${lastConfirmedRev}.`);
-                    this.stashConflictState(this.state, remote);
-                    this.accountStatus = 'EXISTING_USER';
-                    this.cloudSyncStatus = 'CONFLICT';
-                    this.syncError = 'Both local and cloud states have divergent modifications.';
-                    this.initialSyncDone = true;
-                    if (typeof app !== 'undefined') {
-                        if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
-                        if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
-                    }
-                    return false;
-                }
-
-                if (shouldUseRemote) {
-                    console.log(`[Sync] Remote state accepted (Rev ${remoteRev} vs local ${localRev}). Applying...`);
+                    console.log(`[Sync] Fresh device adopting remote state (Rev ${remoteRev}). Applying...`);
                     const persisted = this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
                     if (!persisted) {
                         this.accountStatus = 'SYNC_FAILED';
@@ -1938,7 +1908,6 @@ class StorageManager {
                         return false;
                     }
 
-                    // Derive account resolution status
                     if (this.state.preferences && this.state.preferences.onboardingCompleted === false) {
                         const hasTx = this.getUniqueTransactionCount(this.state) > 0;
                         this.accountStatus = hasTx ? 'EXISTING_USER' : 'ONBOARDING_INCOMPLETE';
@@ -1954,7 +1923,96 @@ class StorageManager {
                     this.initialSyncDone = true;
                     this.checkRollover();
 
-                    // Push migrated v3 state to Supabase only after successful validation
+                    if (remoteNeedsMigration) {
+                        await this.pushToSupabase({ expectedRemoteRevision: remoteRev });
+                    }
+
+                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                        app.updateSyncStatusPill('SYNCED');
+                    }
+                    return true;
+                }
+
+                // Both sides have established local data.
+                if (isContentIdentical) {
+                    if (localRev === remoteRev) {
+                        console.log(`[Sync] Local and remote states are completely identical (Rev ${localRev}). System in sync.`);
+                        this.lastConfirmedCloudRevision = remoteRev;
+                        this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision);
+                        this.accountStatus = 'EXISTING_USER';
+                        this.cloudSyncStatus = 'CONFIRMED';
+                        this.initialSyncDone = true;
+                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                            app.updateSyncStatusPill('SYNCED');
+                        }
+                        return false;
+                    } else if (remoteRev > localRev) {
+                        console.log(`[Sync] Remote revision is ahead (${remoteRev} vs ${localRev}) with identical content. Fast-forwarding local revision...`);
+                        this.state.revision = remoteRev;
+                        this._saveDataDirect();
+                        this.lastConfirmedCloudRevision = remoteRev;
+                        this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision);
+                        this.accountStatus = 'EXISTING_USER';
+                        this.cloudSyncStatus = 'CONFIRMED';
+                        this.initialSyncDone = true;
+                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                            app.updateSyncStatusPill('SYNCED');
+                        }
+                        return false;
+                    } else {
+                        console.log(`[Sync] Local revision is ahead (${localRev} vs ${remoteRev}) with identical content. Enqueuing sync...`);
+                        this.accountStatus = 'EXISTING_USER';
+                        this.cloudSyncStatus = 'SYNC_PENDING';
+                        this.initialSyncDone = true;
+                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                            app.updateSyncStatusPill('SYNC_PENDING');
+                        }
+                        this.enqueueCloudSync(this.state.revision);
+                        return false;
+                    }
+                }
+
+                // Persisted contents differ! Determine lineage relative to lastConfirmedRev
+                const hasPendingLocalEdits = localRev > lastConfirmedRev;
+                const hasRemoteAdvanced = remoteRev > lastConfirmedRev;
+
+                if (hasPendingLocalEdits && !hasRemoteAdvanced) {
+                    // Case A: Local has pending unconfirmed edits, server unchanged since lastConfirmedRev
+                    console.log(`[Sync] Local state has pending edits (Rev ${localRev} vs remote ${remoteRev}, last confirmed ${lastConfirmedRev}). Enqueuing conditional upload...`);
+                    this.accountStatus = 'EXISTING_USER';
+                    this.cloudSyncStatus = 'SYNC_PENDING';
+                    this.initialSyncDone = true;
+                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                        app.updateSyncStatusPill('SYNC_PENDING');
+                    }
+                    this.enqueueCloudSync(this.state.revision);
+                    return false;
+                } else if (!hasPendingLocalEdits && hasRemoteAdvanced) {
+                    // Case B: Local is clean, server has advanced past lastConfirmedRev (e.g. note-only edit on another device)
+                    console.log(`[Sync] Remote state has advanced (Rev ${remoteRev} vs local ${localRev}, last confirmed ${lastConfirmedRev}). Adopting server state...`);
+                    const persisted = this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
+                    if (!persisted) {
+                        this.accountStatus = 'SYNC_FAILED';
+                        this.cloudSyncStatus = 'FAILED';
+                        this.initialSyncDone = true;
+                        return false;
+                    }
+
+                    if (this.state.preferences && this.state.preferences.onboardingCompleted === false) {
+                        const hasTx = this.getUniqueTransactionCount(this.state) > 0;
+                        this.accountStatus = hasTx ? 'EXISTING_USER' : 'ONBOARDING_INCOMPLETE';
+                        this.cloudSyncStatus = 'IDLE';
+                    } else {
+                        this.accountStatus = 'EXISTING_USER';
+                        this.cloudSyncStatus = 'CONFIRMED';
+                    }
+
+                    this.lastConfirmedCloudRevision = remoteRev;
+                    this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision);
+                    this.isFirstLoad = false;
+                    this.initialSyncDone = true;
+                    this.checkRollover();
+
                     if (remoteNeedsMigration) {
                         await this.pushToSupabase({ expectedRemoteRevision: remoteRev });
                     }
@@ -1964,11 +2022,24 @@ class StorageManager {
                     }
                     return true;
                 } else {
-                    console.log(`[Sync] Local state is ahead (Rev ${localRev} vs remote ${remoteRev}). Enqueuing conditional upload...`);
+                    // Case C & Case D:
+                    // Case C: Both local and remote have advanced past lastConfirmedRev (branch divergence)!
+                    // Case D: Revisions are equal (or neither advanced past lastConfirmed), but persisted contents differ!
+                    const reason = (hasPendingLocalEdits && hasRemoteAdvanced)
+                        ? `Branch divergence detected! Local rev ${localRev}, Remote rev ${remoteRev}, Last confirmed rev ${lastConfirmedRev}.`
+                        : `Persisted content divergence detected at revision local ${localRev} vs remote ${remoteRev}.`;
+                    console.warn(`[Sync] ${reason}`);
+                    this.stashConflictState(this.state, remote);
                     this.accountStatus = 'EXISTING_USER';
-                    this.cloudSyncStatus = 'SYNC_PENDING';
+                    this.cloudSyncStatus = 'CONFLICT';
+                    this.syncError = (hasPendingLocalEdits && hasRemoteAdvanced)
+                        ? 'Both local and cloud states have divergent modifications.'
+                        : 'Local and cloud states have conflicting content at the same revision.';
                     this.initialSyncDone = true;
-                    this.enqueueCloudSync(this.state.revision);
+                    if (typeof app !== 'undefined') {
+                        if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                        if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
+                    }
                     return false;
                 }
             }
@@ -2035,6 +2106,7 @@ class StorageManager {
         const outboundSnapshot = JSON.parse(JSON.stringify(this.state));
         const outboundRevision = Number(outboundSnapshot.revision) || 1;
         const outboundFingerprint = this.computeFinancialFingerprint(outboundSnapshot);
+        const outboundPersistedFingerprint = this.computePersistedStateFingerprint(outboundSnapshot);
 
         try {
             if (options.isInitialization) {
@@ -2073,15 +2145,15 @@ class StorageManager {
                         if (remoteRow && remoteRow.state) {
                             const remoteRev = Number(remoteRow.state.revision);
                             const remoteFingerprint = this.computeFinancialFingerprint(remoteRow.state);
-                            if (remoteRev === outboundRevision && remoteFingerprint === outboundFingerprint) {
+                            if (remoteRev === outboundRevision && remoteFingerprint === outboundFingerprint && this.arePersistedStatesEqual(remoteRow.state, outboundSnapshot)) {
                                 console.log(`[Sync] Authoritative server check revealed server already committed initial revision ${outboundRevision}. Confirming...`);
                                 this.syncError = null;
                                 if (remoteRev >= (Number(this.lastConfirmedCloudRevision) || 0)) {
-                                    this._persistConfirmedCloudRevision(remoteRev, outboundFingerprint);
+                                    this._persistConfirmedCloudRevision(remoteRev, outboundFingerprint, outboundPersistedFingerprint);
                                 }
                                 const currentLocalRev = Number(this.state.revision) || 1;
                                 const currentLocalFingerprint = this.computeFinancialFingerprint(this.state);
-                                if (this.lastConfirmedCloudRevision >= currentLocalRev && this.lastConfirmedCloudFingerprint === currentLocalFingerprint) {
+                                if (this.lastConfirmedCloudRevision >= currentLocalRev && this.lastConfirmedCloudFingerprint === currentLocalFingerprint && this.arePersistedStatesEqual(this.state, outboundSnapshot)) {
                                     this.cloudSyncStatus = 'CONFIRMED';
                                     if (typeof localStorage !== 'undefined') {
                                         localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
@@ -2164,14 +2236,14 @@ class StorageManager {
 
                 // Durably confirm strictly the acknowledged revision monotonically
                 if (confirmedRev >= (Number(this.lastConfirmedCloudRevision) || 0)) {
-                    this._persistConfirmedCloudRevision(confirmedRev, outboundFingerprint);
+                    this._persistConfirmedCloudRevision(confirmedRev, outboundFingerprint, outboundPersistedFingerprint);
                 }
 
                 // Check whether newer local changes remain pending
                 const currentLocalRev = Number(this.state.revision) || 1;
                 const currentLocalFingerprint = this.computeFinancialFingerprint(this.state);
 
-                if (this.lastConfirmedCloudRevision >= currentLocalRev && this.lastConfirmedCloudFingerprint === currentLocalFingerprint) {
+                if (this.lastConfirmedCloudRevision >= currentLocalRev && this.lastConfirmedCloudFingerprint === currentLocalFingerprint && this.arePersistedStatesEqual(this.state, outboundSnapshot)) {
                     this.cloudSyncStatus = 'CONFIRMED';
                     if (typeof localStorage !== 'undefined') {
                         localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
@@ -2228,15 +2300,15 @@ class StorageManager {
                 if (remoteRow && remoteRow.state) {
                     const remoteRev = Number(remoteRow.state.revision);
                     const remoteFingerprint = this.computeFinancialFingerprint(remoteRow.state);
-                    if (remoteRev === outboundRevision && remoteFingerprint === outboundFingerprint) {
+                    if (remoteRev === outboundRevision && remoteFingerprint === outboundFingerprint && this.arePersistedStatesEqual(remoteRow.state, outboundSnapshot)) {
                         console.log(`[Sync] Authoritative server check revealed server already committed revision ${outboundRevision}. Confirming...`);
                         this.syncError = null;
                         if (remoteRev >= (Number(this.lastConfirmedCloudRevision) || 0)) {
-                            this._persistConfirmedCloudRevision(remoteRev, outboundFingerprint);
+                            this._persistConfirmedCloudRevision(remoteRev, outboundFingerprint, outboundPersistedFingerprint);
                         }
                         const currentLocalRev = Number(this.state.revision) || 1;
                         const currentLocalFingerprint = this.computeFinancialFingerprint(this.state);
-                        if (this.lastConfirmedCloudRevision >= currentLocalRev && this.lastConfirmedCloudFingerprint === currentLocalFingerprint) {
+                        if (this.lastConfirmedCloudRevision >= currentLocalRev && this.lastConfirmedCloudFingerprint === currentLocalFingerprint && this.arePersistedStatesEqual(this.state, outboundSnapshot)) {
                             this.cloudSyncStatus = 'CONFIRMED';
                             if (typeof localStorage !== 'undefined') {
                                 localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
@@ -2312,14 +2384,14 @@ class StorageManager {
 
             // Only advance confirmed revision monotonically; never let an older response regress metadata
             if (confirmedRev >= (Number(this.lastConfirmedCloudRevision) || 0)) {
-                this._persistConfirmedCloudRevision(confirmedRev, outboundFingerprint);
+                this._persistConfirmedCloudRevision(confirmedRev, outboundFingerprint, outboundPersistedFingerprint);
             }
 
             // Check whether newer local changes remain pending
             const currentLocalRev = Number(this.state.revision) || 1;
             const currentLocalFingerprint = this.computeFinancialFingerprint(this.state);
 
-            if (this.lastConfirmedCloudRevision >= currentLocalRev && this.lastConfirmedCloudFingerprint === currentLocalFingerprint) {
+            if (this.lastConfirmedCloudRevision >= currentLocalRev && this.lastConfirmedCloudFingerprint === currentLocalFingerprint && this.arePersistedStatesEqual(this.state, outboundSnapshot)) {
                 this.cloudSyncStatus = 'CONFIRMED';
                 if (typeof localStorage !== 'undefined') {
                     localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
@@ -2353,7 +2425,31 @@ class StorageManager {
         const lastConfirmedRev = Number(this.lastConfirmedCloudRevision || 0);
         const remoteRev = Number(remoteState.revision || 0);
 
-        // If local has unconfirmed local edits, never overwrite silently via realtime!
+        // Check if incoming remote state is completely identical to our local persisted state
+        const isIdenticalContent = this.arePersistedStatesEqual(this.state, remoteState);
+
+        if (isIdenticalContent) {
+            // Server has confirmed our state (or another client reached identical state)
+            if (remoteRev >= this.lastConfirmedCloudRevision) {
+                this.lastConfirmedCloudRevision = remoteRev;
+                this.lastConfirmedCloudFingerprint = this.computeFinancialFingerprint(this.state);
+                this.lastConfirmedCloudPersistedFingerprint = this.computePersistedStateFingerprint(this.state);
+                this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision, this.lastConfirmedCloudFingerprint, this.lastConfirmedCloudPersistedFingerprint);
+            }
+            if (remoteRev >= localRev) {
+                if (remoteRev > localRev) {
+                    this.state.revision = remoteRev;
+                    this._saveDataDirect();
+                }
+                this.cloudSyncStatus = 'CONFIRMED';
+                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
+                    app.updateSyncStatusPill('SYNCED');
+                }
+            }
+            return false;
+        }
+
+        // Contents differ! If local has unconfirmed local edits, never overwrite silently via realtime!
         if (localRev > lastConfirmedRev) {
             console.warn('[Realtime] Local has unconfirmed edits. Stashing conflicting remote state.');
             this.stashConflictState(this.state, remoteState);
@@ -2365,8 +2461,17 @@ class StorageManager {
             return false;
         }
 
-        // If remote revision is not ahead, ignore it
+        // If remote revision is not ahead, check for equal-revision content divergence
         if (remoteRev <= localRev) {
+            if (remoteRev === localRev) {
+                console.warn(`[Realtime] Conflicting content received at same revision ${remoteRev}. Stashing conflict.`);
+                this.stashConflictState(this.state, remoteState);
+                this.cloudSyncStatus = 'CONFLICT';
+                if (typeof app !== 'undefined') {
+                    if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                    if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
+                }
+            }
             return false;
         }
 
@@ -2379,7 +2484,8 @@ class StorageManager {
         this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
         this.lastConfirmedCloudRevision = remoteRev;
         this.lastConfirmedCloudFingerprint = this.computeFinancialFingerprint(this.state);
-        this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision, this.lastConfirmedCloudFingerprint);
+        this.lastConfirmedCloudPersistedFingerprint = this.computePersistedStateFingerprint(this.state);
+        this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision, this.lastConfirmedCloudFingerprint, this.lastConfirmedCloudPersistedFingerprint);
         this.checkRollover();
         return true; // signals caller to re-render
     }
@@ -2615,6 +2721,146 @@ class StorageManager {
         } catch (e) {
             return String(Date.now());
         }
+    }
+
+    /**
+     * Canonical serialization of all persisted application state attributes.
+     * Covers budgets, wallets, closed months, user preferences, custom categories,
+     * loan configurations, active calendar month, and 100% of transactions including
+     * user notes, descriptions, amounts, currencies, categories, and references.
+     * Excludes non-persisted runtime transient fields (_updatedAt, _haltedMigration, getters)
+     * to prevent spurious conflicts.
+     *
+     * @param {Object} state
+     * @returns {string} Deterministic canonical representation
+     */
+    canonicalizePersistedState(state) {
+        if (!state || typeof state !== 'object') return '';
+        try {
+            // 1. Recurring multi-country budgets (stable country sorting)
+            const b = state.budgets || {};
+            const budgetKeys = Object.keys(b).sort();
+            const budgetsPart = budgetKeys.map(k => {
+                const bk = b[k] || {};
+                const bkAmount = (typeof bk.amount !== 'undefined') ? bk.amount : (bk.monthlyTotal || 0);
+                return `${k}:${bk.enabled ? 1 : 0}:${Number(bkAmount || 0)}:${Number(bk.monthlyTotal || 0)}:${bk.rolloverEnabled ? 1 : 0}:${Number(bk.carryover || 0)}`;
+            }).join(';');
+
+            // 2. Wallets collection (sorted by wallet ID)
+            const w = state.wallets || {};
+            const walletKeys = Object.keys(w).sort();
+            const walletsPart = walletKeys.map(k => {
+                const wk = w[k] || {};
+                return `${k}:${wk.name || ''}:${wk.type || ''}:${wk.region || ''}:${Number(wk.balance || 0)}:${wk.currency || ''}:${wk.color || ''}`;
+            }).join(';');
+
+            // 3. Closed months snapshots (sorted chronologically)
+            const c = state.closedMonths || {};
+            const closedKeys = Object.keys(c).sort();
+            const closedPart = closedKeys.map(k => {
+                const ck = c[k] || {};
+                let wsPart = '';
+                if (ck.walletsSnapshot && typeof ck.walletsSnapshot === 'object') {
+                    const wsk = Object.keys(ck.walletsSnapshot).sort();
+                    wsPart = wsk.map(sk => `${sk}:${Number(ck.walletsSnapshot[sk]?.balance || 0)}`).join(',');
+                }
+                return `${k}:${ck.status || ''}:${Number(ck.baseBudget || 0)}:${Number(ck.spent || 0)}:${Number(ck.carryoverPrior || 0)}:${Number(ck.rolloverAdded || 0)}:${Number(ck.JPRolloverAdded || 0)}:${Number(ck.INRolloverAdded || 0)}:${Number(ck.DERolloverAdded || 0)}:[${wsPart}]`;
+            }).join(';');
+
+            // 4. User preferences relevant to application state and accounting
+            const p = state.preferences || {};
+            const pCountries = Array.isArray(p.activeCountries) ? p.activeCountries.slice().sort().join(',') : (Array.isArray(p.countries) ? p.countries.slice().sort().join(',') : '');
+            const prefPart = `${pCountries}:${p.defaultCountry || p.primaryCountry || ''}:${p.onboardingCompleted ? 1 : 0}:${Number(p.onboardingStep || 1)}:${p.tourCompleted ? 1 : 0}:${p.tourDismissed ? 1 : 0}:${p.theme || ''}`;
+
+            // 5. Multi-country categories (sorted by country, then category ID)
+            const cats = state.categories || {};
+            const catCountries = Object.keys(cats).sort();
+            const categoriesPart = catCountries.map(cc => {
+                const list = Array.isArray(cats[cc]) ? cats[cc] : [];
+                const sortedList = list.slice().sort((x, y) => String(x.id || '').localeCompare(String(y.id || '')));
+                return `${cc}:` + sortedList.map(cat => `${cat.id || ''}:${cat.name || ''}:${cat.icon || ''}:${Number(cat.budget || 0)}`).join(',');
+            }).join(';');
+
+            // 6. Loan tracking configuration
+            const l = state.loanConfig || {};
+            const loanPart = `${l.enabled ? 1 : 0}:${l.country || ''}:${l.currency || ''}:${Number(l.totalPrincipal || 0)}:${Number(l.principalLeft || 0)}:${Number(l.emi || 0)}:${Number(l.duesPaid || 0)}:${Number(l.totalDues || 0)}:${Number(l.annualInterestRate || 0)}:${Number(l.emiDrawDate || 7)}`;
+
+            // 7. Authoritative calendar month key
+            const monthPart = state.currentMonthKey || '';
+
+            // 8. Complete transaction ledger (100% of transactions including note, description, and all persisted attributes, sorted deterministically)
+            const txs = Array.isArray(state.transactions) ? state.transactions : [];
+            const sortedTxs = txs.slice().sort((a, b) => {
+                const idCmp = String(a.id || '').localeCompare(String(b.id || ''));
+                if (idCmp !== 0) return idCmp;
+                const dateCmp = String(a.date || '').localeCompare(String(b.date || ''));
+                if (dateCmp !== 0) return dateCmp;
+                const typeCmp = String(a.type || '').localeCompare(String(b.type || ''));
+                if (typeCmp !== 0) return typeCmp;
+                const amtA = Number(a.amount !== undefined ? a.amount : (a.sourceAmount || 0));
+                const amtB = Number(b.amount !== undefined ? b.amount : (b.sourceAmount || 0));
+                if (amtA !== amtB) return amtA - amtB;
+                const noteA = String(a.note ?? a.description ?? '');
+                const noteB = String(b.note ?? b.description ?? '');
+                const noteCmp = noteA.localeCompare(noteB);
+                if (noteCmp !== 0) return noteCmp;
+                const walletCmp = String(a.walletId || a.sourceId || '').localeCompare(String(b.walletId || b.sourceId || ''));
+                if (walletCmp !== 0) return walletCmp;
+                return 0;
+            });
+            const txsPart = `${sortedTxs.length}:` + sortedTxs.map(t => {
+                const note = (t.note ?? t.description ?? '').toString().trim();
+                const amt = Number(t.amount !== undefined ? t.amount : (t.sourceAmount || 0));
+                const catId = t.categoryId || t.category || '';
+                return `${t.id || ''}:${t.type || ''}:${t.date || ''}:${amt}:${t.currency || ''}:${t.region || ''}:${t.walletId || ''}:${catId}:${note}:${t.sourceId || ''}:${t.destId || ''}:${Number(t.sourceAmount || 0)}:${Number(t.destAmount || 0)}:${t.exchangeRate || ''}:${t.sourceCurrency || ''}:${t.destCurrency || ''}`;
+            }).join(';');
+
+            return `B:{${budgetsPart}}|W:{${walletsPart}}|C:{${closedPart}}|P:{${prefPart}}|CAT:{${categoriesPart}}|L:{${loanPart}}|M:${monthPart}|TX:{${txsPart}}`;
+        } catch (e) {
+            console.warn('[Storage] Failed to canonicalize persisted state:', e);
+            return '';
+        }
+    }
+
+    /**
+     * Compare two persisted application states for complete content equality.
+     * Unlike computeFinancialFingerprint(), this checks 100% of persisted transaction notes,
+     * categories, preferences, budgets, wallets, and closed months.
+     *
+     * @param {Object} stateA
+     * @param {Object} stateB
+     * @returns {boolean} True if all persisted business attributes are identical
+     */
+    arePersistedStatesEqual(stateA, stateB) {
+        if (!stateA || !stateB) return false;
+        if (stateA === stateB) return true;
+        const canonA = this.canonicalizePersistedState(stateA);
+        const canonB = this.canonicalizePersistedState(stateB);
+        if (!canonA || !canonB) return false;
+        return canonA === canonB;
+    }
+
+    /**
+     * Compute a 64-bit composite hexadecimal fingerprint covering complete persisted state.
+     *
+     * @param {Object} state
+     * @returns {string} 16-character hexadecimal composite fingerprint hash
+     */
+    computePersistedStateFingerprint(state = this.state) {
+        const canonical = this.canonicalizePersistedState(state);
+        if (!canonical) return '0000000000000000';
+        let h1 = 2166136261;
+        let h2 = 2166136269;
+        for (let i = 0; i < canonical.length; i++) {
+            const c = canonical.charCodeAt(i);
+            h1 ^= c;
+            h1 = Math.imul(h1, 16777619);
+            h2 ^= c;
+            h2 = Math.imul(h2, 16777627);
+        }
+        const hex1 = (h1 >>> 0).toString(16).padStart(8, '0');
+        const hex2 = (h2 >>> 0).toString(16).padStart(8, '0');
+        return `${hex1}${hex2}`;
     }
 
     /**
@@ -3249,7 +3495,8 @@ class StorageManager {
                     // and will never automatically overwrite newer cloud data without explicit conflict review
                     this.lastConfirmedCloudRevision = 0;
                     this.lastConfirmedCloudFingerprint = null;
-                    this._persistConfirmedCloudRevision(0, null);
+                    this.lastConfirmedCloudPersistedFingerprint = null;
+                    this._persistConfirmedCloudRevision(0, null, null);
                     this.cloudSyncStatus = 'LOCAL_SAVED';
                     if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
                         app.updateSyncStatusPill('LOCAL_SAVED', 'Restored Locally');
