@@ -420,13 +420,13 @@
             </div>
         </div>
 
-        <!-- App-Styled Add Account Dialog for Onboarding -->
+        <!-- App-Styled Account Customization Dialog for Onboarding (Add & Edit) -->
         <div id="onboarding-add-account-modal" class="modal-overlay onboarding-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="onboarding-add-modal-title">
             <div class="onboarding-modal-card">
                 <div class="onboarding-modal-header">
                     <div>
                         <h3 class="onboarding-modal-title" id="onboarding-add-modal-title">Add Account</h3>
-                        <p class="onboarding-modal-subtitle">Configure a new account for this country</p>
+                        <p class="onboarding-modal-subtitle" id="onboarding-add-modal-subtitle">Configure account details and appearance</p>
                     </div>
                     <button type="button" class="icon-btn onboarding-modal-close-btn" id="onboarding-add-modal-close" aria-label="Close dialog">
                         <i data-lucide="x"></i>
@@ -434,14 +434,39 @@
                 </div>
                 <form id="onboarding-add-modal-form" onsubmit="return false;">
                     <div class="onboarding-modal-body">
+                        <!-- Account Name -->
                         <div class="auth-field-group">
                             <label class="auth-label" for="onboarding-modal-account-name">Account Name</label>
                             <div class="auth-input-wrapper">
                                 <span class="auth-input-icon"><i data-lucide="wallet"></i></span>
-                                <input type="text" id="onboarding-modal-account-name" class="auth-input" placeholder="e.g. Savings Account, Cash" autocomplete="off" maxlength="40" required>
+                                <input type="text" id="onboarding-modal-account-name" class="auth-input" placeholder="e.g. Salary Account, Emergency Fund" autocomplete="off" maxlength="40" required>
                             </div>
                             <div id="onboarding-modal-account-error" class="onboarding-modal-error" style="display: none;"></div>
                         </div>
+
+                        <!-- Account Type -->
+                        <div class="auth-field-group" style="margin-top: 14px;">
+                            <label class="auth-label" for="onboarding-modal-account-type">Account Type</label>
+                            <select id="onboarding-modal-account-type" class="auth-input onboarding-modal-select">
+                                <option value="bank">Bank Account</option>
+                                <option value="digital">Digital Wallet</option>
+                                <option value="cash">Cash</option>
+                                <option value="card">Credit / Debit Card</option>
+                            </select>
+                        </div>
+
+                        <!-- Card Theme Gallery -->
+                        <div class="auth-field-group" style="margin-top: 14px;">
+                            <label class="auth-label">Visual Card Theme</label>
+                            <div class="theme-picker-grid onboarding-theme-picker-grid" id="onboarding-wallet-theme-picker">
+                                <!-- Populated dynamically by JS -->
+                            </div>
+                            <input type="hidden" id="onboarding-modal-theme-val" value="emerald-salary">
+                        </div>
+
+                        <input type="hidden" id="onboarding-modal-wallet-id" value="">
+                        <input type="hidden" id="onboarding-modal-region" value="">
+                        <input type="hidden" id="onboarding-modal-mode" value="add">
                     </div>
                     <div class="onboarding-modal-footer">
                         <button type="button" class="btn btn-secondary onboarding-modal-cancel-btn" id="onboarding-add-modal-cancel">Cancel</button>
@@ -849,7 +874,8 @@
                                 <div class="section-header-toggle" id="in-categories-header-toggle" role="button"
                                     tabindex="0" aria-expanded="false" aria-controls="in-categories-wrap"
                                     onclick="app.toggleCollapse('in-categories-wrap', 'in-chevron')"
-                                    onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); app.toggleCollapse('in-categories-wrap', 'in-chevron'); }">
+                                    onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); app.toggleCollapse('in-categories-wrap', 'in-chevron'); }"
+                                    style="display: none;">
                                     <div class="section-title-wrap">
                                         <span class="section-badge-dot in-dot"></span>
                                         <h3 class="section-title" style="margin:0; padding:0;">India Spending Categories
@@ -857,7 +883,8 @@
                                     </div>
                                     <i data-lucide="chevron-down" id="in-chevron" class="rotated"></i>
                                 </div>
-                                <div class="collapsible-wrapper collapsed" id="in-categories-wrap">
+                                <div class="collapsible-wrapper collapsed" id="in-categories-wrap"
+                                    style="display: none;">
                                     <div class="collapsible-inner">
                                         <div class="card budget-central-card" id="budget-overview-card-in"
                                             style="margin: 8px 16px 16px 16px; width: calc(100% - 32px); display: none;">

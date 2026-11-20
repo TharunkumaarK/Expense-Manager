@@ -22,6 +22,15 @@ const WALLET_THEMES = [
     { id: 'frankfurt-slate', name: 'Frankfurt Slate', cls: 'wallet-theme-frankfurt-slate', color: '#1e293b', region: 'DE', match: ['checking', 'sparkasse', 'n26', 'deutsche', 'commerzbank'] }
 ];
 
+if (typeof window !== 'undefined') {
+    window.WALLET_THEMES = WALLET_THEMES;
+    window.WALLET_COLORS = WALLET_COLORS;
+}
+if (typeof global !== 'undefined') {
+    global.WALLET_THEMES = WALLET_THEMES;
+    global.WALLET_COLORS = WALLET_COLORS;
+}
+
 class App {
     constructor() {
         this.currentView = 'home-view';
@@ -300,7 +309,19 @@ class App {
                 btn.classList.add('revealed');
             }
         });
+        this.refreshIcons();
+    }
+
+    refreshIcons(rootEl) {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            if (rootEl && (rootEl.nodeType === 1 || rootEl.nodeType === 9)) {
+                try {
+                    window.lucide.createIcons({ root: rootEl });
+                    return;
+                } catch (e) {
+                    // Fall back to unscoped scan if scoped call fails
+                }
+            }
             window.lucide.createIcons();
         }
     }
@@ -516,8 +537,13 @@ class App {
 
         // Toggle Month Selector visibility in Desktop Header (Dashboard & Reports only)
         const monthSelectorEl = document.getElementById('desktop-month-selector');
+        const desktopHeaderEl = document.getElementById('desktop-header');
+        const showMonth = (resolvedId === 'home-view' || resolvedId === 'reports-view');
         if (monthSelectorEl) {
-            monthSelectorEl.style.display = (resolvedId === 'home-view' || resolvedId === 'reports-view') ? 'inline-flex' : 'none';
+            monthSelectorEl.style.display = showMonth ? 'inline-flex' : 'none';
+        }
+        if (desktopHeaderEl) {
+            desktopHeaderEl.classList.toggle('has-month-selector', showMonth);
         }
 
         this.currentView = resolvedId;
@@ -541,9 +567,7 @@ class App {
             this.renderSettings();
         }
 
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons();
-        }
+        this.refreshIcons(targetView);
     }
 
     toggleSidebarCollapse() {
@@ -2346,9 +2370,7 @@ class App {
         });
 
         this.renderSettingsPage();
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons();
-        }
+        this.refreshIcons(document.getElementById('settings-view'));
     }
 
     navigateToSettingsSection(sectionId) {
@@ -3257,14 +3279,12 @@ class App {
             el.innerHTML = `<div class="card budget-central-card${interactiveCls}" ${interactiveAttr}>${cardContent}</div>`;
         }
 
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons();
-        }
+        this.refreshIcons(el);
     }
 
     renderCategories() {
         const activeCountries = storage.getActiveCountries();
-        const singleCountry = activeCountries.length === 1;
+        const wallets = storage.state?.wallets || {};
 
         const config = [
             { region: 'JP', headerId: 'jp-categories-header-toggle', wrapId: 'jp-categories-wrap', gridId: 'jp-categories-grid', cardId: 'budget-overview-card', chevronId: 'jp-chevron' },
@@ -3272,13 +3292,24 @@ class App {
             { region: 'DE', headerId: 'de-categories-header-toggle', wrapId: 'de-categories-wrap', gridId: 'de-categories-grid', cardId: 'budget-overview-card-de', chevronId: 'de-chevron' }
         ];
 
-        config.forEach(cfg => {
+        // Only show a country's spending categories section if it is an active jurisdiction,
+        // has configured accounts/wallets, and has budgeting enabled.
+        const visibleBudgetRegions = config.filter(cfg => {
             const isActive = activeCountries.includes(cfg.region);
+            const hasWallets = Object.values(wallets).some(w => w && w.region === cfg.region);
+            const isBudgetEnabled = storage.isBudgetEnabled(cfg.region);
+            return isActive && hasWallets && isBudgetEnabled;
+        }).map(cfg => cfg.region);
+
+        const singleCountry = visibleBudgetRegions.length === 1;
+
+        config.forEach(cfg => {
+            const shouldShow = visibleBudgetRegions.includes(cfg.region);
             const headerEl = document.getElementById(cfg.headerId);
             const wrapEl = document.getElementById(cfg.wrapId);
             const cardEl = document.getElementById(cfg.cardId);
 
-            if (!isActive) {
+            if (!shouldShow) {
                 if (headerEl) headerEl.style.display = 'none';
                 if (wrapEl) wrapEl.style.display = 'none';
                 return;
@@ -3291,7 +3322,10 @@ class App {
                     wrapEl.classList.remove('collapsed');
                     if (headerEl) headerEl.setAttribute('aria-expanded', 'true');
                     const chevron = document.getElementById(cfg.chevronId);
-                    if (chevron) chevron.classList.remove('rotate-180');
+                    if (chevron) {
+                        chevron.classList.remove('rotate-180');
+                        chevron.classList.remove('rotated');
+                    }
                 }
             }
 

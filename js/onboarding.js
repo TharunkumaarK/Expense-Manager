@@ -18,6 +18,24 @@
 (function (global) {
     'use strict';
 
+    const ONBOARDING_WALLET_THEMES = [
+        { id: 'emerald-salary', name: 'Emerald Salary', cls: 'wallet-theme-emerald-salary', color: '#047857', region: 'JP', match: ['salary', 'bank'] },
+        { id: 'crimson-paypay', name: 'PayPay Crimson', cls: 'wallet-theme-crimson-paypay', color: '#e60012', region: 'JP', match: ['paypay', 'digital'] },
+        { id: 'amber-gold', name: 'Amber Gold (Cash)', cls: 'wallet-theme-amber-gold', color: '#d97706', region: 'JP', match: ['cash', 'gold'] },
+        { id: 'burgundy-axis', name: 'Burgundy Axis', cls: 'wallet-theme-burgundy-axis', color: '#800020', region: 'IN', match: ['axis', 'bank'] },
+        { id: 'baroda-orange', name: 'Baroda Orange', cls: 'wallet-theme-baroda-orange', color: '#ea580c', region: 'IN', match: ['baroda', 'bob'] },
+        { id: 'sapphire-sbi', name: 'Sapphire SBI', cls: 'wallet-theme-sapphire-sbi', color: '#1d4ed8', region: 'IN', match: ['sbi', 'state bank'] },
+        { id: 'hfc-navy', name: 'HDFC Navy', cls: 'wallet-theme-hfc-navy', color: '#1e3a8a', region: 'IN', match: ['hdfc', 'navy'] },
+        { id: 'icici-ruby', name: 'ICICI Ruby', cls: 'wallet-theme-icici-ruby', color: '#be123c', region: 'IN', match: ['icici', 'ruby'] },
+        { id: 'violet-suica', name: 'Violet Suica/Pasmo', cls: 'wallet-theme-violet-suica', color: '#7c3aed', region: 'JP', match: ['suica', 'pasmo', 'transit', 'metro'] },
+        { id: 'cyan-line', name: 'LINE Cyan', cls: 'wallet-theme-cyan-line', color: '#0891b2', region: 'JP', match: ['line', 'rakuten'] },
+        { id: 'slate-reserve', name: 'Slate Reserve', cls: 'wallet-theme-slate-reserve', color: '#334155', region: 'ALL', match: ['reserve', 'emergency', 'safe'] },
+        { id: 'rose-gold', name: 'Rose Gold Card', cls: 'wallet-theme-rose-gold', color: '#e11d48', region: 'ALL', match: ['card', 'credit'] },
+        { id: 'amethyst-crypto', name: 'Amethyst Vault', cls: 'wallet-theme-amethyst-crypto', color: '#9333ea', region: 'ALL', match: ['vault', 'crypto'] },
+        { id: 'aurora-nordic', name: 'Aurora Teal', cls: 'wallet-theme-aurora-nordic', color: '#0f766e', region: 'ALL', match: ['teal', 'savings'] },
+        { id: 'frankfurt-slate', name: 'Frankfurt Slate', cls: 'wallet-theme-frankfurt-slate', color: '#1e293b', region: 'DE', match: ['checking', 'sparkasse', 'n26', 'deutsche', 'commerzbank'] }
+    ];
+
     class OnboardingController {
         constructor() {
             this.currentStep = 1;
@@ -168,17 +186,17 @@
         _initDraftWallets() {
             const starterTemplates = {
                 JP: [
-                    { id: 'Salary Account', name: 'Salary Account', type: 'bank', region: 'JP', currency: '¥', color: '#009944', balance: 0 },
-                    { id: 'Cash', name: 'Cash', type: 'cash', region: 'JP', currency: '¥', color: '#d4af37', balance: 0 },
-                    { id: 'PayPay', name: 'PayPay', type: 'digital', region: 'JP', currency: '¥', color: '#ff0033', balance: 0 }
+                    { id: 'Salary Account', name: 'Salary Account', type: 'bank', region: 'JP', currency: '¥', color: '#047857', theme: 'emerald-salary', balance: 0 },
+                    { id: 'Cash', name: 'Cash', type: 'cash', region: 'JP', currency: '¥', color: '#d97706', theme: 'amber-gold', balance: 0 },
+                    { id: 'PayPay', name: 'PayPay', type: 'digital', region: 'JP', currency: '¥', color: '#e60012', theme: 'crimson-paypay', balance: 0 }
                 ],
                 IN: [
-                    { id: 'Bank Account', name: 'Bank Account', type: 'bank', region: 'IN', currency: '₹', color: '#97144d', balance: 0 },
-                    { id: 'Cash (IN)', name: 'Cash', type: 'cash', region: 'IN', currency: '₹', color: '#d4af37', balance: 0 }
+                    { id: 'Bank Account', name: 'Bank Account', type: 'bank', region: 'IN', currency: '₹', color: '#800020', theme: 'burgundy-axis', balance: 0 },
+                    { id: 'Cash (IN)', name: 'Cash', type: 'cash', region: 'IN', currency: '₹', color: '#d4af37', theme: 'amber-gold', balance: 0 }
                 ],
                 DE: [
-                    { id: 'Checking Account', name: 'Checking Account', type: 'bank', region: 'DE', currency: '€', color: '#1e3a8a', balance: 0 },
-                    { id: 'Cash (DE)', name: 'Cash', type: 'cash', region: 'DE', currency: '€', color: '#d4af37', balance: 0 }
+                    { id: 'Checking Account', name: 'Checking Account', type: 'bank', region: 'DE', currency: '€', color: '#1e293b', theme: 'frankfurt-slate', balance: 0 },
+                    { id: 'Cash (DE)', name: 'Cash', type: 'cash', region: 'DE', currency: '€', color: '#d4af37', theme: 'amber-gold', balance: 0 }
                 ]
             };
 
@@ -197,6 +215,13 @@
                     starterTemplates[country].forEach(tpl => {
                         this.draft.wallets[tpl.id] = { ...tpl };
                     });
+                }
+            }
+
+            // Ensure all draft wallets have a valid theme assigned
+            for (const w of Object.values(this.draft.wallets)) {
+                if (w && !w.theme) {
+                    w.theme = this.getThemeForWallet(w).id;
                 }
             }
         }
@@ -230,6 +255,7 @@
                 });
 
                 step3Container.addEventListener('click', (e) => {
+                    // 1. Delete button
                     const deleteBtn = e.target.closest('.onboarding-wallet-delete-btn');
                     if (deleteBtn) {
                         const walletId = deleteBtn.getAttribute('data-wallet-id');
@@ -239,6 +265,27 @@
                         return;
                     }
 
+                    // 2. Edit button (pencil)
+                    const editBtn = e.target.closest('.onboarding-wallet-edit-btn');
+                    if (editBtn) {
+                        const walletId = editBtn.getAttribute('data-wallet-id');
+                        if (walletId) {
+                            this.openWalletModal({ mode: 'edit', walletId });
+                        }
+                        return;
+                    }
+
+                    // 3. Click on wallet row left info (name/icon) to customize
+                    const rowLeft = e.target.closest('.onboarding-wallet-row-left');
+                    if (rowLeft) {
+                        const walletId = rowLeft.getAttribute('data-wallet-id');
+                        if (walletId) {
+                            this.openWalletModal({ mode: 'edit', walletId });
+                        }
+                        return;
+                    }
+
+                    // 4. Add account button
                     const addBtn = e.target.closest('.onboarding-btn-add-wallet');
                     if (addBtn) {
                         const region = addBtn.getAttribute('data-region');
@@ -625,15 +672,16 @@
                 `;
 
                 walletsForCountry.forEach(w => {
-                    const typeIcon = w.type === 'cash' ? 'wallet' : (w.type === 'digital' ? 'smartphone' : 'landmark');
+                    const typeIcon = w.type === 'cash' ? 'wallet' : (w.type === 'digital' ? 'smartphone' : (w.type === 'card' ? 'credit-card' : 'landmark'));
                     const escapedId = this.escapeHtml(w.id);
                     const escapedName = this.escapeHtml(w.name || w.id);
                     const escapedType = this.escapeHtml((w.type || 'bank').toUpperCase());
-                    const escapedColor = this.escapeHtml(w.color || '#333');
+                    const themeObj = this.getThemeForWallet(w);
+                    const escapedColor = this.escapeHtml(w.color || themeObj.color || '#333');
 
                     html += `
-                        <div class="onboarding-wallet-row">
-                            <div class="onboarding-wallet-row-left">
+                        <div class="onboarding-wallet-row" data-wallet-id="${escapedId}">
+                            <div class="onboarding-wallet-row-left" data-wallet-id="${escapedId}" title="Click to customize account">
                                 <div class="onboarding-wallet-icon-box" style="border-color: ${escapedColor}">
                                     <i data-lucide="${typeIcon}"></i>
                                 </div>
@@ -651,6 +699,10 @@
                                            data-wallet-id="${escapedId}"
                                            value="${w.balance !== 0 ? w.balance : ''}">
                                 </div>
+                                <button type="button" class="onboarding-wallet-edit-btn" title="Customize account"
+                                        data-wallet-id="${escapedId}">
+                                    <i data-lucide="pencil"></i>
+                                </button>
                                 ${walletsForCountry.length > 1 ? `
                                     <button type="button" class="onboarding-wallet-delete-btn" title="Remove account"
                                             data-wallet-id="${escapedId}">
@@ -680,45 +732,180 @@
             }
         }
 
-        promptAddWallet(countryCode, directName = null) {
-            const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
-            const countryNames = { JP: 'Japan', IN: 'India', DE: 'Germany' };
-            const defaultNames = {
-                JP: 'Savings Account',
-                IN: 'Emergency Fund',
-                DE: 'Savings Account'
+        /**
+         * Resolve the appropriate theme for a given wallet object.
+         */
+        getThemeForWallet(w) {
+            const allThemes = (typeof window !== 'undefined' && window.WALLET_THEMES) || ONBOARDING_WALLET_THEMES;
+            if (!w) return allThemes[0];
+            if (w.theme) {
+                const found = allThemes.find(t => t.id === w.theme);
+                if (found) return found;
+            }
+            if (w.color) {
+                const foundByColor = allThemes.find(t => t.color.toLowerCase() === w.color.toLowerCase());
+                if (foundByColor) return foundByColor;
+            }
+            const nameLower = (w.name || w.id || '').toLowerCase();
+            const typeLower = (w.type || '').toLowerCase();
+
+            for (const t of allThemes) {
+                if (t.match && t.match.some(k => nameLower.includes(k))) {
+                    return t;
+                }
+            }
+            if (typeLower === 'cash') return allThemes.find(t => t.id === 'amber-gold') || allThemes[2];
+            if (typeLower === 'card') return allThemes.find(t => t.id === 'rose-gold') || allThemes[11];
+            if (w.region === 'IN') return allThemes.find(t => t.id === 'burgundy-axis') || allThemes[3];
+            if (w.region === 'DE') return allThemes.find(t => t.id === 'frankfurt-slate') || allThemes[14];
+            return allThemes[0];
+        }
+
+        /**
+         * Populate the theme picker gallery within the onboarding modal.
+         * Prioritizes themes relevant to the active country.
+         */
+        populateThemePicker(containerId, activeThemeId, region = 'JP') {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const allThemes = (typeof window !== 'undefined' && window.WALLET_THEMES) || ONBOARDING_WALLET_THEMES;
+
+            // Prioritize themes by country context
+            const countryThemes = {
+                JP: ['emerald-salary', 'crimson-paypay', 'amber-gold', 'violet-suica', 'cyan-line'],
+                IN: ['burgundy-axis', 'baroda-orange', 'sapphire-sbi', 'hfc-navy', 'icici-ruby', 'amber-gold'],
+                DE: ['frankfurt-slate', 'amber-gold', 'aurora-nordic', 'rose-gold']
             };
 
-            // Programmatic or automated test bypass: if directName is provided, create immediately
-            if (typeof directName === 'string' && directName.trim()) {
-                this._createWallet(countryCode, directName.trim());
-                return;
+            const primaryIds = countryThemes[region] || ['emerald-salary', 'amber-gold', 'crimson-paypay'];
+            const sortedThemes = [
+                ...primaryIds.map(id => allThemes.find(t => t.id === id)).filter(Boolean),
+                ...allThemes.filter(t => !primaryIds.includes(t.id))
+            ];
+
+            let html = '';
+            sortedThemes.forEach(t => {
+                const isSelected = t.id === activeThemeId;
+                const isPrimary = primaryIds.includes(t.id);
+                const activeCls = isSelected ? ' active selected' : '';
+                const featuredTag = isPrimary ? '<span class="theme-tag-frequent theme-tile-frequent">Featured</span>' : '';
+
+                html += `
+                    <div class="theme-picker-tile theme-tile${activeCls}" data-theme-id="${t.id}" role="radio" aria-checked="${isSelected}" title="${t.name}">
+                        <div class="theme-tile-preview ${t.cls}">
+                            <div class="theme-mini-chip"></div>
+                            <div class="theme-tile-sheen"></div>
+                            <div class="theme-tile-check">
+                                <i data-lucide="check" style="width: 11px; height: 11px;"></i>
+                            </div>
+                            ${featuredTag}
+                        </div>
+                        <div class="theme-tile-name">${t.name}</div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            // Click listener for theme tiles
+            container.querySelectorAll('.theme-picker-tile').forEach(tile => {
+                tile.addEventListener('click', () => {
+                    const themeId = tile.getAttribute('data-theme-id');
+                    container.querySelectorAll('.theme-picker-tile').forEach(el => {
+                        el.classList.remove('active', 'selected');
+                        el.setAttribute('aria-checked', 'false');
+                    });
+                    tile.classList.add('active', 'selected');
+                    tile.setAttribute('aria-checked', 'true');
+                    const hiddenVal = document.getElementById('onboarding-modal-theme-val');
+                    if (hiddenVal) hiddenVal.value = themeId;
+                });
+            });
+
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
             }
 
+            // Scroll active theme into view smoothly
+            setTimeout(() => {
+                const activeTile = container.querySelector(`[data-theme-id="${activeThemeId}"]`);
+                if (activeTile && typeof activeTile.scrollIntoView === 'function') {
+                    activeTile.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            }, 50);
+        }
+
+        /**
+         * Open the wallet customization modal in either 'add' or 'edit' mode.
+         */
+        openWalletModal({ mode = 'add', region = 'JP', walletId = null }) {
             const modal = document.getElementById('onboarding-add-account-modal');
             const titleEl = document.getElementById('onboarding-add-modal-title');
+            const subtitleEl = document.getElementById('onboarding-add-modal-subtitle');
             const nameInput = document.getElementById('onboarding-modal-account-name');
+            const typeSelect = document.getElementById('onboarding-modal-account-type');
+            const themeVal = document.getElementById('onboarding-modal-theme-val');
+            const modeInput = document.getElementById('onboarding-modal-mode');
+            const walletIdInput = document.getElementById('onboarding-modal-wallet-id');
+            const regionInput = document.getElementById('onboarding-modal-region');
+            const submitBtn = document.getElementById('onboarding-add-modal-submit');
             const errorEl = document.getElementById('onboarding-modal-account-error');
             const form = document.getElementById('onboarding-add-modal-form');
             const closeBtn = document.getElementById('onboarding-add-modal-close');
             const cancelBtn = document.getElementById('onboarding-add-modal-cancel');
 
             if (!modal || !nameInput || !form) {
-                // Safe fallback to native prompt if modal DOM is unavailable
-                const fallback = prompt(`Enter account name for ${countryCode}:`, defaultNames[countryCode] || 'Savings Account');
-                if (fallback && fallback.trim()) {
-                    this._createWallet(countryCode, fallback.trim());
+                // Fallback for headless environments without modal markup
+                if (mode === 'add') {
+                    const fallbackName = prompt(`Enter account name for ${region}:`, 'Savings Account');
+                    if (fallbackName && fallbackName.trim()) {
+                        this._createWallet(region, fallbackName.trim());
+                    }
                 }
                 return;
             }
 
-            const cName = countryNames[countryCode] || countryCode;
-            if (titleEl) titleEl.textContent = `Add ${cName} Account`;
-            nameInput.value = defaultNames[countryCode] || 'Savings Account';
+            const countryNames = { JP: 'Japan', IN: 'India', DE: 'Germany' };
+            const defaultNames = { JP: 'Savings Account', IN: 'Emergency Fund', DE: 'Savings Account' };
+            const allThemes = (typeof window !== 'undefined' && window.WALLET_THEMES) || ONBOARDING_WALLET_THEMES;
+
+            let initialThemeId = 'emerald-salary';
+            if (mode === 'edit' && walletId && this.draft.wallets[walletId]) {
+                const w = this.draft.wallets[walletId];
+                region = w.region || region;
+                if (titleEl) titleEl.textContent = 'Edit Account';
+                if (subtitleEl) subtitleEl.textContent = `Customize account details and card theme`;
+                if (submitBtn) submitBtn.textContent = 'Save Changes';
+                nameInput.value = w.name || w.id;
+                if (typeSelect) typeSelect.value = w.type || 'bank';
+                const currentTheme = this.getThemeForWallet(w);
+                initialThemeId = currentTheme.id;
+                if (walletIdInput) walletIdInput.value = walletId;
+                if (modeInput) modeInput.value = 'edit';
+                if (regionInput) regionInput.value = region;
+            } else {
+                // Add mode
+                const cName = countryNames[region] || region;
+                if (titleEl) titleEl.textContent = `Add ${cName} Account`;
+                if (subtitleEl) subtitleEl.textContent = `Configure details and appearance for ${cName}`;
+                if (submitBtn) submitBtn.textContent = 'Add Account';
+                nameInput.value = defaultNames[region] || 'Savings Account';
+                if (typeSelect) typeSelect.value = 'bank';
+                const defaultThemeByRegion = { JP: 'emerald-salary', IN: 'burgundy-axis', DE: 'frankfurt-slate' };
+                initialThemeId = defaultThemeByRegion[region] || 'emerald-salary';
+                if (walletIdInput) walletIdInput.value = '';
+                if (modeInput) modeInput.value = 'add';
+                if (regionInput) regionInput.value = region;
+            }
+
+            if (themeVal) themeVal.value = initialThemeId;
             if (errorEl) {
                 errorEl.textContent = '';
                 errorEl.style.display = 'none';
             }
+
+            this.populateThemePicker('onboarding-wallet-theme-picker', initialThemeId, region);
 
             modal.style.display = 'flex';
             if (typeof lucide !== 'undefined' && lucide.createIcons) {
@@ -748,8 +935,8 @@
 
             const submitHandler = (e) => {
                 if (e) e.preventDefault();
-                const val = nameInput.value.trim();
-                if (!val) {
+                const newName = (nameInput.value || '').trim();
+                if (!newName) {
                     if (errorEl) {
                         errorEl.textContent = 'Account name cannot be empty.';
                         errorEl.style.display = 'block';
@@ -757,8 +944,79 @@
                     nameInput.focus();
                     return;
                 }
+
+                const currentMode = modeInput ? modeInput.value : 'add';
+                const currentWalletId = walletIdInput ? walletIdInput.value : '';
+                const currentRegion = regionInput ? regionInput.value : region;
+                const currentType = typeSelect ? typeSelect.value : 'bank';
+                const selectedThemeId = themeVal ? themeVal.value : initialThemeId;
+                const selectedTheme = allThemes.find(t => t.id === selectedThemeId) || allThemes[0];
+
+                if (currentMode === 'add') {
+                    if (this.draft.wallets[newName]) {
+                        if (errorEl) {
+                            errorEl.textContent = `An account named "${newName}" already exists.`;
+                            errorEl.style.display = 'block';
+                        }
+                        nameInput.focus();
+                        return;
+                    }
+                    const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
+                    this.draft.wallets[newName] = {
+                        id: newName,
+                        name: newName,
+                        type: currentType,
+                        region: currentRegion,
+                        currency: currencySymbols[currentRegion] || '¥',
+                        color: selectedTheme.color,
+                        theme: selectedTheme.id,
+                        balance: 0
+                    };
+                } else if (currentMode === 'edit') {
+                    const existing = this.draft.wallets[currentWalletId];
+                    if (!existing) {
+                        closeModal();
+                        return;
+                    }
+
+                    // If renaming, check for collision with another wallet
+                    if (newName !== currentWalletId && this.draft.wallets[newName]) {
+                        if (errorEl) {
+                            errorEl.textContent = `An account named "${newName}" already exists.`;
+                            errorEl.style.display = 'block';
+                        }
+                        nameInput.focus();
+                        return;
+                    }
+
+                    const preservedBalance = existing.balance || 0;
+                    const preservedRegion = existing.region || currentRegion;
+                    const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
+
+                    if (newName !== currentWalletId) {
+                        delete this.draft.wallets[currentWalletId];
+                    }
+
+                    this.draft.wallets[newName] = {
+                        ...existing,
+                        id: newName,
+                        name: newName,
+                        type: currentType,
+                        region: preservedRegion,
+                        currency: existing.currency || currencySymbols[preservedRegion] || '¥',
+                        color: selectedTheme.color,
+                        theme: selectedTheme.id,
+                        balance: preservedBalance
+                    };
+                }
+
                 closeModal();
-                this._createWallet(countryCode, val);
+                this.persistDraftLocally();
+                this.renderStep3();
+                this.updateLiveShowcase();
+                if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                    lucide.createIcons();
+                }
             };
 
             form.onsubmit = submitHandler;
@@ -770,21 +1028,37 @@
             window.addEventListener('keydown', handleKey);
         }
 
-        _createWallet(countryCode, trimmedName) {
+        promptAddWallet(countryCode, directName = null) {
+            // Programmatic or automated test bypass: if directName is provided, create immediately
+            if (typeof directName === 'string' && directName.trim()) {
+                this._createWallet(countryCode, directName.trim());
+                return;
+            }
+            this.openWalletModal({ mode: 'add', region: countryCode });
+        }
+
+        _createWallet(countryCode, trimmedName, chosenType = 'bank', chosenThemeId = null) {
             const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
+            const allThemes = (typeof window !== 'undefined' && window.WALLET_THEMES) || ONBOARDING_WALLET_THEMES;
+
             let uniqueId = trimmedName;
             let counter = 1;
             while (this.draft.wallets[uniqueId]) {
                 uniqueId = `${trimmedName} ${++counter}`;
             }
 
+            const defaultThemeByRegion = { JP: 'emerald-salary', IN: 'burgundy-axis', DE: 'frankfurt-slate' };
+            const themeId = chosenThemeId || defaultThemeByRegion[countryCode] || 'emerald-salary';
+            const themeObj = allThemes.find(t => t.id === themeId) || allThemes[0];
+
             this.draft.wallets[uniqueId] = {
                 id: uniqueId,
                 name: uniqueId,
-                type: 'bank',
+                type: chosenType,
                 region: countryCode,
                 currency: currencySymbols[countryCode] || '¥',
-                color: '#3b82f6',
+                color: themeObj.color,
+                theme: themeObj.id,
                 balance: 0
             };
 
