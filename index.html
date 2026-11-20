@@ -419,6 +419,37 @@
                 </div>
             </div>
         </div>
+
+        <!-- App-Styled Add Account Dialog for Onboarding -->
+        <div id="onboarding-add-account-modal" class="modal-overlay onboarding-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="onboarding-add-modal-title">
+            <div class="onboarding-modal-card">
+                <div class="onboarding-modal-header">
+                    <div>
+                        <h3 class="onboarding-modal-title" id="onboarding-add-modal-title">Add Account</h3>
+                        <p class="onboarding-modal-subtitle">Configure a new account for this country</p>
+                    </div>
+                    <button type="button" class="icon-btn onboarding-modal-close-btn" id="onboarding-add-modal-close" aria-label="Close dialog">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <form id="onboarding-add-modal-form" onsubmit="return false;">
+                    <div class="onboarding-modal-body">
+                        <div class="auth-field-group">
+                            <label class="auth-label" for="onboarding-modal-account-name">Account Name</label>
+                            <div class="auth-input-wrapper">
+                                <span class="auth-input-icon"><i data-lucide="wallet"></i></span>
+                                <input type="text" id="onboarding-modal-account-name" class="auth-input" placeholder="e.g. Savings Account, Cash" autocomplete="off" maxlength="40" required>
+                            </div>
+                            <div id="onboarding-modal-account-error" class="onboarding-modal-error" style="display: none;"></div>
+                        </div>
+                    </div>
+                    <div class="onboarding-modal-footer">
+                        <button type="button" class="btn btn-secondary onboarding-modal-cancel-btn" id="onboarding-add-modal-cancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary onboarding-modal-submit-btn" id="onboarding-add-modal-submit">Add Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Main Content Area -->

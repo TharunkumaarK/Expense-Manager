@@ -680,23 +680,102 @@
             }
         }
 
-        promptAddWallet(countryCode) {
+        promptAddWallet(countryCode, directName = null) {
             const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
+            const countryNames = { JP: 'Japan', IN: 'India', DE: 'Germany' };
             const defaultNames = {
                 JP: 'Savings Account',
                 IN: 'Emergency Fund',
                 DE: 'Savings Account'
             };
 
-            const name = prompt(`Enter account name for ${countryCode}:`, defaultNames[countryCode] || 'Savings');
-            if (!name || !name.trim()) return;
+            // Programmatic or automated test bypass: if directName is provided, create immediately
+            if (typeof directName === 'string' && directName.trim()) {
+                this._createWallet(countryCode, directName.trim());
+                return;
+            }
 
-            const trimmed = name.trim();
-            // Prevent duplicate IDs
-            let uniqueId = trimmed;
+            const modal = document.getElementById('onboarding-add-account-modal');
+            const titleEl = document.getElementById('onboarding-add-modal-title');
+            const nameInput = document.getElementById('onboarding-modal-account-name');
+            const errorEl = document.getElementById('onboarding-modal-account-error');
+            const form = document.getElementById('onboarding-add-modal-form');
+            const closeBtn = document.getElementById('onboarding-add-modal-close');
+            const cancelBtn = document.getElementById('onboarding-add-modal-cancel');
+
+            if (!modal || !nameInput || !form) {
+                // Safe fallback to native prompt if modal DOM is unavailable
+                const fallback = prompt(`Enter account name for ${countryCode}:`, defaultNames[countryCode] || 'Savings Account');
+                if (fallback && fallback.trim()) {
+                    this._createWallet(countryCode, fallback.trim());
+                }
+                return;
+            }
+
+            const cName = countryNames[countryCode] || countryCode;
+            if (titleEl) titleEl.textContent = `Add ${cName} Account`;
+            nameInput.value = defaultNames[countryCode] || 'Savings Account';
+            if (errorEl) {
+                errorEl.textContent = '';
+                errorEl.style.display = 'none';
+            }
+
+            modal.style.display = 'flex';
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+
+            setTimeout(() => {
+                nameInput.focus();
+                nameInput.select();
+            }, 60);
+
+            const closeModal = () => {
+                modal.style.display = 'none';
+                form.onsubmit = null;
+                if (closeBtn) closeBtn.onclick = null;
+                if (cancelBtn) cancelBtn.onclick = null;
+                modal.onclick = null;
+                window.removeEventListener('keydown', handleKey);
+            };
+
+            const handleKey = (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeModal();
+                }
+            };
+
+            const submitHandler = (e) => {
+                if (e) e.preventDefault();
+                const val = nameInput.value.trim();
+                if (!val) {
+                    if (errorEl) {
+                        errorEl.textContent = 'Account name cannot be empty.';
+                        errorEl.style.display = 'block';
+                    }
+                    nameInput.focus();
+                    return;
+                }
+                closeModal();
+                this._createWallet(countryCode, val);
+            };
+
+            form.onsubmit = submitHandler;
+            if (closeBtn) closeBtn.onclick = closeModal;
+            if (cancelBtn) cancelBtn.onclick = closeModal;
+            modal.onclick = (e) => {
+                if (e.target === modal) closeModal();
+            };
+            window.addEventListener('keydown', handleKey);
+        }
+
+        _createWallet(countryCode, trimmedName) {
+            const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
+            let uniqueId = trimmedName;
             let counter = 1;
             while (this.draft.wallets[uniqueId]) {
-                uniqueId = `${trimmed} ${++counter}`;
+                uniqueId = `${trimmedName} ${++counter}`;
             }
 
             this.draft.wallets[uniqueId] = {
@@ -860,10 +939,10 @@
                                 <span class="onboarding-summary-label">Active Budgets</span>
                                 <span class="onboarding-summary-val">
                                     ${this.draft.activeCountries.map(c => {
-                                        const b = this.draft.budgets[c];
-                                        const sym = currencySymbols[c] || '';
-                                        return b && b.enabled ? `${c}: ${sym}${Number(b.monthlyTotal).toLocaleString()}` : `${c}: None`;
-                                    }).join(' • ')}
+                const b = this.draft.budgets[c];
+                const sym = currencySymbols[c] || '';
+                return b && b.enabled ? `${c}: ${sym}${Number(b.monthlyTotal).toLocaleString()}` : `${c}: None`;
+            }).join(' • ')}
                                 </span>
                             </div>
 
@@ -871,12 +950,12 @@
                                 <span class="onboarding-summary-label">Opening Balances</span>
                                 <span class="onboarding-summary-val">
                                     ${this.draft.activeCountries.map(c => {
-                                        const total = Object.values(this.draft.wallets)
-                                            .filter(w => w && w.region === c)
-                                            .reduce((sum, w) => sum + (Number(w.balance) || 0), 0);
-                                        const sym = currencySymbols[c] || '';
-                                        return `${c}: ${sym}${total.toLocaleString()}`;
-                                    }).join(' • ')}
+                const total = Object.values(this.draft.wallets)
+                    .filter(w => w && w.region === c)
+                    .reduce((sum, w) => sum + (Number(w.balance) || 0), 0);
+                const sym = currencySymbols[c] || '';
+                return `${c}: ${sym}${total.toLocaleString()}`;
+            }).join(' • ')}
                                 </span>
                             </div>
 
