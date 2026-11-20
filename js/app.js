@@ -1336,199 +1336,177 @@ class App {
             event.preventDefault();
         }
 
-        if (this._isSubmitting) return;
+        if (this._isSubmitting) return false;
 
-        const dateEl = document.getElementById('tx-date');
-        const date = (dateEl && dateEl.value) ? dateEl.value : new Date().toISOString().split('T')[0];
+        this._isSubmitting = true;
+        try {
+            const dateEl = document.getElementById('tx-date');
+            const date = (dateEl && dateEl.value) ? dateEl.value : new Date().toISOString().split('T')[0];
 
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            alert('Please select a valid date.');
-            return;
-        }
-
-        if (editId) {
-            const found = walletManager.findTransaction(editId);
-            if (found && walletManager.isMonthClosed((found.tx.date || '').slice(0, 7))) {
-                alert(`Cannot edit transaction in closed month ${(found.tx.date || '').slice(0, 7)}. This historical period is permanently sealed.`);
-                return;
-            }
-        }
-
-        const txMonth = (date || '').slice(0, 7);
-        if (walletManager.isMonthClosed(txMonth)) {
-            alert(`Cannot record transactions in closed month ${txMonth}. This historical period is permanently sealed.`);
-            return;
-        }
-
-        let updatedData = { date };
-
-        if (type === 'expense') {
-            const walletEl = document.getElementById('tx-wallet');
-            const walletId = walletEl ? walletEl.value : '';
-            let cat = document.getElementById('tx-category')?.value;
-            if (cat === 'utility-group') {
-                cat = document.getElementById('tx-subcategory')?.value;
-            }
-            const amtStr = document.getElementById('tx-amount')?.value;
-            const amt = Number(amtStr);
-            const note = document.getElementById('tx-note')?.value || '';
-
-            if (!amtStr || isNaN(amt) || amt <= 0) {
-                alert('Please enter a valid amount greater than 0.');
-                return;
-            }
-            if (!walletId || !storage.state.wallets[walletId]) {
-                alert('Please select a valid wallet.');
-                return;
-            }
-            if (!cat) {
-                alert('Please select a category.');
-                return;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+                alert('Please select a valid date.');
+                return false;
             }
 
             if (editId) {
-                updatedData = { ...updatedData, walletId, categoryId: cat, amount: amt, note };
-            } else {
-                this._isSubmitting = true;
-                try {
-                    await storage.runExclusive(async () => {
+                const found = walletManager.findTransaction(editId);
+                if (!found) {
+                    alert('Transaction not found or already deleted.');
+                    return false;
+                }
+                if (walletManager.isMonthClosed((found.tx.date || '').slice(0, 7))) {
+                    alert(`Cannot edit transaction in closed month ${(found.tx.date || '').slice(0, 7)}. This historical period is permanently sealed.`);
+                    return false;
+                }
+                if (!type && found.tx?.type) {
+                    type = found.tx.type;
+                }
+            }
+
+            if (!type || !['expense', 'income', 'transfer', 'remittance'].includes(type)) {
+                alert('Please select a valid transaction type.');
+                return false;
+            }
+
+            const txMonth = (date || '').slice(0, 7);
+            if (walletManager.isMonthClosed(txMonth)) {
+                alert(`Cannot record transactions in closed month ${txMonth}. This historical period is permanently sealed.`);
+                return false;
+            }
+
+            let updatedData = { date };
+            let res;
+
+            if (type === 'expense') {
+                const walletEl = document.getElementById('tx-wallet');
+                const walletId = walletEl ? walletEl.value : '';
+                let cat = document.getElementById('tx-category')?.value;
+                if (cat === 'utility-group') {
+                    cat = document.getElementById('tx-subcategory')?.value;
+                }
+                const amtStr = document.getElementById('tx-amount')?.value;
+                const amt = Number(amtStr);
+                const note = document.getElementById('tx-note')?.value || '';
+
+                if (!amtStr || isNaN(amt) || amt <= 0) {
+                    alert('Please enter a valid amount greater than 0.');
+                    return false;
+                }
+                if (!walletId || !storage.state.wallets[walletId]) {
+                    alert('Please select a valid wallet.');
+                    return false;
+                }
+                if (!cat) {
+                    alert('Please select a category.');
+                    return false;
+                }
+
+                if (editId) {
+                    updatedData = { ...updatedData, walletId, categoryId: cat, amount: amt, note };
+                } else {
+                    res = await storage.runExclusive(async () => {
                         return walletManager.addExpense(walletId, cat, amt, note, date);
                     });
-                } finally {
-                    this._isSubmitting = false;
+                    if (res === false || (res && res.success === false)) {
+                        const errMsg = (res && (res.error || res.message)) || 'Could not record expense. Please verify details and retry.';
+                        alert(errMsg);
+                        return false;
+                    }
                 }
-            }
-        } else if (type === 'income') {
-            const walletEl = document.getElementById('tx-wallet');
-            const walletId = walletEl ? walletEl.value : '';
-            const amtStr = document.getElementById('tx-amount')?.value;
-            const amt = Number(amtStr);
-            const note = document.getElementById('tx-note')?.value || '';
+            } else if (type === 'income') {
+                const walletEl = document.getElementById('tx-wallet');
+                const walletId = walletEl ? walletEl.value : '';
+                const amtStr = document.getElementById('tx-amount')?.value;
+                const amt = Number(amtStr);
+                const note = document.getElementById('tx-note')?.value || '';
 
-            if (!amtStr || isNaN(amt) || amt <= 0) {
-                alert('Please enter a valid amount greater than 0.');
-                return;
-            }
-            if (!walletId || !storage.state.wallets[walletId]) {
-                alert('Please select a valid wallet.');
-                return;
-            }
+                if (!amtStr || isNaN(amt) || amt <= 0) {
+                    alert('Please enter a valid amount greater than 0.');
+                    return false;
+                }
+                if (!walletId || !storage.state.wallets[walletId]) {
+                    alert('Please select a valid wallet.');
+                    return false;
+                }
 
-            if (editId) {
-                updatedData = { ...updatedData, walletId, amount: amt, note };
-            } else {
-                this._isSubmitting = true;
-                try {
-                    await storage.runExclusive(async () => {
+                if (editId) {
+                    updatedData = { ...updatedData, walletId, amount: amt, note };
+                } else {
+                    res = await storage.runExclusive(async () => {
                         return walletManager.addIncome(walletId, amt, note, date);
                     });
-                } finally {
-                    this._isSubmitting = false;
+                    if (res === false || (res && res.success === false)) {
+                        const errMsg = (res && (res.error || res.message)) || 'Could not record income. Please verify details and retry.';
+                        alert(errMsg);
+                        return false;
+                    }
                 }
-            }
-        } else if (type === 'transfer') {
-            const src = document.getElementById('tx-source')?.value;
-            const dest = document.getElementById('tx-dest')?.value;
-            const amtStr = document.getElementById('tx-amount')?.value;
-            const amt = Number(amtStr);
-            const note = document.getElementById('tx-note')?.value || '';
+            } else if (type === 'transfer') {
+                const src = document.getElementById('tx-source')?.value;
+                const dest = document.getElementById('tx-dest')?.value;
+                const amtStr = document.getElementById('tx-amount')?.value;
+                const amt = Number(amtStr);
+                const note = document.getElementById('tx-note')?.value || '';
 
-            const preview = walletManager.getTransferPreview('transfer', src, dest, amt);
-            if (!preview.valid) {
-                alert(preview.error || 'Please enter a valid transfer amount and accounts.');
-                return;
-            }
+                const preview = walletManager.getTransferPreview('transfer', src, dest, amt);
+                if (!preview.valid) {
+                    alert(preview.error || 'Please enter a valid transfer amount and accounts.');
+                    return false;
+                }
 
-            if (editId) {
-                updatedData = { ...updatedData, sourceId: src, destId: dest, amount: amt, note };
-            } else {
-                this._isSubmitting = true;
-                try {
-                    const res = await storage.runExclusive(async () => {
+                if (editId) {
+                    updatedData = { ...updatedData, sourceId: src, destId: dest, amount: amt, note };
+                } else {
+                    res = await storage.runExclusive(async () => {
                         return walletManager.transfer(src, dest, amt, note, date);
                     });
                     if (res === false || (res && res.success === false)) {
-                        alert('Could not complete transfer.');
-                        return;
+                        const errMsg = (res && (res.error || res.message)) || 'Could not complete transfer. Please verify details and retry.';
+                        alert(errMsg);
+                        return false;
                     }
-                } finally {
-                    this._isSubmitting = false;
                 }
-            }
-        } else if (type === 'remittance') {
-            const src = document.getElementById('tx-source')?.value;
-            const dest = document.getElementById('tx-dest')?.value;
-            const amtJpyStr = document.getElementById('tx-amount-jpy')?.value;
-            const amtInrStr = document.getElementById('tx-amount-inr')?.value;
-            const amtJpy = Number(amtJpyStr);
-            const amtInr = Number(amtInrStr);
-            const note = document.getElementById('tx-note')?.value || '';
+            } else if (type === 'remittance') {
+                const src = document.getElementById('tx-source')?.value;
+                const dest = document.getElementById('tx-dest')?.value;
+                const amtJpyStr = document.getElementById('tx-amount-jpy')?.value;
+                const amtInrStr = document.getElementById('tx-amount-inr')?.value;
+                const amtJpy = Number(amtJpyStr);
+                const amtInr = Number(amtInrStr);
+                const note = document.getElementById('tx-note')?.value || '';
 
-            const preview = walletManager.getTransferPreview('remittance', src, dest, amtJpy, amtInr);
-            if (!preview.valid) {
-                alert(preview.error || 'Please enter valid accounts and amounts for international money transfer.');
-                return;
-            }
+                const preview = walletManager.getTransferPreview('remittance', src, dest, amtJpy, amtInr);
+                if (!preview.valid) {
+                    alert(preview.error || 'Please enter valid accounts and amounts for international money transfer.');
+                    return false;
+                }
 
-            if (editId) {
-                updatedData = { ...updatedData, sourceId: src, destId: dest, sourceAmount: amtJpy, destAmount: amtInr, note };
-            } else {
-                this._isSubmitting = true;
-                try {
-                    const res = await storage.runExclusive(async () => {
+                if (editId) {
+                    updatedData = { ...updatedData, sourceId: src, destId: dest, sourceAmount: amtJpy, destAmount: amtInr, note };
+                } else {
+                    res = await storage.runExclusive(async () => {
                         return walletManager.remittance(src, dest, amtJpy, amtInr, note, date);
                     });
                     if (res === false || (res && res.success === false)) {
-                        alert('Could not complete international transfer.');
-                        return;
+                        const errMsg = (res && (res.error || res.message)) || 'Could not complete international transfer. Please verify details and retry.';
+                        alert(errMsg);
+                        return false;
                     }
-                } finally {
-                    this._isSubmitting = false;
                 }
             }
-        }
 
-        if (editId) {
-            this._isSubmitting = true;
-            try {
-                const res = await storage.runExclusive(async () => {
+            if (editId) {
+                res = await storage.runExclusive(async () => {
                     return walletManager.updateTransaction(editId, updatedData);
                 });
                 if (res === false || (res && res.success === false)) {
-                    alert('Could not update transaction.');
-                    return;
+                    const errMsg = (res && (res.error || res.message)) || 'Could not update transaction. Please verify details and retry.';
+                    alert(errMsg);
+                    return false;
                 }
-            } finally {
-                this._isSubmitting = false;
             }
-        }
 
-        this.closeModal('transaction-modal');
-        this.renderAll();
-        if (this.currentView === 'transactions-view') {
-            this.renderTransactionsPage();
-        } else if (this.currentView === 'analytics-view') {
-            this.renderAnalyticsPage();
-        } else if (this.currentView === 'history-view') {
-            this.renderHistory();
-        }
-    }
-
-    submitEdit(id, type) {
-        this.handleFormSubmit(null, id, type);
-    }
-
-    async deleteTx(id) {
-        const found = walletManager.findTransaction(id);
-        if (found && walletManager.isMonthClosed((found.tx.date || '').slice(0, 7))) {
-            alert(`Cannot delete transaction in closed month ${(found.tx.date || '').slice(0, 7)}. This historical period is permanently sealed.`);
-            return;
-        }
-
-        if (confirm("Are you sure you want to delete this transaction?")) {
-            await storage.runExclusive(async () => {
-                return walletManager.deleteTransaction(id);
-            });
+            // Exactly on verified success: close modal, re-render, and return true
             this.closeModal('transaction-modal');
             this.renderAll();
             if (this.currentView === 'transactions-view') {
@@ -1538,6 +1516,66 @@ class App {
             } else if (this.currentView === 'history-view') {
                 this.renderHistory();
             }
+            return true;
+        } catch (err) {
+            console.error('[handleFormSubmit] Transaction submission error:', err);
+            alert(err?.message || 'An error occurred while saving the transaction. Please try again.');
+            return false;
+        } finally {
+            this._isSubmitting = false;
+        }
+    }
+
+    submitEdit(id, type) {
+        return this.handleFormSubmit(null, id, type);
+    }
+
+    async deleteTx(id) {
+        if (this._isSubmitting) return false;
+
+        const found = walletManager.findTransaction(id);
+        if (!found) {
+            alert('Transaction not found or already deleted.');
+            return false;
+        }
+
+        const txMonth = (found.tx.date || '').slice(0, 7);
+        if (walletManager.isMonthClosed(txMonth)) {
+            alert(`Cannot delete transaction in closed month ${txMonth}. This historical period is permanently sealed.`);
+            return false;
+        }
+
+        if (!confirm("Are you sure you want to delete this transaction?")) {
+            return false;
+        }
+
+        this._isSubmitting = true;
+        try {
+            const res = await storage.runExclusive(async () => {
+                return walletManager.deleteTransaction(id);
+            });
+            if (res === false || (res && res.success === false)) {
+                const errMsg = (res && (res.error || res.message)) || 'Could not delete transaction.';
+                alert(errMsg);
+                return false;
+            }
+            this.closeModal('transaction-modal');
+            this.closeTransactionDetail();
+            this.renderAll();
+            if (this.currentView === 'transactions-view') {
+                this.renderTransactionsPage();
+            } else if (this.currentView === 'analytics-view') {
+                this.renderAnalyticsPage();
+            } else if (this.currentView === 'history-view') {
+                this.renderHistory();
+            }
+            return true;
+        } catch (err) {
+            console.error('[deleteTx] Deletion error:', err);
+            alert(err?.message || 'An error occurred while deleting the transaction.');
+            return false;
+        } finally {
+            this._isSubmitting = false;
         }
     }
 
@@ -1891,19 +1929,19 @@ class App {
     }
 
     submitExpense() {
-        this.handleFormSubmit(null, null, 'expense');
+        return this.handleFormSubmit(null, null, 'expense');
     }
 
     submitTransfer() {
-        this.handleFormSubmit(null, null, 'transfer');
+        return this.handleFormSubmit(null, null, 'transfer');
     }
 
     submitRemittance() {
-        this.handleFormSubmit(null, null, 'remittance');
+        return this.handleFormSubmit(null, null, 'remittance');
     }
 
     submitIncome() {
-        this.handleFormSubmit(null, null, 'income');
+        return this.handleFormSubmit(null, null, 'income');
     }
 
     renderAll() {
@@ -6089,7 +6127,9 @@ class App {
     closeTransactionDetail() {
         const modal = document.getElementById('transaction-detail-modal');
         if (modal) modal.classList.remove('active');
-        document.body.style.overflow = '';
+        if (typeof document !== 'undefined' && document.body && document.body.style) {
+            document.body.style.overflow = '';
+        }
         this.currentDetailTxId = null;
     }
 
@@ -6103,25 +6143,10 @@ class App {
         }
     }
 
-    deleteCurrentDetailTransaction() {
+    async deleteCurrentDetailTransaction() {
         const id = this.currentDetailTxId;
-        if (!id) return;
-
-        const found = walletManager.findTransaction(id);
-        if (found && walletManager.isMonthClosed((found.tx.date || '').slice(0, 7))) {
-            alert(`Cannot delete transaction in closed month ${(found.tx.date || '').slice(0, 7)}. This historical period is permanently sealed.`);
-            return;
-        }
-
-        if (confirm("Are you sure you want to delete this transaction from the continuous ledger?")) {
-            walletManager.deleteTransaction(id);
-            this.closeTransactionDetail();
-            this.renderAll();
-            this.renderTransactionsPage();
-            if (this.currentView === 'analytics-view') {
-                this.renderAnalyticsPage();
-            }
-        }
+        if (!id) return false;
+        return await this.deleteTx(id);
     }
 
     exportTransactionsCsv() {
