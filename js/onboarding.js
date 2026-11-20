@@ -934,6 +934,7 @@
             }
             const orderedCountries = baseOrder;
             const count = orderedCountries.length;
+            showcase.setAttribute('data-card-count', String(count));
 
             // Calculate live balances per country from draft wallets
             const getBal = (code) => {
@@ -943,24 +944,10 @@
             };
 
             orderedCountries.forEach((code, idx) => {
-                let topOffset = 0;
-                let leftOffset = 0;
-                let zIndex = idx + 1;
-
-                if (count === 2) {
-                    topOffset = idx * 36;
-                    leftOffset = idx * 54;
-                } else if (count >= 3) {
-                    topOffset = idx * 36;
-                    leftOffset = idx * 48;
-                }
-
-                const posStyle = `position: absolute; top: ${topOffset}px; left: ${leftOffset}px; z-index: ${zIndex}; bottom: auto; right: auto;`;
-
                 if (code === 'JP') {
                     const bal = getBal('JP');
                     html += `
-                        <div class="auth-card-preview auth-card-jp" style="${posStyle}" data-country="JP" data-card-index="${idx}">
+                        <div class="auth-card-preview auth-card-jp" data-country="JP" data-card-index="${idx}" data-card-count="${count}">
                             <div class="auth-card-top">
                                 <div class="auth-card-chip">
                                     <div class="chip-line"></div>
@@ -984,7 +971,7 @@
                 } else if (code === 'IN') {
                     const bal = getBal('IN');
                     html += `
-                        <div class="auth-card-preview auth-card-in" style="${posStyle}" data-country="IN" data-card-index="${idx}">
+                        <div class="auth-card-preview auth-card-in" data-country="IN" data-card-index="${idx}" data-card-count="${count}">
                             <div class="auth-card-top">
                                 <div class="auth-card-chip">
                                     <div class="chip-line"></div>
@@ -1008,7 +995,7 @@
                 } else if (code === 'DE') {
                     const bal = getBal('DE');
                     html += `
-                        <div class="auth-card-preview auth-card-de" style="${posStyle}" data-country="DE" data-card-index="${idx}">
+                        <div class="auth-card-preview auth-card-de" data-country="DE" data-card-index="${idx}" data-card-count="${count}">
                             <div class="auth-card-top">
                                 <div class="auth-card-chip">
                                     <div class="chip-line"></div>

@@ -1026,8 +1026,13 @@ button {
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .sync-pill-failed {
@@ -1046,8 +1051,15 @@ button {
 }
 
 @keyframes conflictPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
-    50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1); }
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+    }
 }
 
 /* In-Modal Non-Destructive Conflict Warning Banner */
@@ -12007,34 +12019,140 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
 }
 
 .onboarding-wallet-showcase {
+    --card-width: clamp(308px, 115px + 18.8vw, 388px);
+    --card-height: calc(var(--card-width) * (220 / 388));
+    --offset-x: clamp(20px, 8px + 1.2vw, 28px);
+    --offset-y: clamp(18px, 6px + 1.2vw, 24px);
     position: relative;
     width: 100%;
-    max-width: 550px;
-    height: 310px;
-    min-height: 310px;
-    margin-bottom: 28px !important;
+    margin-bottom: clamp(20px, 2.5vw, 28px);
+    align-self: flex-start;
 }
 
+/* Fluid Showcase Container Bounds based on Active Card Count */
+.onboarding-wallet-showcase,
+.onboarding-wallet-showcase[data-card-count="1"] {
+    max-width: var(--card-width);
+    height: var(--card-height);
+    min-height: var(--card-height);
+}
+
+.onboarding-wallet-showcase[data-card-count="2"] {
+    max-width: calc(var(--card-width) + var(--offset-x) * 1.4);
+    height: calc(var(--card-height) + var(--offset-y) * 1.35);
+    min-height: calc(var(--card-height) + var(--offset-y) * 1.35);
+}
+
+.onboarding-wallet-showcase[data-card-count="3"] {
+    max-width: calc(var(--card-width) + var(--offset-x) * 2);
+    height: calc(var(--card-height) + var(--offset-y) * 2);
+    min-height: calc(var(--card-height) + var(--offset-y) * 2);
+}
+
+/* Individual Treasury Showcase Cards (Fluid, Aspect-Ratio Preserving) */
 .onboarding-wallet-showcase .auth-card-preview {
     position: absolute;
-    width: 388px;
-    height: 220px;
-    border-radius: 18px;
-    padding: 22px 24px;
+    top: 0;
+    left: 0;
+    bottom: auto;
+    right: auto;
+    width: var(--card-width);
+    height: var(--card-height);
+    aspect-ratio: 388 / 220;
     box-sizing: border-box;
+    border-radius: clamp(14px, 1.25vw, 18px);
+    padding: clamp(16px, 1.5vw, 22px) clamp(18px, 1.7vw, 24px);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     cursor: default;
-    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease, border-color 0.28s ease, z-index 0.05s ease;
+    transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 180ms ease, border-color 180ms ease;
+    will-change: transform;
 }
 
-/* Hover elevation: lifts card up and brings to forefront */
-.onboarding-wallet-showcase .auth-card-preview:hover {
-    z-index: 10 !important;
-    transform: translateY(-8px) scale(1.02) !important;
+/* Authoritative Stacking-Order Policy:
+   Index 0 is always in the background (z-index: 1).
+   Higher indices stack on top (z-index: 2, 3).
+   Whenever India is active, it is placed at the highest index in JS, guaranteeing it stays foremost. */
+.onboarding-wallet-showcase .auth-card-preview[data-card-index="0"] {
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+.onboarding-wallet-showcase .auth-card-preview[data-card-index="1"] {
+    z-index: 2;
+}
+
+.onboarding-wallet-showcase .auth-card-preview[data-card-index="2"] {
+    z-index: 3;
+}
+
+/* Two-card deliberate staggered composition */
+.onboarding-wallet-showcase[data-card-count="2"] .auth-card-preview[data-card-index="1"],
+.onboarding-wallet-showcase .auth-card-preview[data-card-count="2"][data-card-index="1"] {
+    top: calc(var(--offset-y) * 1.35);
+    left: calc(var(--offset-x) * 1.4);
+}
+
+/* Three-card clear depth composition */
+.onboarding-wallet-showcase[data-card-count="3"] .auth-card-preview[data-card-index="1"],
+.onboarding-wallet-showcase .auth-card-preview[data-card-count="3"][data-card-index="1"] {
+    top: var(--offset-y);
+    left: var(--offset-x);
+}
+
+.onboarding-wallet-showcase[data-card-count="3"] .auth-card-preview[data-card-index="2"],
+.onboarding-wallet-showcase .auth-card-preview[data-card-count="3"][data-card-index="2"] {
+    top: calc(var(--offset-y) * 2);
+    left: calc(var(--offset-x) * 2);
+}
+
+/* Subtle, deliberate hover elevation on pointer-capable devices (Emil Kowalski guidance) */
+@media (hover: hover) and (pointer: fine) {
+    .onboarding-wallet-showcase .auth-card-preview:hover {
+        z-index: 10;
+        transform: translateY(-4px);
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.75), 0 0 32px rgba(255, 255, 255, 0.08);
+    }
+}
+
+/* Internal Card Typography and Details Scaling */
+.onboarding-wallet-showcase .auth-card-chip {
+    width: clamp(28px, 2.4vw, 36px);
+    height: clamp(20px, 1.8vw, 26px);
+}
+
+.onboarding-wallet-showcase .auth-card-badge {
+    font-size: clamp(0.72rem, 0.78vw, 0.82rem);
+    padding: clamp(3px, 0.35vw, 4px) clamp(7px, 0.75vw, 10px);
+    gap: clamp(5px, 0.6vw, 8px);
+}
+
+.onboarding-wallet-showcase .auth-flag-svg {
+    width: clamp(14px, 1.25vw, 18px);
+    height: clamp(14px, 1.25vw, 18px);
+}
+
+.onboarding-wallet-showcase .auth-card-label {
+    font-size: clamp(0.66rem, 0.7vw, 0.76rem);
+}
+
+.onboarding-wallet-showcase .auth-card-balance {
+    font-size: clamp(1.2rem, 1.5vw, 1.68rem);
+    letter-spacing: -0.3px;
+}
+
+.onboarding-wallet-showcase .auth-card-network {
+    font-size: clamp(0.66rem, 0.7vw, 0.75rem);
+    letter-spacing: clamp(1px, 0.12vw, 1.8px);
+}
+
+.onboarding-wallet-showcase .auth-card-tag {
+    font-size: clamp(0.66rem, 0.7vw, 0.75rem);
+    padding: clamp(2px, 0.3vw, 4px) clamp(6px, 0.6vw, 8px);
 }
 
 .onboarding-preview-subhead {
@@ -12335,11 +12453,11 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.onboarding-toggle-switch input:checked + .onboarding-toggle-slider {
+.onboarding-toggle-switch input:checked+.onboarding-toggle-slider {
     background-color: #2563eb;
 }
 
-.onboarding-toggle-switch input:checked + .onboarding-toggle-slider:before {
+.onboarding-toggle-switch input:checked+.onboarding-toggle-slider:before {
     transform: translateX(20px);
 }
 
@@ -12780,78 +12898,75 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     }
 }
 
-/* Compact Desktop & Landscape Tablet (1024px - 1199px): Zero Overlap Split Layout */
-@media (min-width: 1024px) and (max-width: 1199px) {
+/* Unified Desktop Onboarding Split Layout (1024px and above) */
+@media (min-width: 1024px) {
     .onboarding-container {
-        grid-template-columns: minmax(340px, 1fr) auto minmax(430px, 1.15fr) !important;
+        grid-template-columns: minmax(360px, 1.15fr) auto minmax(440px, 1.05fr) !important;
         width: 100% !important;
-        max-width: 1080px !important;
-        padding: 0 16px !important;
+        max-width: 1280px !important;
+        padding: 0 clamp(16px, 2.5vw, 32px) !important;
         margin: 0 auto;
         gap: 0;
     }
 
-    /* Prevent auth-divider from being hidden by global max-width: 1024px rule */
+    /* Force display of divider on all desktop widths, overriding global max-width: 1024px */
     .onboarding-container .auth-divider {
         display: block !important;
         width: 1px !important;
-        height: 420px !important;
-        margin: 0 clamp(14px, 2vw, 24px) !important;
+        height: clamp(420px, 52vh, 540px) !important;
+        margin: 0 clamp(16px, 2.5vw, 40px) !important;
         background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.15) 20%, rgba(255, 255, 255, 0.15) 80%, transparent) !important;
+        opacity: 1 !important;
     }
 
-    .onboarding-preview-pane {
+    /* Authoritative Left Brand Alignment across all desktop widths (Defect C fix) */
+    .onboarding-container .auth-brand-pane.onboarding-preview-pane {
         display: flex !important;
-        padding-right: 12px !important;
         min-width: 0 !important;
+        padding: 0 clamp(14px, 2vw, 28px) 0 0 !important;
+        align-items: flex-start !important;
+        text-align: left !important;
+        justify-content: center;
     }
 
-    .onboarding-wallet-showcase {
-        max-width: 360px !important;
-        height: 240px !important;
-        min-height: 240px !important;
-        margin-bottom: 20px !important;
+    .onboarding-container .auth-brand-header {
+        align-items: flex-start !important;
+        text-align: left !important;
+        margin-bottom: clamp(16px, 2vw, 26px) !important;
+        width: 100% !important;
     }
 
-    /* Scaled showcase cards ensuring strict containment and 0px overlap with form card */
-    .onboarding-wallet-showcase .auth-card-preview {
-        width: 300px !important;
-        height: 168px !important;
-        padding: 18px 20px !important;
+    .onboarding-container .onboarding-step-pill {
+        align-self: flex-start !important;
+        margin: 0 0 10px 0 !important;
     }
 
-    .onboarding-wallet-showcase .auth-card-preview:nth-child(1),
-    .onboarding-wallet-showcase .auth-card-preview[data-card-index="0"] {
-        top: 0 !important;
-        left: 0 !important;
-        z-index: 3 !important;
+    .onboarding-container .auth-brand-title {
+        text-align: left !important;
+        font-size: clamp(2.2rem, 2.5vw, 2.85rem) !important;
+        margin: 0 !important;
     }
 
-    .onboarding-wallet-showcase .auth-card-preview:nth-child(2),
-    .onboarding-wallet-showcase .auth-card-preview[data-card-index="1"] {
-        top: 22px !important;
-        left: 20px !important;
-        z-index: 2 !important;
+    .onboarding-container .auth-headline {
+        text-align: left !important;
+        margin: 0 0 clamp(18px, 2.2vw, 28px) 0 !important;
+        font-size: clamp(1.15rem, 1.35vw, 1.4rem) !important;
+        line-height: 1.4 !important;
     }
 
-    .onboarding-wallet-showcase .auth-card-preview:nth-child(3),
-    .onboarding-wallet-showcase .auth-card-preview[data-card-index="2"] {
-        top: 44px !important;
-        left: 40px !important;
-        z-index: 1 !important;
+    .onboarding-container .onboarding-wallet-showcase {
+        margin: 0 0 clamp(20px, 2.5vw, 28px) 0 !important;
+        margin-left: 0 !important;
+        margin-right: auto !important;
+        align-self: flex-start !important;
     }
 
-    .onboarding-wallet-showcase .auth-card-preview .auth-card-name {
-        font-size: 0.72rem !important;
-    }
-
-    .onboarding-wallet-showcase .auth-card-preview .auth-card-num {
-        font-size: 0.8rem !important;
-        letter-spacing: 1.5px !important;
-    }
-
-    .onboarding-wallet-showcase .auth-card-preview .auth-card-bal-val {
-        font-size: 1.15rem !important;
+    .onboarding-container .auth-subhead {
+        text-align: left !important;
+        margin: 0 !important;
+        font-size: clamp(0.82rem, 0.88vw, 0.92rem) !important;
+        max-width: 440px !important;
+        line-height: 1.55 !important;
     }
 
     .onboarding-form-pane {
@@ -12859,7 +12974,7 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     }
 
     .onboarding-card {
-        padding: 28px 24px !important;
+        padding: clamp(28px, 2.8vw, 36px) clamp(22px, 2.4vw, 32px) !important;
         min-width: 0 !important;
         width: 100% !important;
         box-sizing: border-box !important;
@@ -13173,6 +13288,7 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
 
 /* Accessibility: Respect Reduced Motion (Emil Kowalski Philosophy: keep gentle color/opacity, remove transforms) */
 @media (prefers-reduced-motion: reduce) {
+
     .onboarding-progress-bar,
     .onboarding-country-card,
     .onboarding-toggle-slider,
