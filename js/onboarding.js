@@ -301,6 +301,7 @@
          */
         renderStepNavigation() {
             const stepPill = document.getElementById('onboarding-step-indicator');
+            const stepPillMobile = document.getElementById('onboarding-step-indicator-mobile');
             const progressFill = document.getElementById('onboarding-progress-fill');
             const titleEl = document.getElementById('onboarding-step-title');
             const descEl = document.getElementById('onboarding-step-desc');
@@ -310,6 +311,7 @@
             const nextIcon = document.getElementById('onboarding-next-icon');
 
             if (stepPill) stepPill.textContent = `Step ${this.currentStep} of ${this.totalSteps}`;
+            if (stepPillMobile) stepPillMobile.textContent = `Step ${this.currentStep} of ${this.totalSteps}`;
             if (progressFill) progressFill.style.width = `${(this.currentStep / this.totalSteps) * 100}%`;
 
             if (backBtn) {
@@ -415,6 +417,7 @@
                 html += `
                     <div class="onboarding-country-card ${isSelected ? 'selected' : ''}" 
                          onclick="onboardingController.toggleCountry('${c.code}')"
+                         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onboardingController.toggleCountry('${c.code}')}"
                          role="checkbox" aria-checked="${isSelected}" tabindex="0">
                         <div class="onboarding-country-card-header">
                             <div class="onboarding-country-card-title">
