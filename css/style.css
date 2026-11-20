@@ -1026,13 +1026,8 @@ button {
 }
 
 @keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .sync-pill-failed {
@@ -1051,15 +1046,8 @@ button {
 }
 
 @keyframes conflictPulse {
-
-    0%,
-    100% {
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2);
-    }
-
-    50% {
-        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
-    }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
+    50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1); }
 }
 
 /* In-Modal Non-Destructive Conflict Warning Banner */
@@ -12345,11 +12333,11 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.onboarding-toggle-switch input:checked+.onboarding-toggle-slider {
+.onboarding-toggle-switch input:checked + .onboarding-toggle-slider {
     background-color: #2563eb;
 }
 
-.onboarding-toggle-switch input:checked+.onboarding-toggle-slider:before {
+.onboarding-toggle-switch input:checked + .onboarding-toggle-slider:before {
     transform: translateX(20px);
 }
 
@@ -13037,7 +13025,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
 
 /* Accessibility: Respect Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
-
     .onboarding-progress-bar,
     .onboarding-country-card,
     .onboarding-toggle-slider,
