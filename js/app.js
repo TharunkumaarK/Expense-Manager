@@ -3224,7 +3224,7 @@ class App {
         else if (pct > 75 || utilizationPct >= 75) barClass = 'neon-warn';
 
         const editButtonHtml = options.showEditButton ? `
-            <button class="budgets-kpi-edit-btn" onclick="event.stopPropagation(); app.openOverallBudgetModal('${region}')" title="Configure Overall Monthly Limit" style="margin-left: 6px; cursor: pointer;">
+            <button class="budgets-kpi-edit-btn" onclick="event.stopPropagation(); app.openOverallBudgetModal('${region}')" title="Configure Overall Monthly Limit" style="cursor: pointer;">
                 <i data-lucide="sliders" style="width: 13px; height: 13px;"></i>
             </button>
         ` : '';
@@ -3233,20 +3233,29 @@ class App {
             <span class="budget-cushion-badge privacy-blur" title="Unspent rollover from previous month">+${this.formatMoney(carryover, currency)} Rollover Cushion</span>
         ` : '';
 
+        const cushionBadgeHtml = cushion > 0 ? `
+            <span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, currency)} Cushion</span>
+        ` : '';
+
+        const hasBadges = Boolean(cushionBadgeHtml || rolloverBadgeHtml);
+        const badgesRowHtml = hasBadges ? `
+            <div class="budget-central-badges-row">
+                ${cushionBadgeHtml}
+                ${rolloverBadgeHtml}
+            </div>
+        ` : '';
+
         const cardContent = `
             <div class="budget-central-header">
-                <div class="budget-central-title-group">
-                    ${this.getCountryFlagSvg(region, 20, 15)}
-                    <h3>Monthly Budget</h3>
-                    <span class="text-xs text-muted font-numeric">(${monthKey})</span>
-                    ${cushion > 0 ? `<span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, currency)} cushion</span>` : ''}
-                    ${rolloverBadgeHtml}
+                <div class="budget-central-header-top">
+                    <div class="budget-central-title-group">
+                        ${this.getCountryFlagSvg(region, 20, 15)}
+                        <h3 class="budget-central-title">Monthly Budget</h3>
+                        <span class="text-xs text-muted font-numeric budget-central-month">(${monthKey})</span>
+                    </div>
                     ${editButtonHtml}
                 </div>
-                <div class="budget-remaining-hero">
-                    <span class="remaining-val privacy-blur ${isOver ? 'text-danger' : ''}">${this.formatMoney(remaining, currency)}</span>
-                    <span class="remaining-label">${isOver ? 'over budget' : 'remaining'}</span>
-                </div>
+                ${badgesRowHtml}
             </div>
             <div class="budget-central-progress-wrap">
                 <div class="budget-streak-track">
@@ -3254,9 +3263,11 @@ class App {
                 </div>
             </div>
             <div class="budget-central-stats-row">
-                <span class="privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
-                <span class="text-xs text-muted font-numeric">${utilizationPct}% used</span>
-                <span class="privacy-blur">Base Budget: <strong>${this.formatMoney(allocatedBudget, currency)}</strong></span>
+                <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
+                ${isOver
+                    ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
+                    : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
+                }
             </div>
         `;
 
