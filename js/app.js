@@ -3271,9 +3271,9 @@ class App {
                 <div class="budget-central-stats-row">
                     <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
                     ${isOver
-                ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
-                : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
-            }
+                        ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
+                        : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
+                    }
                 </div>
             </div>
         `;
@@ -7682,18 +7682,18 @@ class App {
                 </div>
 
                 ${periodTotalBudget > 0 ? this.getBudgetOverviewCardHtml({
-                region: this.reportRegion,
-                currency: currency,
-                monthKey: this.reportMonthKey,
-                allocatedBudget: periodTotalBudget,
-                carryover: 0,
-                totalSpent: totalExpense,
-                sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
-                title: 'Monthly Budget',
-                showEditButton: false,
-                isInteractive: false,
-                cardClass: 'reports-budget-perf-card'
-            }) : ''}
+                    region: this.reportRegion,
+                    currency: currency,
+                    monthKey: this.reportMonthKey,
+                    allocatedBudget: periodTotalBudget,
+                    carryover: 0,
+                    totalSpent: totalExpense,
+                    sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
+                    title: 'Monthly Budget',
+                    showEditButton: false,
+                    isInteractive: false,
+                    cardClass: 'reports-budget-perf-card'
+                }) : ''}
 
                 ${historicalBudgetNote ? `
                     <div style="padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-sm); font-size: 0.78rem; color: #93c5fd; display: flex; align-items: center; gap: 8px;">
