@@ -954,11 +954,31 @@ class WalletManager {
         const preCommitTxFields = JSON.parse(JSON.stringify(tx));
         const preCommitTransactions = Array.isArray(storage.state.transactions) ? storage.state.transactions.slice() : [];
         const preCommitHistory = storage.state.history ? JSON.parse(JSON.stringify(storage.state.history)) : null;
+        const preCommitLoanConfig = storage.state.loanConfig ? JSON.parse(JSON.stringify(storage.state.loanConfig)) : null;
+
+        const isLoanPayment = Boolean(
+            tx.isLoanPayment ||
+            tx.subType === 'loan_emi' ||
+            tx.categoryId === 'in-loan' ||
+            (typeof tx.note === 'string' && /Loan EMI/i.test(tx.note))
+        );
 
         try {
             affectedWalletIds.forEach(wId => {
                 storage.state.wallets[wId].balance = tentativeBalances[wId];
             });
+
+            // Adjust loan principal if an existing loan EMI transaction's amount was edited
+            if (isLoanPayment && storage.state.loanConfig && typeof updatedData.amount !== 'undefined') {
+                const oldAmt = Number(tx.amount) || 0;
+                const newAmt = Number(prospectiveTx.amount) || 0;
+                const diff = newAmt - oldAmt;
+                const oldPrincipal = Number(storage.state.loanConfig.principalLeft) || 0;
+                storage.state.loanConfig.principalLeft = Math.max(0, oldPrincipal - diff);
+                if (storage.state.preferences?.loanTracking) {
+                    storage.state.preferences.loanTracking.principalLeft = storage.state.loanConfig.principalLeft;
+                }
+            }
 
             Object.assign(tx, prospectiveTx);
             tx.updatedAt = new Date().toISOString();
@@ -981,6 +1001,13 @@ class WalletManager {
             if (preCommitHistory) {
                 storage.state.history = preCommitHistory;
                 storage._attachHistoryGetters(storage.state);
+            }
+            if (preCommitLoanConfig && storage.state.loanConfig) {
+                Object.assign(storage.state.loanConfig, preCommitLoanConfig);
+                if (storage.state.preferences?.loanTracking) {
+                    storage.state.preferences.loanTracking.duesPaid = preCommitLoanConfig.duesPaid;
+                    storage.state.preferences.loanTracking.principalLeft = preCommitLoanConfig.principalLeft;
+                }
             }
             return false;
         }
@@ -1052,11 +1079,32 @@ class WalletManager {
         });
         const preCommitTransactions = Array.isArray(storage.state.transactions) ? storage.state.transactions.slice() : [];
         const preCommitHistory = storage.state.history ? JSON.parse(JSON.stringify(storage.state.history)) : null;
+        const preCommitLoanConfig = storage.state.loanConfig ? JSON.parse(JSON.stringify(storage.state.loanConfig)) : null;
+
+        const isLoanPayment = Boolean(
+            tx.isLoanPayment ||
+            tx.subType === 'loan_emi' ||
+            tx.categoryId === 'in-loan' ||
+            (typeof tx.note === 'string' && /Loan EMI/i.test(tx.note))
+        );
 
         try {
             affectedWalletIds.forEach(wId => {
                 storage.state.wallets[wId].balance = tentativeBalances[wId];
             });
+
+            // If deleting a loan payment, reverse the loan tracker state (decrement duesPaid, restore principalLeft)
+            if (isLoanPayment && storage.state.loanConfig) {
+                const oldDues = Number(storage.state.loanConfig.duesPaid) || 0;
+                storage.state.loanConfig.duesPaid = Math.max(0, oldDues - 1);
+                const oldPrincipal = Number(storage.state.loanConfig.principalLeft) || 0;
+                const totalPrinc = Number(storage.state.loanConfig.totalPrincipal) || Infinity;
+                storage.state.loanConfig.principalLeft = Math.min(totalPrinc, oldPrincipal + Number(tx.amount || 0));
+                if (storage.state.preferences?.loanTracking) {
+                    storage.state.preferences.loanTracking.duesPaid = storage.state.loanConfig.duesPaid;
+                    storage.state.preferences.loanTracking.principalLeft = storage.state.loanConfig.principalLeft;
+                }
+            }
 
             // Remove from canonical continuous collection
             if (Array.isArray(storage.state.transactions)) {
@@ -1096,6 +1144,13 @@ class WalletManager {
             if (preCommitHistory) {
                 storage.state.history = preCommitHistory;
                 storage._attachHistoryGetters(storage.state);
+            }
+            if (preCommitLoanConfig && storage.state.loanConfig) {
+                Object.assign(storage.state.loanConfig, preCommitLoanConfig);
+                if (storage.state.preferences?.loanTracking) {
+                    storage.state.preferences.loanTracking.duesPaid = preCommitLoanConfig.duesPaid;
+                    storage.state.preferences.loanTracking.principalLeft = preCommitLoanConfig.principalLeft;
+                }
             }
             return false;
         }
@@ -1151,10 +1206,39 @@ class WalletManager {
         const config = storage.state.loanConfig;
         if (!config) return null;
 
-        const amountPaid = config.duesPaid * config.emi;
-        const totalExpected = config.emi * config.totalDues;
-        const principalPaid = config.totalPrincipal - config.principalLeft;
-        const percentPaid = Math.min(100, (config.duesPaid / config.totalDues) * 100).toFixed(0);
+        const totalPrincipal = Number(config.totalPrincipal) || 0;
+        const principalLeft = Number(config.principalLeft) || 0;
+        const emi = Number(config.emi) || 0;
+        const duesPaid = Number(config.duesPaid) || 0;
+        const totalDues = Number(config.totalDues) || 0;
+        const rate = Number(config.annualInterestRate) || 0;
+        const mode = config.percentMode || 'principal';
+
+        const amountPaid = duesPaid * emi;
+        const totalExpected = (emi > 0 && totalDues > 0) ? (emi * totalDues) : totalPrincipal;
+        const totalInterest = Math.max(0, totalExpected - totalPrincipal);
+        const principalPaid = Math.max(0, totalPrincipal - principalLeft);
+
+        let rawPercent = 0;
+        let percentLabel = 'Principal';
+        let subLabel = 'Repaid';
+
+        if (mode === 'total') {
+            rawPercent = totalExpected > 0 ? (amountPaid / totalExpected) * 100 : 0;
+            percentLabel = 'Total';
+            subLabel = 'Repaid';
+        } else if (mode === 'tenure') {
+            rawPercent = totalDues > 0 ? (duesPaid / totalDues) * 100 : 0;
+            percentLabel = 'Tenure';
+            subLabel = 'Completed';
+        } else {
+            // Default: 'principal'
+            rawPercent = totalPrincipal > 0 ? (principalPaid / totalPrincipal) * 100 : 0;
+            percentLabel = 'Principal';
+            subLabel = 'Repaid';
+        }
+
+        const percentPaid = Math.min(100, Math.max(0, rawPercent)).toFixed(0);
 
         const today = new Date();
         const drawDay = config.emiDrawDate || 7;
@@ -1172,7 +1256,12 @@ class WalletManager {
             amountPaid,
             principalPaid,
             principalLeft: config.principalLeft,
+            totalExpected,
+            totalInterest,
             percentPaid,
+            percentMode: mode,
+            percentLabel,
+            subLabel,
             emiCount: config.duesPaid,
             daysUntilNextEmi,
             nextEmiDateStr,

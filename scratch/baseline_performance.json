@@ -1,0 +1,82 @@
+{
+  "360x780": {
+    "viewport": "360x780",
+    "metrics": {
+      "renderAllMs": 207.40000000223517,
+      "switchTransactionsMs": 20.300000000745058,
+      "switchHomeMs": 99.5,
+      "totalDomNodes": 3484,
+      "lucideSvgCount": 193,
+      "lucidePendingCount": 193
+    },
+    "raw": {
+      "JSHeapUsedSize": 6.181598663330078,
+      "LayoutCount": 15,
+      "RecalcStyleCount": 18,
+      "LayoutDuration": 118.47399999999999,
+      "RecalcStyleDuration": 96.451,
+      "ScriptDuration": 36.774,
+      "TaskDuration": 560.5219999999999
+    }
+  },
+  "390x844": {
+    "viewport": "390x844",
+    "metrics": {
+      "renderAllMs": 264.8999999985099,
+      "switchTransactionsMs": 25.699999999254942,
+      "switchHomeMs": 100.80000000074506,
+      "totalDomNodes": 3484,
+      "lucideSvgCount": 193,
+      "lucidePendingCount": 193
+    },
+    "raw": {
+      "JSHeapUsedSize": 4.397453308105469,
+      "LayoutCount": 15,
+      "RecalcStyleCount": 16,
+      "LayoutDuration": 112.483,
+      "RecalcStyleDuration": 100.355,
+      "ScriptDuration": 48.74,
+      "TaskDuration": 620.683
+    }
+  },
+  "430x932": {
+    "viewport": "430x932",
+    "metrics": {
+      "renderAllMs": 198.89999999850988,
+      "switchTransactionsMs": 18.400000002235174,
+      "switchHomeMs": 69.80000000074506,
+      "totalDomNodes": 3484,
+      "lucideSvgCount": 193,
+      "lucidePendingCount": 193
+    },
+    "raw": {
+      "JSHeapUsedSize": 4.420036315917969,
+      "LayoutCount": 16,
+      "RecalcStyleCount": 18,
+      "LayoutDuration": 97.22699999999999,
+      "RecalcStyleDuration": 82.51899999999999,
+      "ScriptDuration": 49.02,
+      "TaskDuration": 524.912
+    }
+  },
+  "1440x1024": {
+    "viewport": "1440x1024",
+    "metrics": {
+      "renderAllMs": 202.09999999776483,
+      "switchTransactionsMs": 20.800000000745058,
+      "switchHomeMs": 73.30000000074506,
+      "totalDomNodes": 3484,
+      "lucideSvgCount": 193,
+      "lucidePendingCount": 193
+    },
+    "raw": {
+      "JSHeapUsedSize": 4.340251922607422,
+      "LayoutCount": 15,
+      "RecalcStyleCount": 16,
+      "LayoutDuration": 104.823,
+      "RecalcStyleDuration": 89.61,
+      "ScriptDuration": 43.533,
+      "TaskDuration": 540.673
+    }
+  }
+}

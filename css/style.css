@@ -118,6 +118,9 @@
 }
 
 :root {
+    /* Modern Web Guidance: Opt-in to smooth keyword interpolation for intrinsic sizing */
+    interpolate-size: allow-keywords;
+
     /* ==========================================================================
        Background & Surface Elevations (Neutral Black Specification)
        ========================================================================== */
@@ -5174,6 +5177,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
 .wallets-accordion-body {
     overflow: hidden;
+    /* Baseline fallback */
     transition: max-height 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms ease-out;
     max-height: 2000px;
     opacity: 1;
@@ -5184,6 +5188,18 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     opacity: 0;
     pointer-events: none;
     margin-bottom: 0 !important;
+}
+
+/* Modern Web Guidance: Smooth intrinsic sizing when supported */
+@supports (interpolate-size: allow-keywords) {
+    .wallets-accordion-body {
+        block-size: auto;
+        transition: block-size 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms ease-out;
+    }
+
+    .wallets-accordion-body.collapsed {
+        block-size: 0;
+    }
 }
 
 /* Wallets Debit Cards Grid */
@@ -12357,10 +12373,20 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     margin: 0;
 }
 
-/* 3. Rail Loan Card Integration (Pass 1 Requirement 6.F) */
-.workspace-rail .loan-card {
-    margin: 0;
-    width: 100%;
+/* 3. Rail Loan Card Integration */
+.dashboard-rail .loan-card,
+.workspace-rail .loan-card,
+#loan-tracker-widget {
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.loan-card-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
 }
 
 /* 4. Relocated Dashboard Recent Activity Widget */
@@ -14594,4 +14620,89 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     font-size: 0.88rem;
     font-weight: 600;
     color: #f8fafc;
+}
+
+/* ==========================================================================
+   Modern Web Guidance: Performance Containment & Deferral (content-visibility)
+   ========================================================================== */
+
+/* Defer rendering of heavy off-screen transaction list items */
+.recent-tx-item,
+.dash-recent-item,
+.dash-recent-row,
+.tx-item-card,
+.ledger-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 58px;
+}
+
+/* Isolate offscreen dashboard charts & heavy cards from global reflow */
+.dash-chart-card,
+.dash-rail-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 260px;
+}
+
+/* CSS Containment: Isolate style and layout calculations for self-contained components */
+.stat-card-row,
+.budget-card,
+.settings-loan-card {
+    contain: layout style;
+}
+
+/* Fallback for browsers without content-visibility */
+@supports not (content-visibility: auto) {
+
+    .recent-tx-item,
+    .dash-recent-item,
+    .dash-recent-row,
+    .tx-item-card,
+    .ledger-row,
+    .dash-chart-card,
+    .dash-rail-card {
+        contain: layout style;
+    }
+}
+
+
+/* ==========================================================================
+   Modern Web Guidance: Performance Containment & Deferral (content-visibility)
+   ========================================================================== */
+
+/* Defer rendering of heavy off-screen transaction list items */
+.recent-tx-item,
+.dash-recent-item,
+.dash-recent-row,
+.tx-item-card,
+.ledger-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 58px;
+}
+
+/* Isolate offscreen dashboard charts & heavy cards from global reflow */
+.dash-chart-card,
+.dash-rail-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 260px;
+}
+
+/* CSS Containment: Isolate style and layout calculations for self-contained components */
+.stat-card-row,
+.budget-card,
+.settings-loan-card {
+    contain: layout style;
+}
+
+/* Fallback for browsers without content-visibility */
+@supports not (content-visibility: auto) {
+
+    .recent-tx-item,
+    .dash-recent-item,
+    .dash-recent-row,
+    .tx-item-card,
+    .ledger-row,
+    .dash-chart-card,
+    .dash-rail-card {
+        contain: layout style;
+    }
 }

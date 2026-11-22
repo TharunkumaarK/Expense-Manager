@@ -83,7 +83,11 @@ async def run_comprehensive_tests():
             await send_cmd(ws, "Page.enable")
             await send_cmd(ws, "Runtime.enable")
             await send_cmd(ws, "Page.navigate", {"url": INDEX_URL})
-            await asyncio.sleep(2.0)
+            for _ in range(25):
+                await asyncio.sleep(0.2)
+                ready = await eval_js(ws, "typeof onboardingController !== 'undefined' && document.readyState === 'complete'")
+                if ready:
+                    break
 
             # -------------------------------------------------------------
             # SECTION 1: RESET & INITIALIZE ONBOARDING

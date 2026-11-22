@@ -77,6 +77,8 @@ const defaultState = {
         enabled: false,
         country: 'IN',
         currency: '₹',
+        repaymentWallet: '',
+        percentMode: 'principal',
         totalPrincipal: 0,
         principalLeft: 0,
         emi: 0,
@@ -1339,6 +1341,9 @@ class StorageManager {
             } else {
                 if (typeof state.loanConfig.country === 'undefined') state.loanConfig.country = 'IN';
                 if (typeof state.loanConfig.currency === 'undefined') state.loanConfig.currency = '₹';
+                if (typeof state.loanConfig.repaymentWallet === 'undefined') state.loanConfig.repaymentWallet = '';
+                if (typeof state.loanConfig.percentMode === 'undefined') state.loanConfig.percentMode = 'principal';
+                if (typeof state.loanConfig.annualInterestRate === 'undefined') state.loanConfig.annualInterestRate = 0;
                 if (typeof state.loanConfig.emiDrawDate === 'undefined') state.loanConfig.emiDrawDate = 7;
             }
 
@@ -3967,6 +3972,8 @@ class StorageManager {
             if (options && typeof options === 'object') {
                 if (options.country) state.loanConfig.country = options.country;
                 if (options.currency) state.loanConfig.currency = options.currency;
+                if (typeof options.repaymentWallet === 'string') state.loanConfig.repaymentWallet = options.repaymentWallet;
+                if (typeof options.percentMode === 'string') state.loanConfig.percentMode = options.percentMode;
                 if (typeof options.totalPrincipal === 'number') state.loanConfig.totalPrincipal = options.totalPrincipal;
                 if (typeof options.principalLeft === 'number') state.loanConfig.principalLeft = options.principalLeft;
                 if (typeof options.emi === 'number') state.loanConfig.emi = options.emi;

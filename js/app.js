@@ -1974,11 +1974,22 @@ class App {
         this.renderCategories();
         this.renderTransactions();
         this.renderMonthlySummary();
-        this.renderDashboardExpenseChart();
-        this.renderWalletsPage();
+        
+        // Modern Web Guidance: Only render canvas chart when home-view is active
+        if (this.currentView === 'home-view' || !this.currentView) {
+            this.renderDashboardExpenseChart();
+        }
+
+        // Modern Web Guidance: Only render wallets view when it is the active screen
+        if (this.currentView === 'wallets-view') {
+            this.renderWalletsPage();
+        }
 
         this.renderSettings();
-        lucide.createIcons();
+
+        // Modern Web Guidance: Scope icon replacement to active view container to avoid document-wide scan
+        const activeContainer = document.getElementById(this.currentView) || document.getElementById('home-view');
+        this.refreshIcons(activeContainer);
     }
 
     clearViewsOnLogout() {
@@ -1998,7 +2009,7 @@ class App {
         ];
         elIds.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = '';
+            if (el) el.replaceChildren();
         });
 
         const jpBal = document.getElementById('jp-total-balance');
@@ -2188,7 +2199,41 @@ class App {
         if (loanContainer) {
             const loanCfg = storage.state.loanConfig || { enabled: false };
             const isLoanEnabled = Boolean(loanCfg.enabled);
-            const loanCurrency = loanCfg.currency || '₹';
+            const loanCountry = loanCfg.country || 'IN';
+            const loanCurrency = loanCfg.currency || (typeof CountryConfig !== 'undefined' && CountryConfig.get(loanCountry)?.currency) || '₹';
+            const allCountries = (typeof CountryConfig !== 'undefined' && typeof CountryConfig.getAll === 'function')
+                ? CountryConfig.getAll()
+                : [
+                    { code: 'JP', name: 'Japan', currency: '¥', currencyCode: 'JPY' },
+                    { code: 'IN', name: 'India', currency: '₹', currencyCode: 'INR' },
+                    { code: 'DE', name: 'Germany', currency: '€', currencyCode: 'EUR' }
+                ];
+            const loanCountryObj = (typeof CountryConfig !== 'undefined' && CountryConfig.get(loanCountry)) || { name: loanCountry };
+            const loanCountryName = loanCountryObj.name || loanCountry;
+
+            const allWallets = Object.values(storage.state.wallets || {});
+            const regionalWallets = allWallets.filter(w => w.region === loanCountry || w.currency === loanCurrency);
+            let walletOptionsHtml = '';
+            if (regionalWallets.length === 0) {
+                walletOptionsHtml = `<option value="" disabled selected>No wallets configured in ${this.escapeHtml(loanCountryName)}</option>`;
+            } else {
+                walletOptionsHtml = `
+                    <option value="" ${!loanCfg.repaymentWallet ? 'selected' : ''}>-- Unselected --</option>
+                    ${regionalWallets.map(w => {
+                        const isSel = loanCfg.repaymentWallet === w.id ? 'selected' : '';
+                        const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
+                        return `<option value="${this.escapeHtml(w.id)}" ${isSel}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
+                    }).join('')}
+                `;
+            }
+
+            const percentMode = loanCfg.percentMode || 'principal';
+            const annualInterestRate = loanCfg.annualInterestRate || 0;
+            const totalPrincipal = Number(loanCfg.totalPrincipal) || 0;
+            const emi = Number(loanCfg.emi) || 0;
+            const totalDues = Number(loanCfg.totalDues) || 0;
+            const totalExpected = (emi > 0 && totalDues > 0) ? (emi * totalDues) : totalPrincipal;
+            const totalInterest = Math.max(0, totalExpected - totalPrincipal);
 
             loanContainer.innerHTML = `
                 <div class="settings-loan-card" style="padding: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px;">
@@ -2203,6 +2248,41 @@ class App {
                         </label>
                     </div>
                     ${isLoanEnabled ? `
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06);">
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Loan Country / Region</label>
+                                <select class="settings-select" id="setting-loan-country" onchange="app.updateLoanPref('country', this.value)" style="width: 100%;">
+                                    ${allCountries.map(c => `
+                                        <option value="${c.code}" ${loanCountry === c.code ? 'selected' : ''}>
+                                            ${c.name} (${c.code} - ${c.currency})
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Loan Currency</label>
+                                <select class="settings-select" id="setting-loan-currency" onchange="app.updateLoanPref('currency', this.value)" style="width: 100%;">
+                                    <option value="₹" ${loanCurrency === '₹' ? 'selected' : ''}>INR (₹)</option>
+                                    <option value="¥" ${loanCurrency === '¥' ? 'selected' : ''}>JPY (¥)</option>
+                                    <option value="€" ${loanCurrency === '€' ? 'selected' : ''}>EUR (€)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Default Repayment Wallet</label>
+                                <select class="settings-select" id="setting-loan-repayment-wallet" onchange="app.updateLoanPref('repaymentWallet', this.value)" style="width: 100%;">
+                                    ${walletOptionsHtml}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Progress Percentage Basis</label>
+                                <select class="settings-select" id="setting-loan-percent-mode" onchange="app.updateLoanPref('percentMode', this.value)" style="width: 100%;">
+                                    <option value="principal" ${percentMode === 'principal' ? 'selected' : ''}>Principal Repaid % (Default)</option>
+                                    <option value="total" ${percentMode === 'total' ? 'selected' : ''}>Total Repaid % (Principal + Interest)</option>
+                                    <option value="tenure" ${percentMode === 'tenure' ? 'selected' : ''}>Tenure Completed % (Months Paid)</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06);">
                             <div>
                                 <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Total Principal (${loanCurrency})</label>
@@ -2211,6 +2291,10 @@ class App {
                             <div>
                                 <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Principal Left (${loanCurrency})</label>
                                 <input type="number" class="settings-input" id="setting-loan-principal" value="${loanCfg.principalLeft || 0}" onblur="app.updateLoanPref('principalLeft', this.value)" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Annual Interest Rate (%)</label>
+                                <input type="number" step="0.01" min="0" class="settings-input" id="setting-loan-interest-rate" value="${annualInterestRate || 0}" onblur="app.updateLoanPref('annualInterestRate', this.value)" style="width: 100%;" placeholder="e.g. 8.5">
                             </div>
                             <div>
                                 <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Total Dues (Months)</label>
@@ -2229,6 +2313,13 @@ class App {
                                 <input type="number" class="settings-input" id="setting-loan-date" value="${loanCfg.emiDrawDate || 7}" onblur="app.updateLoanPref('emiDrawDate', this.value)" style="width: 100%;">
                             </div>
                         </div>
+
+                        ${totalExpected > 0 ? `
+                            <div style="margin-top: 14px; padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                <span>Total Obligation: <strong style="color: var(--text-primary); font-weight: 600;">${loanCurrency}${totalExpected.toLocaleString()}</strong></span>
+                                <span>Estimated Total Interest: <strong style="color: #f59e0b; font-weight: 600;">${loanCurrency}${totalInterest.toLocaleString()}</strong></span>
+                            </div>
+                        ` : ''}
                     ` : ''}
                 </div>
             `;
@@ -2334,6 +2425,27 @@ class App {
                 if (state.preferences?.loanTracking) {
                     state.preferences.loanTracking.enabled = Boolean(value);
                 }
+            } else if (field === 'country') {
+                state.loanConfig.country = value;
+                const countryCfg = typeof CountryConfig !== 'undefined' ? CountryConfig.get(value) : null;
+                if (countryCfg && countryCfg.currency) {
+                    state.loanConfig.currency = countryCfg.currency;
+                }
+                // Validate if existing repayment wallet is still in the new region
+                if (state.loanConfig.repaymentWallet) {
+                    const currentWallet = state.wallets?.[state.loanConfig.repaymentWallet];
+                    if (currentWallet && currentWallet.region !== value && currentWallet.currency !== state.loanConfig.currency) {
+                        state.loanConfig.repaymentWallet = '';
+                    }
+                }
+            } else if (field === 'currency') {
+                state.loanConfig.currency = value;
+            } else if (field === 'repaymentWallet') {
+                state.loanConfig.repaymentWallet = value || '';
+            } else if (field === 'percentMode') {
+                state.loanConfig.percentMode = value || 'principal';
+            } else if (field === 'annualInterestRate') {
+                state.loanConfig.annualInterestRate = Math.max(0, parseFloat(value) || 0);
             } else {
                 const num = parseFloat(value);
                 if (!isNaN(num)) {
@@ -3178,7 +3290,10 @@ class App {
             }
         });
 
-        this.renderWalletsPage();
+        // Modern Web Guidance: Only render wallets view when it is the active screen
+        if (this.currentView === 'wallets-view') {
+            this.renderWalletsPage();
+        }
     }
 
     getBudgetOverviewCardHtml(options = {}) {
@@ -3457,9 +3572,7 @@ class App {
                     <p class="dash-recent-empty-text">No activity recorded for this period.</p>
                 </div>
             `;
-            if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                lucide.createIcons();
-            }
+            this.refreshIcons(container);
             return;
         }
 
@@ -3545,9 +3658,7 @@ class App {
         });
 
         container.innerHTML = html;
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            lucide.createIcons();
-        }
+        this.refreshIcons(container);
     }
 
     setMonthlySummaryRegion(region) {
@@ -4485,11 +4596,23 @@ class App {
 
     async saveEditWallet() {
         const id = document.getElementById('edit-wallet-id').value;
+        const newName = (document.getElementById('edit-wallet-name')?.value || '').trim();
         const type = document.getElementById('edit-wallet-type').value;
         const balStr = document.getElementById('edit-wallet-balance').value;
         const themeId = document.getElementById('edit-wallet-theme-val').value;
 
         if (!id || !storage.state.wallets || !storage.state.wallets[id]) return;
+
+        if (!newName) {
+            alert('Please enter a wallet name.');
+            return;
+        }
+
+        const isRenaming = newName !== id;
+        if (isRenaming && storage.state.wallets[newName]) {
+            alert(`A wallet named "${newName}" already exists. Please choose a different name.`);
+            return;
+        }
 
         let balance = Number(balStr);
         if (balStr !== '' && (isNaN(balance) || !isFinite(balance) || Math.abs(balance) > 1e12)) {
@@ -4506,17 +4629,104 @@ class App {
 
         const chosenTheme = WALLET_THEMES.find(t => t.id === themeId);
 
+        // Confirmation prompt if renaming a wallet with existing transactions
+        if (isRenaming) {
+            let txCount = 0;
+            if (Array.isArray(storage.state.transactions)) {
+                txCount += storage.state.transactions.filter(t => t && (t.walletId === id || t.sourceId === id || t.destId === id)).length;
+            }
+            if (storage.state.closedMonths) {
+                for (const m of Object.values(storage.state.closedMonths)) {
+                    if (Array.isArray(m?.transactions)) {
+                        txCount += m.transactions.filter(t => t && (t.walletId === id || t.sourceId === id || t.destId === id)).length;
+                    }
+                }
+            }
+            if (Array.isArray(storage.state.history)) {
+                for (const h of storage.state.history) {
+                    if (Array.isArray(h?.transactions)) {
+                        txCount += h.transactions.filter(t => t && (t.walletId === id || t.sourceId === id || t.destId === id)).length;
+                    }
+                }
+            }
+
+            if (txCount > 0) {
+                const proceed = confirm(`Renaming wallet "${id}" to "${newName}" will update ${txCount} recorded transaction${txCount === 1 ? '' : 's'} across your ledger. Do you want to proceed?`);
+                if (!proceed) {
+                    return;
+                }
+            }
+        }
+
         const res = await storage.runExclusive(async (state) => {
-            const w = state.wallets?.[id];
-            if (!w) return { success: false, error: 'Wallet not found.' };
+            if (!state.wallets || !state.wallets[id]) {
+                return { success: false, error: 'Wallet not found.' };
+            }
+
+            if (isRenaming) {
+                if (state.wallets[newName]) {
+                    return { success: false, error: `A wallet named "${newName}" already exists.` };
+                }
+
+                // Move wallet record to new key and update id
+                const oldWallet = state.wallets[id];
+                delete state.wallets[id];
+                state.wallets[newName] = {
+                    ...oldWallet,
+                    id: newName
+                };
+
+                // Cascade rename across all historical transactions in continuous ledger
+                if (Array.isArray(state.transactions)) {
+                    state.transactions.forEach(tx => {
+                        if (!tx) return;
+                        if (tx.walletId === id) tx.walletId = newName;
+                        if (tx.sourceId === id) tx.sourceId = newName;
+                        if (tx.destId === id) tx.destId = newName;
+                    });
+                }
+
+                // Cascade rename across closed months archives
+                if (state.closedMonths) {
+                    for (const m of Object.values(state.closedMonths)) {
+                        if (Array.isArray(m?.transactions)) {
+                            m.transactions.forEach(tx => {
+                                if (!tx) return;
+                                if (tx.walletId === id) tx.walletId = newName;
+                                if (tx.sourceId === id) tx.sourceId = newName;
+                                if (tx.destId === id) tx.destId = newName;
+                            });
+                        }
+                    }
+                }
+
+                // Cascade rename across history archives
+                if (Array.isArray(state.history)) {
+                    for (const h of state.history) {
+                        if (Array.isArray(h?.transactions)) {
+                            h.transactions.forEach(tx => {
+                                if (!tx) return;
+                                if (tx.walletId === id) tx.walletId = newName;
+                                if (tx.sourceId === id) tx.sourceId = newName;
+                                if (tx.destId === id) tx.destId = newName;
+                            });
+                        }
+                    }
+                }
+            }
+
+            const targetWallet = state.wallets[isRenaming ? newName : id];
+            if (!targetWallet) {
+                return { success: false, error: 'Target wallet could not be found.' };
+            }
 
             if (!isNaN(balance)) {
-                w.balance = balance;
+                targetWallet.balance = balance;
             }
-            w.type = type;
-            w.theme = themeId;
+            targetWallet.type = type;
+            targetWallet.theme = themeId;
             if (chosenTheme) {
-                w.color = chosenTheme.color;
+                targetWallet.color = chosenTheme.color;
             }
             return true;
         }, { expectedRevision: this._editWalletBaseRev });
@@ -4528,14 +4738,17 @@ class App {
 
         if (res && res.success !== false) {
             this.renderAll();
+            // Modern Web Guidance: Only render wallets view when it is the active screen
+        if (this.currentView === 'wallets-view') {
             this.renderWalletsPage();
+        }
             this.closeModal('edit-wallet-modal');
 
             const overlay = document.getElementById('focus-overlay');
             if (overlay && (overlay.classList.contains('active') || overlay.style.display !== 'none')) {
                 const title = document.getElementById('focus-modal-title');
-                if (title && title.innerText === id) {
-                    this.openWalletFocus(id);
+                if (title && (title.innerText === id || title.innerText === newName)) {
+                    this.openWalletFocus(newName);
                 }
             }
         } else {
@@ -4569,7 +4782,10 @@ class App {
 
         if (res && res.success !== false) {
             this.renderAll();
+            // Modern Web Guidance: Only render wallets view when it is the active screen
+        if (this.currentView === 'wallets-view') {
             this.renderWalletsPage();
+        }
             this.closeModal('edit-wallet-modal');
             this.closeFocusOverlay();
         } else {
@@ -4967,50 +5183,233 @@ class App {
 
         if (widget) {
             widget.style.display = 'block';
-            const primary = storage.getPrimaryCountry();
-            const loanCurrency = loanState.config.currency || (typeof CountryConfig !== 'undefined' && CountryConfig.get(primary)?.currency) || '₹';
-            const loanLocale = (typeof CountryConfig !== 'undefined' && CountryConfig.get(primary)?.locale) || 'en-IN';
+            const loanCountry = loanState.config.country || storage.getPrimaryCountry();
+            const loanCurrency = loanState.config.currency || (typeof CountryConfig !== 'undefined' && CountryConfig.get(loanCountry)?.currency) || '₹';
+            const loanLocale = (typeof CountryConfig !== 'undefined' && CountryConfig.get(loanCountry)?.locale) || 'en-IN';
+            const duesPaid = Number(loanState.config.duesPaid) || 0;
+            const totalDues = Number(loanState.config.totalDues) || 0;
+            const monthsLeft = Math.max(0, totalDues - duesPaid);
 
             widget.innerHTML = `
-                <div class="loan-header" style="flex-wrap: wrap; padding-bottom: 12px;">
+                <div class="loan-card-topbar">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="landmark" style="width: 16px; height: 16px; color: var(--text-secondary);"></i>
+                        <h3 class="dash-chart-title" style="margin: 0; font-size: 0.92rem;">Loan Tracker</h3>
+                    </div>
+                    <button type="button" id="log-emi-btn" class="btn btn-primary btn-sm loan-log-emi-btn" onclick="app.openLogEmiModal()" style="height: 28px; padding: 2px 10px; font-size: 11.5px; gap: 6px;" title="Record monthly EMI installment">
+                        <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
+                        <span>Log EMI</span>
+                    </button>
+                </div>
+
+                <div class="loan-header" style="display: flex; justify-content: space-between; flex-wrap: wrap; padding: 0 0 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
                     <div style="width: 50%;">
                         <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.totalPrincipal, loanCurrency, { locale: loanLocale })}</div>
                         <div class="loan-label">Total Loan</div>
                     </div>
                     <div style="width: 50%; text-align: right;">
                         <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.emi, loanCurrency, { locale: loanLocale })}</div>
-                        <div class="loan-label">EMI</div>
+                        <div class="loan-label">Monthly EMI</div>
                     </div>
                     <div style="width: 100%; text-align: center; font-size: 0.72rem; color: var(--text-muted); margin-top: 10px;">
                         Next draw in <span style="color: var(--text-main); font-weight: 600;">${loanState.daysUntilNextEmi} Days</span> (${loanState.nextEmiDateStr})
                     </div>
                 </div>
                 
-                <div class="loan-progress-box">
-                    <div class="loan-progress-header">
-                        <span class="loan-percent financial-amount">${loanState.percentPaid}%</span>
+                <div class="loan-progress-box" style="padding: 12px 0 0 0;">
+                    <div class="loan-progress-header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                        <span class="loan-percent financial-amount" style="font-size: 2.2rem; font-weight: 700; color: #10b981; line-height: 1;">${loanState.percentPaid}%</span>
                         <div style="display:flex; flex-direction:column; line-height:1.2; text-align:left;">
-                            <span class="loan-label" style="font-size:0.75rem;">Paid</span>
-                            <span class="loan-label" style="font-size:0.75rem;">Till Date</span>
+                            <span class="loan-label" style="font-size:0.75rem; margin:0;">${loanState.percentLabel || 'Principal'}</span>
+                            <span class="loan-label" style="font-size:0.75rem; margin:0;">${loanState.subLabel || 'Repaid'}</span>
                         </div>
-                        <span class="loan-status">ON TRACK</span>
+                        <span class="loan-status" style="margin-left: auto; font-size: 0.72rem; font-weight: 600; color: #10b981; letter-spacing: 1px;">ON TRACK</span>
                     </div>
-                    <div class="budget-streak-track" style="margin: 8px 0 14px 0;">
+                    <div class="budget-streak-track" style="margin: 8px 0 10px 0;">
                         <div class="budget-streak-fill neon-safe" style="width: ${loanState.percentPaid}%;"></div>
                     </div>
                     
-                    <div class="loan-stats-grid">
-                        <span class="loan-stat-label">Amount Paid</span>
-                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.amountPaid, loanCurrency, { locale: loanLocale })}</span>
+                    <div class="loan-tenure-summary" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; color: var(--text-muted); margin: 0 0 14px 0;">
+                        <span><strong style="color: var(--text-primary); font-weight: 600;">${duesPaid}</strong> out of ${totalDues} months paid</span>
+                        <span style="font-weight: 500; color: var(--text-secondary);"><strong style="color: var(--text-primary); font-weight: 600;">${monthsLeft}</strong> months left</span>
+                    </div>
+                    
+                    <div class="loan-stats-grid" style="display: grid; grid-template-columns: 1fr auto; row-gap: 6px; font-size: 0.8rem;">
+                        <span class="loan-stat-label" style="color: var(--text-muted);">Amount Paid</span>
+                        <span class="loan-stat-value financial-amount privacy-blur" style="font-weight: 600; text-align: right;">${this.formatMoney(loanState.amountPaid, loanCurrency, { locale: loanLocale })}</span>
                         
-                        <span class="loan-stat-label">Principal Paid</span>
-                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.principalPaid, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
+                        <span class="loan-stat-label" style="color: var(--text-muted);">Principal Paid</span>
+                        <span class="loan-stat-value financial-amount privacy-blur" style="font-weight: 600; text-align: right;">${this.formatMoney(loanState.principalPaid, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
                         
-                        <span class="loan-stat-label">Principal Left</span>
-                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.principalLeft, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
+                        <span class="loan-stat-label" style="color: var(--text-muted);">Principal Left</span>
+                        <span class="loan-stat-value financial-amount privacy-blur" style="font-weight: 600; text-align: right;">${this.formatMoney(loanState.principalLeft, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
+
+                        ${loanState.totalInterest > 0 ? `
+                            <span class="loan-stat-label" style="color: var(--text-muted);">Total Interest</span>
+                            <span class="loan-stat-value financial-amount privacy-blur" style="font-weight: 600; text-align: right; color: #f59e0b;">${this.formatMoney(loanState.totalInterest, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
+                        ` : ''}
                     </div>
                 </div>
             `;
+            if (window.lucide && lucide.createIcons) lucide.createIcons({ root: widget });
+        }
+    }
+
+    openLogEmiModal() {
+        if (!storage.isLoanTrackingEnabled() || !storage.state.loanConfig) {
+            alert('Loan tracking is currently not configured or disabled. Please enable it in Settings.');
+            return;
+        }
+
+        const cfg = storage.state.loanConfig;
+        const loanCountry = cfg.country || 'IN';
+        const loanCurrency = cfg.currency || (typeof CountryConfig !== 'undefined' && CountryConfig.get(loanCountry)?.currency) || '₹';
+        const nextDues = (Number(cfg.duesPaid) || 0) + 1;
+
+        const dateInput = document.getElementById('log-emi-date');
+        const amountInput = document.getElementById('log-emi-amount');
+        const labelEl = document.getElementById('log-emi-amount-label');
+        const noteInput = document.getElementById('log-emi-note');
+        const walletSelect = document.getElementById('log-emi-wallet');
+
+        if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+        if (amountInput) amountInput.value = cfg.emi || 0;
+        if (labelEl) labelEl.innerText = `EMI Amount (${loanCurrency})`;
+        if (noteInput) noteInput.value = `Loan EMI Payment #${nextDues}`;
+
+        // Populate wallets filtered strictly by loan currency/region
+        if (walletSelect) {
+            const allWallets = Object.values(storage.state.wallets || {});
+            const matchingWallets = allWallets.filter(w => w.region === loanCountry || w.currency === loanCurrency);
+
+            if (matchingWallets.length === 0) {
+                walletSelect.innerHTML = `<option value="" disabled selected>No wallets available in ${loanCountry}</option>`;
+            } else {
+                walletSelect.innerHTML = matchingWallets.map(w => {
+                    const isSelected = (cfg.repaymentWallet && cfg.repaymentWallet === w.id) ? 'selected' : '';
+                    const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
+                    return `<option value="${this.escapeHtml(w.id)}" ${isSelected}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
+                }).join('');
+            }
+        }
+
+        this.updateLogEmiPreview();
+
+        if (amountInput) {
+            amountInput.oninput = () => this.updateLogEmiPreview();
+        }
+
+        const modal = document.getElementById('log-emi-modal');
+        if (modal) modal.classList.add('active');
+        if (window.lucide && lucide.createIcons) lucide.createIcons();
+    }
+
+    updateLogEmiPreview() {
+        const cfg = storage.state.loanConfig;
+        if (!cfg) return;
+
+        const loanCountry = cfg.country || 'IN';
+        const loanCurrency = cfg.currency || (typeof CountryConfig !== 'undefined' && CountryConfig.get(loanCountry)?.currency) || '₹';
+        const amountInput = document.getElementById('log-emi-amount');
+        const amt = Number(amountInput?.value) || 0;
+
+        const currentPrincipal = Number(cfg.principalLeft) || 0;
+        const newPrincipal = Math.max(0, currentPrincipal - amt);
+
+        const currentDues = Number(cfg.duesPaid) || 0;
+        const totalDues = Number(cfg.totalDues) || 0;
+        const newDues = currentDues + 1;
+
+        const princEl = document.getElementById('log-emi-preview-principal');
+        const duesEl = document.getElementById('log-emi-preview-dues');
+
+        if (princEl) {
+            princEl.innerText = `${loanCurrency}${currentPrincipal.toLocaleString()} → ${loanCurrency}${newPrincipal.toLocaleString()}`;
+        }
+        if (duesEl) {
+            duesEl.innerText = `${currentDues}/${totalDues} → ${newDues}/${totalDues}`;
+        }
+    }
+
+    async saveLogEmiPayment() {
+        const date = document.getElementById('log-emi-date')?.value || new Date().toISOString().split('T')[0];
+        const amt = Number(document.getElementById('log-emi-amount')?.value);
+        const walletId = document.getElementById('log-emi-wallet')?.value;
+        const note = document.getElementById('log-emi-note')?.value.trim();
+
+        if (!amt || isNaN(amt) || amt <= 0) {
+            alert('Please enter a valid EMI payment amount greater than zero.');
+            return;
+        }
+
+        if (!walletId || !storage.state.wallets || !storage.state.wallets[walletId]) {
+            alert('Please select an active payment account.');
+            return;
+        }
+
+        const cfg = storage.state.loanConfig;
+        if (!cfg) return;
+
+        const loanCountry = cfg.country || 'IN';
+        const loanCurrency = cfg.currency || '₹';
+
+        const res = await storage.runExclusive(async (state) => {
+            const w = state.wallets?.[walletId];
+            if (!w) return { success: false, error: 'Selected wallet not found.' };
+
+            if (!state.loanConfig) {
+                return { success: false, error: 'Loan configuration not found.' };
+            }
+
+            // 1. Deduct payment from wallet balance
+            w.balance = (Number(w.balance) || 0) - amt;
+
+            // 2. Update loan configuration
+            const oldDues = Number(state.loanConfig.duesPaid) || 0;
+            state.loanConfig.duesPaid = oldDues + 1;
+            const oldPrincipal = Number(state.loanConfig.principalLeft) || 0;
+            state.loanConfig.principalLeft = Math.max(0, oldPrincipal - amt);
+
+            if (state.preferences?.loanTracking) {
+                state.preferences.loanTracking.duesPaid = state.loanConfig.duesPaid;
+                state.preferences.loanTracking.principalLeft = state.loanConfig.principalLeft;
+            }
+
+            // 3. Find or create loan category
+            const cats = state.categories?.[loanCountry] || [];
+            let loanCat = cats.find(c => c.id === 'in-loan' || c.name.toLowerCase().includes('loan') || c.name.toLowerCase().includes('emi'));
+            const catId = loanCat ? loanCat.id : (cats[0]?.id || 'in-loan');
+
+            // 4. Create expense transaction in continuous ledger
+            const txId = 'tx-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+            const tx = {
+                id: txId,
+                type: 'expense',
+                isLoanPayment: true,
+                subType: 'loan_emi',
+                walletId: walletId,
+                categoryId: catId,
+                amount: amt,
+                note: note || `Loan EMI #${state.loanConfig.duesPaid}`,
+                date: date,
+                region: loanCountry,
+                currency: loanCurrency,
+                createdAt: new Date().toISOString()
+            };
+
+            if (!Array.isArray(state.transactions)) state.transactions = [];
+            state.transactions.unshift(tx);
+
+            return true;
+        });
+
+        if (res && res.success !== false) {
+            this.closeModal('log-emi-modal');
+            this.renderAll();
+            this.renderLoanTracker();
+            alert(`EMI Payment of ${loanCurrency}${amt.toLocaleString()} recorded successfully!`);
+        } else {
+            alert(res?.error || 'Failed to record EMI payment.');
         }
     }
 
@@ -5075,8 +5474,8 @@ class App {
     openPdfModal() {
         const fromSelect = document.getElementById('pdf-from-month');
         const toSelect = document.getElementById('pdf-to-month');
-        fromSelect.innerHTML = '';
-        toSelect.innerHTML = '';
+        fromSelect.replaceChildren();
+        toSelect.replaceChildren();
 
         // Gather all months
         const months = storage.state.history.map(h => h.monthKey);
@@ -5356,7 +5755,8 @@ class App {
                 this.isPrivacyHidden = savedPrivacy;
                 // Optional: clear it after
                 setTimeout(() => {
-                    document.getElementById('print-container').innerHTML = '';
+                    const printEl = document.getElementById('print-container');
+                    if (printEl) printEl.replaceChildren();
                 }, 1000);
             }, 500);
         }, 500);
@@ -6710,7 +7110,7 @@ class App {
 
             // Insight 3: Largest single outlay
             if (expenseTxs.length > 0) {
-                const maxTx = [...expenseTxs].sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))[0];
+                const maxTx = expenseTxs.toSorted((a, b) => Number(b.amount || 0) - Number(a.amount || 0))[0];
                 if (maxTx && Number(maxTx.amount || 0) > 0) {
                     insightsHtml += `
                         <div class="insight-item">
@@ -7297,13 +7697,8 @@ class App {
         // Itemized Transactions
         let txsHtml = '';
         if (reportTxs.length > 0) {
-            const groupedTxs = {};
-            const sortedTxs = [...reportTxs].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-            sortedTxs.forEach(tx => {
-                const dKey = tx.date || 'Undated';
-                if (!groupedTxs[dKey]) groupedTxs[dKey] = [];
-                groupedTxs[dKey].push(tx);
-            });
+            const sortedTxs = reportTxs.toSorted((a, b) => (b.date || '').localeCompare(a.date || ''));
+            const groupedTxs = Object.groupBy(sortedTxs, tx => tx.date || 'Undated');
 
             let groupsHtml = '';
             Object.keys(groupedTxs).forEach(dateStr => {
@@ -7382,7 +7777,7 @@ class App {
                 window.print();
                 this.isPrivacyHidden = savedPrivacy;
                 setTimeout(() => {
-                    printContainer.innerHTML = '';
+                    printContainer.replaceChildren();
                 }, 1000);
             }, 300);
         };
@@ -8019,7 +8414,7 @@ class App {
 
         if (resultsEl) {
             resultsEl.style.display = 'none';
-            resultsEl.innerHTML = '';
+            resultsEl.replaceChildren();
         }
         this.lastCustomReportData = null;
     }
@@ -8357,7 +8752,7 @@ class App {
             window.print();
             this.isPrivacyHidden = savedPrivacy;
             setTimeout(() => {
-                printContainer.innerHTML = '';
+                printContainer.replaceChildren();
             }, 1000);
         }, 300);
     }
