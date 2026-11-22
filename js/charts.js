@@ -13,7 +13,7 @@ class ChartManager {
         if (typeof Chart !== 'undefined' && Chart.defaults) {
             Chart.defaults.color = '#8b8b99';
             if (Chart.defaults.font) {
-                Chart.defaults.font.family = 'Inter, sans-serif';
+                Chart.defaults.font.family = "'SF Pro', -apple-system, BlinkMacSystemFont, sans-serif";
             }
         }
     }

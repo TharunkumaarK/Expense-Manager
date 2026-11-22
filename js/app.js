@@ -3181,28 +3181,34 @@ class App {
         this.renderWalletsPage();
     }
 
-    renderBudgetOverviewCard(target, options = {}) {
-        const el = typeof target === 'string' ? document.getElementById(target) : target;
-        if (!el) return;
-
+    getBudgetOverviewCardHtml(options = {}) {
         const region = options.region || 'JP';
-        const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
+        const currency = options.currency
+            || (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
             || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
         const monthKey = options.monthKey || this.activeMonthKey || (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
 
         // Sum category limits for cushion calculation
-        const cats = (storage.state.categories && storage.state.categories[region]) || [];
-        const sumCatBudgets = cats
-            .filter(c => c.contributesToTotalBudget !== false && c.isActive !== false)
-            .reduce((s, c) => s + (c.budget || 0), 0);
+        let sumCatBudgets;
+        if (options.sumCatBudgets !== undefined && options.sumCatBudgets !== null) {
+            sumCatBudgets = Number(options.sumCatBudgets) || 0;
+        } else {
+            const cats = (storage.state.categories && storage.state.categories[region]) || [];
+            sumCatBudgets = cats
+                .filter(c => c.contributesToTotalBudget !== false && c.isActive !== false)
+                .reduce((s, c) => s + (c.budget || 0), 0);
+        }
 
         // Overall allocated budget for region
-        let allocatedBudget;
+        let baseBudget;
         if (options.allocatedBudget !== undefined && options.allocatedBudget !== null) {
-            allocatedBudget = Number(options.allocatedBudget) || 0;
+            baseBudget = Number(options.allocatedBudget) || 0;
         } else {
-            allocatedBudget = storage.getTotalBudget(region);
+            baseBudget = storage.getTotalBudget(region);
         }
+
+        const carryover = options.carryover !== undefined ? Number(options.carryover) : storage.getCarryover(region);
+        const totalAvailable = baseBudget + carryover;
 
         // Total spent in region for active month
         let totalSpent;
@@ -3212,12 +3218,11 @@ class App {
             totalSpent = walletManager.getTotalSpent(region, this.getActiveTransactions());
         }
 
-        const remaining = allocatedBudget - totalSpent;
+        const remaining = totalAvailable - totalSpent;
         const isOver = remaining < 0;
-        const pct = allocatedBudget > 0 ? Math.min((totalSpent / allocatedBudget) * 100, 100) : 0;
-        const utilizationPct = allocatedBudget > 0 ? Math.round((totalSpent / allocatedBudget) * 100) : 0;
-        const cushion = Math.max(0, allocatedBudget - sumCatBudgets);
-        const carryover = storage.getCarryover(region);
+        const pct = totalAvailable > 0 ? Math.min((totalSpent / totalAvailable) * 100, 100) : 0;
+        const utilizationPct = totalAvailable > 0 ? Math.round((totalSpent / totalAvailable) * 100) : 0;
+        const cushion = (sumCatBudgets > 0) ? Math.max(0, totalAvailable - sumCatBudgets) : 0;
 
         let barClass = 'neon-safe';
         if (pct > 90 || utilizationPct > 100) barClass = 'neon-danger';
@@ -3229,50 +3234,62 @@ class App {
             </button>
         ` : '';
 
-        const rolloverBadgeHtml = carryover > 0 ? `
-            <span class="budget-cushion-badge privacy-blur" title="Unspent rollover from previous month">+${this.formatMoney(carryover, currency)} Rollover Cushion</span>
-        ` : '';
-
+        const cushionTooltip = carryover > 0 ? `title="Includes +${this.formatMoney(carryover, currency)} rollover from previous month"` : '';
         const cushionBadgeHtml = cushion > 0 ? `
-            <span class="budget-cushion-pill privacy-blur">+${this.formatMoney(cushion, currency)} Cushion</span>
+            <span class="budget-cushion-pill privacy-blur" ${cushionTooltip}>+${this.formatMoney(cushion, currency)} Cushion</span>
         ` : '';
 
-        const hasBadges = Boolean(cushionBadgeHtml || rolloverBadgeHtml);
-        const badgesRowHtml = hasBadges ? `
+        const badgesRowHtml = cushionBadgeHtml ? `
             <div class="budget-central-badges-row">
                 ${cushionBadgeHtml}
-                ${rolloverBadgeHtml}
             </div>
         ` : '';
 
-        const cardContent = `
-            <div class="budget-central-header">
-                <div class="budget-central-header-top">
-                    <div class="budget-central-title-group">
-                        ${this.getCountryFlagSvg(region, 20, 15)}
-                        <h3 class="budget-central-title">Monthly Budget</h3>
-                        <span class="text-xs text-muted font-numeric budget-central-month">(${monthKey})</span>
+        const titleText = options.title || 'Monthly Budget';
+        const cardClass = options.cardClass ? ` ${options.cardClass}` : '';
+        const interactiveAttr = options.isInteractive ? `onclick="app.openOverallBudgetModal('${region}')" style="cursor: pointer;" title="Configure Overall Monthly Limit"` : '';
+        const interactiveCls = options.isInteractive ? ' interactive' : '';
+
+        return `
+            <div class="card budget-central-card${cardClass}${interactiveCls}" ${interactiveAttr}>
+                <div class="budget-central-header">
+                    <div class="budget-central-header-top">
+                        <div class="budget-central-title-group">
+                            ${this.getCountryFlagSvg(region, 20, 15)}
+                            <h3 class="budget-central-title">${titleText}</h3>
+                            <span class="text-xs text-muted font-numeric budget-central-month">(${monthKey})</span>
+                        </div>
+                        ${editButtonHtml}
                     </div>
-                    ${editButtonHtml}
+                    ${badgesRowHtml}
                 </div>
-                ${badgesRowHtml}
-            </div>
-            <div class="budget-central-progress-wrap">
-                <div class="budget-streak-track">
-                    <div class="budget-streak-fill ${barClass}" style="width: ${pct}%;"></div>
+                <div class="budget-central-progress-wrap">
+                    <div class="budget-streak-track">
+                        <div class="budget-streak-fill ${barClass}" style="width: ${pct}%;"></div>
+                    </div>
                 </div>
-            </div>
-            <div class="budget-central-stats-row">
-                <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
-                ${isOver
-                    ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
-                    : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
-                }
+                <div class="budget-central-stats-row">
+                    <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
+                    ${isOver
+                ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
+                : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
+            }
+                </div>
             </div>
         `;
+    }
 
+    renderBudgetOverviewCard(target, options = {}) {
+        const el = typeof target === 'string' ? document.getElementById(target) : target;
+        if (!el) return;
+
+        const html = this.getBudgetOverviewCardHtml(options);
         if (el.classList.contains('budget-central-card')) {
-            el.innerHTML = cardContent;
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            const innerCard = tmp.firstElementChild;
+            el.innerHTML = innerCard ? innerCard.innerHTML : '';
+            const region = options.region || 'JP';
             if (options.isInteractive) {
                 el.style.cursor = 'pointer';
                 el.setAttribute('title', 'Configure Overall Monthly Limit');
@@ -3285,9 +3302,7 @@ class App {
                 el.classList.remove('interactive');
             }
         } else {
-            const interactiveAttr = options.isInteractive ? `onclick="app.openOverallBudgetModal('${region}')" style="cursor: pointer;" title="Configure Overall Monthly Limit"` : '';
-            const interactiveCls = options.isInteractive ? ' interactive' : '';
-            el.innerHTML = `<div class="card budget-central-card${interactiveCls}" ${interactiveAttr}>${cardContent}</div>`;
+            el.innerHTML = html;
         }
 
         this.refreshIcons(el);
@@ -3579,7 +3594,7 @@ class App {
         if (activeCountries.length > 1) {
             selectorHtml = `
                 <div class="monthly-summary-pills" style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-                    <span class="text-xs text-muted" style="font-weight: 500;">Financial Inflow &amp; Outflow (${countryName})</span>
+                    <span class="text-xs text-muted" style="font-weight: 500;">Monthly Cash Flow</span>
                     <div class="segmented-control" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 2px; border-radius: 6px;">
                         ${activeCountries.map(c => `
                             <button class="segment-btn ${c === region ? 'active' : ''}" onclick="app.setMonthlySummaryRegion('${c}')" style="padding: 3px 10px; font-size: 0.75rem; border-radius: 4px;">
@@ -3596,34 +3611,34 @@ class App {
             <div class="monthly-stat-card">
                 <div class="monthly-stat-header">
                     <span class="monthly-stat-label">Monthly Income</span>
-                    <span class="monthly-stat-trend trend-positive">
-                        <i data-lucide="trending-up"></i> ${region} Inflow
+                    <span class="monthly-stat-icon">
+                        <i data-lucide="trending-up"></i>
                     </span>
                 </div>
                 <div class="monthly-stat-value privacy-blur financial-amount" style="color: var(--emerald);">
                     ${this.formatMoney(income, currency, { prefix: '+' })}
                 </div>
-                <div class="monthly-stat-sub">${countryName} inflows this month</div>
+                <div class="monthly-stat-sub">Earned this month</div>
             </div>
 
             <div class="monthly-stat-card">
                 <div class="monthly-stat-header">
                     <span class="monthly-stat-label">Total Outflows</span>
-                    <span class="monthly-stat-trend trend-negative">
-                        <i data-lucide="trending-down"></i> ${region} Outflow
+                    <span class="monthly-stat-icon">
+                        <i data-lucide="trending-down"></i>
                     </span>
                 </div>
                 <div class="monthly-stat-value privacy-blur financial-amount" style="color: var(--rose);">
                     ${this.formatMoney(expenses, currency, { prefix: '-' })}
                 </div>
-                <div class="monthly-stat-sub">${countryName} expenses this month</div>
+                <div class="monthly-stat-sub">Spent this month</div>
             </div>
 
             <div class="monthly-stat-card">
                 <div class="monthly-stat-header">
                     <span class="monthly-stat-label">Net Savings</span>
-                    <span class="monthly-stat-trend ${net >= 0 ? 'trend-positive' : 'trend-negative'}">
-                        <i data-lucide="${net >= 0 ? 'sparkles' : 'alert-circle'}"></i> ${region} Net
+                    <span class="monthly-stat-icon">
+                        <i data-lucide="${net >= 0 ? 'sparkles' : 'alert-circle'}"></i>
                     </span>
                 </div>
                 <div class="monthly-stat-value privacy-blur financial-amount ${netSavingsClass}">
@@ -6517,8 +6532,8 @@ class App {
 
         const kpiSavings = document.getElementById('jp-kpi-savings');
         if (kpiSavings) {
-            kpiSavings.innerText = (netSavings >= 0 ? '+' : '-') + this.formatMoney(Math.abs(netSavings), '¥');
-            kpiSavings.className = `kpi-value privacy-blur ${netSavings >= 0 ? 'text-emerald' : 'text-rose'}`;
+            kpiSavings.innerText = this.formatMoney(Math.abs(netSavings), '¥', { prefix: netSavings >= 0 ? '+' : '-' });
+            kpiSavings.className = `kpi-value privacy-blur${this.isPrivacyHidden ? '' : (netSavings >= 0 ? ' text-emerald' : ' text-rose')}`;
         }
 
         const kpiSavingsRate = document.getElementById('jp-kpi-savings-rate');
@@ -7592,48 +7607,37 @@ class App {
                 ? `<span class="report-status-badge closed"><i data-lucide="lock" style="width:12px;height:12px;"></i> Closed & Reconciled</span>`
                 : `<span class="report-status-badge active"><i data-lucide="activity" style="width:12px;height:12px;"></i> Active Reporting Period</span>`;
 
-            const budgetPct = periodTotalBudget > 0 ? Math.min((totalExpense / periodTotalBudget) * 100, 100) : 0;
-            const budgetRem = periodTotalBudget - totalExpense;
-            const utilizationPct = periodTotalBudget > 0 ? Math.round((totalExpense / periodTotalBudget) * 100) : 0;
-            const isOver = budgetRem < 0;
-
-            let barClass = 'neon-safe';
-            if (budgetPct > 90 || utilizationPct > 100) barClass = 'neon-danger';
-            else if (budgetPct > 75 || utilizationPct >= 75) barClass = 'neon-warn';
-
             const incomeCount = reportTxs.filter(t => t.type === 'income').length;
             const expenseCount = reportTxs.filter(t => t.type === 'expense').length;
 
             heroEl.innerHTML = `
                 <div class="card reports-snapshot-banner">
-                    <div class="report-snapshot-top">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                                ${this.getCountryFlagSvg(this.reportRegion, 24, 18)}
-                                <h2 style="margin: 0; font-size: 1.35rem; font-weight: 600;">${this.reportMonthKey} Financial Snapshot</h2>
+                    <div class="report-snapshot-header">
+                        <div class="report-snapshot-title-row">
+                            <div class="report-snapshot-title-group">
+                                ${this.getCountryFlagSvg(this.reportRegion, 20, 15)}
+                                <h2 class="reports-snapshot-title">${this.reportMonthKey} Financial Snapshot</h2>
+                            </div>
+                            <div class="report-snapshot-badge-wrap">
                                 ${statusBadge}
                             </div>
-                            <div class="report-meta-text">
-                                <span>Generated: <strong>${snapshotMeta.generatedAt}</strong></span>
-                                <span>•</span>
-                                <span>Last Refreshed: <strong>${snapshotMeta.refreshedAt}</strong> (Rev ${snapshotMeta.revisionsCount || 1})</span>
-                                <span>•</span>
-                                <span>Transactions: <strong>${reportTxs.length}</strong></span>
-                                <span>•</span>
-                                <span>Currency: <strong>${currency} (${this.reportRegion})</strong></span>
-                            </div>
-                            ${snapshotMeta.revisions && snapshotMeta.revisions.length > 1 ? `
-                                <div class="card reports-revisions-box">
-                                    <span style="color: var(--text-muted); font-weight: 600;">Revision History (${snapshotMeta.revisions.length} retained):</span>
-                                    <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 3px; color: var(--text-secondary);">
-                                        ${snapshotMeta.revisions.slice(0, 3).map(r => `
-                                            <div>• Rev ${r.rev} (${r.timestamp}): ${r.txCount} txs, Spent ${this.formatMoney(r.totalExpense, currency)}</div>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                            ` : ''}
+                        </div>
+                        <div class="report-meta-text">
+                            <span class="report-meta-item">Updated: <strong>${snapshotMeta.refreshedAt || snapshotMeta.generatedAt}</strong>${snapshotMeta.revisionsCount && snapshotMeta.revisionsCount > 1 ? ` <span class="report-rev-tag">Rev ${snapshotMeta.revisionsCount}</span>` : ''}</span>
+                            <span class="report-meta-dot">•</span>
+                            <span class="report-meta-item">Transactions: <strong>${reportTxs.length}</strong></span>
                         </div>
                     </div>
+                    ${snapshotMeta.revisions && snapshotMeta.revisions.length > 1 ? `
+                        <div class="card reports-revisions-box">
+                            <span style="color: var(--text-muted); font-weight: 600;">Revision History (${snapshotMeta.revisions.length} retained):</span>
+                            <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 3px; color: var(--text-secondary);">
+                                ${snapshotMeta.revisions.slice(0, 3).map(r => `
+                                    <div>• Rev ${r.rev} (${r.timestamp}): ${r.txCount} txs, Spent ${this.formatMoney(r.totalExpense, currency)}</div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
 
                 <div class="reports-kpi-grid">
@@ -7677,36 +7681,19 @@ class App {
                     </div>
                 </div>
 
-                ${periodTotalBudget > 0 ? `
-                    <div class="card budget-central-card reports-budget-perf-card">
-                        <div class="budget-central-header">
-                            <div class="budget-central-title-group">
-                                ${this.getCountryFlagSvg(this.reportRegion, 20, 15)}
-                                <h3>Monthly Budget Performance</h3>
-                                <span class="text-xs text-muted font-numeric">(${this.reportMonthKey})</span>
-                                <span class="budget-cushion-pill privacy-blur ${isOver ? 'text-danger' : ''}" style="${isOver ? 'background: rgba(244, 63, 94, 0.12); color: #fb7185; border-color: rgba(244, 63, 94, 0.25);' : ''}">
-                                    ${isOver ? `${this.formatMoney(Math.abs(budgetRem), currency)} over budget` : `+${this.formatMoney(budgetRem, currency)} cushion remaining`}
-                                </span>
-                            </div>
-                            <div class="budget-remaining-hero">
-                                <span class="remaining-val privacy-blur ${isOver ? 'text-danger' : 'text-success'}">
-                                    ${this.formatMoney(isOver ? Math.abs(budgetRem) : budgetRem, currency)}
-                                </span>
-                                <span class="remaining-label">${isOver ? 'over budget' : 'cushion remaining'}</span>
-                            </div>
-                        </div>
-                        <div class="budget-central-progress-wrap">
-                            <div class="budget-streak-track">
-                                <div class="budget-streak-fill ${barClass}" style="width: ${budgetPct}%;"></div>
-                            </div>
-                        </div>
-                        <div class="budget-central-stats-row">
-                            <span class="privacy-blur">Spent: <strong>${this.formatMoney(totalExpense, currency)}</strong></span>
-                            <span class="text-xs text-muted font-numeric">${utilizationPct}% consumed</span>
-                            <span class="privacy-blur">Allocated Limit: <strong>${this.formatMoney(periodTotalBudget, currency)}</strong></span>
-                        </div>
-                    </div>
-                ` : ''}
+                ${periodTotalBudget > 0 ? this.getBudgetOverviewCardHtml({
+                region: this.reportRegion,
+                currency: currency,
+                monthKey: this.reportMonthKey,
+                allocatedBudget: periodTotalBudget,
+                carryover: 0,
+                totalSpent: totalExpense,
+                sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
+                title: 'Monthly Budget',
+                showEditButton: false,
+                isInteractive: false,
+                cardClass: 'reports-budget-perf-card'
+            }) : ''}
 
                 ${historicalBudgetNote ? `
                     <div style="padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-sm); font-size: 0.78rem; color: #93c5fd; display: flex; align-items: center; gap: 8px;">
