@@ -1979,7 +1979,7 @@ class App {
         this.renderCategories();
         this.renderTransactions();
         this.renderMonthlySummary();
-
+        
         // Modern Web Guidance: Only render canvas chart when home-view is active
         if (this.currentView === 'home-view' || !this.currentView) {
             this.renderDashboardExpenseChart();
@@ -2225,10 +2225,10 @@ class App {
                 walletOptionsHtml = `
                     <option value="" ${!loanCfg.repaymentWallet ? 'selected' : ''}>-- Unselected --</option>
                     ${regionalWallets.map(w => {
-                    const isSel = loanCfg.repaymentWallet === w.id ? 'selected' : '';
-                    const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
-                    return `<option value="${this.escapeHtml(w.id)}" ${isSel}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
-                }).join('')}
+                        const isSel = loanCfg.repaymentWallet === w.id ? 'selected' : '';
+                        const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
+                        return `<option value="${this.escapeHtml(w.id)}" ${isSel}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
+                    }).join('')}
                 `;
             }
 
@@ -3386,9 +3386,9 @@ class App {
                 <div class="budget-central-stats-row">
                     <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
                     ${isOver
-                ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
-                : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
-            }
+                        ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
+                        : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
+                    }
                 </div>
             `
             : `
@@ -4781,9 +4781,9 @@ class App {
         if (res && res.success !== false) {
             this.renderAll();
             // Modern Web Guidance: Only render wallets view when it is the active screen
-            if (this.currentView === 'wallets-view') {
-                this.renderWalletsPage();
-            }
+        if (this.currentView === 'wallets-view') {
+            this.renderWalletsPage();
+        }
             this.closeModal('edit-wallet-modal');
 
             const overlay = document.getElementById('focus-overlay');
@@ -4825,9 +4825,9 @@ class App {
         if (res && res.success !== false) {
             this.renderAll();
             // Modern Web Guidance: Only render wallets view when it is the active screen
-            if (this.currentView === 'wallets-view') {
-                this.renderWalletsPage();
-            }
+        if (this.currentView === 'wallets-view') {
+            this.renderWalletsPage();
+        }
             this.closeModal('edit-wallet-modal');
             this.closeFocusOverlay();
         } else {
@@ -8137,18 +8137,18 @@ class App {
                 </div>
 
                 ${periodTotalBudget > 0 ? this.getBudgetOverviewCardHtml({
-                region: this.reportRegion,
-                currency: currency,
-                monthKey: this.reportMonthKey,
-                allocatedBudget: periodTotalBudget,
-                carryover: 0,
-                totalSpent: totalExpense,
-                sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
-                title: 'Monthly Budget',
-                showEditButton: false,
-                isInteractive: false,
-                cardClass: 'reports-budget-perf-card'
-            }) : ''}
+                    region: this.reportRegion,
+                    currency: currency,
+                    monthKey: this.reportMonthKey,
+                    allocatedBudget: periodTotalBudget,
+                    carryover: 0,
+                    totalSpent: totalExpense,
+                    sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
+                    title: 'Monthly Budget',
+                    showEditButton: false,
+                    isInteractive: false,
+                    cardClass: 'reports-budget-perf-card'
+                }) : ''}
 
                 ${historicalBudgetNote ? `
                     <div style="padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-sm); font-size: 0.78rem; color: #93c5fd; display: flex; align-items: center; gap: 8px;">
