@@ -2385,7 +2385,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .ledger-quick-actions .btn-primary,
 .budgets-header-actions .btn-primary,
 #btn-open-closing-wizard,
-#btn-custom-report-generate,
 #btn-header-add-category,
 #btn-add-category,
 #add-tx-btn {
@@ -2404,12 +2403,55 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .ledger-quick-actions .btn-primary,
     .budgets-header-actions .btn-primary,
     #btn-open-closing-wizard,
-    #btn-custom-report-generate,
     #btn-header-add-category,
     #btn-add-category,
     #add-tx-btn {
         min-width: unset;
         width: auto;
+    }
+}
+
+/* Custom Date Range Report Action Buttons (Unified Sizing & Alignment) */
+.custom-report-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+#btn-custom-report-reset,
+#btn-custom-report-generate {
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 0 14px !important;
+    font-size: 0.82rem !important;
+    line-height: 1 !important;
+    gap: 6px !important;
+    min-width: unset !important;
+    width: auto !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+}
+
+#btn-custom-report-reset svg,
+#btn-custom-report-reset i,
+#btn-custom-report-generate svg,
+#btn-custom-report-generate i {
+    width: 15px !important;
+    height: 15px !important;
+    flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+
+    #btn-custom-report-reset,
+    #btn-custom-report-generate {
+        height: 42px !important;
+        min-height: 42px !important;
+        padding: 0 14px !important;
+        font-size: 0.82rem !important;
     }
 }
 
@@ -5943,8 +5985,10 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
-        width: 38px;
-        height: 38px;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
         border-radius: var(--radius-sm);
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid var(--border-subtle);
@@ -6661,16 +6705,29 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     }
 
     /* General Button Touch Targets & Spacing */
-    .btn:not(.global-privacy-btn):not(#main-fab) {
-        height: 36px !important;
-        padding: 7px 12px !important;
-        font-size: 0.80rem !important;
+    .btn:not(.global-privacy-btn):not(#main-fab):not(.modal-overlay .btn):not(.bottom-sheet .btn):not(.wallet-config-modal .btn):not(.action-selector-card .btn):not(.category-manage-sheet .btn):not(.btn-primary) {
+        min-height: 38px;
+        padding: 7px 12px;
+        font-size: 0.80rem;
     }
 
     .btn-sm {
-        height: 32px !important;
-        padding: 5px 10px !important;
-        font-size: 0.76rem !important;
+        min-height: 34px;
+        padding: 5px 10px;
+        font-size: 0.76rem;
+    }
+
+    .modal-overlay .btn,
+    .bottom-sheet .btn,
+    .wallet-config-modal .btn,
+    .category-manage-sheet .btn,
+    .action-selector-card .btn,
+    .btn-primary,
+    .btn-large {
+        min-height: 44px !important;
+        height: auto !important;
+        padding: 10px 16px !important;
+        font-size: 0.88rem !important;
     }
 
     .segmented-control {
@@ -9019,11 +9076,70 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 @media (max-width: 768px) {
-    :root {
-        --glass-blur: blur(8px);
-        --glass-blur-heavy: blur(12px);
+
+    /* Bottom Sheets & Modal Ergonomics */
+    .bottom-sheet {
+        padding-bottom: max(24px, env(safe-area-inset-bottom, 24px)) !important;
     }
 
+    /* Responsive HSV Color Picker Modal Containment */
+    #color-picker-modal .bottom-sheet {
+        max-width: 420px;
+        margin: 0 auto;
+        box-sizing: border-box;
+        width: 100%;
+    }
+
+    #color-picker-modal .bottom-sheet>div:nth-child(2) {
+        min-width: 0;
+        box-sizing: border-box;
+        width: 100%;
+    }
+
+    #cp-sv-canvas {
+        min-width: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    #cp-hue-canvas {
+        min-width: 26px;
+        width: 26px;
+        flex-shrink: 0;
+    }
+
+    /* Tactile Active Press Feedback (Emil Kowalski Craft System) */
+    .btn:active,
+    .quick-action-pill:active,
+    .desktop-nav-item:active,
+    .mobile-menu-toggle:active {
+        transform: scale(0.97) !important;
+        transition-duration: 0.08s !important;
+    }
+}
+
+@media (max-width: 360px) {
+    .stat-card-row {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+
+    .balance-card {
+        padding: 14px 12px !important;
+    }
+
+    .dash-quick-actions-scroll {
+        padding: 6px 10px !important;
+    }
+
+    .country-card {
+        padding: 12px 14px !important;
+    }
+
+    .reports-actions-group {
+        grid-template-columns: 1fr !important;
+    }
 }
 
 /* Card Subtle Elevation & Hover Illumination - Interactive Elements (Glow, NOT Lift) */

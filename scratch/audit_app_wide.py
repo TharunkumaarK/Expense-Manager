@@ -106,12 +106,22 @@ def audit():
                 inner_w = eval_js("window.innerWidth")
                 overflow = scroll_w > inner_w
                 
-                # Check for overflowing children
+                # Check for overflowing children outside intentional scroll containers
                 overflow_elements = eval_js("""
                     (() => {
                         const bad = [];
                         document.querySelectorAll('*').forEach(el => {
-                            if (el.offsetWidth > window.innerWidth + 1 && el.offsetParent !== null) {
+                            let p = el.parentElement;
+                            let insideScroll = false;
+                            while (p && p !== document.body) {
+                                const s = window.getComputedStyle(p);
+                                if (s.overflowX === 'auto' || s.overflowX === 'scroll') {
+                                    insideScroll = true;
+                                    break;
+                                }
+                                p = p.parentElement;
+                            }
+                            if (!insideScroll && el.offsetWidth > window.innerWidth + 1 && el.offsetParent !== null) {
                                 bad.push({
                                     tag: el.tagName,
                                     cls: el.className,
@@ -131,8 +141,9 @@ def audit():
                         print(f"      -> Overflow element: <{el['tag']} id='{el['id']}' class='{el['cls']}'> width={el['w']}px")
 
         print("\n" + "=" * 80)
-        print("AUDIT: PERFORMANCE BOTTLENECKS (BACKDROP FILTERS, ANIMATIONS, ICONS)")
+        print("AUDIT: PERFORMANCE BOTTLENECKS (BACKDROP FILTERS & COMPOSITING ON MOBILE 390PX)")
         print("=" * 80)
+        set_vp(390, 844)
 
         perf_data = eval_js("""
             (() => {

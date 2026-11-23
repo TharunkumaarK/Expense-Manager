@@ -770,7 +770,7 @@ class App {
             if (context && context.walletId) {
                 sub.innerText = `Record for ${context.walletId}`;
             } else if (context && context.region) {
-                const countryName = context.region === 'JP' ? 'Japan (JPY)' : 'India (INR)';
+                const countryName = context.region === 'JP' ? 'Japan (JPY)' : (context.region === 'DE' ? 'Germany (EUR)' : 'India (INR)');
                 sub.innerText = `Record for ${countryName}`;
             } else {
                 sub.innerText = 'Select transaction type to record';
@@ -830,7 +830,7 @@ class App {
         const title = document.getElementById('modal-title');
         const content = document.getElementById('modal-content');
 
-        const currentDate = new Date().toISOString().split('T')[0];
+        const currentDate = typeof getLocalDateString === 'function' ? getLocalDateString() : new Date().toISOString().split('T')[0];
         let formInnerHtml = '';
 
         const allWalletOpts = this.getWalletOptionsHtml();
@@ -1365,7 +1365,7 @@ class App {
         this._isSubmitting = true;
         try {
             const dateEl = document.getElementById('tx-date');
-            const date = (dateEl && dateEl.value) ? dateEl.value : new Date().toISOString().split('T')[0];
+            const date = (dateEl && dateEl.value) ? dateEl.value : (typeof getLocalDateString === 'function' ? getLocalDateString() : new Date().toISOString().split('T')[0]);
 
             if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
                 alert('Please select a valid date.');
@@ -1539,6 +1539,11 @@ class App {
                 this.renderAnalyticsPage();
             } else if (this.currentView === 'history-view') {
                 this.renderHistory();
+            }
+
+            const actionLabel = editId ? 'Transaction updated' : (type === 'income' ? 'Income added' : type === 'transfer' ? 'Transfer recorded' : type === 'remittance' ? 'International transfer recorded' : 'Expense recorded');
+            if (typeof this.showToast === 'function') {
+                this.showToast(`${actionLabel} successfully.`, 'success');
             }
             return true;
         } catch (err) {
@@ -1974,7 +1979,7 @@ class App {
         this.renderCategories();
         this.renderTransactions();
         this.renderMonthlySummary();
-        
+
         // Modern Web Guidance: Only render canvas chart when home-view is active
         if (this.currentView === 'home-view' || !this.currentView) {
             this.renderDashboardExpenseChart();
@@ -2220,10 +2225,10 @@ class App {
                 walletOptionsHtml = `
                     <option value="" ${!loanCfg.repaymentWallet ? 'selected' : ''}>-- Unselected --</option>
                     ${regionalWallets.map(w => {
-                        const isSel = loanCfg.repaymentWallet === w.id ? 'selected' : '';
-                        const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
-                        return `<option value="${this.escapeHtml(w.id)}" ${isSel}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
-                    }).join('')}
+                    const isSel = loanCfg.repaymentWallet === w.id ? 'selected' : '';
+                    const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
+                    return `<option value="${this.escapeHtml(w.id)}" ${isSel}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
+                }).join('')}
                 `;
             }
 
@@ -3089,6 +3094,12 @@ class App {
             }, { passive: false });
             document.addEventListener('mouseup', () => { this._cpSvDrag = false; this._cpHueDrag = false; });
             document.addEventListener('touchend', () => { this._cpSvDrag = false; this._cpHueDrag = false; });
+
+            window.addEventListener('resize', () => {
+                if (document.getElementById('color-picker-modal')?.classList.contains('active')) {
+                    this._cpDrawAll();
+                }
+            });
         }
         this._cpDrawAll();
     }
@@ -3102,7 +3113,9 @@ class App {
     _cpDrawSV() {
         const canvas = document.getElementById('cp-sv-canvas');
         if (!canvas) return;
-        const W = canvas.clientWidth, H = canvas.clientHeight;
+        const rect = canvas.getBoundingClientRect();
+        const W = Math.floor(rect.width || canvas.clientWidth);
+        const H = Math.floor(rect.height || canvas.clientHeight);
         if (!W || !H) return;
         canvas.width = W; canvas.height = H;
         const ctx = canvas.getContext('2d');
@@ -3134,7 +3147,9 @@ class App {
     _cpDrawHue() {
         const canvas = document.getElementById('cp-hue-canvas');
         if (!canvas) return;
-        const W = canvas.clientWidth, H = canvas.clientHeight;
+        const rect = canvas.getBoundingClientRect();
+        const W = Math.floor(rect.width || canvas.clientWidth);
+        const H = Math.floor(rect.height || canvas.clientHeight);
         if (!W || !H) return;
         canvas.width = W; canvas.height = H;
         const ctx = canvas.getContext('2d');
@@ -3365,6 +3380,24 @@ class App {
         const interactiveAttr = options.isInteractive ? `onclick="app.openOverallBudgetModal('${region}')" style="cursor: pointer;" title="Configure Overall Monthly Limit"` : '';
         const interactiveCls = options.isInteractive ? ' interactive' : '';
 
+        const isBudgetConfigured = totalAvailable > 0;
+        const statsRowHtml = isBudgetConfigured
+            ? `
+                <div class="budget-central-stats-row">
+                    <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
+                    ${isOver
+                ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
+                : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
+            }
+                </div>
+            `
+            : `
+                <div class="budget-central-stats-row">
+                    <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
+                    <span class="budget-stat-item-right" style="color: var(--text-muted); font-size: 0.8rem;">Limit: Not Set</span>
+                </div>
+            `;
+
         return `
             <div class="card budget-central-card${cardClass}${interactiveCls}" ${interactiveAttr}>
                 <div class="budget-central-header">
@@ -3383,13 +3416,7 @@ class App {
                         <div class="budget-streak-fill ${barClass}" style="width: ${pct}%;"></div>
                     </div>
                 </div>
-                <div class="budget-central-stats-row">
-                    <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
-                    ${isOver
-                        ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
-                        : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
-                    }
-                </div>
+                ${statsRowHtml}
             </div>
         `;
     }
@@ -3566,12 +3593,27 @@ class App {
         if (!container) return;
 
         if (txs.length === 0) {
-            container.innerHTML = `
-                <div class="dash-recent-empty">
-                    <i data-lucide="receipt" class="dash-recent-empty-icon"></i>
-                    <p class="dash-recent-empty-text">No activity recorded for this period.</p>
-                </div>
-            `;
+            const allTotalTxs = (storage.state?.transactions || []).length;
+            if (allTotalTxs === 0) {
+                container.innerHTML = `
+                    <div class="dash-recent-empty">
+                        <i data-lucide="sparkles" class="dash-recent-empty-icon" style="color: var(--accent);"></i>
+                        <p class="dash-recent-empty-text font-medium" style="color: var(--text-primary); margin-bottom: 2px;">Your accounts are ready</p>
+                        <p class="dash-recent-empty-text text-xs" style="color: var(--text-muted); margin-bottom: 10px;">Record your first expense or income to track your activity.</p>
+                        <button class="btn btn-primary btn-xs" onclick="app.openTransactionModal('expense')" style="gap: 5px;">
+                            <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
+                            <span>Add Transaction</span>
+                        </button>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="dash-recent-empty">
+                        <i data-lucide="receipt" class="dash-recent-empty-icon"></i>
+                        <p class="dash-recent-empty-text">No activity recorded for this period.</p>
+                    </div>
+                `;
+            }
             this.refreshIcons(container);
             return;
         }
@@ -4739,9 +4781,9 @@ class App {
         if (res && res.success !== false) {
             this.renderAll();
             // Modern Web Guidance: Only render wallets view when it is the active screen
-        if (this.currentView === 'wallets-view') {
-            this.renderWalletsPage();
-        }
+            if (this.currentView === 'wallets-view') {
+                this.renderWalletsPage();
+            }
             this.closeModal('edit-wallet-modal');
 
             const overlay = document.getElementById('focus-overlay');
@@ -4783,9 +4825,9 @@ class App {
         if (res && res.success !== false) {
             this.renderAll();
             // Modern Web Guidance: Only render wallets view when it is the active screen
-        if (this.currentView === 'wallets-view') {
-            this.renderWalletsPage();
-        }
+            if (this.currentView === 'wallets-view') {
+                this.renderWalletsPage();
+            }
             this.closeModal('edit-wallet-modal');
             this.closeFocusOverlay();
         } else {
@@ -5272,7 +5314,7 @@ class App {
         const noteInput = document.getElementById('log-emi-note');
         const walletSelect = document.getElementById('log-emi-wallet');
 
-        if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+        if (dateInput) dateInput.value = typeof getLocalDateString === 'function' ? getLocalDateString() : new Date().toISOString().split('T')[0];
         if (amountInput) amountInput.value = cfg.emi || 0;
         if (labelEl) labelEl.innerText = `EMI Amount (${loanCurrency})`;
         if (noteInput) noteInput.value = `Loan EMI Payment #${nextDues}`;
@@ -5332,7 +5374,7 @@ class App {
     }
 
     async saveLogEmiPayment() {
-        const date = document.getElementById('log-emi-date')?.value || new Date().toISOString().split('T')[0];
+        const date = document.getElementById('log-emi-date')?.value || (typeof getLocalDateString === 'function' ? getLocalDateString() : new Date().toISOString().split('T')[0]);
         const amt = Number(document.getElementById('log-emi-amount')?.value);
         const walletId = document.getElementById('log-emi-wallet')?.value;
         const note = document.getElementById('log-emi-note')?.value.trim();
@@ -5899,20 +5941,18 @@ class App {
         if (catSelect && catSelect.options.length <= 1) {
             let catOptions = '<option value="all">All Categories</option>';
             if (storage.state?.categories) {
-                if (storage.state.categories.JP && storage.state.categories.JP.length > 0) {
-                    catOptions += '<optgroup label="Japan Categories">';
-                    storage.state.categories.JP.forEach(c => {
-                        catOptions += `<option value="${c.id}">${c.name}</option>`;
-                    });
-                    catOptions += '</optgroup>';
-                }
-                if (storage.state.categories.IN && storage.state.categories.IN.length > 0) {
-                    catOptions += '<optgroup label="India Categories">';
-                    storage.state.categories.IN.forEach(c => {
-                        catOptions += `<option value="${c.id}">${c.name}</option>`;
-                    });
-                    catOptions += '</optgroup>';
-                }
+                const regionLabels = { JP: 'Japan', IN: 'India', DE: 'Germany' };
+                Object.keys(storage.state.categories).forEach(reg => {
+                    const cats = storage.state.categories[reg];
+                    if (Array.isArray(cats) && cats.length > 0) {
+                        const label = regionLabels[reg] ? `${regionLabels[reg]} Categories` : `${reg} Categories`;
+                        catOptions += `<optgroup label="${label}">`;
+                        cats.forEach(c => {
+                            catOptions += `<option value="${c.id}">${c.name}</option>`;
+                        });
+                        catOptions += '</optgroup>';
+                    }
+                });
             }
             catSelect.innerHTML = catOptions;
             if (this.ledgerFilters.categoryId) catSelect.value = this.ledgerFilters.categoryId;
@@ -5924,7 +5964,7 @@ class App {
             let walletOptions = '<option value="all">All Wallets</option>';
             if (storage.state?.wallets) {
                 Object.values(storage.state.wallets).forEach(w => {
-                    const countryTag = w.region === 'JP' ? '[JP]' : '[IN]';
+                    const countryTag = `[${(w.region || 'JP').toUpperCase()}]`;
                     walletOptions += `<option value="${w.id}">${countryTag} ${w.name || w.id}</option>`;
                 });
             }
@@ -5965,17 +6005,27 @@ class App {
 
         // Empty state check
         if (totalCount === 0) {
+            const allTotalTxs = (storage.state?.transactions || []).length;
+            const isGenuineEmpty = allTotalTxs === 0;
+
             timelineEl.innerHTML = `
                 <div class="card ledger-empty-state">
                     <div class="empty-icon-circle">
-                        <i data-lucide="receipt"></i>
+                        <i data-lucide="${isGenuineEmpty ? 'receipt-text' : 'search-x'}"></i>
                     </div>
-                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 600;">No Transactions Found</h3>
-                    <p class="text-muted text-sm" style="margin: 0; max-width: 360px;">No transactions match your search query or applied filter criteria.</p>
-                    <button class="btn btn-secondary btn-sm" onclick="app.resetAllLedgerFilters()" style="margin-top: 6px;">
-                        <i data-lucide="rotate-ccw"></i>
-                        <span>Reset All Filters</span>
-                    </button>
+                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 600;">${isGenuineEmpty ? 'No Transactions Yet' : 'No Matching Transactions'}</h3>
+                    <p class="text-muted text-sm" style="margin: 0; max-width: 360px;">${isGenuineEmpty ? 'Record your first expense or income to start building your financial timeline.' : 'No transactions match your search query or applied filter criteria.'}</p>
+                    ${isGenuineEmpty ? `
+                        <button class="btn btn-primary btn-sm" onclick="app.openTransactionModal('expense')" style="margin-top: 6px;">
+                            <i data-lucide="plus"></i>
+                            <span>Add First Transaction</span>
+                        </button>
+                    ` : `
+                        <button class="btn btn-secondary btn-sm" onclick="app.resetAllLedgerFilters()" style="margin-top: 6px;">
+                            <i data-lucide="rotate-ccw"></i>
+                            <span>Reset All Filters</span>
+                        </button>
+                    `}
                 </div>
             `;
             const paginationWrap = document.getElementById('ledger-pagination-wrap');
@@ -6000,20 +6050,30 @@ class App {
             const groupTxs = dateGroups[dateStr];
             const dateHeaderLabel = this.formatLedgerDateHeader(dateStr);
 
-            // Compute day net summary
-            let dayNet = 0;
-            let dayCurrency = '¥';
+            // Compute day net summary safely per currency (never sum mixed currencies into one scalar)
+            const currencyNets = {};
             groupTxs.forEach(t => {
-                if (t.type === 'income') dayNet += Number(t.amount || 0);
-                else if (t.type === 'expense') dayNet -= Number(t.amount || 0);
-                if (t.currency) {
-                    dayCurrency = (t.currency === 'INR' || t.currency === '₹' || t.region === 'IN') ? '₹' : '¥';
-                } else if (t.region === 'IN') {
-                    dayCurrency = '₹';
-                }
+                const effType = t.type || (t.isIncome ? 'income' : 'expense');
+                if (effType !== 'income' && effType !== 'expense') return;
+
+                let sym = '¥';
+                if (t.currency === 'INR' || t.currency === '₹' || t.region === 'IN') sym = '₹';
+                else if (t.currency === 'EUR' || t.currency === '€' || t.region === 'DE') sym = '€';
+                else if (t.currency === 'USD' || t.currency === '$' || t.region === 'US') sym = '$';
+                else if (t.currency) sym = t.currency;
+
+                if (!currencyNets[sym]) currencyNets[sym] = 0;
+                if (effType === 'income') currencyNets[sym] += Number(t.amount || 0);
+                else if (effType === 'expense') currencyNets[sym] -= Number(t.amount || 0);
             });
 
-            const dayCurrencySym = (dayCurrency === 'INR' || dayCurrency === '₹') ? '₹' : '¥';
+            const subtotalChips = Object.entries(currencyNets)
+                .filter(([_, net]) => net !== 0)
+                .map(([sym, net]) => {
+                    const formatted = this.formatMoney(Math.abs(net), sym);
+                    return net > 0 ? `+${formatted}` : `-${formatted}`;
+                });
+            const subtotalHtml = subtotalChips.join(' &bull; ');
 
             html += `
                 <div class="ledger-date-group">
@@ -6023,7 +6083,7 @@ class App {
                             <span class="day-pill">${groupTxs.length} ${groupTxs.length === 1 ? 'tx' : 'txs'}</span>
                         </div>
                         <div class="ledger-date-subtotal privacy-blur">
-                            ${dayNet !== 0 ? (dayNet > 0 ? `+${this.formatMoney(dayNet, dayCurrencySym)}` : `-${this.formatMoney(Math.abs(dayNet), dayCurrencySym)}`) : ''}
+                            ${subtotalHtml}
                         </div>
                     </div>
             `;
@@ -6181,7 +6241,7 @@ class App {
             activeCount++;
             chipsHtml += `
                 <span class="filter-chip">
-                    <span style="display:inline-flex; align-items:center; gap:6px;">Country: ${this.getCountryFlagSvg(this.ledgerFilters.region, 14, 10.5)} ${this.ledgerFilters.region === 'JP' ? 'Japan' : 'India'}</span>
+                    <span style="display:inline-flex; align-items:center; gap:6px;">Country: ${this.getCountryFlagSvg(this.ledgerFilters.region, 14, 10.5)} ${this.ledgerFilters.region === 'JP' ? 'Japan' : (this.ledgerFilters.region === 'DE' ? 'Germany' : 'India')}</span>
                     <button class="filter-chip-remove" onclick="app.removeLedgerFilter('region')" title="Remove region filter">×</button>
                 </span>
             `;
@@ -8077,18 +8137,18 @@ class App {
                 </div>
 
                 ${periodTotalBudget > 0 ? this.getBudgetOverviewCardHtml({
-                    region: this.reportRegion,
-                    currency: currency,
-                    monthKey: this.reportMonthKey,
-                    allocatedBudget: periodTotalBudget,
-                    carryover: 0,
-                    totalSpent: totalExpense,
-                    sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
-                    title: 'Monthly Budget',
-                    showEditButton: false,
-                    isInteractive: false,
-                    cardClass: 'reports-budget-perf-card'
-                }) : ''}
+                region: this.reportRegion,
+                currency: currency,
+                monthKey: this.reportMonthKey,
+                allocatedBudget: periodTotalBudget,
+                carryover: 0,
+                totalSpent: totalExpense,
+                sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
+                title: 'Monthly Budget',
+                showEditButton: false,
+                isInteractive: false,
+                cardClass: 'reports-budget-perf-card'
+            }) : ''}
 
                 ${historicalBudgetNote ? `
                     <div style="padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-sm); font-size: 0.78rem; color: #93c5fd; display: flex; align-items: center; gap: 8px;">
@@ -8296,15 +8356,16 @@ class App {
             : wallets.filter(w => w.region === selectedRegion);
 
         walletSelect.innerHTML = '<option value="ALL">All Wallets</option>' +
-            filteredWallets.map(w => `<option value="${w.id}" ${w.id === currentWallet ? 'selected' : ''}>${w.id} (${w.currency || (w.region === 'JP' ? '¥' : '₹')})</option>`).join('');
+            filteredWallets.map(w => `<option value="${w.id}" ${w.id === currentWallet ? 'selected' : ''}>${w.id} (${w.currency || (w.region === 'JP' ? '¥' : (w.region === 'DE' ? '€' : '₹'))})</option>`).join('');
 
         // Categories
         let cats = [];
         if (selectedRegion === 'ALL') {
             const jpCats = storage.state.categories?.JP || [];
             const inCats = storage.state.categories?.IN || [];
+            const deCats = storage.state.categories?.DE || [];
             const seen = new Set();
-            [...jpCats, ...inCats].forEach(c => {
+            [...jpCats, ...inCats, ...deCats].forEach(c => {
                 if (!seen.has(c.id)) {
                     seen.add(c.id);
                     cats.push(c);
@@ -9049,15 +9110,20 @@ class App {
             document.body.appendChild(container);
         }
         const toast = document.createElement('div');
-        const bg = type === 'error' ? 'rgba(239, 68, 68, 0.95)' : type === 'warning' ? 'rgba(245, 158, 11, 0.95)' : 'rgba(15, 23, 42, 0.95)';
-        const border = type === 'error' ? 'rgba(248, 113, 113, 0.4)' : type === 'warning' ? 'rgba(251, 191, 36, 0.4)' : 'rgba(59, 130, 246, 0.4)';
+        const bg = type === 'error' ? 'rgba(239, 68, 68, 0.95)' : type === 'warning' ? 'rgba(245, 158, 11, 0.95)' : type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(15, 23, 42, 0.95)';
+        const border = type === 'error' ? 'rgba(248, 113, 113, 0.4)' : type === 'warning' ? 'rgba(251, 191, 36, 0.4)' : type === 'success' ? 'rgba(52, 211, 153, 0.4)' : 'rgba(59, 130, 246, 0.4)';
         toast.style.cssText = `background:${bg};color:#ffffff;border:1px solid ${border};padding:12px 18px;border-radius:8px;font-size:0.85rem;box-shadow:0 10px 25px -5px rgba(0,0,0,0.5);pointer-events:auto;transition:all 0.3s ease;transform:translateY(10px);opacity:0;max-width:380px;line-height:1.4;`;
         toast.textContent = message;
         container.appendChild(toast);
-        requestAnimationFrame(() => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => {
+                toast.style.transform = 'translateY(0)';
+                toast.style.opacity = '1';
+            });
+        } else {
             toast.style.transform = 'translateY(0)';
             toast.style.opacity = '1';
-        });
+        }
         setTimeout(() => {
             toast.style.opacity = '0';
             toast.style.transform = 'translateY(10px)';
@@ -9186,7 +9252,7 @@ class App {
                         ${this.getCountryFlagSvg(w.region, 18, 13.5)}
                         <strong style="font-size: 0.88rem;">${w.id}</strong>
                     </div>
-                    <div class="font-bold privacy-blur" style="font-size: 0.95rem;">${this.formatMoney(w.balance, w.currency || (w.region === 'JP' ? '¥' : '₹'))}</div>
+                    <div class="font-bold privacy-blur" style="font-size: 0.95rem;">${this.formatMoney(w.balance, w.currency || (w.region === 'JP' ? '¥' : (w.region === 'DE' ? '€' : '₹')))}</div>
                 </div>
             `).join('');
 

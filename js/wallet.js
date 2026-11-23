@@ -1,3 +1,16 @@
+function getLocalDateString(d = new Date()) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+if (typeof window !== 'undefined') {
+    window.getLocalDateString = getLocalDateString;
+}
+if (typeof globalThis !== 'undefined') {
+    globalThis.getLocalDateString = getLocalDateString;
+}
+
 class WalletManager {
 
     // Return all transactions from continuous ledger
@@ -183,7 +196,7 @@ class WalletManager {
     }
 
     // Add a standard expense (debit)
-    addExpense(walletId, categoryId, amount, note, date = new Date().toISOString().split('T')[0]) {
+    addExpense(walletId, categoryId, amount, note, date = getLocalDateString()) {
         const monthKey = (date || '').slice(0, 7);
         if (this.isMonthClosed(monthKey)) {
             console.warn(`[WalletManager] Month ${monthKey} is closed. Cannot add expense.`);
@@ -240,7 +253,7 @@ class WalletManager {
     }
 
     // Add income (credit)
-    addIncome(walletId, amount, note, date = new Date().toISOString().split('T')[0]) {
+    addIncome(walletId, amount, note, date = getLocalDateString()) {
         const monthKey = (date || '').slice(0, 7);
         if (this.isMonthClosed(monthKey)) {
             console.warn(`[WalletManager] Month ${monthKey} is closed. Cannot add income.`);
@@ -439,7 +452,7 @@ class WalletManager {
     }
 
     // Transfer between wallets (same currency)
-    transfer(sourceId, destId, amount, note, date = new Date().toISOString().split('T')[0]) {
+    transfer(sourceId, destId, amount, note, date = getLocalDateString()) {
         const monthKey = (date || '').slice(0, 7);
         if (this.isMonthClosed(monthKey)) {
             console.warn(`[WalletManager] Month ${monthKey} is closed. Cannot create transfer.`);
@@ -500,7 +513,7 @@ class WalletManager {
     }
 
     // Remittance (cross currency international money transfer)
-    remittance(sourceId, destId, sourceAmount, destAmount, note, date = new Date().toISOString().split('T')[0]) {
+    remittance(sourceId, destId, sourceAmount, destAmount, note, date = getLocalDateString()) {
         const monthKey = (date || '').slice(0, 7);
         if (this.isMonthClosed(monthKey)) {
             console.warn(`[WalletManager] Month ${monthKey} is closed. Cannot create remittance.`);

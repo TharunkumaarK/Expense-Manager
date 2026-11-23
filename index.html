@@ -1794,13 +1794,13 @@
                                             read-only financial analysis for arbitrary calendar intervals from the
                                             continuous ledger</p>
                                     </div>
-                                    <div style="display: flex; gap: 8px;">
-                                        <button class="btn btn-secondary btn-sm" id="btn-custom-report-reset"
+                                    <div class="custom-report-actions">
+                                        <button class="btn btn-secondary" id="btn-custom-report-reset"
                                             onclick="app.resetCustomRangeReport()" title="Reset report filters">
                                             <i data-lucide="rotate-ccw"></i>
                                             <span>Reset</span>
                                         </button>
-                                        <button class="btn btn-primary btn-sm" id="btn-custom-report-generate"
+                                        <button class="btn btn-primary" id="btn-custom-report-generate"
                                             onclick="app.generateCustomRangeReport()">
                                             <i data-lucide="calendar-range"></i>
                                             <span>Generate Report</span>
@@ -2784,9 +2784,9 @@
                                             <div class="settings-form-row">
                                                 <div>
                                                     <div class="settings-row-label">Full State Backup (JSON)</div>
-                                                    <div class="settings-row-desc">Download an encrypted, full snapshot
+                                                    <div class="settings-row-desc">Download a complete snapshot
                                                         containing wallets, transactions, monthly closings, report
-                                                        snapshots, and preferences.</div>
+                                                        snapshots, and preferences. Note: This file is an unencrypted JSON backup — keep it stored in a secure location.</div>
                                                 </div>
                                                 <div class="settings-control-wrap">
                                                     <button class="btn btn-secondary btn-sm"
@@ -3081,8 +3081,9 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Adjust Balance</label>
+                            <label>Manual Balance Correction (Override)</label>
                             <input type="number" id="edit-wallet-balance" placeholder="0" step="any">
+                            <span class="text-xs text-muted" style="display: block; margin-top: 3px;">Directly sets this wallet's current balance without creating a transaction in your ledger history.</span>
                         </div>
                     </div>
                 </div>
@@ -3268,7 +3269,7 @@
                     </div>
                     <div class="action-type-info">
                         <span class="action-type-name">Log Expense</span>
-                        <span class="action-type-desc">Track category spending & budgets</span>
+                        <span class="action-type-desc">Record money spent (food, bills, shopping)</span>
                     </div>
                     <i data-lucide="chevron-right" class="action-chevron"></i>
                 </button>
@@ -3279,7 +3280,7 @@
                     </div>
                     <div class="action-type-info">
                         <span class="action-type-name">Add Income</span>
-                        <span class="action-type-desc">Record salary, deposits & inward credit</span>
+                        <span class="action-type-desc">Record money received (salary, deposit, refund)</span>
                     </div>
                     <i data-lucide="chevron-right" class="action-chevron"></i>
                 </button>
@@ -3289,8 +3290,8 @@
                         <i data-lucide="arrow-left-right"></i>
                     </div>
                     <div class="action-type-info">
-                        <span class="action-type-name">Transfer Funds</span>
-                        <span class="action-type-desc">Move money between domestic accounts</span>
+                        <span class="action-type-name">Domestic Transfer</span>
+                        <span class="action-type-desc">Move money between accounts in the same country</span>
                     </div>
                     <i data-lucide="chevron-right" class="action-chevron"></i>
                 </button>
@@ -3300,9 +3301,8 @@
                         <i data-lucide="send"></i>
                     </div>
                     <div class="action-type-info">
-                        <span class="action-type-name">International Money Transfer</span>
-                        <span class="action-type-desc">Cross-border transfer between accounts with different
-                            currencies</span>
+                        <span class="action-type-name">International Remittance</span>
+                        <span class="action-type-desc">Send money between accounts in different countries & currencies</span>
                     </div>
                     <i data-lucide="chevron-right" class="action-chevron"></i>
                 </button>
@@ -3365,9 +3365,9 @@
                     style="background:none;border:none;color:var(--text-main);font-size:1rem;font-weight:600;letter-spacing:1px;width:80px;outline:none;font-family:var(--font-numeric);text-align:center;"
                     oninput="app.cpHexInput(this.value)">
             </div>
-            <div style="display:flex;padding:16px;gap:12px;height:240px;">
+            <div style="display:flex;padding:16px;gap:12px;height:240px;min-width:0;box-sizing:border-box;">
                 <canvas id="cp-sv-canvas"
-                    style="flex:1;border-radius:10px;cursor:crosshair;touch-action:none;display:block;"></canvas>
+                    style="flex:1;min-width:0;border-radius:10px;cursor:crosshair;touch-action:none;display:block;box-sizing:border-box;"></canvas>
                 <canvas id="cp-hue-canvas"
                     style="width:26px;border-radius:8px;cursor:ns-resize;touch-action:none;display:block;flex-shrink:0;"></canvas>
             </div>

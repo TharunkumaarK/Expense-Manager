@@ -367,7 +367,7 @@
 
             if (nextText && nextIcon) {
                 if (this.currentStep === this.totalSteps) {
-                    nextText.textContent = 'Confirm & Launch Ledger';
+                    nextText.textContent = 'Complete Setup & Launch';
                     nextIcon.setAttribute('data-lucide', 'check');
                 } else {
                     nextText.textContent = 'Continue';
@@ -382,7 +382,7 @@
                 },
                 2: {
                     title: 'Monthly Budgets',
-                    desc: 'Set independent monthly limits and rollover cushion per country.'
+                    desc: 'Set your monthly spending target and optional buffer for each country.'
                 },
                 3: {
                     title: 'Accounts & Wallets',
@@ -390,7 +390,7 @@
                 },
                 4: {
                     title: 'Review & Launch',
-                    desc: 'Verify your financial setup before initializing your ledger.'
+                    desc: 'Review your accounts and budgets before starting.'
                 }
             };
 
@@ -601,7 +601,7 @@
                             <label class="onboarding-checkbox-row">
                                 <input type="checkbox" ${bConfig.rolloverEnabled ? 'checked' : ''}
                                        onchange="onboardingController.toggleBudgetRollover('${code}', this.checked)">
-                                <span>Enable rollover cushion (unspent savings carry forward to next month)</span>
+                                <span>Roll over unspent funds to next month (adds saved amount to next month's spending limit)</span>
                             </label>
                         </div>
                     </div>
@@ -1196,7 +1196,7 @@
 
                     <!-- Structured Ledger Review Summary -->
                     <div class="onboarding-summary-card">
-                        <h3 class="onboarding-review-section-title mb-3">Ledger Configuration Summary</h3>
+                        <h3 class="onboarding-review-section-title mb-3">Setup Summary</h3>
                         
                         <div class="onboarding-summary-grid">
                             <div class="onboarding-summary-item">
