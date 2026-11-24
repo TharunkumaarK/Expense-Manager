@@ -1979,7 +1979,7 @@ class App {
         this.renderCategories();
         this.renderTransactions();
         this.renderMonthlySummary();
-        
+
         // Modern Web Guidance: Only render canvas chart when home-view is active
         if (this.currentView === 'home-view' || !this.currentView) {
             this.renderDashboardExpenseChart();
@@ -2225,10 +2225,10 @@ class App {
                 walletOptionsHtml = `
                     <option value="" ${!loanCfg.repaymentWallet ? 'selected' : ''}>-- Unselected --</option>
                     ${regionalWallets.map(w => {
-                        const isSel = loanCfg.repaymentWallet === w.id ? 'selected' : '';
-                        const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
-                        return `<option value="${this.escapeHtml(w.id)}" ${isSel}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
-                    }).join('')}
+                    const isSel = loanCfg.repaymentWallet === w.id ? 'selected' : '';
+                    const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
+                    return `<option value="${this.escapeHtml(w.id)}" ${isSel}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
+                }).join('')}
                 `;
             }
 
@@ -3380,23 +3380,59 @@ class App {
         const interactiveAttr = options.isInteractive ? `onclick="app.openOverallBudgetModal('${region}')" style="cursor: pointer;" title="Configure Overall Monthly Limit"` : '';
         const interactiveCls = options.isInteractive ? ' interactive' : '';
 
-        const isBudgetConfigured = totalAvailable > 0;
-        const statsRowHtml = isBudgetConfigured
-            ? `
-                <div class="budget-central-stats-row">
-                    <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
-                    ${isOver
-                        ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
-                        : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
-                    }
-                </div>
-            `
-            : `
-                <div class="budget-central-stats-row">
-                    <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
-                    <span class="budget-stat-item-right" style="color: var(--text-muted); font-size: 0.8rem;">Limit: Not Set</span>
+        const isBudgetEnabled = options.enabled !== undefined ? Boolean(options.enabled) : storage.isBudgetEnabled(region);
+        if (!isBudgetEnabled) {
+            return `
+                <div class="card budget-central-card${cardClass}${interactiveCls}" ${interactiveAttr}>
+                    <div class="budget-central-header">
+                        <div class="budget-central-header-top">
+                            <div class="budget-central-title-group">
+                                ${this.getCountryFlagSvg(region, 20, 15)}
+                                <h3 class="budget-central-title">${titleText}</h3>
+                                <span class="text-xs text-muted font-numeric budget-central-month">(${monthKey})</span>
+                            </div>
+                            ${editButtonHtml}
+                        </div>
+                    </div>
+                    <div style="padding: 10px 0;">
+                        <span class="text-xs text-muted">Budgeting is turned off for this region.</span>
+                        <div style="margin-top: 8px;">
+                            <button type="button" class="btn btn-secondary btn-xs" onclick="event.stopPropagation(); app.openOverallBudgetModal('${region}')" style="gap: 5px; font-size: 0.75rem;">
+                                <i data-lucide="sliders" style="width: 12px; height: 12px;"></i>
+                                <span>Enable & Configure Budget</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             `;
+        }
+
+        const isBudgetConfigured = totalAvailable > 0;
+        if (!isBudgetConfigured) {
+            return `
+                <div class="card budget-central-card${cardClass}${interactiveCls}" ${interactiveAttr}>
+                    <div class="budget-central-header">
+                        <div class="budget-central-header-top">
+                            <div class="budget-central-title-group">
+                                ${this.getCountryFlagSvg(region, 20, 15)}
+                                <h3 class="budget-central-title">${titleText}</h3>
+                                <span class="text-xs text-muted font-numeric budget-central-month">(${monthKey})</span>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-xs" onclick="event.stopPropagation(); app.openOverallBudgetModal('${region}')" style="gap: 5px; font-size: 0.75rem;" title="Configure Monthly Budget">
+                                <i data-lucide="sliders" style="width: 12px; height: 12px;"></i>
+                                <span>Set Monthly Budget</span>
+                            </button>
+                        </div>
+                        ${badgesRowHtml}
+                    </div>
+                    <div class="budget-central-stats-row" style="margin-top: 8px;">
+                        <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
+                        <span class="budget-stat-item-right" style="color: var(--text-muted); font-size: 0.8rem;">Limit: Not Set</span>
+                    </div>
+                    <p class="text-xs text-muted" style="margin: 6px 0 0 0; line-height: 1.4;">Expense tracking continues without a spending limit. Tap to configure a monthly budget.</p>
+                </div>
+            `;
+        }
 
         return `
             <div class="card budget-central-card${cardClass}${interactiveCls}" ${interactiveAttr}>
@@ -3416,7 +3452,13 @@ class App {
                         <div class="budget-streak-fill ${barClass}" style="width: ${pct}%;"></div>
                     </div>
                 </div>
-                ${statsRowHtml}
+                <div class="budget-central-stats-row">
+                    <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
+                    ${isOver
+                ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
+                : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
+            }
+                </div>
             </div>
         `;
     }
@@ -3600,7 +3642,7 @@ class App {
                         <i data-lucide="sparkles" class="dash-recent-empty-icon" style="color: var(--accent);"></i>
                         <p class="dash-recent-empty-text font-medium" style="color: var(--text-primary); margin-bottom: 2px;">Your accounts are ready</p>
                         <p class="dash-recent-empty-text text-xs" style="color: var(--text-muted); margin-bottom: 10px;">Record your first expense or income to track your activity.</p>
-                        <button class="btn btn-primary btn-xs" onclick="app.openTransactionModal('expense')" style="gap: 5px;">
+                        <button class="btn btn-primary btn-xs" onclick="app.openUnifiedTransactionSelector()" style="gap: 5px;">
                             <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
                             <span>Add Transaction</span>
                         </button>
@@ -3655,8 +3697,11 @@ class App {
                 typeCls = 'remittance';
                 amountCls = 'tx-amt-neutral';
                 sign = '';
+                const { srcName, dstName } = this.getRemittanceCountryNames(tx);
+                const srcWalletName = this.getWalletName(tx.sourceId);
+                const dstWalletName = this.getWalletName(tx.destId);
                 title = tx.note || 'Remittance';
-                meta = `${dateStr} • Japan → India`;
+                meta = `${dateStr} • ${srcWalletName} → ${dstWalletName} (${srcName} → ${dstName})`;
             } else {
                 // Expense
                 icon = 'arrow-up-right';
@@ -3678,7 +3723,7 @@ class App {
             }
 
             const amt = (effectiveType === 'remittance')
-                ? (this.isPrivacyHidden ? '******' : `¥${(tx.sourceAmount || 0).toLocaleString()} → ₹${(tx.destAmount || 0).toLocaleString()}`)
+                ? this.formatRemittanceAmount(tx)
                 : this.formatMoney(tx.amount, tx.currency, { prefix: sign });
 
             html += `
@@ -4416,9 +4461,10 @@ class App {
                     label = `Transfer: ${this.getWalletName(tx.sourceId)} → ${this.getWalletName(tx.destId)}`;
                 } else if (effectiveType === 'remittance') {
                     icon = 'globe';
-                    colorCls = 'text-muted';
-                    sign = '-';
-                    label = 'Remittance JP → IN';
+                    colorCls = (tx.destId === w.id) ? 'text-emerald' : 'text-muted';
+                    sign = (tx.destId === w.id) ? '+' : '-';
+                    const { srcCur, dstCur } = this.getRemittanceCurrencies(tx);
+                    label = `Remittance: ${this.getWalletName(tx.sourceId)} (${srcCur}) → ${this.getWalletName(tx.destId)} (${dstCur})`;
                 }
 
                 const formattedDate = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
@@ -4436,7 +4482,7 @@ class App {
                             </div>
                         </div>
                         <div class="financial-amount privacy-blur focus-tx-amount ${colorCls === 'text-emerald' ? 'text-emerald' : colorCls === 'text-rose' ? 'text-rose' : 'text-secondary'}">
-                            ${this.formatMoney(tx.amount || tx.sourceAmount, w.currency, { prefix: sign })}
+                            ${this.formatMoney(tx.destId === w.id ? (tx.destAmount !== undefined ? tx.destAmount : tx.amount) : (tx.sourceAmount !== undefined ? tx.sourceAmount : tx.amount), w.currency, { prefix: sign })}
                         </div>
                     </div>
                 `;
@@ -4781,9 +4827,9 @@ class App {
         if (res && res.success !== false) {
             this.renderAll();
             // Modern Web Guidance: Only render wallets view when it is the active screen
-        if (this.currentView === 'wallets-view') {
-            this.renderWalletsPage();
-        }
+            if (this.currentView === 'wallets-view') {
+                this.renderWalletsPage();
+            }
             this.closeModal('edit-wallet-modal');
 
             const overlay = document.getElementById('focus-overlay');
@@ -4825,9 +4871,9 @@ class App {
         if (res && res.success !== false) {
             this.renderAll();
             // Modern Web Guidance: Only render wallets view when it is the active screen
-        if (this.currentView === 'wallets-view') {
-            this.renderWalletsPage();
-        }
+            if (this.currentView === 'wallets-view') {
+                this.renderWalletsPage();
+            }
             this.closeModal('edit-wallet-modal');
             this.closeFocusOverlay();
         } else {
@@ -4857,11 +4903,11 @@ class App {
             icon = 'globe';
             colorCls = 'text-muted';
             title = tx.note || 'Remittance';
-            amt = this.isPrivacyHidden ? '******' : `\u00a5${(tx.sourceAmount || 0).toLocaleString()} \u2192 \u20b9${(tx.destAmount || 0).toLocaleString()}`;
+            amt = this.formatRemittanceAmount(tx);
         } else {
             // expense
             title = tx.note || catName;
-            const currency = tx.currency || (tx.region === 'JP' ? '\u00a5' : '\u20b9');
+            const currency = tx.currency || (tx.region === 'JP' ? '¥' : (tx.region === 'DE' ? '€' : '₹'));
             amt = this.formatMoney(tx.amount, currency, { prefix: '-' });
         }
 
@@ -5928,6 +5974,48 @@ class App {
         return String(walletId || 'Wallet');
     }
 
+    // Helper: Remittance Currency Resolution (Supports JPY, INR, EUR across arbitrary pairs)
+    getRemittanceCurrencies(tx) {
+        if (!tx) return { srcCur: '¥', dstCur: '₹' };
+        const srcWallet = (storage.state?.wallets && tx.sourceId) ? storage.state.wallets[tx.sourceId] : null;
+        const dstWallet = (storage.state?.wallets && tx.destId) ? storage.state.wallets[tx.destId] : null;
+
+        let srcCur = tx.sourceCurrency || (srcWallet && (srcWallet.currency || (srcWallet.region === 'JP' ? '¥' : srcWallet.region === 'DE' ? '€' : '₹')));
+        let dstCur = tx.destCurrency || (dstWallet && (dstWallet.currency || (dstWallet.region === 'JP' ? '¥' : dstWallet.region === 'DE' ? '€' : '₹')));
+
+        if (!srcCur && tx.currency) srcCur = tx.currency;
+        if (!srcCur) srcCur = '¥';
+        if (!dstCur) dstCur = '₹';
+
+        return { srcCur, dstCur };
+    }
+
+    // Helper: Remittance Country Names Resolution
+    getRemittanceCountryNames(tx) {
+        if (!tx) return { srcName: 'Japan', dstName: 'India' };
+        const srcWallet = (storage.state?.wallets && tx.sourceId) ? storage.state.wallets[tx.sourceId] : null;
+        const dstWallet = (storage.state?.wallets && tx.destId) ? storage.state.wallets[tx.destId] : null;
+        const regionNames = { JP: 'Japan', IN: 'India', DE: 'Germany' };
+
+        const srcRegion = (srcWallet && srcWallet.region) || (tx.sourceCurrency === '¥' || tx.sourceCurrency === 'JPY' ? 'JP' : (tx.sourceCurrency === '€' || tx.sourceCurrency === 'EUR' ? 'DE' : (tx.sourceCurrency === '₹' || tx.sourceCurrency === 'INR' ? 'IN' : 'JP')));
+        const dstRegion = (dstWallet && dstWallet.region) || (tx.destCurrency === '₹' || tx.destCurrency === 'INR' ? 'IN' : (tx.destCurrency === '€' || tx.destCurrency === 'EUR' ? 'DE' : (tx.destCurrency === '¥' || tx.destCurrency === 'JPY' ? 'JP' : 'IN')));
+
+        const srcName = regionNames[srcRegion] || srcRegion || 'Japan';
+        const dstName = regionNames[dstRegion] || dstRegion || 'India';
+
+        return { srcName, dstName };
+    }
+
+    // Helper: Format Remittance Amount String
+    formatRemittanceAmount(tx) {
+        if (this.isPrivacyHidden) return '******';
+        if (!tx) return '0';
+        const { srcCur, dstCur } = this.getRemittanceCurrencies(tx);
+        const srcFormatted = this.formatMoney(Number(tx.sourceAmount || 0), srcCur);
+        const dstFormatted = this.formatMoney(Number(tx.destAmount || 0), dstCur);
+        return `${srcFormatted} → ${dstFormatted}`;
+    }
+
     // --------------------------------------------------------------------------
     // TRANSACTIONS CONTINUOUS LEDGER
     // --------------------------------------------------------------------------
@@ -6016,7 +6104,7 @@ class App {
                     <h3 style="margin: 0; font-size: 1.05rem; font-weight: 600;">${isGenuineEmpty ? 'No Transactions Yet' : 'No Matching Transactions'}</h3>
                     <p class="text-muted text-sm" style="margin: 0; max-width: 360px;">${isGenuineEmpty ? 'Record your first expense or income to start building your financial timeline.' : 'No transactions match your search query or applied filter criteria.'}</p>
                     ${isGenuineEmpty ? `
-                        <button class="btn btn-primary btn-sm" onclick="app.openTransactionModal('expense')" style="margin-top: 6px;">
+                        <button class="btn btn-primary btn-sm" onclick="app.openUnifiedTransactionSelector()" style="margin-top: 6px;">
                             <i data-lucide="plus"></i>
                             <span>Add First Transaction</span>
                         </button>
@@ -6112,19 +6200,16 @@ class App {
                     icon = 'send';
                     typeCls = 'remittance';
                     sign = '';
-                    title = `${this.getWalletName(tx.sourceId)} (¥) → ${this.getWalletName(tx.destId)} (₹)`;
+                    const { srcCur, dstCur } = this.getRemittanceCurrencies(tx);
+                    title = `${this.getWalletName(tx.sourceId)} (${srcCur}) → ${this.getWalletName(tx.destId)} (${dstCur})`;
                 }
 
                 // Amount string
                 let amountHtml = '';
                 if (effectiveType === 'remittance') {
-                    if (this.isPrivacyHidden) {
-                        amountHtml = '******';
-                    } else {
-                        amountHtml = `¥${Number(tx.sourceAmount || 0).toLocaleString()} → ₹${Number(tx.destAmount || 0).toLocaleString()}`;
-                    }
+                    amountHtml = this.formatRemittanceAmount(tx);
                 } else {
-                    const cur = (tx.currency === 'INR' || tx.currency === '₹' || tx.region === 'IN') ? '₹' : '¥';
+                    const cur = (tx.currency === 'INR' || tx.currency === '₹' || tx.region === 'IN') ? '₹' : (tx.currency === 'EUR' || tx.currency === '€' || tx.region === 'DE') ? '€' : '¥';
                     amountHtml = this.formatMoney(tx.amount, cur, { prefix: sign });
                 }
 
@@ -6574,12 +6659,10 @@ class App {
 
         if (amountVal) {
             if (tx.type === 'remittance') {
-                amountVal.innerText = this.isPrivacyHidden
-                    ? '******'
-                    : `¥${Number(tx.sourceAmount || 0).toLocaleString()} → ₹${Number(tx.destAmount || 0).toLocaleString()}`;
+                amountVal.innerText = this.formatRemittanceAmount(tx);
             } else {
                 const sign = tx.type === 'income' ? '+' : (tx.type === 'expense' ? '-' : '');
-                const cur = (tx.currency === 'INR' || tx.currency === '₹' || tx.region === 'IN') ? '₹' : '¥';
+                const cur = (tx.currency === 'INR' || tx.currency === '₹' || tx.region === 'IN') ? '₹' : (tx.currency === 'EUR' || tx.currency === '€' || tx.region === 'DE') ? '€' : '¥';
                 amountVal.innerText = this.formatMoney(tx.amount, cur, { prefix: sign });
             }
             amountVal.className = `tx-detail-amount-val privacy-blur ${tx.type || 'expense'}`;
@@ -6595,7 +6678,8 @@ class App {
             } else if (tx.type === 'transfer') {
                 subtitle.innerText = 'Internal Wallet Transfer';
             } else if (tx.type === 'remittance') {
-                subtitle.innerText = 'Cross-Border Remittance (Japan → India)';
+                const { srcName, dstName } = this.getRemittanceCountryNames(tx);
+                subtitle.innerText = `Cross-Border Remittance (${srcName} → ${dstName})`;
             }
         }
 
@@ -6619,11 +6703,16 @@ class App {
             if (categoryWrap) categoryWrap.style.display = 'none';
             if (destWrap) {
                 destWrap.style.display = 'flex';
-                if (destVal) destVal.innerText = `${this.getWalletName(tx.destId)} (₹${Number(tx.destAmount || 0).toLocaleString()})`;
+                const { dstCur } = this.getRemittanceCurrencies(tx);
+                const dstFormatted = this.formatMoney(Number(tx.destAmount || 0), dstCur);
+                if (destVal) destVal.innerText = `${this.getWalletName(tx.destId)} (${dstFormatted})`;
             }
             if (rateWrap) {
                 rateWrap.style.display = 'flex';
-                if (rateVal) rateVal.innerText = tx.exchangeRate ? `1 JPY = ${tx.exchangeRate} INR` : '--';
+                const { srcCur, dstCur } = this.getRemittanceCurrencies(tx);
+                const srcCode = srcCur === '¥' ? 'JPY' : srcCur === '€' ? 'EUR' : srcCur === '₹' ? 'INR' : srcCur;
+                const dstCode = dstCur === '¥' ? 'JPY' : dstCur === '€' ? 'EUR' : dstCur === '₹' ? 'INR' : dstCur;
+                if (rateVal) rateVal.innerText = tx.exchangeRate ? `1 ${srcCode} = ${tx.exchangeRate} ${dstCode}` : '--';
             }
         } else {
             if (categoryWrap) categoryWrap.style.display = 'none';
@@ -8137,18 +8226,18 @@ class App {
                 </div>
 
                 ${periodTotalBudget > 0 ? this.getBudgetOverviewCardHtml({
-                    region: this.reportRegion,
-                    currency: currency,
-                    monthKey: this.reportMonthKey,
-                    allocatedBudget: periodTotalBudget,
-                    carryover: 0,
-                    totalSpent: totalExpense,
-                    sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
-                    title: 'Monthly Budget',
-                    showEditButton: false,
-                    isInteractive: false,
-                    cardClass: 'reports-budget-perf-card'
-                }) : ''}
+                region: this.reportRegion,
+                currency: currency,
+                monthKey: this.reportMonthKey,
+                allocatedBudget: periodTotalBudget,
+                carryover: 0,
+                totalSpent: totalExpense,
+                sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
+                title: 'Monthly Budget',
+                showEditButton: false,
+                isInteractive: false,
+                cardClass: 'reports-budget-perf-card'
+            }) : ''}
 
                 ${historicalBudgetNote ? `
                     <div style="padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-sm); font-size: 0.78rem; color: #93c5fd; display: flex; align-items: center; gap: 8px;">

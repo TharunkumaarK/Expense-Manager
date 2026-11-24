@@ -30,7 +30,8 @@ function runTests() {
     assert(html.includes('unencrypted JSON backup'), 'A3: Unencrypted JSON backup accurately disclosed');
     assert(html.includes('Manual Balance Correction (Override)'), 'A5: Wallet balance adjustment explicitly marked as override');
     assert(html.includes('without creating a transaction in your ledger history'), 'A5: Balance override explains ledger bypass');
-    assert(html.includes('Domestic Transfer'), 'C1: Action selector card clearly labeled Domestic Transfer');
+    assert(html.includes('Transfer Between Accounts'), 'C1: Action selector card clearly labeled Transfer Between Accounts');
+    assert(html.includes('Move money between your accounts in the same currency'), 'C1: Action selector card clarifies same currency');
     assert(html.includes('International Remittance'), 'C1: Action selector card clearly labeled International Remittance');
 
     // 2. Verify onboarding copy
