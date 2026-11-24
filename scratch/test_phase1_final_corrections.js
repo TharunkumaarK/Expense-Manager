@@ -65,13 +65,13 @@ function createMockEnvironment() {
         id,
         style: {},
         classList: {
-            add: () => { },
-            remove: () => { },
+            add: () => {},
+            remove: () => {},
             contains: () => false,
-            toggle: () => { }
+            toggle: () => {}
         },
-        setAttribute: () => { },
-        removeAttribute: () => { },
+        setAttribute: () => {},
+        removeAttribute: () => {},
         innerText: '',
         innerHTML: '',
         value: '',
@@ -92,9 +92,9 @@ function createMockEnvironment() {
     const context = {
         console,
         window: {
-            addEventListener: () => { },
+            addEventListener: () => {},
             WALLET_THEMES: [{ id: 'emerald-salary', name: 'Emerald', color: '#10b981' }],
-            lucide: { createIcons: () => { } }
+            lucide: { createIcons: () => {} }
         },
         document: mockDocument,
         localStorage: {
@@ -105,7 +105,7 @@ function createMockEnvironment() {
         },
         storage: mockStorage,
         setTimeout: (fn) => fn(),
-        clearTimeout: () => { },
+        clearTimeout: () => {},
         CountryConfig: {
             get: (reg) => ({ name: reg, currency: reg === 'JP' ? '¥' : reg === 'DE' ? '€' : '₹' })
         }
@@ -134,7 +134,7 @@ function runBehavioralTests() {
     // TEST 1: Currency-Specific Remittance Display Across Supported Pairs
     // -------------------------------------------------------------------------
     console.log("\n--- TEST 1: Remittance Multi-Currency Formatting ---");
-
+    
     // Pair 1: JPY -> INR
     const txJpyInr = {
         type: 'remittance',
@@ -227,10 +227,10 @@ function runBehavioralTests() {
     // -------------------------------------------------------------------------
     console.log("\n--- TEST 3: First-Use Transaction Entry Points ---");
     const appJsContent = fs.readFileSync('js/app.js', 'utf8');
-
+    
     // Check Dashboard first-use
     assert(appJsContent.includes(`app.openUnifiedTransactionSelector()" style="gap: 5px;">`), '3.1: Dashboard first-use CTA calls openUnifiedTransactionSelector()');
-
+    
     // Check Continuous ledger first-use
     assert(appJsContent.includes(`app.openUnifiedTransactionSelector()" style="margin-top: 6px;">`), '3.2: Continuous Ledger first-use CTA calls openUnifiedTransactionSelector()');
 
