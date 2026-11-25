@@ -58,6 +58,20 @@ def run_browser_verification():
         ws = websocket.create_connection(ws_url, timeout=15)
 
         msg_id = 0
+        console_errors = []
+        js_exceptions = []
+
+        def record_event(msg):
+            method = msg.get("method")
+            params = msg.get("params", {})
+            if method == "Runtime.exceptionThrown":
+                details = params.get("exceptionDetails", {})
+                text = details.get("text") or ""
+                exc = details.get("exception", {}).get("description") or ""
+                js_exceptions.append(f"{text} {exc}".strip())
+            elif method == "Runtime.consoleAPICalled" and params.get("type") == "error":
+                args = " ".join(str(a.get("value") or a.get("description") or "") for a in params.get("args", []))
+                console_errors.append(args)
 
         def call(method, params=None):
             nonlocal msg_id
@@ -65,6 +79,9 @@ def run_browser_verification():
             ws.send(json.dumps({"id": msg_id, "method": method, "params": params or {}}))
             while True:
                 resp = json.loads(ws.recv())
+                if "method" in resp and "id" not in resp:
+                    record_event(resp)
+                    continue
                 if resp.get("id") == msg_id:
                     if "error" in resp:
                         raise RuntimeError(f"CDP error for {method}: {resp['error']}")
@@ -254,8 +271,38 @@ def run_browser_verification():
             print(f"  [PASS] Reports & Print verified for {code} ({iso} {sym})")
 
         eval_js("app.setReportRegion('DE');")
-        time.sleep(0.25)
+        time.sleep(1.1)
         capture_screen("reports_de_1440.png")
+
+        # 1b. Custom Date-Range Report & Custom PDF Export (JP, IN, DE)
+        print("\n[Browser 1b] Verifying Custom Date-Range Report & Custom PDF Export...")
+        custom_res = eval_js("""(() => {
+            document.getElementById('report-custom-start').value = '2026-11-01';
+            document.getElementById('report-custom-end').value = '2026-11-30';
+            document.getElementById('report-custom-region').value = 'ALL';
+            document.getElementById('report-custom-wallet').value = 'ALL';
+            document.getElementById('report-custom-category').value = 'ALL';
+            app.generateCustomRangeReport();
+            const resultsHtml = document.getElementById('report-custom-results')?.innerHTML || '';
+            window._capturedCustomPdf = '';
+            window.print = () => {
+                window._capturedCustomPdf = document.getElementById('print-container')?.innerHTML || '';
+            };
+            app.exportCustomReportPdf();
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    resolve({ resultsHtml, pdfHtml: window._capturedCustomPdf });
+                }, 500);
+            });
+        })()""")
+        assert custom_res['resultsHtml'].count('Japan (JPY ¥)') == 1, "Custom report Japan summary count != 1"
+        assert custom_res['resultsHtml'].count('India (INR ₹)') == 1, "Custom report India summary count != 1"
+        assert custom_res['resultsHtml'].count('Germany (EUR €)') == 1, "Custom report Germany summary count != 1"
+        assert custom_res['pdfHtml'].count('Japan Portfolio (JPY ¥)') == 1, "Custom PDF Japan header count != 1"
+        assert custom_res['pdfHtml'].count('India Portfolio (INR ₹)') == 1, "Custom PDF India header count != 1"
+        assert custom_res['pdfHtml'].count('Germany Portfolio (EUR €)') == 1, "Custom PDF Germany header count != 1"
+        assert '€3.800' in custom_res['pdfHtml'] and '¥320,000' in custom_res['pdfHtml'] and '₹95,000' in custom_res['pdfHtml'], "Custom PDF missing expected regional totals"
+        print("  [PASS] Custom Date-Range Report & Custom PDF verified with independent JP/IN/DE sections")
 
         # ----------------------------------------------------------------------
         # 2. Reports Country Selector: 1, 2, 3 enabled countries & navigation persistence
@@ -520,6 +567,10 @@ def run_browser_verification():
                 capture_screen(f"responsive_{w}_settings_help.png")
 
             print(f"  [PASS] {w}x{h}: zero horizontal overflow across Reports, Analytics, Settings Help")
+
+        assert len(js_exceptions) == 0, f"Uncaught JS exceptions observed: {js_exceptions}"
+        assert len(console_errors) == 0, f"Console errors observed: {console_errors}"
+        print(f"  [PASS] Zero JS exceptions and zero console errors across entire browser session")
 
         ws.close()
         print("\n[SUCCESS] All browser verification checks passed!")

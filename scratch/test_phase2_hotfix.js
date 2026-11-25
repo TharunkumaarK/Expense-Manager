@@ -73,10 +73,10 @@ function createInteractiveMockDOM(htmlContent) {
             querySelector() { return null; },
             appendChild(child) { this.children.push(child); return child; },
             replaceChildren() { this.innerHTML = ''; this.children = []; },
-            focus() {},
-            scrollIntoView() {},
-            addEventListener() {},
-            removeEventListener() {},
+            focus() { },
+            scrollIntoView() { },
+            addEventListener() { },
+            removeEventListener() { },
             getContext() { return {}; }
         };
     }
@@ -103,7 +103,7 @@ function createInteractiveMockDOM(htmlContent) {
         },
         querySelector() { return null; },
         createElement(tag) { return makeEl('', tag); },
-        addEventListener() {},
+        addEventListener() { },
         visibilityState: 'visible',
         body: makeEl('body', 'body')
     };
@@ -182,16 +182,16 @@ function createHarness(html) {
     };
 
     const sandbox = {
-        console: { log() {}, warn() {}, error() {}, info() {} },
+        console: { log() { }, warn() { }, error() { }, info() { } },
         window: {
-            addEventListener() {},
-            removeEventListener() {},
-            lucide: { createIcons() {} },
+            addEventListener() { },
+            removeEventListener() { },
+            lucide: { createIcons() { } },
             print() {
                 printCount++;
                 printedSnapshotHtml = elementsById['print-container'] ? elementsById['print-container'].innerHTML : '';
             },
-            location: { reload() {} },
+            location: { reload() { } },
             navigator: { userAgent: 'test' }
         },
         document: documentMock,
@@ -204,12 +204,12 @@ function createHarness(html) {
         },
         storage: mockStorage,
         charts: {
-            renderReportExpensePie() {}
+            renderReportExpensePie() { }
         },
-        lucide: { createIcons() {} },
+        lucide: { createIcons() { } },
         defaultState: { userProfile: { displayName: 'User' }, regionalPreferences: {} },
         setTimeout(fn) { return fn(); },
-        clearTimeout() {},
+        clearTimeout() { },
         requestAnimationFrame(fn) { return fn(); }
     };
     sandbox.window.document = documentMock;
@@ -244,6 +244,16 @@ function runTests() {
     const appJs = fs.readFileSync('js/app.js', 'utf8');
 
     // -------------------------------------------------------------------------
+    // GATE 1: JavaScript Syntax Integrity Check
+    // -------------------------------------------------------------------------
+    console.log('\n--- GATE 1: JavaScript Syntax Integrity ---');
+    ['js/app.js', 'js/wallet.js', 'js/storage.js', 'js/country-config.js', 'js/charts.js', 'js/onboarding.js'].forEach(file => {
+        const src = fs.readFileSync(file, 'utf8');
+        new vm.Script(src, { filename: file });
+        assert(true, `Syntax valid: ${file}`);
+    });
+
+    // -------------------------------------------------------------------------
     // TASK 1: Printable Reports & Export Currency Resolution (JP, IN, DE)
     // -------------------------------------------------------------------------
     console.log('\n--- TASK 1: Printable Reports & Export Currency (JP / IN / DE) ---');
@@ -256,6 +266,7 @@ function runTests() {
     const dePrintHtml = h.getPrintedHtml();
     assert(h.getPrintCount() === 1, '1.1: printCurrentReport invoked window.print() for DE');
     assert(dePrintHtml.includes('Germany Portfolio (EUR €)'), '1.1: DE print subtitle displays "Germany Portfolio (EUR €)"');
+    assert((dePrintHtml.match(/class="print-report-subtitle"/g) || []).length === 1, '1.1: DE print report contains exactly one subtitle');
     assert(!dePrintHtml.includes('India Portfolio'), '1.1: DE print report does NOT display India Portfolio');
     assert(!dePrintHtml.includes('₹'), '1.1: DE print report contains zero ₹ symbols');
     assert(dePrintHtml.includes('€'), '1.1: DE print report formats amounts with €');
@@ -267,6 +278,7 @@ function runTests() {
     h.app.printCurrentReport();
     const deClosedPrintHtml = h.getPrintedHtml();
     assert(deClosedPrintHtml.includes('Germany Portfolio (EUR €)'), '1.2: DE closed-month print displays Germany Portfolio (EUR €)');
+    assert((deClosedPrintHtml.match(/class="print-report-subtitle"/g) || []).length === 1, '1.2: DE closed-month print contains exactly one subtitle');
     assert(deClosedPrintHtml.includes(h.app.formatMoney(1600, '€')), '1.2: DE closed-month print uses deTotalBudget (€1,600) instead of inTotalBudget');
     assert(!deClosedPrintHtml.includes('₹'), '1.2: DE closed-month print contains zero ₹ symbols');
 
@@ -276,6 +288,7 @@ function runTests() {
     h.app.printCurrentReport();
     const jpPrintHtml = h.getPrintedHtml();
     assert(jpPrintHtml.includes('Japan Portfolio (JPY ¥)'), '1.3: JP print subtitle displays "Japan Portfolio (JPY ¥)"');
+    assert((jpPrintHtml.match(/class="print-report-subtitle"/g) || []).length === 1, '1.3: JP print contains exactly one subtitle');
     assert(jpPrintHtml.includes('¥300,000'), '1.3: JP print report displays ¥300,000 income');
 
     // 1.4 India printCurrentReport()
@@ -284,6 +297,7 @@ function runTests() {
     h.app.printCurrentReport();
     const inPrintHtml = h.getPrintedHtml();
     assert(inPrintHtml.includes('India Portfolio (INR ₹)'), '1.4: IN print subtitle displays "India Portfolio (INR ₹)"');
+    assert((inPrintHtml.match(/class="print-report-subtitle"/g) || []).length === 1, '1.4: IN print contains exactly one subtitle');
     assert(inPrintHtml.includes('₹85,000'), '1.4: IN print report displays ₹85,000 income');
 
     // 1.5 renderReportsPage() pie badge currency code for JP, IN, DE
@@ -308,15 +322,32 @@ function runTests() {
     assert(h.app.lastCustomReportData.inIncome === 85000 && h.app.lastCustomReportData.inExpense === 12000,
         '1.6: Custom range report preserves exact IN totals without DE contamination');
     const customResultsHtml = h.elementsById['report-custom-results'].innerHTML;
-    assert(customResultsHtml.includes('Germany (EUR €)'), '1.6: Custom range HTML renders Germany (EUR €) summary card');
+    assert(!customResultsHtml.includes('< div') && !customResultsHtml.includes('</div >'), '1.6: Custom range HTML has no malformed tags');
+    assert((customResultsHtml.match(/Japan \(JPY ¥\)/g) || []).length === 1, '1.6: Custom range HTML renders Japan summary once');
+    assert((customResultsHtml.match(/India \(INR ₹\)/g) || []).length === 1, '1.6: Custom range HTML renders India summary once');
+    assert((customResultsHtml.match(/Germany \(EUR €\)/g) || []).length === 1, '1.6: Custom range HTML renders Germany summary once');
     h.app.exportCustomReportPdf();
     const customPdfHtml = h.getPrintedHtml();
-    assert(customPdfHtml.includes('Germany Portfolio (EUR €)'), '1.6: exportCustomReportPdf renders Germany Portfolio (EUR €) section');
+    assert(!customPdfHtml.includes('< div'), '1.6: Custom PDF HTML has no malformed < div tags');
+    assert((customPdfHtml.match(/Japan Portfolio \(JPY ¥\)/g) || []).length === 1, '1.6: Custom PDF renders Japan Portfolio once');
+    assert((customPdfHtml.match(/India Portfolio \(INR ₹\)/g) || []).length === 1, '1.6: Custom PDF renders India Portfolio once');
+    assert((customPdfHtml.match(/Germany Portfolio \(EUR €\)/g) || []).length === 1, '1.6: Custom PDF renders Germany Portfolio once');
+    assert((customPdfHtml.match(/<span>Total Income<\/span>/g) || []).length === 3, '1.6: Custom PDF renders 3 Total Income blocks (1 per region)');
+    const pdfTbodyMatches = [...customPdfHtml.matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)];
+    assert(pdfTbodyMatches.length === 3, '1.6: Custom PDF renders 3 regional transaction tables');
+    assert((pdfTbodyMatches[0][1].match(/<tr/g) || []).length === 2, '1.6: JP table has 2 rows (no duplicated rows)');
+    assert((pdfTbodyMatches[1][1].match(/<tr/g) || []).length === 2, '1.6: IN table has 2 rows (no duplicated rows)');
+    assert((pdfTbodyMatches[2][1].match(/<tr/g) || []).length === 2, '1.6: DE table has 2 rows (no duplicated rows)');
 
     // -------------------------------------------------------------------------
     // TASK 2: Reports Country Selector IDs & Visibility Combinations
     // -------------------------------------------------------------------------
     console.log('\n--- TASK 2: Reports Country Selector Visibility & State ---');
+    const reportSelectorMatch = html.match(/id="report-country-selector">([\s\S]*?)<\/div>/);
+    assert(Boolean(reportSelectorMatch), '2.1: Found #report-country-selector container');
+    const reportSelectorHtml = reportSelectorMatch[1];
+    assert(!/<button[^>]*<button/.test(reportSelectorHtml), '2.1: No malformed doubled <button> opening tags');
+    assert((reportSelectorHtml.match(/<button\b/g) || []).length === 3, '2.1: Exactly 3 <button> elements inside #report-country-selector');
     assert(html.includes('id="report-tab-jp"'), '2.1: index.html has id="report-tab-jp"');
     assert(html.includes('id="report-tab-in"'), '2.1: index.html has id="report-tab-in"');
     assert(html.includes('id="report-tab-de"'), '2.1: index.html has id="report-tab-de"');
@@ -374,6 +405,8 @@ function runTests() {
     const remitSectionMatch = html.match(/id="help-topic-remittances"[\s\S]*?<\/details>/);
     assert(Boolean(remitSectionMatch), '3.1: Found #help-topic-remittances section');
     const remitText = remitSectionMatch[0];
+    assert((remitText.match(/<strong>Effective Exchange Rate:<\/strong>/g) || []).length === 1,
+        '3.2: Contains exactly one Effective Exchange Rate explanation');
     assert(/effective\s+exchange\s+rate\s+is\s+calculated\s+directly\s+from\s+the\s+two\s+entered\s+amounts/i.test(remitText),
         '3.2: Explains effective exchange rate is calculated from entered amounts');
     assert(!/effective\s+exchange\s+rate\s+and\s+bank\s+transfer\s+fee\s+are\s+calculated/i.test(remitText),
