@@ -2414,6 +2414,7 @@ class App {
             if (this.budgetsRegion === code) this.budgetsRegion = newPrimary;
             if (this.analyticsCountry === code) this.analyticsCountry = newPrimary;
             if (this.reportRegion === code) this.reportRegion = newPrimary;
+            if (this.ledgerFilters && this.ledgerFilters.region === code) this.ledgerFilters.region = 'all';
 
             this.renderAll();
             this.renderSettingsPage();
@@ -6035,9 +6036,110 @@ class App {
     // TRANSACTIONS CONTINUOUS LEDGER
     // --------------------------------------------------------------------------
 
+    _getLedgerActiveCountries() {
+        const active = (typeof storage !== 'undefined' && typeof storage.getActiveCountries === 'function')
+            ? storage.getActiveCountries()
+            : ['JP', 'IN'];
+        const normalized = Array.isArray(active) ? active.map(c => String(c).toUpperCase()).filter(Boolean) : [];
+        return normalized.length > 0 ? normalized : ['JP', 'IN'];
+    }
+
+    _syncLedgerRegionState() {
+        const activeCountries = this._getLedgerActiveCountries();
+        let effectiveRegion = 'all';
+
+        if (activeCountries.length === 1) {
+            this.ledgerFilters.region = 'all';
+            effectiveRegion = activeCountries[0];
+        } else {
+            if (this.ledgerFilters.region !== 'all' && !activeCountries.includes(this.ledgerFilters.region)) {
+                this.ledgerFilters.region = 'all';
+            }
+            effectiveRegion = this.ledgerFilters.region || 'all';
+        }
+
+        const segment = document.getElementById('ledger-country-filter');
+        if (segment) {
+            if (activeCountries.length <= 1) {
+                segment.style.display = 'none';
+            } else {
+                segment.style.display = '';
+                segment.querySelectorAll('.segment-btn').forEach(btn => {
+                    const btnRegion = btn.getAttribute('data-region');
+                    const isVisible = btnRegion === 'all' || activeCountries.includes(btnRegion);
+                    btn.style.display = isVisible ? '' : 'none';
+                    if (isVisible && btnRegion === effectiveRegion) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                });
+            }
+        }
+
+        return { activeCountries, effectiveRegion };
+    }
+
+    _inferLedgerTxRegions(tx) {
+        const regions = new Set();
+        if (!tx) return regions;
+
+        const wallets = storage.state?.wallets || {};
+        let primary = tx.region ? String(tx.region).toUpperCase() : null;
+        if (!primary && tx.walletId && wallets[tx.walletId]?.region) {
+            primary = String(wallets[tx.walletId].region).toUpperCase();
+        }
+        if (!primary && tx.sourceId && wallets[tx.sourceId]?.region) {
+            primary = String(wallets[tx.sourceId].region).toUpperCase();
+        }
+        if (!primary && tx.categoryId && storage.state?.categories) {
+            for (const reg of Object.keys(storage.state.categories)) {
+                const list = storage.state.categories[reg];
+                if (Array.isArray(list) && list.some(c => c.id === tx.categoryId)) {
+                    primary = reg.toUpperCase();
+                    break;
+                }
+            }
+        }
+        if (!primary) {
+            const cur = String(tx.currency || tx.sourceCurrency || '').toUpperCase();
+            if (cur === '¥' || cur === 'JPY') primary = 'JP';
+            else if (cur === '€' || cur === 'EUR') primary = 'DE';
+            else if (cur === '₹' || cur === 'INR') primary = 'IN';
+        }
+        if (primary) regions.add(primary);
+
+        if ((tx.type === 'remittance' || tx.type === 'transfer') && tx.destId && wallets[tx.destId]?.region) {
+            regions.add(String(wallets[tx.destId].region).toUpperCase());
+        }
+        return regions;
+    }
+
+    _getFilteredLedgerTransactions(activeCountries, effectiveRegion) {
+        const queryFilters = {};
+        if (this.ledgerSearchQuery) queryFilters.search = this.ledgerSearchQuery;
+        if (this.ledgerFilters.type !== 'all') queryFilters.type = this.ledgerFilters.type;
+        if (this.ledgerFilters.categoryId !== 'all') queryFilters.categoryId = this.ledgerFilters.categoryId;
+        if (this.ledgerFilters.walletId !== 'all') queryFilters.walletId = this.ledgerFilters.walletId;
+        if (this.ledgerFilters.startDate) queryFilters.startDate = this.ledgerFilters.startDate;
+        if (this.ledgerFilters.endDate) queryFilters.endDate = this.ledgerFilters.endDate;
+        if (this.ledgerFilters.minAmount !== null) queryFilters.minAmount = this.ledgerFilters.minAmount;
+        if (this.ledgerFilters.maxAmount !== null) queryFilters.maxAmount = this.ledgerFilters.maxAmount;
+
+        const baseTxs = walletManager.getTransactions(queryFilters);
+        return baseTxs.filter(tx => {
+            const txRegions = this._inferLedgerTxRegions(tx);
+            if (txRegions.size === 0) return effectiveRegion === 'all';
+            if (effectiveRegion !== 'all') {
+                const primary = tx.region ? String(tx.region).toUpperCase() : Array.from(txRegions)[0];
+                return primary === effectiveRegion;
+            }
+            return Array.from(txRegions).some(r => activeCountries.includes(r));
+        });
+    }
+
     renderTransactionsPage() {
         const timelineEl = document.getElementById('ledger-timeline-container');
         if (!timelineEl) return;
+
+        const { activeCountries, effectiveRegion } = this._syncLedgerRegionState();
 
         // 1. Populate Category dropdown
         const catSelect = document.getElementById('filter-category-select');
@@ -6075,19 +6177,8 @@ class App {
             if (this.ledgerFilters.walletId) walletSelect.value = this.ledgerFilters.walletId;
         }
 
-        // 3. Build query filters for walletManager
-        const queryFilters = {};
-        if (this.ledgerSearchQuery) queryFilters.search = this.ledgerSearchQuery;
-        if (this.ledgerFilters.type !== 'all') queryFilters.type = this.ledgerFilters.type;
-        if (this.ledgerFilters.region !== 'all') queryFilters.region = this.ledgerFilters.region;
-        if (this.ledgerFilters.categoryId !== 'all') queryFilters.categoryId = this.ledgerFilters.categoryId;
-        if (this.ledgerFilters.walletId !== 'all') queryFilters.walletId = this.ledgerFilters.walletId;
-        if (this.ledgerFilters.startDate) queryFilters.startDate = this.ledgerFilters.startDate;
-        if (this.ledgerFilters.endDate) queryFilters.endDate = this.ledgerFilters.endDate;
-        if (this.ledgerFilters.minAmount !== null) queryFilters.minAmount = this.ledgerFilters.minAmount;
-        if (this.ledgerFilters.maxAmount !== null) queryFilters.maxAmount = this.ledgerFilters.maxAmount;
-
-        const allFilteredTxs = walletManager.getTransactions(queryFilters);
+        // 3. Filter transactions consistently with active/selected country
+        const allFilteredTxs = this._getFilteredLedgerTransactions(activeCountries, effectiveRegion);
         const totalCount = allFilteredTxs.length;
         const showingCount = Math.min(this.ledgerVisibleCount, totalCount);
 
@@ -6337,7 +6428,7 @@ class App {
             `;
         }
 
-        if (this.ledgerFilters.region !== 'all') {
+        if (this._getLedgerActiveCountries().length > 1 && this.ledgerFilters.region !== 'all') {
             activeCount++;
             chipsHtml += `
                 <span class="filter-chip">
@@ -6535,16 +6626,17 @@ class App {
     }
 
     setLedgerRegion(region) {
-        this.ledgerFilters.region = region;
-        const segment = document.getElementById('ledger-country-filter');
-        if (segment) {
-            segment.querySelectorAll('.segment-btn').forEach(btn => {
-                if (btn.getAttribute('data-region') === region) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
+        const activeCountries = this._getLedgerActiveCountries();
+        const isAllowed = region === 'all' || (typeof region === 'string' && activeCountries.includes(region));
+        if (!isAllowed) {
+            this._syncLedgerRegionState();
+            return false;
         }
+        this.ledgerFilters.region = activeCountries.length <= 1 ? 'all' : region;
+        this._syncLedgerRegionState();
         this.ledgerVisibleCount = this.ledgerPageSize;
         this.renderTransactionsPage();
+        return true;
     }
 
     removeLedgerFilter(key) {
@@ -6613,13 +6705,7 @@ class App {
         const customWrap = document.getElementById('filter-custom-date-wrap');
         if (customWrap) customWrap.style.display = 'none';
 
-        const segment = document.getElementById('ledger-country-filter');
-        if (segment) {
-            segment.querySelectorAll('.segment-btn').forEach(btn => {
-                if (btn.getAttribute('data-region') === 'all') btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
-        }
+        this._syncLedgerRegionState();
 
         const panel = document.getElementById('ledger-filter-panel');
         if (panel) panel.style.display = 'none';
@@ -6774,16 +6860,8 @@ class App {
     }
 
     exportTransactionsCsv() {
-        const queryFilters = {};
-        if (this.ledgerSearchQuery) queryFilters.search = this.ledgerSearchQuery;
-        if (this.ledgerFilters.type !== 'all') queryFilters.type = this.ledgerFilters.type;
-        if (this.ledgerFilters.region !== 'all') queryFilters.region = this.ledgerFilters.region;
-        if (this.ledgerFilters.categoryId !== 'all') queryFilters.categoryId = this.ledgerFilters.categoryId;
-        if (this.ledgerFilters.walletId !== 'all') queryFilters.walletId = this.ledgerFilters.walletId;
-        if (this.ledgerFilters.startDate) queryFilters.startDate = this.ledgerFilters.startDate;
-        if (this.ledgerFilters.endDate) queryFilters.endDate = this.ledgerFilters.endDate;
-
-        const txs = walletManager.getTransactions(queryFilters);
+        const { activeCountries, effectiveRegion } = this._syncLedgerRegionState();
+        const txs = this._getFilteredLedgerTransactions(activeCountries, effectiveRegion);
         if (!txs || txs.length === 0) {
             alert('No transactions to export.');
             return;
