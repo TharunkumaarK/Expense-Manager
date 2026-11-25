@@ -1343,39 +1343,52 @@
                                     </div>
                                 </div>
 
-                                <!-- Lifestyle Exclusions Banner -->
-                                <div class="card analytics-exclusions-card">
-                                    <div class="exclusions-left">
-                                        <div class="exclusions-title-row">
-                                            <i data-lucide="filter" class="exclusions-icon"></i>
-                                            <span class="exclusions-title">Lifestyle Spending Exclusions</span>
-                                            <span class="badge badge-subtle">Analytical Only</span>
+                                <!-- Lifestyle Exclusions Collapsible Section -->
+                                <details class="card analytics-customize-details" id="analytics-customize-analysis">
+                                    <summary class="analytics-customize-summary" tabindex="0">
+                                        <div class="customize-summary-left">
+                                            <i data-lucide="sliders-horizontal" class="customize-icon"></i>
+                                            <span class="customize-summary-title">Customize Analysis</span>
+                                            <span class="badge badge-subtle">Lifestyle Exclusions</span>
                                         </div>
-                                        <p class="exclusions-desc">Exclude non-discretionary or one-off categories (e.g.
-                                            Remittance, Groceries) from lifestyle spend analysis. <em>Never affects
-                                                ledger records or wallet balances.</em></p>
-                                        <div class="exclusions-chips-list" id="jp-exclusions-chips">
-                                            <!-- Exclusion pill checkboxes injected here -->
+                                        <div class="customize-summary-right">
+                                            <span class="text-xs text-muted customize-hint">Filter discretionary spend</span>
+                                            <i data-lucide="chevron-down" class="customize-chevron"></i>
+                                        </div>
+                                    </summary>
+                                    <div class="analytics-customize-body">
+                                        <div class="exclusions-left">
+                                            <div class="exclusions-title-row">
+                                                <i data-lucide="filter" class="exclusions-icon"></i>
+                                                <span class="exclusions-title">Lifestyle Spending Exclusions</span>
+                                                <span class="badge badge-subtle">Analytical Only</span>
+                                            </div>
+                                            <p class="exclusions-desc">Exclude non-discretionary or one-off categories (e.g.
+                                                Remittance, Groceries) from lifestyle spend analysis. Changes analytical reporting only; <em>never alters
+                                                    ledger records or wallet balances.</em></p>
+                                            <div class="exclusions-chips-list" id="jp-exclusions-chips">
+                                                <!-- Exclusion pill checkboxes injected here -->
+                                            </div>
+                                        </div>
+                                        <div class="exclusions-summary-box">
+                                            <div class="stat-mini">
+                                                <span class="stat-mini-label">Total Expenses:</span>
+                                                <span class="stat-mini-val privacy-blur"
+                                                    id="jp-stat-total-expenses">¥0</span>
+                                            </div>
+                                            <div class="stat-mini highlight">
+                                                <span class="stat-mini-label">Analytical Spend:</span>
+                                                <span class="stat-mini-val text-primary privacy-blur"
+                                                    id="jp-stat-analytical-expenses">¥0</span>
+                                            </div>
+                                            <div class="stat-mini" id="jp-stat-excluded-diff-wrap" style="display: none;">
+                                                <span class="stat-mini-label">Excluded:</span>
+                                                <span class="stat-mini-val text-muted privacy-blur"
+                                                    id="jp-stat-excluded-diff">-¥0</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="exclusions-summary-box">
-                                        <div class="stat-mini">
-                                            <span class="stat-mini-label">Total Expenses:</span>
-                                            <span class="stat-mini-val privacy-blur"
-                                                id="jp-stat-total-expenses">¥0</span>
-                                        </div>
-                                        <div class="stat-mini highlight">
-                                            <span class="stat-mini-label">Analytical Spend:</span>
-                                            <span class="stat-mini-val text-primary privacy-blur"
-                                                id="jp-stat-analytical-expenses">¥0</span>
-                                        </div>
-                                        <div class="stat-mini" id="jp-stat-excluded-diff-wrap" style="display: none;">
-                                            <span class="stat-mini-label">Excluded:</span>
-                                            <span class="stat-mini-val text-muted privacy-blur"
-                                                id="jp-stat-excluded-diff">-¥0</span>
-                                        </div>
-                                    </div>
-                                </div>
+                                </details>
 
                                 <!-- Spending Trend Chart -->
                                 <div class="card analytics-chart-card">
@@ -1737,13 +1750,21 @@
                                     </select>
                                 </div>
 
-                                <!-- Main Actions: Refresh Snapshot & Monthly Closing -->
+                                <!-- Main Actions: More Report Actions & Monthly Closing -->
                                 <div class="reports-actions-group">
-                                    <button class="btn btn-secondary btn-sm" onclick="app.refreshReportSnapshot()"
-                                        title="Recompute snapshot from continuous ledger transactions">
-                                        <i data-lucide="rotate-cw"></i>
-                                        <span>Refresh Snapshot</span>
-                                    </button>
+                                    <details class="reports-more-actions-details" id="reports-more-actions">
+                                        <summary class="btn btn-secondary btn-sm" id="btn-reports-more-actions" title="More report actions">
+                                            <i data-lucide="more-horizontal"></i>
+                                            <span>More Actions</span>
+                                        </summary>
+                                        <div class="reports-more-actions-menu">
+                                            <button type="button" class="reports-menu-item" onclick="document.getElementById('reports-more-actions').removeAttribute('open'); app.refreshReportSnapshot();"
+                                                title="Recompute snapshot from continuous ledger transactions">
+                                                <i data-lucide="rotate-cw"></i>
+                                                <span>Refresh Snapshot</span>
+                                            </button>
+                                        </div>
+                                    </details>
                                     <button class="btn btn-primary btn-sm" id="btn-open-closing-wizard"
                                         onclick="app.openClosingWizard()">
                                         <i data-lucide="check-circle-2"></i>
@@ -2338,6 +2359,11 @@
                                             <i data-lucide="database"></i>
                                             <span>Data Management</span>
                                         </button>
+                                        <button class="settings-tab-btn" data-section="help"
+                                            onclick="app.switchSettingsSection('help')">
+                                            <i data-lucide="help-circle"></i>
+                                            <span>Help & Getting Started</span>
+                                        </button>
                                         <button class="settings-tab-btn" data-section="about"
                                             onclick="app.switchSettingsSection('about')">
                                             <i data-lucide="info"></i>
@@ -2845,7 +2871,178 @@
                                         </div>
                                     </div>
 
-                                    <!-- 7. About Section -->
+                                    <!-- 7. Help & Getting Started Section -->
+                                    <div class="settings-section-card" id="settings-sec-help">
+                                        <div class="settings-sec-header">
+                                            <h2>Help & Getting Started</h2>
+                                            <p>Guides and explanations for core workflows, multi-currency features, and account settings.</p>
+                                        </div>
+
+                                        <div class="settings-help-accordion">
+                                            <!-- Topic 1: Getting Started -->
+                                            <details class="settings-help-item" id="help-topic-getting-started">
+                                                <summary class="settings-help-summary">
+                                                    <div class="help-summary-title">
+                                                        <i data-lucide="compass" class="help-summary-icon"></i>
+                                                        <span>1. Getting Started</span>
+                                                    </div>
+                                                    <i data-lucide="chevron-down" class="help-chevron"></i>
+                                                </summary>
+                                                <div class="settings-help-body">
+                                                    <p>Welcome to Expense Manager. The standard workflow for tracking your finances involves four straightforward steps:</p>
+                                                    <ol class="help-steps-list">
+                                                        <li><strong>Configure accounts and opening balances:</strong> Set up your bank accounts, credit cards, and cash wallets. <em>Important: An opening balance represents money you already hold, not new income received.</em></li>
+                                                        <li><strong>Record income and expenses:</strong> Log daily transactions as they happen. Categorize expenses to track spending habits.</li>
+                                                        <li><strong>Review transactions and balances:</strong> Inspect your continuous ledger to verify that real-world account balances match the app.</li>
+                                                        <li><strong>Optionally configure budgets:</strong> Set monthly spending limits per country or category to manage discretionary spending.</li>
+                                                    </ol>
+                                                    <div class="settings-help-actions">
+                                                        <button type="button" class="btn btn-secondary btn-xs" onclick="app.switchView('wallets-view')">
+                                                            <i data-lucide="wallet"></i>
+                                                            <span>Go to Wallets</span>
+                                                        </button>
+                                                        <button type="button" class="btn btn-secondary btn-xs" onclick="app.switchView('transactions-view')">
+                                                            <i data-lucide="list"></i>
+                                                            <span>Go to Transactions</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </details>
+
+                                            <!-- Topic 2: Income, Expenses & Transfers -->
+                                            <details class="settings-help-item" id="help-topic-income-expenses">
+                                                <summary class="settings-help-summary">
+                                                    <div class="help-summary-title">
+                                                        <i data-lucide="arrow-left-right" class="help-summary-icon"></i>
+                                                        <span>2. Income, Expenses and Transfers</span>
+                                                    </div>
+                                                    <i data-lucide="chevron-down" class="help-chevron"></i>
+                                                </summary>
+                                                <div class="settings-help-body">
+                                                    <p>Understanding the distinction between transaction types keeps your balances and reports accurate:</p>
+                                                    <ul class="help-bullets-list">
+                                                        <li><strong>Income:</strong> New funds arriving into your accounts from external sources (e.g. salary, client payments, interest, or refunds). Increases total net worth.</li>
+                                                        <li><strong>Expenses:</strong> Money leaving your accounts to external merchants or providers (e.g. food, rent, shopping, utility bills). Decreases total net worth.</li>
+                                                        <li><strong>Transfer Between Accounts:</strong> Moving money between two of your own accounts in the same currency (e.g. moving funds from a checking account to an ATM cash wallet). <em>Ordinary wallet transfers do not change your total net worth and should never be recorded as income.</em></li>
+                                                    </ul>
+                                                    <div class="settings-help-actions">
+                                                        <button type="button" class="btn btn-secondary btn-xs" onclick="app.switchView('transactions-view')">
+                                                            <i data-lucide="list"></i>
+                                                            <span>View Transactions</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </details>
+
+                                            <!-- Topic 3: International Remittances -->
+                                            <details class="settings-help-item" id="help-topic-remittances">
+                                                <summary class="settings-help-summary">
+                                                    <div class="help-summary-title">
+                                                        <i data-lucide="send" class="help-summary-icon"></i>
+                                                        <span>3. International Remittances</span>
+                                                    </div>
+                                                    <i data-lucide="chevron-down" class="help-chevron"></i>
+                                                </summary>
+                                                <div class="settings-help-body">
+                                                    <p>When transferring money internationally between accounts in different countries and currencies (such as sending money from Japan to India, or Germany to India):</p>
+                                                    <ul class="help-bullets-list">
+                                                        <li><strong>Send and Receive Amounts:</strong> You enter both the exact amount sent from the source wallet and the exact amount received in the destination wallet.</li>
+                                                        <li><strong>Effective Exchange Rate:</strong> The effective exchange rate and bank transfer fee are calculated directly from the two entered amounts. The application does not fetch or force live market rates, ensuring your ledger reflects the actual net payout received by your destination account.</li>
+                                                        <li><strong>Ledger Balance Impact:</strong> The source wallet is debited in its local currency, and the destination wallet is credited in its local currency.</li>
+                                                    </ul>
+                                                    <div class="settings-help-actions">
+                                                        <button type="button" class="btn btn-secondary btn-xs" onclick="app.openTransactionModal('remittance')">
+                                                            <i data-lucide="send"></i>
+                                                            <span>Record Remittance</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </details>
+
+                                            <!-- Topic 4: Budgets and Rollover -->
+                                            <details class="settings-help-item" id="help-topic-budgets">
+                                                <summary class="settings-help-summary">
+                                                    <div class="help-summary-title">
+                                                        <i data-lucide="pie-chart" class="help-summary-icon"></i>
+                                                        <span>4. Budgets and Rollover</span>
+                                                    </div>
+                                                    <i data-lucide="chevron-down" class="help-chevron"></i>
+                                                </summary>
+                                                <div class="settings-help-body">
+                                                    <p>Budgets help you plan and restrict your monthly discretionary spending:</p>
+                                                    <ul class="help-bullets-list">
+                                                        <li><strong>Spending Allowance vs. Cash Balance:</strong> A budget is a spending limit, not actual cash held in wallets. Setting a budget does not create or transfer money.</li>
+                                                        <li><strong>Monthly Spending Limit:</strong> The maximum total expenditure planned for a country during a calendar month.</li>
+                                                        <li><strong>Category Allocation:</strong> Optional spending caps assigned to individual categories (e.g. Dining, Groceries).</li>
+                                                        <li><strong>Unused Budget Rollover:</strong> If enabled, unspent allowance from one month is added to the spending limit of the next month. This increases your future spending allowance; it does not transfer actual money between bank accounts.</li>
+                                                    </ul>
+                                                    <div class="settings-help-actions">
+                                                        <button type="button" class="btn btn-secondary btn-xs" onclick="app.switchView('budgets-view')">
+                                                            <i data-lucide="pie-chart"></i>
+                                                            <span>Go to Budgets</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </details>
+
+                                            <!-- Topic 5: Reports and Monthly Closing -->
+                                            <details class="settings-help-item" id="help-topic-reports-closing">
+                                                <summary class="settings-help-summary">
+                                                    <div class="help-summary-title">
+                                                        <i data-lucide="file-text" class="help-summary-icon"></i>
+                                                        <span>5. Reports and Monthly Closing</span>
+                                                    </div>
+                                                    <i data-lucide="chevron-down" class="help-chevron"></i>
+                                                </summary>
+                                                <div class="settings-help-body">
+                                                    <p>Reports allow you to review periodic summaries, export accounting statements, and finalize completed months:</p>
+                                                    <ul class="help-bullets-list">
+                                                        <li><strong>Continuous Account Balances:</strong> Real-world bank and cash balances continue across months without resetting.</li>
+                                                        <li><strong>Monthly Closing:</strong> When a calendar month ends, running Monthly Closing creates an archival snapshot of that month's income, expenses, and savings.</li>
+                                                        <li><strong>Editing Restrictions:</strong> Closing a month seals its transactions against future modifications or accidental deletion, preserving your historical financial records.</li>
+                                                        <li><strong>Advancing the Calendar:</strong> Monthly Closing automatically advances the active tracking period to the subsequent month and applies any unused budget rollover.</li>
+                                                    </ul>
+                                                    <div class="settings-help-actions">
+                                                        <button type="button" class="btn btn-secondary btn-xs" onclick="app.switchView('reports-view')">
+                                                            <i data-lucide="file-text"></i>
+                                                            <span>Go to Reports</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </details>
+
+                                            <!-- Topic 6: Data and Privacy -->
+                                            <details class="settings-help-item" id="help-topic-data-privacy">
+                                                <summary class="settings-help-summary">
+                                                    <div class="help-summary-title">
+                                                        <i data-lucide="shield" class="help-summary-icon"></i>
+                                                        <span>6. Data and Privacy</span>
+                                                    </div>
+                                                    <i data-lucide="chevron-down" class="help-chevron"></i>
+                                                </summary>
+                                                <div class="settings-help-body">
+                                                    <p>Understanding how your data is protected and stored:</p>
+                                                    <ul class="help-bullets-list">
+                                                        <li><strong>Screen Concealment (Privacy Mode):</strong> Toggling the eye icon obscures monetary figures on screen with asterisks or blurs. This prevents onlookers from seeing balances in public, but does not encrypt your stored data.</li>
+                                                        <li><strong>Exported Backups:</strong> The Full State Backup generates an unencrypted JSON file containing your transactions, wallets, and preferences. Store exported backups in a safe, private location.</li>
+                                                        <li><strong>Manual Balance Corrections (Override):</strong> In the Edit Wallet dialog, adjusting a wallet balance directly overrides the recorded number without adding an income or expense transaction to your ledger timeline.</li>
+                                                    </ul>
+                                                    <div class="settings-help-actions">
+                                                        <button type="button" class="btn btn-secondary btn-xs" onclick="app.switchSettingsSection('privacy')">
+                                                            <i data-lucide="eye-off"></i>
+                                                            <span>Privacy Settings</span>
+                                                        </button>
+                                                        <button type="button" class="btn btn-secondary btn-xs" onclick="app.switchSettingsSection('data')">
+                                                            <i data-lucide="database"></i>
+                                                            <span>Data Management</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </details>
+                                        </div>
+                                    </div>
+
+                                    <!-- 8. About Section -->
                                     <div class="settings-section-card" id="settings-sec-about">
                                         <div class="settings-sec-header">
                                             <h2>About</h2>

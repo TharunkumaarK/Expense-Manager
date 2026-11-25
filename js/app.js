@@ -222,6 +222,14 @@ class App {
                 }
             }
         });
+
+        // Close Reports "More Actions" dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const moreActions = document.getElementById('reports-more-actions');
+            if (moreActions && moreActions.hasAttribute('open') && !moreActions.contains(e.target)) {
+                moreActions.removeAttribute('open');
+            }
+        });
     }
 
     resetInactivityTimer() {
@@ -2191,6 +2199,7 @@ class App {
                                         <input type="checkbox" ${rollover ? 'checked' : ''} onchange="app.updateCountryBudgetPref('${c}', undefined, undefined, this.checked)">
                                         <span class="toggle-slider"></span>
                                     </label>
+                                    <span class="text-xs text-muted" style="display:block; margin-top: 4px; font-size: 0.72rem; line-height: 1.35;">Adds unspent allowance to next month's spending limit. Does not transfer cash between accounts.</span>
                                 </div>
                             </div>
                         ` : '<p class="text-muted text-xs" style="margin:8px 0 0 0;">Budget tracking is currently disabled for this jurisdiction.</p>'}
@@ -3455,9 +3464,9 @@ class App {
                 <div class="budget-central-stats-row">
                     <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
                     ${isOver
-                        ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
-                        : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
-                    }
+                ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
+                : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
+            }
                 </div>
             </div>
         `;
@@ -8230,12 +8239,13 @@ class App {
                 currency: currency,
                 monthKey: this.reportMonthKey,
                 allocatedBudget: periodTotalBudget,
-                carryover: 0,
+                carryover: closedMeta ? (closedMeta[`${this.reportRegion}CarryoverPrior`] || 0) : 0,
                 totalSpent: totalExpense,
                 sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
                 title: 'Monthly Budget',
                 showEditButton: false,
                 isInteractive: false,
+                enabled: isClosed ? (periodTotalBudget > 0) : undefined,
                 cardClass: 'reports-budget-perf-card'
             }) : ''}
 
@@ -9436,15 +9446,14 @@ class App {
                         </div>
                         <h3 style="margin: 0 0 6px 0; font-size: 1.15rem; font-weight: 600;">Final Confirmation: Close Month ${curMonth}</h3>
                         <p class="text-xs text-muted" style="margin: 0;">
-                            Month <code>${curMonth}</code> will be frozen and permanently recorded in <code>closedMonths</code>.
-                            The application will advance to <code>${nextMonth}</code>.
+                            Month <code>${curMonth}</code> will be sealed against further transaction edits. The application will advance to active month <code>${nextMonth}</code>.
                         </p>
                     </div>
 
                     <div style="padding: 12px 14px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; display: flex; flex-direction: column; gap: 6px;">
-                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Wallet balances continue seamlessly without artificial adjustments.</span></div>
-                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Continuous transaction ledger remains intact.</span></div>
-                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Snapshots capture categories and limits for audit reconstruction.</span></div>
+                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="lock" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Transactions in ${curMonth} will be locked against future edits or accidental deletion.</span></div>
+                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Wallet balances continue seamlessly into ${nextMonth} without artificial resets.</span></div>
+                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Continuous transaction ledger remains intact across all historical periods.</span></div>
                     </div>
                 </div>
             `;

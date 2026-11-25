@@ -27,7 +27,7 @@ function runTests() {
     // 1. Verify index.html copy & security transparency
     const html = fs.readFileSync('index.html', 'utf8');
     assert(!html.includes('Download an encrypted, full snapshot'), 'A3: Misleading encrypted claim removed from JSON backup');
-    assert(html.includes('unencrypted JSON backup'), 'A3: Unencrypted JSON backup accurately disclosed');
+    assert(/unencrypted\s+JSON\s+backup/.test(html), 'A3: Unencrypted JSON backup accurately disclosed');
     assert(html.includes('Manual Balance Correction (Override)'), 'A5: Wallet balance adjustment explicitly marked as override');
     assert(html.includes('without creating a transaction in your ledger history'), 'A5: Balance override explains ledger bypass');
     assert(html.includes('Transfer Between Accounts'), 'C1: Action selector card clearly labeled Transfer Between Accounts');
