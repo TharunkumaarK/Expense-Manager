@@ -2025,6 +2025,29 @@ class App {
             this.renderedHistoryCharts.clear();
         }
         this._hasInit = false;
+        if (typeof this.resetAllLedgerFilters === 'function') {
+            this.resetAllLedgerFilters(true);
+        }
+        const catFilterSelect = document.getElementById('filter-category-select');
+        if (catFilterSelect) {
+            catFilterSelect.innerHTML = '<option value="all">All Categories</option>';
+            if (catFilterSelect.dataset) {
+                delete catFilterSelect.dataset.optionsSig;
+            }
+            if (typeof catFilterSelect.removeAttribute === 'function') {
+                catFilterSelect.removeAttribute('data-options-sig');
+            }
+        }
+        const walletFilterSelect = document.getElementById('filter-wallet-select');
+        if (walletFilterSelect) {
+            walletFilterSelect.innerHTML = '<option value="all">All Wallets</option>';
+            if (walletFilterSelect.dataset) {
+                delete walletFilterSelect.dataset.optionsSig;
+            }
+            if (typeof walletFilterSelect.removeAttribute === 'function') {
+                walletFilterSelect.removeAttribute('data-options-sig');
+            }
+        }
 
         const elIds = [
             'jp-wallets-list', 'in-wallets-list',
@@ -2420,7 +2443,17 @@ class App {
             if (this.budgetsRegion === code) this.budgetsRegion = newPrimary;
             if (this.analyticsCountry === code) this.analyticsCountry = newPrimary;
             if (this.reportRegion === code) this.reportRegion = newPrimary;
-            if (this.ledgerFilters && this.ledgerFilters.region === code) this.ledgerFilters.region = 'all';
+            if (this.ledgerFilters) {
+                if (this.ledgerFilters.region === code) this.ledgerFilters.region = 'all';
+                if (this.ledgerFilters.categoryId && this.ledgerFilters.categoryId !== 'all') {
+                    const catBelongsToDeactivated = (storage.state?.categories?.[code] || []).some(c => c && c.id === this.ledgerFilters.categoryId);
+                    if (catBelongsToDeactivated) this.ledgerFilters.categoryId = 'all';
+                }
+                if (this.ledgerFilters.walletId && this.ledgerFilters.walletId !== 'all') {
+                    const w = storage.state?.wallets?.[this.ledgerFilters.walletId];
+                    if (w && (w.region || 'JP').toUpperCase() === code) this.ledgerFilters.walletId = 'all';
+                }
+            }
 
             this.renderAll();
             this.renderSettingsPage();
@@ -2773,6 +2806,9 @@ class App {
             return false;
         });
         if (res && res.success !== false) {
+            if (this.ledgerFilters && this.ledgerFilters.categoryId === id) {
+                this.ledgerFilters.categoryId = 'all';
+            }
             this.renderSettings();
             if (window.lucide && lucide.createIcons) lucide.createIcons();
         }
@@ -2910,6 +2946,9 @@ class App {
         });
 
         if (res && res.success !== false) {
+            if (this.ledgerFilters && this.ledgerFilters.walletId === id) {
+                this.ledgerFilters.walletId = 'all';
+            }
             this.renderAll();
             this.renderSettings();
             if (window.lucide && lucide.createIcons) lucide.createIcons();
@@ -4783,7 +4822,8 @@ class App {
                 delete state.wallets[id];
                 state.wallets[newName] = {
                     ...oldWallet,
-                    id: newName
+                    id: newName,
+                    name: newName
                 };
 
                 // Cascade rename across all historical transactions in continuous ledger
@@ -4847,6 +4887,9 @@ class App {
         }
 
         if (res && res.success !== false) {
+            if (isRenaming && this.ledgerFilters && this.ledgerFilters.walletId === id) {
+                this.ledgerFilters.walletId = newName;
+            }
             this.renderAll();
             // Modern Web Guidance: Only render wallets view when it is the active screen
             if (this.currentView === 'wallets-view') {
@@ -4891,6 +4934,9 @@ class App {
         });
 
         if (res && res.success !== false) {
+            if (this.ledgerFilters && this.ledgerFilters.walletId === id) {
+                this.ledgerFilters.walletId = 'all';
+            }
             this.renderAll();
             // Modern Web Guidance: Only render wallets view when it is the active screen
             if (this.currentView === 'wallets-view') {
@@ -5911,17 +5957,21 @@ class App {
         }
         if (storage.state?.categories) {
             if (region && storage.state.categories[region]) {
-                const found = storage.state.categories[region].find(c => c.id === catId || c.name === catId || c.id === `jp-${catId}` || c.id === `in-${catId}`);
+                const found = storage.state.categories[region].find(c => c.id === catId || c.name === catId || c.id === `jp-${catId}` || c.id === `in-${catId}` || c.id === `de-${catId}`);
                 if (found?.name) return found.name;
             }
-            for (const reg of ['JP', 'IN']) {
-                const found = storage.state.categories[reg]?.find(c => c.id === catId || c.name === catId || c.id === `jp-${catId}` || c.id === `in-${catId}`);
+            const allRegs = ['JP', 'IN', 'DE'];
+            Object.keys(storage.state.categories).forEach(r => {
+                if (!allRegs.includes(r)) allRegs.push(r);
+            });
+            for (const reg of allRegs) {
+                const found = storage.state.categories[reg]?.find(c => c.id === catId || c.name === catId || c.id === `jp-${catId}` || c.id === `in-${catId}` || c.id === `de-${catId}`);
                 if (found?.name) return found.name;
             }
         }
         // Humanize slugs if not found directly
         if (typeof catId === 'string') {
-            let cleaned = catId.replace(/^(jp|in)-/i, '');
+            let cleaned = catId.replace(/^(jp|in|de)-/i, '');
             // Restrict timestamp removal strictly to the generated timestamp pattern (12-14 digits from Date.now())
             // while preserving legitimate category names that end in numbers (e.g. Room 101, Level 2).
             cleaned = cleaned.replace(/-\d{12,14}$/, '');
@@ -5946,7 +5996,7 @@ class App {
                     return resolved;
                 }
                 if (typeof rawCat === 'string') {
-                    const cleaned = rawCat.replace(/^(jp|in)-/, '');
+                    const cleaned = rawCat.replace(/^(jp|in|de)-/i, '');
                     const humanized = cleaned.split(/[-_]/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                     if (humanized && humanized.toLowerCase() !== 'undefined' && humanized.toLowerCase() !== 'null') {
                         return humanized;
@@ -6141,6 +6191,110 @@ class App {
         });
     }
 
+    _syncLedgerCategoryDropdown(activeCountries) {
+        const catSelect = document.getElementById('filter-category-select');
+        if (!catSelect) return;
+        if (!catSelect.dataset) catSelect.dataset = {};
+
+        const rawEnabled = Array.isArray(activeCountries) ? activeCountries : this._getLedgerActiveCountries();
+        const enabled = rawEnabled.map(c => String(c).toUpperCase());
+        const availableRegions = ['JP', 'IN', 'DE'].filter(r => enabled.includes(r));
+        if (storage.state?.categories) {
+            Object.keys(storage.state.categories).forEach(r => {
+                const upperR = String(r).toUpperCase();
+                if (!availableRegions.includes(upperR) && enabled.includes(upperR)) {
+                    availableRegions.push(upperR);
+                }
+            });
+        }
+
+        const regionCats = {};
+        const sigParts = [];
+        availableRegions.forEach(reg => {
+            const list = (storage.state?.categories?.[reg] || []).filter(c => c && c.isActive !== false && !c.archived && !c.isArchived);
+            regionCats[reg] = list;
+            sigParts.push(`${reg}:` + list.map(c => `${c.id}=${c.name || ''}`).join(','));
+        });
+        const optionsSig = sigParts.join('|');
+        const totalActiveCats = availableRegions.reduce((sum, reg) => sum + (regionCats[reg] || []).length, 0);
+
+        const needsRebuild = !catSelect.dataset.optionsSig ||
+            catSelect.dataset.optionsSig !== optionsSig ||
+            (catSelect.options && catSelect.options.length === 1 && totalActiveCats > 0);
+
+        if (needsRebuild) {
+            let catOptions = '<option value="all">All Categories</option>';
+            const regionLabels = { JP: 'Japan', IN: 'India', DE: 'Germany' };
+            availableRegions.forEach(reg => {
+                const cats = regionCats[reg] || [];
+                if (cats.length > 0) {
+                    const label = regionLabels[reg] ? `${regionLabels[reg]} Categories` : `${reg} Categories`;
+                    catOptions += `<optgroup label="${this.escapeHtml(label)}">`;
+                    cats.forEach(c => {
+                        catOptions += `<option value="${this.escapeHtml(c.id)}">${this.escapeHtml(c.name || c.id)}</option>`;
+                    });
+                    catOptions += '</optgroup>';
+                }
+            });
+            catSelect.innerHTML = catOptions;
+            catSelect.dataset.optionsSig = optionsSig;
+        }
+
+        const targetCatId = (this.ledgerFilters && this.ledgerFilters.categoryId) || 'all';
+        catSelect.value = targetCatId;
+        const optionExists = catSelect.options && catSelect.options.length > 0
+            ? Array.from(catSelect.options).some(o => o.value === targetCatId)
+            : (catSelect.value === targetCatId);
+        if (!optionExists || catSelect.value !== targetCatId) {
+            catSelect.value = 'all';
+            if (this.ledgerFilters) this.ledgerFilters.categoryId = 'all';
+        }
+    }
+
+    _syncLedgerWalletDropdown(activeCountries) {
+        const walletSelect = document.getElementById('filter-wallet-select');
+        if (!walletSelect) return;
+        if (!walletSelect.dataset) walletSelect.dataset = {};
+
+        const rawEnabled = Array.isArray(activeCountries) ? activeCountries : this._getLedgerActiveCountries();
+        const enabled = rawEnabled.map(c => String(c).toUpperCase());
+        const availableWallets = Object.values(storage.state?.wallets || {}).filter(w => {
+            if (!w || !w.id) return false;
+            if (w.isActive === false || w.isArchived === true || w.archived === true) return false;
+            const reg = (w.region || 'JP').toUpperCase();
+            return enabled.includes(reg);
+        });
+
+        const optionsSig = availableWallets
+            .map(w => `${w.id}:${(w.region || 'JP').toUpperCase()}:${w.name || w.id}`)
+            .join('|');
+
+        const needsRebuild = !walletSelect.dataset.optionsSig ||
+            walletSelect.dataset.optionsSig !== optionsSig ||
+            (walletSelect.options && walletSelect.options.length === 1 && availableWallets.length > 0);
+
+        if (needsRebuild) {
+            let walletOptions = '<option value="all">All Wallets</option>';
+            availableWallets.forEach(w => {
+                const countryTag = `[${(w.region || 'JP').toUpperCase()}]`;
+                const label = `${countryTag} ${w.name || w.id}`;
+                walletOptions += `<option value="${this.escapeHtml(w.id)}">${this.escapeHtml(label)}</option>`;
+            });
+            walletSelect.innerHTML = walletOptions;
+            walletSelect.dataset.optionsSig = optionsSig;
+        }
+
+        const targetWalletId = (this.ledgerFilters && this.ledgerFilters.walletId) || 'all';
+        walletSelect.value = targetWalletId;
+        const walletOptionExists = walletSelect.options && walletSelect.options.length > 0
+            ? Array.from(walletSelect.options).some(o => o.value === targetWalletId)
+            : (walletSelect.value === targetWalletId);
+        if (!walletOptionExists || walletSelect.value !== targetWalletId) {
+            walletSelect.value = 'all';
+            if (this.ledgerFilters) this.ledgerFilters.walletId = 'all';
+        }
+    }
+
     renderTransactionsPage() {
         const timelineEl = document.getElementById('ledger-timeline-container');
         if (!timelineEl) return;
@@ -6149,53 +6303,11 @@ class App {
 
         const { activeCountries, effectiveRegion } = this._syncLedgerRegionState();
 
-        // 1. Populate Category dropdown
-        const catSelect = document.getElementById('filter-category-select');
-        if (catSelect) {
-            if (catSelect.options.length <= 1) {
-                let catOptions = '<option value="all">All Categories</option>';
-                if (storage.state?.categories) {
-                    const regionLabels = { JP: 'Japan', IN: 'India', DE: 'Germany' };
-                    Object.keys(storage.state.categories).forEach(reg => {
-                        const cats = storage.state.categories[reg];
-                        if (Array.isArray(cats) && cats.length > 0) {
-                            const label = regionLabels[reg] ? `${regionLabels[reg]} Categories` : `${reg} Categories`;
-                            catOptions += `<optgroup label="${label}">`;
-                            cats.forEach(c => {
-                                catOptions += `<option value="${c.id}">${c.name}</option>`;
-                            });
-                            catOptions += '</optgroup>';
-                        }
-                    });
-                }
-                catSelect.innerHTML = catOptions;
-            }
-            catSelect.value = this.ledgerFilters.categoryId || 'all';
-            if (catSelect.value !== (this.ledgerFilters.categoryId || 'all')) {
-                catSelect.value = 'all';
-                this.ledgerFilters.categoryId = 'all';
-            }
-        }
+        // 1. Synchronize Category dropdown
+        this._syncLedgerCategoryDropdown(activeCountries);
 
-        // 2. Populate Wallet dropdown
-        const walletSelect = document.getElementById('filter-wallet-select');
-        if (walletSelect) {
-            if (walletSelect.options.length <= 1) {
-                let walletOptions = '<option value="all">All Wallets</option>';
-                if (storage.state?.wallets) {
-                    Object.values(storage.state.wallets).forEach(w => {
-                        const countryTag = `[${(w.region || 'JP').toUpperCase()}]`;
-                        walletOptions += `<option value="${w.id}">${countryTag} ${w.name || w.id}</option>`;
-                    });
-                }
-                walletSelect.innerHTML = walletOptions;
-            }
-            walletSelect.value = this.ledgerFilters.walletId || 'all';
-            if (walletSelect.value !== (this.ledgerFilters.walletId || 'all')) {
-                walletSelect.value = 'all';
-                this.ledgerFilters.walletId = 'all';
-            }
-        }
+        // 2. Synchronize Wallet dropdown
+        this._syncLedgerWalletDropdown(activeCountries);
 
         // Reconcile remaining filter input controls
         const typeSelect = document.getElementById('filter-type-select');
