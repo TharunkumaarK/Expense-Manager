@@ -7193,7 +7193,8 @@ class App {
     }
 
     renderGermanyAnalytics() {
-        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod);
+        const now = new Date();
+        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
         const { startDate, endDate, prevStartDate, prevEndDate, label } = periodRange;
 
         // Query German transactions
@@ -7227,8 +7228,7 @@ class App {
             kpiExpensesMeta.innerHTML = `<span class="delta-neutral">${label || 'This period'}</span>`;
         }
 
-        const weeks = (this.analyticsPeriod === 'last-3-months' ? 13 : 4);
-        const weeklyAvg = totalExpenses > 0 ? (totalExpenses / weeks) : 0;
+        const weeklyAvg = this.calculateAnalyticsWeeklyAverage(deTxs, periodRange, now);
         const kpiWeeklyAvg = document.getElementById('de-kpi-weekly-avg');
         if (kpiWeeklyAvg) kpiWeeklyAvg.innerText = this.formatMoney(weeklyAvg, '€');
 
@@ -7272,8 +7272,7 @@ class App {
         this.renderAnalyticsPage();
     }
 
-    getAnalyticsPeriodRange(period) {
-        const now = new Date();
+    getAnalyticsPeriodRange(period, now = new Date()) {
         const curYear = now.getFullYear();
         const curMonth = now.getMonth(); // 0-11
 
@@ -7324,6 +7323,38 @@ class App {
 
             return { startDate, endDate, prevStartDate, prevEndDate, label: 'This Month' };
         }
+    }
+
+    calculateAnalyticsWeeklyAverage(transactions, { startDate, endDate }, now = new Date()) {
+        const toUtcDay = date => {
+            if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NaN;
+            const midnight = Date.parse(`${date}T00:00:00.000Z`);
+            // Reject dates that the parser normalizes, such as February 30.
+            if (!Number.isFinite(midnight) || new Date(midnight).toISOString().slice(0, 10) !== date) return NaN;
+            return midnight / 86_400_000;
+        };
+
+        const today = toUtcDay(getLocalDateString(now));
+        const lastDay = endDate === null ? today : Math.min(today, toUtcDay(endDate));
+        const allTime = startDate === null;
+        let firstDay = allTime ? Infinity : toUtcDay(startDate);
+        if (!Number.isFinite(lastDay) || (!allTime && !Number.isFinite(firstDay))) return 0;
+
+        let expenses = 0;
+        for (const tx of transactions) {
+            const day = toUtcDay(tx.date);
+            if (!Number.isFinite(day) || day > lastDay) continue;
+            if (allTime) firstDay = Math.min(firstDay, day);
+            if (day < firstDay || tx.type !== 'expense') continue;
+
+            const amount = Number(tx.amount || 0);
+            if (Number.isFinite(amount)) expenses += amount;
+        }
+
+        if (firstDay > lastDay) return 0;
+        const elapsedWeeks = (lastDay - firstDay + 1) / 7;
+        const average = expenses / elapsedWeeks;
+        return Number.isFinite(average) ? average : 0;
     }
 
     renderJapanAnalytics() {
@@ -7697,7 +7728,8 @@ class App {
     }
 
     renderIndiaAnalytics() {
-        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod);
+        const now = new Date();
+        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
         const { startDate, endDate, prevStartDate, prevEndDate } = periodRange;
 
         // Query Indian transactions
@@ -7711,8 +7743,7 @@ class App {
         const totalExpenses = inExpenses.reduce((s, t) => s + Number(t.amount || 0), 0);
         const txCount = inTxs.length;
 
-        // Weekly average (paced over active period weeks)
-        const weeklyAvg = Math.round(totalExpenses / 4);
+        const weeklyAvg = this.calculateAnalyticsWeeklyAverage(inTxs, periodRange, now);
 
         // Previous period comparison
         let delta = null;
