@@ -7088,21 +7088,22 @@ class App {
             return;
         }
 
+        const escapeCsvField = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
         let csv = 'ID,Date,Type,Region,Wallet,Category,Amount,Currency,DestWallet,DestAmount,ExchangeRate,Note\n';
         txs.forEach(t => {
             const row = [
-                `"${t.id || ''}"`,
-                `"${t.date || ''}"`,
-                `"${t.type || ''}"`,
-                `"${t.region || ''}"`,
-                `"${this.getWalletName(t.walletId || t.sourceId)}"`,
-                `"${this.getTransactionCategory(t)}"`,
+                escapeCsvField(t.id),
+                escapeCsvField(t.date),
+                escapeCsvField(t.type),
+                escapeCsvField(t.region),
+                escapeCsvField(this.getWalletName(t.walletId || t.sourceId)),
+                escapeCsvField(this.getTransactionCategory(t)),
                 t.amount !== undefined ? t.amount : (t.sourceAmount || 0),
-                `"${t.currency || t.sourceCurrency || ''}"`,
-                `"${t.destId ? this.getWalletName(t.destId) : ''}"`,
+                escapeCsvField(t.currency === '' ? t.sourceCurrency : (t.currency ?? t.sourceCurrency)),
+                escapeCsvField(t.destId ? this.getWalletName(t.destId) : ''),
                 t.destAmount || '',
                 t.exchangeRate || '',
-                `"${(t.note || '').replace(/"/g, '""')}"`
+                escapeCsvField(t.note)
             ];
             csv += row.join(',') + '\n';
         });
