@@ -163,11 +163,22 @@ def run_browser_verification():
 
         print("Navigating to application...")
         call("Page.navigate", {"url": f"http://127.0.0.1:{HTTP_PORT}/index.html"})
-        time.sleep(1.8)
+        for _ in range(40):
+            ready = eval_js("typeof app !== 'undefined' && typeof supabaseClient !== 'undefined' && Boolean(supabaseClient.isInitialized)")
+            if ready:
+                break
+            time.sleep(0.25)
 
         # Seed synthetic multi-country financial state
         eval_js("""(() => {
             localStorage.clear();
+            if (typeof supabaseClient !== 'undefined') {
+                supabaseClient.session = { user: { email: 'hotfix@example.com', id: 'hotfix-tester' } };
+                supabaseClient.updateUI = async () => {};
+            }
+            if (typeof storage.onUserLogin === 'function') {
+                storage.onUserLogin('hotfix-tester');
+            }
             storage.state.onboardingCompleted = true;
             storage.setActiveCountries(['JP', 'IN', 'DE']);
             storage.setPrimaryCountry('JP');
