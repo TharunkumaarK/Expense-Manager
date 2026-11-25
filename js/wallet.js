@@ -11,6 +11,14 @@ if (typeof globalThis !== 'undefined') {
     globalThis.getLocalDateString = getLocalDateString;
 }
 
+function getTransactionUtcDay(date) {
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NaN;
+    const midnight = Date.parse(`${date}T00:00:00.000Z`);
+    // Reject dates that the parser normalizes, such as February 30.
+    if (!Number.isFinite(midnight) || new Date(midnight).toISOString().slice(0, 10) !== date) return NaN;
+    return midnight / 86_400_000;
+}
+
 class WalletManager {
 
     // Return all transactions from continuous ledger
@@ -28,16 +36,12 @@ class WalletManager {
             return txs;
         }
 
-        if (filters.startDate) {
-            txs = txs.filter(tx => tx.date && tx.date >= filters.startDate);
-        }
-
-        if (filters.endDate) {
-            txs = txs.filter(tx => tx.date && tx.date <= filters.endDate);
-        }
-
-        if (filters.monthKey) {
-            txs = txs.filter(tx => tx.date && tx.date.startsWith(filters.monthKey));
+        const { startDate, endDate, monthKey } = filters;
+        if (startDate || endDate || monthKey) {
+            txs = txs.filter(({ date }) => Number.isFinite(getTransactionUtcDay(date)) &&
+                (!startDate || date >= startDate) &&
+                (!endDate || date <= endDate) &&
+                (!monthKey || date.startsWith(monthKey)));
         }
 
         if (filters.walletIds && Array.isArray(filters.walletIds) && filters.walletIds.length > 0) {
@@ -156,25 +160,22 @@ class WalletManager {
             });
         }
 
-        const sortOrder = filters.sort === 'asc' ? 'asc' : 'desc';
-        txs.sort((a, b) => {
-            const dateCmp = (b.date || '').localeCompare(a.date || '');
-            const idCmp = String(b.id || '').localeCompare(String(a.id || ''));
-            const res = dateCmp !== 0 ? dateCmp : idCmp;
-            return sortOrder === 'asc' ? -res : res;
-        });
+        const direction = filters.sort === 'asc' ? -1 : 1;
+        txs.sort((a, b) => direction * this._compareTransactionsDescending(a, b));
 
         return txs;
+    }
+
+    _compareTransactionsDescending(a, b) {
+        const dateA = typeof a.date === 'string' ? a.date : '';
+        const dateB = typeof b.date === 'string' ? b.date : '';
+        return dateB.localeCompare(dateA) || String(b.id || '').localeCompare(String(a.id || ''));
     }
 
     // Helper to keep storage.state.transactions sorted chronologically descending
     _sortContinuousTransactions() {
         if (storage.state && Array.isArray(storage.state.transactions)) {
-            storage.state.transactions.sort((a, b) => {
-                const dateCmp = (b.date || '').localeCompare(a.date || '');
-                if (dateCmp !== 0) return dateCmp;
-                return String(b.id || '').localeCompare(String(a.id || ''));
-            });
+            storage.state.transactions.sort(this._compareTransactionsDescending);
         }
     }
 
@@ -581,6 +582,11 @@ class WalletManager {
     findTransaction(txId) {
         if (!storage.state) return null;
 
+        const getMonthKey = (date, fallback) => {
+            if (date == null || date === '') return fallback || '';
+            return Number.isFinite(getTransactionUtcDay(date)) ? date.slice(0, 7) : '';
+        };
+
         if (Array.isArray(storage.state.transactions)) {
             const index = storage.state.transactions.findIndex(t => t.id === txId);
             if (index !== -1) {
@@ -589,7 +595,7 @@ class WalletManager {
                     tx,
                     location: 'continuous',
                     index,
-                    monthKey: tx.date ? tx.date.substring(0, 7) : (storage.state.currentMonthKey || '')
+                    monthKey: getMonthKey(tx.date, storage.state.currentMonthKey)
                 };
             }
         }
@@ -607,7 +613,7 @@ class WalletManager {
                             location: 'history',
                             ledgerIndex: hIndex,
                             index,
-                            monthKey: tx.date ? tx.date.substring(0, 7) : (ledger.monthKey || '')
+                            monthKey: getMonthKey(tx.date, ledger.monthKey)
                         };
                     }
                 }

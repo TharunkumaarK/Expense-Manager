@@ -5927,13 +5927,9 @@ class App {
 
     // Helper: format dates for ledger headers
     formatLedgerDateHeader(dateStr) {
-        if (!dateStr) return 'Unknown Date';
-        const parts = dateStr.split('-');
-        if (parts.length !== 3) return dateStr;
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const day = parseInt(parts[2], 10);
-        const d = new Date(year, month, day);
+        const utcDay = getTransactionUtcDay(dateStr);
+        if (!Number.isFinite(utcDay)) return 'Unknown Date';
+        const d = new Date(utcDay * 86_400_000);
 
         const today = new Date();
         const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -5941,7 +5937,7 @@ class App {
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
 
-        const formatted = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+        const formatted = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
         if (dateStr === todayStr) {
             return `Today • ${formatted}`;
         } else if (dateStr === yesterdayStr) {
@@ -6402,16 +6398,15 @@ class App {
         const visibleTxs = allFilteredTxs.slice(0, showingCount);
 
         // Group transactions by date (reverse chronological)
-        const dateGroups = {};
+        const dateGroups = new Map();
         visibleTxs.forEach(tx => {
-            const dKey = tx.date || 'Undated';
-            if (!dateGroups[dKey]) dateGroups[dKey] = [];
-            dateGroups[dKey].push(tx);
+            const date = tx.date || null;
+            if (!dateGroups.has(date)) dateGroups.set(date, []);
+            dateGroups.get(date).push(tx);
         });
 
         let html = '';
-        Object.keys(dateGroups).forEach(dateStr => {
-            const groupTxs = dateGroups[dateStr];
+        dateGroups.forEach((groupTxs, dateStr) => {
             const dateHeaderLabel = this.formatLedgerDateHeader(dateStr);
 
             // Compute day net summary safely per currency (never sum mixed currencies into one scalar)
@@ -7197,15 +7192,8 @@ class App {
 
     renderGermanyAnalytics() {
         const now = new Date();
-        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
-        const { startDate, endDate, label } = periodRange;
-
-        // Query German transactions
-        const deTxs = walletManager.getTransactions({
-            region: 'DE',
-            startDate: startDate || undefined,
-            endDate: endDate || undefined
-        });
+        const { periodRange, transactions: deTxs } = this.getAnalyticsSelection('DE', now);
+        const { label } = periodRange;
 
         const expenseTxs = deTxs.filter(t => t.type === 'expense');
         const totalExpenses = expenseTxs.reduce((s, t) => s + Number(t.amount || 0), 0);
@@ -7292,8 +7280,7 @@ class App {
             const y = start3Date.getFullYear();
             const m = start3Date.getMonth();
             const startDate = `${y}-${String(m + 1).padStart(2, '0')}-01`;
-            const lastDay = new Date(curYear, curMonth + 1, 0).getDate();
-            const endDate = `${curYear}-${String(curMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+            const endDate = getLocalDateString(now);
 
             const pstart = new Date(y, m - 3, 1);
             const pend = new Date(y, m, 0);
@@ -7302,12 +7289,11 @@ class App {
 
             return { startDate, endDate, prevStartDate, prevEndDate, label: 'Last 3 Months' };
         } else if (period === 'all-time') {
-            return { startDate: null, endDate: null, prevStartDate: null, prevEndDate: null, label: 'All Time' };
+            return { startDate: null, endDate: getLocalDateString(now), prevStartDate: null, prevEndDate: null, label: 'All Time' };
         } else {
             // 'this-month' default
-            const lastDay = new Date(curYear, curMonth + 1, 0).getDate();
             const startDate = `${curYear}-${String(curMonth + 1).padStart(2, '0')}-01`;
-            const endDate = `${curYear}-${String(curMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+            const endDate = getLocalDateString(now);
 
             const prevDate = new Date(curYear, curMonth - 1, 1);
             const py = prevDate.getFullYear();
@@ -7320,12 +7306,15 @@ class App {
         }
     }
 
+    getAnalyticsSelection(region, now) {
+        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
+        const { startDate, endDate } = periodRange;
+        const transactions = walletManager.getTransactions({ region, startDate, endDate });
+        return { periodRange, transactions };
+    }
+
     getAnalyticsUtcDay(date) {
-        if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NaN;
-        const midnight = Date.parse(`${date}T00:00:00.000Z`);
-        // Reject dates that the parser normalizes, such as February 30.
-        if (!Number.isFinite(midnight) || new Date(midnight).toISOString().slice(0, 10) !== date) return NaN;
-        return midnight / 86_400_000;
+        return getTransactionUtcDay(date);
     }
 
     getAnalyticsComparisonRange(period, range, now) {
@@ -7409,15 +7398,8 @@ class App {
     renderJapanAnalytics() {
         this.syncJapanAnalyticsPreferences();
         const now = new Date();
-        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
+        const { periodRange, transactions: jpTxs } = this.getAnalyticsSelection('JP', now);
         const { startDate, endDate } = periodRange;
-
-        // Query Japanese transactions
-        const jpTxs = walletManager.getTransactions({
-            region: 'JP',
-            startDate: startDate || undefined,
-            endDate: endDate || undefined
-        });
 
         // 1. Calculations: Income, Expenses, Savings
         const incomeTxs = jpTxs.filter(t => t.type === 'income');
@@ -7522,7 +7504,8 @@ class App {
 
         // 5. Render Spending Trend Chart
         if (typeof charts !== 'undefined' && typeof charts.renderJpSpendingTrend === 'function') {
-            charts.renderJpSpendingTrend(this.jpTrendGranularity, analyticalTxs, startDate, endDate);
+            const trendStart = startDate || jpTxs.at(-1)?.date;
+            charts.renderJpSpendingTrend(this.jpTrendGranularity, analyticalTxs, trendStart, endDate);
         }
 
         // 6. Category Breakdown & Ranking List
@@ -7811,15 +7794,7 @@ class App {
 
     renderIndiaAnalytics() {
         const now = new Date();
-        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
-        const { startDate, endDate } = periodRange;
-
-        // Query Indian transactions
-        const inTxs = walletManager.getTransactions({
-            region: 'IN',
-            startDate: startDate || undefined,
-            endDate: endDate || undefined
-        });
+        const { periodRange, transactions: inTxs } = this.getAnalyticsSelection('IN', now);
 
         const inExpenses = inTxs.filter(t => t.type === 'expense');
         const totalExpenses = inExpenses.reduce((s, t) => s + Number(t.amount || 0), 0);
