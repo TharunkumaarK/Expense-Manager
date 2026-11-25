@@ -4,6 +4,14 @@ if (!window.SUPABASE_CONFIG?.storageKey) {
 
 const BASE_STORAGE_KEY = window.SUPABASE_CONFIG.storageKey;
 
+function isStorageDateInMonth(date, monthKey) {
+    if (typeof date !== 'string' || date.slice(0, 7) !== monthKey || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return false;
+    }
+    const day = new Date(`${date}T00:00:00Z`);
+    return Number.isFinite(day.getTime()) && day.toISOString().slice(0, 10) === date;
+}
+
 const defaultState = {
     schemaVersion: 3,
     revision: 1,
@@ -1055,7 +1063,7 @@ class StorageManager {
                     Object.defineProperty(h, 'transactions', {
                         get() {
                             if (!state.transactions) return [];
-                            return state.transactions.filter(t => t.date && t.date.startsWith(this.monthKey));
+                            return state.transactions.filter(t => isStorageDateInMonth(t.date, this.monthKey));
                         },
                         enumerable: false,
                         configurable: true
@@ -1661,7 +1669,9 @@ class StorageManager {
 
         // Chronological sort (newest first, secondary sort by ID)
         continuousTransactions.sort((a, b) => {
-            const dateCmp = (b.date || '').localeCompare(a.date || '');
+            const dateA = typeof a.date === 'string' ? a.date : '';
+            const dateB = typeof b.date === 'string' ? b.date : '';
+            const dateCmp = dateB.localeCompare(dateA);
             if (dateCmp !== 0) return dateCmp;
             return String(b.id).localeCompare(String(a.id));
         });
@@ -3044,7 +3054,7 @@ class StorageManager {
 
                 // Total actual expenses recorded in this month for this country
                 const spent = (this.state.transactions || [])
-                    .filter(tx => tx.type === 'expense' && tx.region === code && (tx.date || '').startsWith(mKey))
+                    .filter(tx => tx.type === 'expense' && tx.region === code && isStorageDateInMonth(tx.date, mKey))
                     .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
 
                 let rolloverAdded = 0;
@@ -3361,7 +3371,7 @@ class StorageManager {
 
             // Compute total expense spent in monthKey for this country
             const spent = (this.state.transactions || [])
-                .filter(tx => tx.type === 'expense' && tx.region === code && (tx.date || '').startsWith(monthKey))
+                .filter(tx => tx.type === 'expense' && tx.region === code && isStorageDateInMonth(tx.date, monthKey))
                 .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
 
             let nextCarryover = 0;
