@@ -68,11 +68,8 @@ class App {
         this.analyticsCountry = 'JP';
         this.analyticsPeriod = 'this-month';
         this.jpTrendGranularity = 'daily';
-        this.jpExclusions = new Set(
-            (storage.state && Array.isArray(storage.state.analyticsExclusions))
-                ? storage.state.analyticsExclusions
-                : ['jp-misc']
-        );
+        this.jpAnalyticsUserId = storage.currentUserId;
+        this.jpExclusions = new Set(this.getJapanExclusions(storage.state));
         this.selectedDrilldownCategoryId = null;
 
         // Phase 4: Reports, Budgets & Closing Wizard state
@@ -102,6 +99,7 @@ class App {
     init() {
         this._cancelLedgerSearchTimer();
         this.ledgerSearchQuery = '';
+        this.syncJapanAnalyticsPreferences();
         storage.checkRollover();
         this.initSidebarState();
         this.setupNavigation();
@@ -109,6 +107,7 @@ class App {
         this.updatePrivacyUI();
         this.updateDesktopAccountInfo();
         this.renderAll();
+        if (this.currentView === 'analytics-view') this.renderAnalyticsPage();
 
         // Gated Budget Recovery & Reconciliation Check
         if (typeof storage !== 'undefined' && storage.getBudgetRecoveryStatus() === 'BUDGET_RECOVERY_REQUIRED') {
@@ -2018,6 +2017,9 @@ class App {
     clearViewsOnLogout() {
         this._cancelLedgerSearchTimer();
         this.ledgerSearchQuery = '';
+        this.jpAnalyticsUserId = null;
+        this.jpExclusions = new Set();
+        this.closeCategoryDrilldown();
         this.setPrivacyHidden(true);
         this.clearInactivityTimer();
         this.viewingMonthKey = null;
@@ -2053,7 +2055,8 @@ class App {
             'jp-wallets-list', 'in-wallets-list',
             'jp-categories-list', 'in-categories-list',
             'recent-transactions-list', 'settings-wallets-list',
-            'settings-categories-list', 'settings-in-categories-list'
+            'settings-categories-list', 'settings-in-categories-list',
+            'jp-exclusions-chips', 'jp-category-ranking-list', 'jp-insights-list'
         ];
         elIds.forEach(id => {
             const el = document.getElementById(id);
@@ -7404,6 +7407,7 @@ class App {
     }
 
     renderJapanAnalytics() {
+        this.syncJapanAnalyticsPreferences();
         const now = new Date();
         const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
         const { startDate, endDate } = periodRange;
@@ -7489,23 +7493,27 @@ class App {
 
         if (statTotalExpenses) statTotalExpenses.innerText = this.formatMoney(totalExpenses, '¥');
         if (statAnalyticalExpenses) statAnalyticalExpenses.innerText = this.formatMoney(analyticalExpenses, '¥');
-        if (statExcludedDiff) statExcludedDiff.innerText = `-${this.formatMoney(excludedDiff, '¥')}`;
-        if (statExcludedDiffWrap) statExcludedDiffWrap.style.display = excludedDiff > 0 ? 'flex' : 'none';
+        if (statExcludedDiff) statExcludedDiff.innerText = this.formatMoney(Math.abs(excludedDiff), '¥', { prefix: excludedDiff < 0 ? '+' : '-' });
+        if (statExcludedDiffWrap) statExcludedDiffWrap.style.display = excludedDiff !== 0 ? 'flex' : 'none';
 
+        const jpCategories = new Map((storage.state?.categories?.JP || []).filter(cat => cat?.id).map(cat => [cat.id, cat]));
         if (exclusionsChips) {
             // Selectable candidate categories for lifestyle exclusion
-            const candidateCats = (storage.state?.categories?.JP || []).filter(c => {
+            const candidateCats = [...jpCategories.values()].filter(c => {
                 return c.id === 'jp-food' || c.id === 'jp-dining' || c.id === 'jp-shopping' ||
-                    c.id === 'jp-misc' || c.id === 'jp-tax' || c.id.startsWith('jp-utility');
+                    c.id === 'jp-misc' || c.id === 'jp-tax' || String(c.id).startsWith('jp-utility') || this.jpExclusions.has(c.id);
             });
+            for (const id of this.jpExclusions) {
+                if (!jpCategories.has(id)) candidateCats.push({ id, name: this.getCategoryName(id, 'JP') });
+            }
 
             let chipsHtml = '';
             candidateCats.forEach(cat => {
                 const isExcluded = this.jpExclusions.has(cat.id);
                 chipsHtml += `
-                    <button class="exclusion-pill ${isExcluded ? 'excluded' : ''}" onclick="app.toggleCategoryExclusion('${cat.id}')">
+                    <button class="exclusion-pill ${isExcluded ? 'excluded' : ''}" data-category-id="${this.escapeHtml(cat.id)}" onclick="app.toggleCategoryExclusion(this.dataset.categoryId)">
                         <i data-lucide="${isExcluded ? 'x' : 'check'}" style="width: 13px; height: 13px;"></i>
-                        <span>${cat.name}</span>
+                        <span>${this.escapeHtml(cat.name)}</span>
                     </button>
                 `;
             });
@@ -7518,14 +7526,15 @@ class App {
         }
 
         // 6. Category Breakdown & Ranking List
-        const categoryTotals = {};
-        analyticalTxs.forEach(t => {
-            categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + Number(t.amount || 0);
-        });
-
-        const activeCats = (storage.state?.categories?.JP || [])
-            .filter(c => (categoryTotals[c.id] || 0) > 0)
-            .sort((a, b) => (categoryTotals[b.id] || 0) - (categoryTotals[a.id] || 0));
+        const categoryTotals = new Map();
+        for (const tx of analyticalTxs) {
+            const id = jpCategories.has(tx.categoryId) ? tx.categoryId : null;
+            categoryTotals.set(id, (categoryTotals.get(id) || 0) + Number(tx.amount || 0));
+        }
+        const activeCats = !Number.isFinite(analyticalExpenses) || analyticalExpenses === 0 ? [] : [...categoryTotals]
+            .filter(([, amount]) => amount !== 0)
+            .map(([id, amount]) => ({ id, name: jpCategories.get(id)?.name || 'Uncategorized / Historical', amount }))
+            .sort((a, b) => b.amount - a.amount);
 
         const catRankingList = document.getElementById('jp-category-ranking-list');
         const catCountLabel = document.getElementById('jp-category-count-label');
@@ -7541,24 +7550,27 @@ class App {
                 ];
                 let rankingHtml = '';
                 activeCats.forEach((cat, idx) => {
-                    const spent = categoryTotals[cat.id] || 0;
-                    const pct = analyticalExpenses > 0 ? ((spent / analyticalExpenses) * 100).toFixed(1) : '0';
+                    const share = analyticalExpenses > 0 ? (cat.amount / analyticalExpenses) * 100 : 0;
+                    const pct = analyticalExpenses > 0 ? `${share.toFixed(1).replace(/^-0\.0$/, '0.0')}%` : '--';
+                    const name = this.escapeHtml(cat.name);
+                    const drilldown = cat.id === null ? 'style="cursor: default"' :
+                        `data-category-id="${this.escapeHtml(cat.id)}" onclick="app.openCategoryDrilldown(this.dataset.categoryId)" title="Inspect transactions for ${name}"`;
                     const color = baseColors[idx % baseColors.length];
 
                     rankingHtml += `
-                        <div class="category-rank-row" onclick="app.openCategoryDrilldown('${cat.id}')" title="Inspect transactions for ${cat.name}">
+                        <div class="category-rank-row" ${drilldown}>
                             <div class="category-rank-top">
                                 <div class="category-rank-info">
                                     <span class="category-dot" style="background: ${color};"></span>
-                                    <span class="category-name">${cat.name}</span>
+                                    <span class="category-name">${name}</span>
                                 </div>
                                 <div class="category-amount-wrap">
-                                    <span class="category-amount privacy-blur">${this.formatMoney(spent, '¥')}</span>
-                                    <span class="category-pct">${pct}%</span>
+                                    <span class="category-amount privacy-blur">${this.formatMoney(cat.amount, '¥')}</span>
+                                    <span class="category-pct">${pct}</span>
                                 </div>
                             </div>
                             <div class="category-bar-bg">
-                                <div class="category-bar-fill" style="width: ${pct}%; background: ${color};"></div>
+                                <div class="category-bar-fill" style="width: ${Math.min(100, Math.max(0, share))}%; background: ${color};"></div>
                             </div>
                         </div>
                     `;
@@ -7569,7 +7581,7 @@ class App {
 
         // Render Donut Chart
         if (typeof charts !== 'undefined' && typeof charts.renderJpCategoryDonut === 'function') {
-            charts.renderJpCategoryDonut(activeCats, categoryTotals, (cat) => this.openCategoryDrilldown(cat.id));
+            charts.renderJpCategoryDonut(activeCats, (cat) => this.openCategoryDrilldown(cat.id));
         }
 
         // 7. Category Drilldown view (if active)
@@ -7608,16 +7620,16 @@ class App {
             let insightsHtml = '';
 
             // Insight 1: Top Category
-            if (activeCats.length > 0) {
+            if (analyticalExpenses > 0 && activeCats.length > 0) {
                 const topCat = activeCats[0];
-                const topSpent = categoryTotals[topCat.id] || 0;
-                const topPct = analyticalExpenses > 0 ? Math.round((topSpent / analyticalExpenses) * 100) : 0;
+                const topName = this.escapeHtml(topCat.name);
+                const topPct = ((topCat.amount / analyticalExpenses) * 100).toFixed(1);
                 insightsHtml += `
                     <div class="insight-item">
                         <div class="insight-icon"><i data-lucide="pie-chart"></i></div>
                         <div class="insight-content">
-                            <span class="insight-title">Dominant Category: ${topCat.name}</span>
-                            <p class="insight-desc">${topCat.name} accounts for ${topPct}% of your analytical spending (<span class="privacy-blur">${this.formatMoney(topSpent, '¥')}</span>).</p>
+                            <span class="insight-title">Dominant Category: ${topName}</span>
+                            <p class="insight-desc">${topName} accounts for ${topPct}% of your analytical spending (<span class="privacy-blur">${this.formatMoney(topCat.amount, '¥')}</span>).</p>
                         </div>
                     </div>
                 `;
@@ -7650,7 +7662,7 @@ class App {
                             <div class="insight-icon"><i data-lucide="alert-circle"></i></div>
                             <div class="insight-content">
                                 <span class="insight-title">Peak Transaction Outlay</span>
-                                <p class="insight-desc">Largest single transaction was <span class="privacy-blur">${this.formatMoney(maxTx.amount, '¥')}</span> on ${maxTx.date} (${maxTx.note || this.getTransactionCategory(maxTx)}).</p>
+                                <p class="insight-desc">Largest single transaction was <span class="privacy-blur">${this.formatMoney(maxTx.amount, '¥')}</span> on ${this.escapeHtml(maxTx.date)} (${this.escapeHtml(maxTx.note || this.getTransactionCategory(maxTx))}).</p>
                             </div>
                         </div>
                     `;
@@ -7676,20 +7688,41 @@ class App {
         }
     }
 
-    async toggleCategoryExclusion(catId) {
-        if (this.jpExclusions.has(catId)) {
-            this.jpExclusions.delete(catId);
-        } else {
-            this.jpExclusions.add(catId);
+    getJapanExclusions(state) {
+        return Array.isArray(state?.analyticsExclusions) ? state.analyticsExclusions : ['jp-misc'];
+    }
+
+    syncJapanAnalyticsPreferences() {
+        if (this.jpAnalyticsUserId !== storage.currentUserId) {
+            this.jpAnalyticsUserId = storage.currentUserId;
+            this.closeCategoryDrilldown();
         }
+        this.jpExclusions = new Set(this.getJapanExclusions(storage.state));
+    }
 
-        const exclusionsArr = Array.from(this.jpExclusions);
-        await storage.runExclusive(async (state) => {
-            state.analyticsExclusions = exclusionsArr;
+    async toggleCategoryExclusion(catId) {
+        const userId = storage.currentUserId;
+        // Serialize clicks even when Storage uses its fallback lock.
+        while (this.jpExclusionSave) await this.jpExclusionSave;
+        if (storage.currentUserId !== userId) return;
+
+        this.jpExclusionSave = storage.runExclusive(state => {
+            if (storage.currentUserId !== userId) return false;
+            const exclusions = new Set(this.getJapanExclusions(state));
+            if (!exclusions.delete(catId)) exclusions.add(catId);
+            state.analyticsExclusions = [...exclusions];
             return true;
+        }).catch(error => {
+            console.error('Could not save Analytics exclusions:', error);
+            return false;
         });
+        const saved = await this.jpExclusionSave === true;
+        this.jpExclusionSave = null;
 
-        this.renderJapanAnalytics();
+        if (storage.currentUserId !== userId) return;
+        if (!saved) this.showToast('Could not save the category exclusion. Please try again.', 'error');
+        if (this.analyticsCountry === 'JP') this.renderJapanAnalytics();
+        else this.syncJapanAnalyticsPreferences();
     }
 
     setJpTrendGranularity(granularity) {
@@ -7705,12 +7738,15 @@ class App {
     }
 
     openCategoryDrilldown(catId) {
+        if (catId == null || this.getJapanExclusions(storage.state).includes(catId)) return;
         this.selectedDrilldownCategoryId = catId;
         const drilldownSection = document.getElementById('jp-drilldown-section');
         if (drilldownSection) {
             drilldownSection.style.display = 'block';
             this.renderJapanAnalytics();
-            drilldownSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            if (this.selectedDrilldownCategoryId !== null) {
+                drilldownSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         }
     }
 
@@ -7718,11 +7754,17 @@ class App {
         this.selectedDrilldownCategoryId = null;
         const drilldownSection = document.getElementById('jp-drilldown-section');
         if (drilldownSection) drilldownSection.style.display = 'none';
+        const listEl = document.getElementById('jp-drilldown-tx-list');
+        if (listEl) listEl.replaceChildren();
     }
 
     renderCategoryDrilldownView(analyticalTxs) {
         const drilldownSection = document.getElementById('jp-drilldown-section');
         if (!drilldownSection || !this.selectedDrilldownCategoryId) return;
+        if (this.jpExclusions.has(this.selectedDrilldownCategoryId)) {
+            this.closeCategoryDrilldown();
+            return;
+        }
 
         const catName = this.getCategoryName(this.selectedDrilldownCategoryId, 'JP');
         const catTxs = analyticalTxs.filter(t => t.categoryId === this.selectedDrilldownCategoryId);
@@ -7740,22 +7782,24 @@ class App {
             } else {
                 let html = '';
                 catTxs.forEach(tx => {
+                    const amount = Number(tx.amount || 0);
+                    const prefix = amount < 0 ? '+' : amount > 0 ? '-' : '';
                     html += `
-                        <div class="ledger-tx-row" onclick="app.openTransactionDetail('${tx.id}')">
+                        <div class="ledger-tx-row" data-transaction-id="${this.escapeHtml(tx.id)}" onclick="app.openTransactionDetail(this.dataset.transactionId)">
                             <div class="ledger-tx-left">
                                 <div class="tx-type-icon expense"><i data-lucide="arrow-up-right"></i></div>
                                 <div class="ledger-tx-details">
                                     <div class="ledger-tx-primary-line">
-                                        <span class="ledger-tx-title">${tx.note || catName}</span>
+                                        <span class="ledger-tx-title">${this.escapeHtml(tx.note || catName)}</span>
                                     </div>
                                     <div class="tx-meta-pills">
-                                        <span class="tx-pill">${tx.date}</span>
-                                        <span class="tx-pill">${this.getWalletName(tx.walletId)}</span>
+                                        <span class="tx-pill">${this.escapeHtml(tx.date)}</span>
+                                        <span class="tx-pill">${this.escapeHtml(this.getWalletName(tx.walletId))}</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="ledger-tx-right">
-                                <span class="ledger-tx-amount expense privacy-blur">-${this.formatMoney(tx.amount, tx.currency || '¥')}</span>
+                                <span class="ledger-tx-amount expense privacy-blur">${this.formatMoney(Math.abs(amount), this.escapeHtml(tx.currency || '¥'), { prefix })}</span>
                             </div>
                         </div>
                     `;

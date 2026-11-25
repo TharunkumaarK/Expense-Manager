@@ -64,6 +64,56 @@ class ChartManager {
         return { backgrounds, borders };
     }
 
+    getSpendingTrendSeries(transactions, granularity, startDate, endDate) {
+        const toUtcDate = date => new Date(`${date}T00:00:00Z`);
+        const totals = new Map();
+        for (const tx of transactions) {
+            const amount = Number(tx.amount || 0);
+            if (tx.type !== 'expense' || !Number.isFinite(amount) || amount === 0) continue;
+            const date = tx.date;
+            if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+            const utcDate = toUtcDate(date);
+            if (!Number.isFinite(utcDate.getTime()) || utcDate.toISOString().slice(0, 10) !== date) continue;
+            if ((startDate && date < startDate) || (endDate && date > endDate)) continue;
+
+            const month = date.slice(0, 7);
+            let key = month;
+            if (granularity === 'daily') key = date;
+            if (granularity === 'weekly') key = `${month}-W${Math.ceil(utcDate.getUTCDate() / 7)}`;
+            totals.set(key, (totals.get(key) || 0) + amount);
+        }
+
+        const keys = [...totals.keys()].sort();
+        if (granularity === 'weekly' && keys.length === 0) {
+            return { labels: ['W1', 'W2', 'W3', 'W4'], data: [0, 0, 0, 0] };
+        }
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        if (granularity === 'daily') {
+            const first = startDate || keys[0] || `${currentMonth}-01`;
+            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            const last = endDate || keys.at(-1) || `${currentMonth}-${lastDay}`;
+            const options = { day: 'numeric', month: 'short', timeZone: 'UTC' };
+            if (first.slice(0, 4) !== last.slice(0, 4)) options.year = 'numeric';
+            const format = new Intl.DateTimeFormat('en-GB', options);
+            const labels = [], data = [];
+            const end = toUtcDate(last);
+            for (const day = toUtcDate(first); day <= end; day.setUTCDate(day.getUTCDate() + 1)) {
+                labels.push(format.format(day));
+                data.push(totals.get(day.toISOString().slice(0, 10)) || 0);
+            }
+            return { labels, data };
+        }
+
+        if (keys.length === 0) keys.push(currentMonth);
+        const format = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+        const labels = keys.map(key => {
+            const month = format.format(toUtcDate(`${key.slice(0, 7)}-01`));
+            return granularity === 'weekly' ? `${month} ${key.slice(8)}` : month;
+        });
+        return { labels, data: keys.map(key => totals.get(key) || 0) };
+    }
+
     /**
      * Phase 3: Japan Spending Trend (Daily / Weekly / Monthly)
      */
@@ -76,96 +126,7 @@ class ChartManager {
             this.jpTrendChart = null;
         }
 
-        const validTxs = transactions.filter(t => t.type === 'expense' && Number(t.amount || 0) > 0);
-
-        // Build data points according to granularity
-        let labels = [];
-        let data = [];
-
-        if (granularity === 'daily') {
-            // Determine date bounds
-            let minD = startDateStr;
-            let maxD = endDateStr;
-
-            if (!minD || !maxD) {
-                if (validTxs.length > 0) {
-                    const sortedDates = validTxs.map(t => t.date).sort();
-                    minD = minD || sortedDates[0];
-                    maxD = maxD || sortedDates[sortedDates.length - 1];
-                } else {
-                    const now = new Date();
-                    const year = now.getFullYear();
-                    const month = String(now.getMonth() + 1).padStart(2, '0');
-                    minD = `${year}-${month}-01`;
-                    maxD = `${year}-${month}-${String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
-                }
-            }
-
-            // Group by date
-            const dayTotals = {};
-            validTxs.forEach(t => {
-                if (t.date) dayTotals[t.date] = (dayTotals[t.date] || 0) + Number(t.amount || 0);
-            });
-
-            // Fill all days between minD and maxD
-            const curDate = new Date(minD + 'T00:00:00');
-            const targetDate = new Date(maxD + 'T00:00:00');
-
-            while (curDate <= targetDate) {
-                const yyyy = curDate.getFullYear();
-                const mm = String(curDate.getMonth() + 1).padStart(2, '0');
-                const dd = String(curDate.getDate()).padStart(2, '0');
-                const dKey = `${yyyy}-${mm}-${dd}`;
-                labels.push(curDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
-                data.push(dayTotals[dKey] || 0);
-                curDate.setDate(curDate.getDate() + 1);
-            }
-        } else if (granularity === 'weekly') {
-            // Group by 7-day intervals
-            const weekTotals = {};
-            validTxs.forEach(t => {
-                if (t.date) {
-                    const d = new Date(t.date + 'T00:00:00');
-                    const dayNum = d.getDate();
-                    const weekNum = Math.min(Math.ceil(dayNum / 7), 5);
-                    const weekKey = `W${weekNum} (${d.toLocaleDateString('en-GB', { month: 'short' })})`;
-                    weekTotals[weekKey] = (weekTotals[weekKey] || 0) + Number(t.amount || 0);
-                }
-            });
-
-            if (Object.keys(weekTotals).length === 0) {
-                ['W1', 'W2', 'W3', 'W4'].forEach(w => {
-                    weekTotals[w] = 0;
-                });
-            }
-
-            labels = Object.keys(weekTotals);
-            data = Object.values(weekTotals);
-        } else {
-            // Monthly
-            const monthTotals = {};
-            validTxs.forEach(t => {
-                if (t.date) {
-                    const mKey = t.date.substring(0, 7);
-                    monthTotals[mKey] = (monthTotals[mKey] || 0) + Number(t.amount || 0);
-                }
-            });
-
-            const sortedKeys = Object.keys(monthTotals).sort();
-            if (sortedKeys.length === 0) {
-                const now = new Date();
-                const curM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                sortedKeys.push(curM);
-                monthTotals[curM] = 0;
-            }
-
-            sortedKeys.forEach(mk => {
-                const [y, m] = mk.split('-');
-                const d = new Date(parseInt(y), parseInt(m) - 1, 1);
-                labels.push(d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }));
-                data.push(monthTotals[mk] || 0);
-            });
-        }
+        const { labels, data } = this.getSpendingTrendSeries(transactions, granularity, startDateStr, endDateStr);
 
         const canvasCtx = ctx.getContext('2d');
         const gradient = canvasCtx.createLinearGradient(0, 0, 0, 260);
@@ -252,7 +213,7 @@ class ChartManager {
     /**
      * Phase 3: Japan Category Donut Chart with Drilldown
      */
-    renderJpCategoryDonut(categories = [], totals = {}, onCategoryClick = null) {
+    renderJpCategoryDonut(categories = [], onCategoryClick = null) {
         const ctx = document.getElementById('jp-category-donut-chart');
         if (!ctx) return;
 
@@ -261,15 +222,21 @@ class ChartManager {
             this.jpCategoryDonut = null;
         }
 
-        const activeCategories = categories.filter(c => (totals[c.id] || 0) > 0);
-
-        if (activeCategories.length === 0) {
+        if (categories.length === 0) {
             this.jpCategoryDonut = new Chart(ctx, this.getEmptyConfig('No expenses in period'));
             return;
         }
+        // Doughnut slices represent magnitudes and cannot show negative shares.
+        if (categories.some(cat => cat.amount < 0)) {
+            const message = 'Category shares unavailable for negative totals';
+            const config = this.getEmptyConfig(message);
+            config.options.plugins.title = { display: true, text: message };
+            this.jpCategoryDonut = new Chart(ctx, config);
+            return;
+        }
 
-        const labels = activeCategories.map(c => c.name);
-        const data = activeCategories.map(c => totals[c.id] || 0);
+        const labels = categories.map(c => c.name);
+        const data = categories.map(c => c.amount);
         const totalSum = data.reduce((s, v) => s + v, 0);
 
         const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
@@ -293,8 +260,8 @@ class ChartManager {
                 onClick: (event, elements) => {
                     if (elements.length > 0 && typeof onCategoryClick === 'function') {
                         const index = elements[0].index;
-                        const selectedCat = activeCategories[index];
-                        if (selectedCat) onCategoryClick(selectedCat);
+                        const selectedCat = categories[index];
+                        if (selectedCat && selectedCat.id !== null) onCategoryClick(selectedCat);
                     }
                 },
                 plugins: {
@@ -342,27 +309,7 @@ class ChartManager {
             this.inTrendChart = null;
         }
 
-        const validTxs = transactions.filter(t => t.type === 'expense' && Number(t.amount || 0) > 0);
-
-        // Group into week buckets
-        const weekTotals = {};
-        validTxs.forEach(t => {
-            if (t.date) {
-                const d = new Date(t.date + 'T00:00:00');
-                const weekNum = Math.min(Math.ceil(d.getDate() / 7), 5);
-                const wKey = `Week ${weekNum}`;
-                weekTotals[wKey] = (weekTotals[wKey] || 0) + Number(t.amount || 0);
-            }
-        });
-
-        if (Object.keys(weekTotals).length === 0) {
-            ['Week 1', 'Week 2', 'Week 3', 'Week 4'].forEach(w => {
-                weekTotals[w] = 0;
-            });
-        }
-
-        const labels = Object.keys(weekTotals);
-        const data = Object.values(weekTotals);
+        const { labels, data } = this.getSpendingTrendSeries(transactions, 'weekly');
 
         this.inTrendChart = new Chart(ctx, {
             type: 'bar',
