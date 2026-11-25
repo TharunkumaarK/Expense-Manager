@@ -48,6 +48,7 @@ class App {
         // Phase 3: Transactions Continuous Ledger state
         this.ledgerSearchQuery = '';
         this.ledgerSearchDebounceTimer = null;
+        this._pendingSearchQuery = null;
         this.ledgerFilters = {
             type: 'all',
             categoryId: 'all',
@@ -99,6 +100,8 @@ class App {
     }
 
     init() {
+        this._cancelLedgerSearchTimer();
+        this.ledgerSearchQuery = '';
         storage.checkRollover();
         this.initSidebarState();
         this.setupNavigation();
@@ -491,6 +494,7 @@ class App {
 
     switchView(viewId) {
         if (!viewId) return;
+        this._flushLedgerSearchTimer();
 
         // Approved view titles and contextual subtitles
         const viewTitles = {
@@ -2012,6 +2016,8 @@ class App {
     }
 
     clearViewsOnLogout() {
+        this._cancelLedgerSearchTimer();
+        this.ledgerSearchQuery = '';
         this.setPrivacyHidden(true);
         this.clearInactivityTimer();
         this.viewingMonthKey = null;
@@ -6139,43 +6145,92 @@ class App {
         const timelineEl = document.getElementById('ledger-timeline-container');
         if (!timelineEl) return;
 
+        this._flushLedgerSearchTimer();
+
         const { activeCountries, effectiveRegion } = this._syncLedgerRegionState();
 
         // 1. Populate Category dropdown
         const catSelect = document.getElementById('filter-category-select');
-        if (catSelect && catSelect.options.length <= 1) {
-            let catOptions = '<option value="all">All Categories</option>';
-            if (storage.state?.categories) {
-                const regionLabels = { JP: 'Japan', IN: 'India', DE: 'Germany' };
-                Object.keys(storage.state.categories).forEach(reg => {
-                    const cats = storage.state.categories[reg];
-                    if (Array.isArray(cats) && cats.length > 0) {
-                        const label = regionLabels[reg] ? `${regionLabels[reg]} Categories` : `${reg} Categories`;
-                        catOptions += `<optgroup label="${label}">`;
-                        cats.forEach(c => {
-                            catOptions += `<option value="${c.id}">${c.name}</option>`;
-                        });
-                        catOptions += '</optgroup>';
-                    }
-                });
+        if (catSelect) {
+            if (catSelect.options.length <= 1) {
+                let catOptions = '<option value="all">All Categories</option>';
+                if (storage.state?.categories) {
+                    const regionLabels = { JP: 'Japan', IN: 'India', DE: 'Germany' };
+                    Object.keys(storage.state.categories).forEach(reg => {
+                        const cats = storage.state.categories[reg];
+                        if (Array.isArray(cats) && cats.length > 0) {
+                            const label = regionLabels[reg] ? `${regionLabels[reg]} Categories` : `${reg} Categories`;
+                            catOptions += `<optgroup label="${label}">`;
+                            cats.forEach(c => {
+                                catOptions += `<option value="${c.id}">${c.name}</option>`;
+                            });
+                            catOptions += '</optgroup>';
+                        }
+                    });
+                }
+                catSelect.innerHTML = catOptions;
             }
-            catSelect.innerHTML = catOptions;
-            if (this.ledgerFilters.categoryId) catSelect.value = this.ledgerFilters.categoryId;
+            catSelect.value = this.ledgerFilters.categoryId || 'all';
+            if (catSelect.value !== (this.ledgerFilters.categoryId || 'all')) {
+                catSelect.value = 'all';
+                this.ledgerFilters.categoryId = 'all';
+            }
         }
 
         // 2. Populate Wallet dropdown
         const walletSelect = document.getElementById('filter-wallet-select');
-        if (walletSelect && walletSelect.options.length <= 1) {
-            let walletOptions = '<option value="all">All Wallets</option>';
-            if (storage.state?.wallets) {
-                Object.values(storage.state.wallets).forEach(w => {
-                    const countryTag = `[${(w.region || 'JP').toUpperCase()}]`;
-                    walletOptions += `<option value="${w.id}">${countryTag} ${w.name || w.id}</option>`;
-                });
+        if (walletSelect) {
+            if (walletSelect.options.length <= 1) {
+                let walletOptions = '<option value="all">All Wallets</option>';
+                if (storage.state?.wallets) {
+                    Object.values(storage.state.wallets).forEach(w => {
+                        const countryTag = `[${(w.region || 'JP').toUpperCase()}]`;
+                        walletOptions += `<option value="${w.id}">${countryTag} ${w.name || w.id}</option>`;
+                    });
+                }
+                walletSelect.innerHTML = walletOptions;
             }
-            walletSelect.innerHTML = walletOptions;
-            if (this.ledgerFilters.walletId) walletSelect.value = this.ledgerFilters.walletId;
+            walletSelect.value = this.ledgerFilters.walletId || 'all';
+            if (walletSelect.value !== (this.ledgerFilters.walletId || 'all')) {
+                walletSelect.value = 'all';
+                this.ledgerFilters.walletId = 'all';
+            }
         }
+
+        // Reconcile remaining filter input controls
+        const typeSelect = document.getElementById('filter-type-select');
+        if (typeSelect) {
+            typeSelect.value = this.ledgerFilters.type || 'all';
+            if (typeSelect.value !== (this.ledgerFilters.type || 'all')) {
+                typeSelect.value = 'all';
+                this.ledgerFilters.type = 'all';
+            }
+        }
+
+        const dateSelect = document.getElementById('filter-date-preset');
+        if (dateSelect) {
+            dateSelect.value = this.ledgerFilters.datePreset || 'all';
+            if (dateSelect.value !== (this.ledgerFilters.datePreset || 'all')) {
+                dateSelect.value = 'all';
+                this.ledgerFilters.datePreset = 'all';
+            }
+        }
+
+        const customWrap = document.getElementById('filter-custom-date-wrap');
+        if (customWrap) customWrap.style.display = this.ledgerFilters.datePreset === 'custom' ? 'grid' : 'none';
+
+        const startInput = document.getElementById('filter-date-start');
+        if (startInput && document.activeElement !== startInput) startInput.value = this.ledgerFilters.startDate || '';
+        const endInput = document.getElementById('filter-date-end');
+        if (endInput && document.activeElement !== endInput) endInput.value = this.ledgerFilters.endDate || '';
+
+        const minInput = document.getElementById('filter-amount-min');
+        if (minInput && document.activeElement !== minInput) minInput.value = (this.ledgerFilters.minAmount !== null && this.ledgerFilters.minAmount !== undefined) ? this.ledgerFilters.minAmount : '';
+        const maxInput = document.getElementById('filter-amount-max');
+        if (maxInput && document.activeElement !== maxInput) maxInput.value = (this.ledgerFilters.maxAmount !== null && this.ledgerFilters.maxAmount !== undefined) ? this.ledgerFilters.maxAmount : '';
+
+        const searchInput = document.getElementById('ledger-search-input');
+        if (searchInput && document.activeElement !== searchInput) searchInput.value = this.ledgerSearchQuery || '';
 
         // 3. Filter transactions consistently with active/selected country
         const allFilteredTxs = this._getFilteredLedgerTransactions(activeCountries, effectiveRegion);
@@ -6410,10 +6465,11 @@ class App {
 
         if (this.ledgerSearchQuery) {
             activeCount++;
+            const safeSearch = this.escapeHtml(this.ledgerSearchQuery);
             chipsHtml += `
                 <span class="filter-chip">
-                    <span>Search: "${this.ledgerSearchQuery}"</span>
-                    <button class="filter-chip-remove" onclick="app.clearLedgerSearch()" title="Remove search">×</button>
+                    <span>Search: "${safeSearch}"</span>
+                    <button class="filter-chip-remove" onclick="app.removeLedgerFilter('search')" title="Remove search">×</button>
                 </span>
             `;
         }
@@ -6422,7 +6478,7 @@ class App {
             activeCount++;
             chipsHtml += `
                 <span class="filter-chip">
-                    <span>Type: ${this.ledgerFilters.type}</span>
+                    <span>Type: ${this.escapeHtml(this.ledgerFilters.type)}</span>
                     <button class="filter-chip-remove" onclick="app.removeLedgerFilter('type')" title="Remove type filter">×</button>
                 </span>
             `;
@@ -6430,9 +6486,10 @@ class App {
 
         if (this._getLedgerActiveCountries().length > 1 && this.ledgerFilters.region !== 'all') {
             activeCount++;
+            const regName = this.ledgerFilters.region === 'JP' ? 'Japan' : (this.ledgerFilters.region === 'DE' ? 'Germany' : 'India');
             chipsHtml += `
                 <span class="filter-chip">
-                    <span style="display:inline-flex; align-items:center; gap:6px;">Country: ${this.getCountryFlagSvg(this.ledgerFilters.region, 14, 10.5)} ${this.ledgerFilters.region === 'JP' ? 'Japan' : (this.ledgerFilters.region === 'DE' ? 'Germany' : 'India')}</span>
+                    <span style="display:inline-flex; align-items:center; gap:6px;">Country: ${this.getCountryFlagSvg(this.ledgerFilters.region, 14, 10.5)} ${this.escapeHtml(regName)}</span>
                     <button class="filter-chip-remove" onclick="app.removeLedgerFilter('region')" title="Remove region filter">×</button>
                 </span>
             `;
@@ -6449,7 +6506,7 @@ class App {
 
             chipsHtml += `
                 <span class="filter-chip">
-                    <span>Date: ${dateLabel}</span>
+                    <span>Date: ${this.escapeHtml(dateLabel)}</span>
                     <button class="filter-chip-remove" onclick="app.removeLedgerFilter('datePreset')" title="Remove date filter">×</button>
                 </span>
             `;
@@ -6459,7 +6516,7 @@ class App {
             activeCount++;
             chipsHtml += `
                 <span class="filter-chip">
-                    <span>Category: ${this.getCategoryName(this.ledgerFilters.categoryId)}</span>
+                    <span>Category: ${this.escapeHtml(this.getCategoryName(this.ledgerFilters.categoryId))}</span>
                     <button class="filter-chip-remove" onclick="app.removeLedgerFilter('categoryId')" title="Remove category filter">×</button>
                 </span>
             `;
@@ -6469,7 +6526,7 @@ class App {
             activeCount++;
             chipsHtml += `
                 <span class="filter-chip">
-                    <span>Wallet: ${this.getWalletName(this.ledgerFilters.walletId)}</span>
+                    <span>Wallet: ${this.escapeHtml(this.getWalletName(this.ledgerFilters.walletId))}</span>
                     <button class="filter-chip-remove" onclick="app.removeLedgerFilter('walletId')" title="Remove wallet filter">×</button>
                 </span>
             `;
@@ -6477,11 +6534,11 @@ class App {
 
         if (this.ledgerFilters.minAmount !== null || this.ledgerFilters.maxAmount !== null) {
             activeCount++;
-            const minStr = this.ledgerFilters.minAmount !== null ? this.ledgerFilters.minAmount : '0';
-            const maxStr = this.ledgerFilters.maxAmount !== null ? this.ledgerFilters.maxAmount : '∞';
+            const minStr = this.ledgerFilters.minAmount !== null ? String(this.ledgerFilters.minAmount) : '0';
+            const maxStr = this.ledgerFilters.maxAmount !== null ? String(this.ledgerFilters.maxAmount) : '∞';
             chipsHtml += `
                 <span class="filter-chip">
-                    <span>Amount: ${minStr} - ${maxStr}</span>
+                    <span>Amount: ${this.escapeHtml(minStr)} - ${this.escapeHtml(maxStr)}</span>
                     <button class="filter-chip-remove" onclick="app.removeLedgerFilter('amount')" title="Remove amount filter">×</button>
                 </span>
             `;
@@ -6503,28 +6560,62 @@ class App {
         }
     }
 
-    onLedgerSearchInput(event) {
+    _cancelLedgerSearchTimer() {
         if (this.ledgerSearchDebounceTimer) {
             clearTimeout(this.ledgerSearchDebounceTimer);
+            this.ledgerSearchDebounceTimer = null;
         }
+        this._pendingSearchQuery = null;
+    }
 
+    _flushLedgerSearchTimer() {
+        if (this.ledgerSearchDebounceTimer) {
+            clearTimeout(this.ledgerSearchDebounceTimer);
+            this.ledgerSearchDebounceTimer = null;
+            if (this._pendingSearchQuery !== null && this._pendingSearchQuery !== undefined) {
+                const query = this._pendingSearchQuery;
+                this._pendingSearchQuery = null;
+                if (this.ledgerSearchQuery !== query) {
+                    this.ledgerSearchQuery = query;
+                    this.ledgerVisibleCount = this.ledgerPageSize;
+                }
+            }
+        }
+    }
+
+    onLedgerSearchInput(event) {
+        this._cancelLedgerSearchTimer();
+
+        const input = document.getElementById('ledger-search-input');
+        const rawValue = (event && event.target) ? event.target.value : (input ? input.value : '');
+        const query = rawValue.trim();
         const clearBtn = document.getElementById('ledger-search-clear');
-        const query = (event.target.value || '').trim();
-        if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
+        if (clearBtn) clearBtn.style.display = rawValue ? 'flex' : 'none';
 
+        this._pendingSearchQuery = query;
         this.ledgerSearchDebounceTimer = setTimeout(() => {
-            this.ledgerSearchQuery = query;
-            this.ledgerVisibleCount = this.ledgerPageSize;
-            this.renderTransactionsPage();
+            this.ledgerSearchDebounceTimer = null;
+            this._pendingSearchQuery = null;
+            if (this.ledgerSearchQuery !== query) {
+                this.ledgerSearchQuery = query;
+                this.ledgerVisibleCount = this.ledgerPageSize;
+                this.renderTransactionsPage();
+            }
         }, 200);
     }
 
-    clearLedgerSearch() {
+    clearLedgerSearch(options = {}) {
+        this._cancelLedgerSearchTimer();
         const input = document.getElementById('ledger-search-input');
         if (input) input.value = '';
+        const clearBtn = document.getElementById('ledger-search-clear');
+        if (clearBtn) clearBtn.style.display = 'none';
         this.ledgerSearchQuery = '';
         this.ledgerVisibleCount = this.ledgerPageSize;
-        this.renderTransactionsPage();
+        const skipRender = (options === true) || Boolean(options && options.skipRender);
+        if (!skipRender) {
+            this.renderTransactionsPage();
+        }
     }
 
     toggleLedgerFilterPanel() {
@@ -6568,57 +6659,61 @@ class App {
         this.renderTransactionsPage();
     }
 
+    _computeDatePresetRange(preset) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const date = now.getDate();
+
+        if (preset === 'today') {
+            const todayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+            return { startDate: todayStr, endDate: todayStr };
+        } else if (preset === 'week') {
+            const dayOfWeek = now.getDay();
+            const sunday = new Date(now);
+            sunday.setDate(now.getDate() - dayOfWeek);
+            const saturday = new Date(sunday);
+            saturday.setDate(sunday.getDate() + 6);
+            return {
+                startDate: `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`,
+                endDate: `${saturday.getFullYear()}-${String(saturday.getMonth() + 1).padStart(2, '0')}-${String(saturday.getDate()).padStart(2, '0')}`
+            };
+        } else if (preset === 'month') {
+            const lastDay = new Date(year, month + 1, 0).getDate();
+            return {
+                startDate: `${year}-${String(month + 1).padStart(2, '0')}-01`,
+                endDate: `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+            };
+        } else if (preset === 'prev_month') {
+            const prevMonthDate = new Date(year, month - 1, 1);
+            const py = prevMonthDate.getFullYear();
+            const pm = prevMonthDate.getMonth();
+            const lastDay = new Date(py, pm + 1, 0).getDate();
+            return {
+                startDate: `${py}-${String(pm + 1).padStart(2, '0')}-01`,
+                endDate: `${py}-${String(pm + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+            };
+        }
+        return { startDate: '', endDate: '' };
+    }
+
     onLedgerDatePresetChange() {
         const dateSelect = document.getElementById('filter-date-preset');
         const customWrap = document.getElementById('filter-custom-date-wrap');
         const preset = dateSelect?.value || 'all';
         this.ledgerFilters.datePreset = preset;
 
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth(); // 0-11
-        const date = now.getDate();
-
-        if (preset === 'today') {
-            const todayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
-            this.ledgerFilters.startDate = todayStr;
-            this.ledgerFilters.endDate = todayStr;
-            if (customWrap) customWrap.style.display = 'none';
-        } else if (preset === 'week') {
-            const dayOfWeek = now.getDay(); // 0 (Sun) - 6 (Sat)
-            const sunday = new Date(now);
-            sunday.setDate(now.getDate() - dayOfWeek);
-            const saturday = new Date(sunday);
-            saturday.setDate(sunday.getDate() + 6);
-
-            const sStr = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
-            const eStr = `${saturday.getFullYear()}-${String(saturday.getMonth() + 1).padStart(2, '0')}-${String(saturday.getDate()).padStart(2, '0')}`;
-            this.ledgerFilters.startDate = sStr;
-            this.ledgerFilters.endDate = eStr;
-            if (customWrap) customWrap.style.display = 'none';
-        } else if (preset === 'month') {
-            const lastDay = new Date(year, month + 1, 0).getDate();
-            this.ledgerFilters.startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-            this.ledgerFilters.endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-            if (customWrap) customWrap.style.display = 'none';
-        } else if (preset === 'prev_month') {
-            const prevMonthDate = new Date(year, month - 1, 1);
-            const py = prevMonthDate.getFullYear();
-            const pm = prevMonthDate.getMonth();
-            const lastDay = new Date(py, pm + 1, 0).getDate();
-            this.ledgerFilters.startDate = `${py}-${String(pm + 1).padStart(2, '0')}-01`;
-            this.ledgerFilters.endDate = `${py}-${String(pm + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-            if (customWrap) customWrap.style.display = 'none';
-        } else if (preset === 'custom') {
+        if (preset === 'custom') {
             if (customWrap) customWrap.style.display = 'grid';
             const startInput = document.getElementById('filter-date-start');
             const endInput = document.getElementById('filter-date-end');
             this.ledgerFilters.startDate = startInput?.value || '';
             this.ledgerFilters.endDate = endInput?.value || '';
         } else {
-            this.ledgerFilters.startDate = '';
-            this.ledgerFilters.endDate = '';
             if (customWrap) customWrap.style.display = 'none';
+            const range = this._computeDatePresetRange(preset);
+            this.ledgerFilters.startDate = range.startDate;
+            this.ledgerFilters.endDate = range.endDate;
         }
 
         this.ledgerVisibleCount = this.ledgerPageSize;
@@ -6640,14 +6735,17 @@ class App {
     }
 
     removeLedgerFilter(key) {
-        if (key === 'type') {
+        if (key === 'search') {
+            this.clearLedgerSearch();
+            return;
+        } else if (key === 'type') {
             this.ledgerFilters.type = 'all';
             const el = document.getElementById('filter-type-select');
             if (el) el.value = 'all';
-        } else if (key === 'region') {
+        } else if (key === 'region' || key === 'country') {
             this.setLedgerRegion('all');
             return;
-        } else if (key === 'datePreset') {
+        } else if (key === 'datePreset' || key === 'date') {
             this.ledgerFilters.datePreset = 'all';
             this.ledgerFilters.startDate = '';
             this.ledgerFilters.endDate = '';
@@ -6655,11 +6753,15 @@ class App {
             if (el) el.value = 'all';
             const customWrap = document.getElementById('filter-custom-date-wrap');
             if (customWrap) customWrap.style.display = 'none';
-        } else if (key === 'categoryId') {
+            const startInput = document.getElementById('filter-date-start');
+            const endInput = document.getElementById('filter-date-end');
+            if (startInput) startInput.value = '';
+            if (endInput) endInput.value = '';
+        } else if (key === 'categoryId' || key === 'category') {
             this.ledgerFilters.categoryId = 'all';
             const el = document.getElementById('filter-category-select');
             if (el) el.value = 'all';
-        } else if (key === 'walletId') {
+        } else if (key === 'walletId' || key === 'wallet') {
             this.ledgerFilters.walletId = 'all';
             const el = document.getElementById('filter-wallet-select');
             if (el) el.value = 'all';
@@ -6676,8 +6778,8 @@ class App {
         this.renderTransactionsPage();
     }
 
-    resetAllLedgerFilters() {
-        this.clearLedgerSearch();
+    resetAllLedgerFilters(options = {}) {
+        this.clearLedgerSearch(true);
         this.ledgerFilters = {
             type: 'all',
             categoryId: 'all',
@@ -6704,6 +6806,10 @@ class App {
         if (maxInput) maxInput.value = '';
         const customWrap = document.getElementById('filter-custom-date-wrap');
         if (customWrap) customWrap.style.display = 'none';
+        const startInput = document.getElementById('filter-date-start');
+        if (startInput) startInput.value = '';
+        const endInput = document.getElementById('filter-date-end');
+        if (endInput) endInput.value = '';
 
         this._syncLedgerRegionState();
 
@@ -6711,7 +6817,10 @@ class App {
         if (panel) panel.style.display = 'none';
 
         this.ledgerVisibleCount = this.ledgerPageSize;
-        this.renderTransactionsPage();
+        const skipRender = (options === true) || Boolean(options && options.skipRender);
+        if (!skipRender) {
+            this.renderTransactionsPage();
+        }
     }
 
     loadMoreLedger() {
@@ -7573,10 +7682,72 @@ class App {
     }
 
     viewTransactionsWithFilter(filterObj = {}) {
-        this.resetAllLedgerFilters();
-        Object.assign(this.ledgerFilters, filterObj);
+        const filters = (filterObj && typeof filterObj === 'object') ? filterObj : {};
+        this.resetAllLedgerFilters(true);
+
+        if (filters.search !== undefined && filters.search !== null) {
+            this.ledgerSearchQuery = String(filters.search).trim();
+        }
+
+        const validTypes = ['all', 'expense', 'income', 'transfer', 'remittance'];
+        const incomingType = filters.type ? String(filters.type).toLowerCase() : '';
+        if (incomingType && validTypes.includes(incomingType)) {
+            this.ledgerFilters.type = incomingType;
+        }
+
+        const activeCountries = this._getLedgerActiveCountries();
+        const incomingRegion = filters.region ? String(filters.region).toUpperCase() : '';
+        if (incomingRegion && incomingRegion !== 'ALL' && activeCountries.includes(incomingRegion) && activeCountries.length > 1) {
+            this.ledgerFilters.region = incomingRegion;
+        } else {
+            this.ledgerFilters.region = 'all';
+        }
+        this._syncLedgerRegionState();
+
+        if (filters.categoryId && filters.categoryId !== 'all') {
+            let isValidCat = false;
+            if (storage.state?.categories) {
+                for (const reg of Object.keys(storage.state.categories)) {
+                    const list = storage.state.categories[reg];
+                    if (Array.isArray(list) && list.some(c => c.id === filters.categoryId)) {
+                        isValidCat = true;
+                        break;
+                    }
+                }
+            }
+            if (isValidCat) {
+                this.ledgerFilters.categoryId = filters.categoryId;
+            }
+        }
+
+        if (filters.walletId && filters.walletId !== 'all') {
+            if (storage.state?.wallets && storage.state.wallets[filters.walletId]) {
+                this.ledgerFilters.walletId = filters.walletId;
+            }
+        }
+
+        if (filters.datePreset === 'custom' || filters.startDate || filters.endDate) {
+            this.ledgerFilters.datePreset = 'custom';
+            this.ledgerFilters.startDate = filters.startDate ? String(filters.startDate).trim() : '';
+            this.ledgerFilters.endDate = filters.endDate ? String(filters.endDate).trim() : '';
+        } else if (['today', 'week', 'month', 'prev_month'].includes(filters.datePreset)) {
+            this.ledgerFilters.datePreset = filters.datePreset;
+            const range = this._computeDatePresetRange(filters.datePreset);
+            this.ledgerFilters.startDate = range.startDate;
+            this.ledgerFilters.endDate = range.endDate;
+        }
+
+        if (filters.minAmount !== undefined && filters.minAmount !== null && filters.minAmount !== '') {
+            const min = Number(filters.minAmount);
+            this.ledgerFilters.minAmount = (!isNaN(min) && min >= 0) ? min : null;
+        }
+        if (filters.maxAmount !== undefined && filters.maxAmount !== null && filters.maxAmount !== '') {
+            const max = Number(filters.maxAmount);
+            this.ledgerFilters.maxAmount = (!isNaN(max) && max >= 0) ? max : null;
+        }
+
+        this.ledgerVisibleCount = this.ledgerPageSize;
         this.switchView('transactions-view');
-        this.renderTransactionsPage();
     }
 
     // =========================================================================
