@@ -7195,7 +7195,7 @@ class App {
     renderGermanyAnalytics() {
         const now = new Date();
         const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
-        const { startDate, endDate, prevStartDate, prevEndDate, label } = periodRange;
+        const { startDate, endDate, label } = periodRange;
 
         // Query German transactions
         const deTxs = walletManager.getTransactions({
@@ -7207,19 +7207,8 @@ class App {
         const expenseTxs = deTxs.filter(t => t.type === 'expense');
         const totalExpenses = expenseTxs.reduce((s, t) => s + Number(t.amount || 0), 0);
 
-        // Previous period comparison
-        let deltaExpenses = null;
-        if (prevStartDate && prevEndDate) {
-            const prevDeTxs = walletManager.getTransactions({
-                region: 'DE',
-                startDate: prevStartDate,
-                endDate: prevEndDate
-            });
-            const prevExpenses = prevDeTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
-            if (prevExpenses > 0) {
-                deltaExpenses = (((totalExpenses - prevExpenses) / prevExpenses) * 100).toFixed(1);
-            }
-        }
+        const comparison = this.compareAnalyticsPeriods('DE', deTxs, periodRange, now);
+        const expenseChange = this.formatAnalyticsChange(comparison.expense);
 
         const kpiExpenses = document.getElementById('de-kpi-expenses');
         const kpiExpensesMeta = document.getElementById('de-kpi-expenses-meta');
@@ -7235,18 +7224,21 @@ class App {
         const kpiComp = document.getElementById('de-kpi-comparison');
         const kpiCompMeta = document.getElementById('de-kpi-comparison-meta');
         if (kpiComp) {
-            if (deltaExpenses !== null) {
-                const isLess = Number(deltaExpenses) <= 0;
-                kpiComp.innerHTML = `<span class="${isLess ? 'text-emerald' : 'text-rose'}">${Number(deltaExpenses) >= 0 ? '+' : ''}${deltaExpenses}%</span>`;
-                if (kpiCompMeta) kpiCompMeta.innerHTML = `<span class="text-faint">vs prior period</span>`;
+            if (expenseChange) {
+                const { magnitude, direction } = expenseChange;
+                const sign = direction > 0 ? '+' : direction < 0 ? '-' : '';
+                kpiComp.innerHTML = `<span class="${direction <= 0 ? 'text-emerald' : 'text-rose'}">${sign}${magnitude}%</span>`;
             } else {
                 kpiComp.innerText = '--';
-                if (kpiCompMeta) kpiCompMeta.innerHTML = `<span class="text-faint">Baseline period</span>`;
             }
+        }
+        if (kpiCompMeta) {
+            const label = expenseChange ? comparison.label : (comparison.label ? 'No prior spending baseline' : 'No comparison available');
+            kpiCompMeta.innerHTML = `<span class="text-faint">${label}</span>`;
         }
 
         const kpiCount = document.getElementById('de-kpi-count');
-        if (kpiCount) kpiCount.innerText = String(expenseTxs.length);
+        if (kpiCount) kpiCount.innerText = String(deTxs.length);
 
         // Render recent German transactions list
         const recentContainer = document.getElementById('de-recent-tx-list');
@@ -7325,24 +7317,78 @@ class App {
         }
     }
 
-    calculateAnalyticsWeeklyAverage(transactions, { startDate, endDate }, now = new Date()) {
-        const toUtcDay = date => {
-            if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NaN;
-            const midnight = Date.parse(`${date}T00:00:00.000Z`);
-            // Reject dates that the parser normalizes, such as February 30.
-            if (!Number.isFinite(midnight) || new Date(midnight).toISOString().slice(0, 10) !== date) return NaN;
-            return midnight / 86_400_000;
-        };
+    getAnalyticsUtcDay(date) {
+        if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NaN;
+        const midnight = Date.parse(`${date}T00:00:00.000Z`);
+        // Reject dates that the parser normalizes, such as February 30.
+        if (!Number.isFinite(midnight) || new Date(midnight).toISOString().slice(0, 10) !== date) return NaN;
+        return midnight / 86_400_000;
+    }
 
-        const today = toUtcDay(getLocalDateString(now));
-        const lastDay = endDate === null ? today : Math.min(today, toUtcDay(endDate));
+    getAnalyticsComparisonRange(period, range, now) {
+        if (period === 'last-month' || !range.startDate) return range;
+
+        const endDate = getLocalDateString(now);
+        const firstDay = this.getAnalyticsUtcDay(range.startDate);
+        const elapsedDays = this.getAnalyticsUtcDay(endDate) - firstDay + 1;
+        const dateFromUtcDay = day => new Date(day * 86_400_000).toISOString().slice(0, 10);
+        return {
+            startDate: range.startDate,
+            endDate,
+            prevStartDate: dateFromUtcDay(firstDay - elapsedDays),
+            prevEndDate: dateFromUtcDay(firstDay - 1)
+        };
+    }
+
+    compareAnalyticsPeriods(region, transactions, periodRange, now) {
+        const { startDate, endDate, prevStartDate, prevEndDate } = this.getAnalyticsComparisonRange(this.analyticsPeriod, periodRange, now);
+        if (!prevStartDate) return { income: null, expense: null, label: null };
+
+        const sumByType = (txs, start, end) => {
+            const totals = { income: 0, expense: 0 };
+            for (const tx of txs) {
+                if (tx.type !== 'income' && tx.type !== 'expense') continue;
+                if (!Number.isFinite(this.getAnalyticsUtcDay(tx.date)) || tx.date < start || tx.date > end) continue;
+                totals[tx.type] += Number(tx.amount || 0);
+            }
+            return totals;
+        };
+        const previousTxs = walletManager.getTransactions({ region, startDate: prevStartDate, endDate: prevEndDate });
+        const current = sumByType(transactions, startDate, endDate);
+        const previous = sumByType(previousTxs, prevStartDate, prevEndDate);
+        return {
+            income: this.calculateAnalyticsPercentageChange(current.income, previous.income),
+            expense: this.calculateAnalyticsPercentageChange(current.expense, previous.expense),
+            label: this.analyticsPeriod === 'last-month' ? 'vs previous month' : 'vs previous equal-length period'
+        };
+    }
+
+    calculateAnalyticsPercentageChange(current, previous) {
+        if (!Number.isFinite(current) || !Number.isFinite(previous) || previous === 0) return null;
+        const change = ((current - previous) / previous) * 100;
+        return Number.isFinite(change) ? change : null;
+    }
+
+    formatAnalyticsChange(change) {
+        if (change === null) return null;
+        const magnitude = Math.abs(change).toLocaleString('en-US', {
+            useGrouping: false,
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        });
+        return { magnitude, direction: magnitude === '0.0' ? 0 : Math.sign(change) };
+    }
+
+    calculateAnalyticsWeeklyAverage(transactions, { startDate, endDate }, now = new Date()) {
+        const today = this.getAnalyticsUtcDay(getLocalDateString(now));
+        const lastDay = endDate === null ? today : Math.min(today, this.getAnalyticsUtcDay(endDate));
         const allTime = startDate === null;
-        let firstDay = allTime ? Infinity : toUtcDay(startDate);
+        let firstDay = allTime ? Infinity : this.getAnalyticsUtcDay(startDate);
         if (!Number.isFinite(lastDay) || (!allTime && !Number.isFinite(firstDay))) return 0;
 
         let expenses = 0;
         for (const tx of transactions) {
-            const day = toUtcDay(tx.date);
+            const day = this.getAnalyticsUtcDay(tx.date);
             if (!Number.isFinite(day) || day > lastDay) continue;
             if (allTime) firstDay = Math.min(firstDay, day);
             if (day < firstDay || tx.type !== 'expense') continue;
@@ -7358,8 +7404,9 @@ class App {
     }
 
     renderJapanAnalytics() {
-        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod);
-        const { startDate, endDate, prevStartDate, prevEndDate } = periodRange;
+        const now = new Date();
+        const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
+        const { startDate, endDate } = periodRange;
 
         // Query Japanese transactions
         const jpTxs = walletManager.getTransactions({
@@ -7383,32 +7430,21 @@ class App {
         const netSavings = totalIncome - totalExpenses;
         const savingsRate = totalIncome > 0 ? ((netSavings / totalIncome) * 100).toFixed(1) : '0';
 
-        // 2. Previous Period Comparison
-        let deltaIncome = null;
-        let deltaExpenses = null;
-        if (prevStartDate && prevEndDate) {
-            const prevJpTxs = walletManager.getTransactions({
-                region: 'JP',
-                startDate: prevStartDate,
-                endDate: prevEndDate
-            });
-            const prevIncome = prevJpTxs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
-            const prevExpenses = prevJpTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
-
-            if (prevIncome > 0) deltaIncome = (((totalIncome - prevIncome) / prevIncome) * 100).toFixed(1);
-            if (prevExpenses > 0) deltaExpenses = (((totalExpenses - prevExpenses) / prevExpenses) * 100).toFixed(1);
-        }
+        const comparison = this.compareAnalyticsPeriods('JP', jpTxs, periodRange, now);
+        const incomeChange = this.formatAnalyticsChange(comparison.income);
+        const expenseChange = this.formatAnalyticsChange(comparison.expense);
 
         // 3. Update KPI Elements
         const kpiIncome = document.getElementById('jp-kpi-income');
         const kpiIncomeDelta = document.getElementById('jp-kpi-income-delta');
         if (kpiIncome) kpiIncome.innerText = this.formatMoney(totalIncome, '¥');
         if (kpiIncomeDelta) {
-            if (deltaIncome !== null) {
-                const isPos = Number(deltaIncome) >= 0;
-                kpiIncomeDelta.innerHTML = `<span class="${isPos ? 'delta-positive' : 'delta-negative'}">${isPos ? '↑' : '↓'} ${Math.abs(deltaIncome)}%</span> vs prior period`;
+            if (incomeChange) {
+                const { magnitude, direction } = incomeChange;
+                const arrow = direction > 0 ? '↑ ' : direction < 0 ? '↓ ' : '';
+                kpiIncomeDelta.innerHTML = `<span class="${direction >= 0 ? 'delta-positive' : 'delta-negative'}">${arrow}${magnitude}%</span> ${comparison.label}`;
             } else {
-                kpiIncomeDelta.innerHTML = `<span class="delta-neutral">Baseline period</span>`;
+                kpiIncomeDelta.innerHTML = `<span class="delta-neutral">-- · ${comparison.label ? 'No prior income baseline' : 'No comparison available'}</span>`;
             }
         }
 
@@ -7416,12 +7452,12 @@ class App {
         const kpiExpensesDelta = document.getElementById('jp-kpi-expenses-delta');
         if (kpiExpenses) kpiExpenses.innerText = this.formatMoney(totalExpenses, '¥');
         if (kpiExpensesDelta) {
-            if (deltaExpenses !== null) {
-                const isLess = Number(deltaExpenses) <= 0;
-                // For expenses, going down is positive
-                kpiExpensesDelta.innerHTML = `<span class="${isLess ? 'delta-positive' : 'delta-negative'}">${Number(deltaExpenses) >= 0 ? '↑' : '↓'} ${Math.abs(deltaExpenses)}%</span> vs prior period`;
+            if (expenseChange) {
+                const { magnitude, direction } = expenseChange;
+                const arrow = direction > 0 ? '↑ ' : direction < 0 ? '↓ ' : '';
+                kpiExpensesDelta.innerHTML = `<span class="${direction <= 0 ? 'delta-positive' : 'delta-negative'}">${arrow}${magnitude}%</span> ${comparison.label}`;
             } else {
-                kpiExpensesDelta.innerHTML = `<span class="delta-neutral">Baseline period</span>`;
+                kpiExpensesDelta.innerHTML = `<span class="delta-neutral">-- · ${comparison.label ? 'No prior spending baseline' : 'No comparison available'}</span>`;
             }
         }
 
@@ -7587,17 +7623,19 @@ class App {
                 `;
             }
 
-            // Insight 2: Month-over-month Trend
-            if (deltaExpenses !== null) {
-                const isDown = Number(deltaExpenses) < 0;
+            // Insight 2: Spending comparison
+            if (expenseChange) {
+                const { magnitude, direction } = expenseChange;
+                const title = direction < 0 ? 'Spending Reduced' : direction > 0 ? 'Expenditure Accelerated' : 'Spending Unchanged';
+                const change = direction === 0 ? 'unchanged' : `${direction < 0 ? 'down' : 'up'} ${magnitude}%`;
                 insightsHtml += `
                     <div class="insight-item">
-                        <div class="insight-icon" style="color: ${isDown ? '#34d399' : '#fb7185'}; background: ${isDown ? 'rgba(52, 211, 153, 0.12)' : 'rgba(251, 113, 133, 0.12)'}">
-                            <i data-lucide="${isDown ? 'trending-down' : 'trending-up'}"></i>
+                        <div class="insight-icon" style="color: ${direction <= 0 ? '#34d399' : '#fb7185'}; background: ${direction <= 0 ? 'rgba(52, 211, 153, 0.12)' : 'rgba(251, 113, 133, 0.12)'}">
+                            <i data-lucide="${direction < 0 ? 'trending-down' : direction > 0 ? 'trending-up' : 'minus'}"></i>
                         </div>
                         <div class="insight-content">
-                            <span class="insight-title">${isDown ? 'Spending Reduced' : 'Expenditure Accelerated'}</span>
-                            <p class="insight-desc">Outflows are ${isDown ? 'down' : 'up'} ${Math.abs(deltaExpenses)}% compared to the prior period (${isDown ? 'positive trajectory' : 'monitor closely'}).</p>
+                            <span class="insight-title">${title}</span>
+                            <p class="insight-desc">Outflows are ${change} ${comparison.label}.</p>
                         </div>
                     </div>
                 `;
@@ -7730,7 +7768,7 @@ class App {
     renderIndiaAnalytics() {
         const now = new Date();
         const periodRange = this.getAnalyticsPeriodRange(this.analyticsPeriod, now);
-        const { startDate, endDate, prevStartDate, prevEndDate } = periodRange;
+        const { startDate, endDate } = periodRange;
 
         // Query Indian transactions
         const inTxs = walletManager.getTransactions({
@@ -7745,17 +7783,8 @@ class App {
 
         const weeklyAvg = this.calculateAnalyticsWeeklyAverage(inTxs, periodRange, now);
 
-        // Previous period comparison
-        let delta = null;
-        if (prevStartDate && prevEndDate) {
-            const prevInTxs = walletManager.getTransactions({
-                region: 'IN',
-                startDate: prevStartDate,
-                endDate: prevEndDate
-            });
-            const prevTotal = prevInTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
-            if (prevTotal > 0) delta = (((totalExpenses - prevTotal) / prevTotal) * 100).toFixed(1);
-        }
+        const comparison = this.compareAnalyticsPeriods('IN', inTxs, periodRange, now);
+        const expenseChange = this.formatAnalyticsChange(comparison.expense);
 
         // Update India KPI elements
         const kpiExpenses = document.getElementById('in-kpi-expenses');
@@ -7769,15 +7798,15 @@ class App {
         if (kpiCount) kpiCount.innerText = txCount;
 
         if (kpiComparison) {
-            if (delta !== null) {
-                const isLess = Number(delta) <= 0;
-                kpiComparison.innerHTML = `<span class="${isLess ? 'delta-positive' : 'delta-negative'}">${Number(delta) >= 0 ? '↑' : '↓'} ${Math.abs(delta)}%</span>`;
-                if (kpiComparisonMeta) kpiComparisonMeta.innerText = isLess ? 'Lower than last month' : 'Higher than last month';
+            if (expenseChange) {
+                const { magnitude, direction } = expenseChange;
+                const arrow = direction > 0 ? '↑ ' : direction < 0 ? '↓ ' : '';
+                kpiComparison.innerHTML = `<span class="${direction <= 0 ? 'delta-positive' : 'delta-negative'}">${arrow}${magnitude}%</span>`;
             } else {
                 kpiComparison.innerText = '--';
-                if (kpiComparisonMeta) kpiComparisonMeta.innerText = 'No previous month data';
             }
         }
+        if (kpiComparisonMeta) kpiComparisonMeta.innerText = expenseChange ? comparison.label : (comparison.label ? 'No prior spending baseline' : 'No comparison available');
 
         // Render India Weekly Spending Trend
         if (typeof charts !== 'undefined' && typeof charts.renderInSpendingTrend === 'function') {
