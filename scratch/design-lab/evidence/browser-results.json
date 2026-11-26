@@ -1,0 +1,1124 @@
+{
+  "functional": {
+    "tests": [
+      [
+        "eight comparison sections",
+        true
+      ],
+      [
+        "no document overflow at six widths",
+        true
+      ],
+      [
+        "equal 168x44 dimensions, graphite rest and exact bronze gradient",
+        true
+      ],
+      [
+        "A1 filled ink, no path animation and stable geometry",
+        true
+      ],
+      [
+        "A2 fades along one fixed part of the edge",
+        true
+      ],
+      [
+        "A3 has a constant dash length and equal path distance per interval",
+        true
+      ],
+      [
+        "stationary A3 hover does not repeat",
+        true
+      ],
+      [
+        "A3 returns to outline on pointer exit",
+        true
+      ],
+      [
+        "preset updates control values",
+        true
+      ],
+      [
+        "all motion sliders affect the rendered interaction",
+        true
+      ],
+      [
+        "glimmer switch suppresses motion and preserves fill",
+        true
+      ],
+      [
+        "reset restores balanced parameters and the toggle",
+        true
+      ],
+      [
+        "toolbar effects limited to signature across standard and utility actions",
+        true
+      ],
+      [
+        "Tab reaches standard action with a visible focus outline",
+        true
+      ],
+      [
+        "keyboard standard action provides status, no path animation",
+        true
+      ],
+      [
+        "keyboard opens dialog immediately with no signature lap",
+        true
+      ],
+      [
+        "Escape closes menu and restores keyboard focus",
+        true
+      ],
+      [
+        "selective blur is confined to C2",
+        true
+      ],
+      [
+        "surface choice updates both dashboard settings and all atmosphere samples",
+        true
+      ],
+      [
+        "atmosphere choice updates both dashboards and three surface samples",
+        true
+      ],
+      [
+        "budget streaks are 3.5px across three readable states",
+        true
+      ],
+      [
+        "budget sheen toggles a 3.5s independent optical effect",
+        true
+      ],
+      [
+        "desktop rail expands as an overlay with no content reflow",
+        true
+      ],
+      [
+        "privacy utility hides both visible and accessible demo amounts",
+        true
+      ],
+      [
+        "filter limits transactions to synthetic expenses",
+        true
+      ],
+      [
+        "wallet and country controls switch preserved gradients and currencies",
+        true
+      ],
+      [
+        "short tap activates immediately and stays visible briefly",
+        true
+      ],
+      [
+        "touch fill clears promptly without a sticky hover state",
+        true
+      ],
+      [
+        "pointer cancellation drops press feedback and stops the lap",
+        true
+      ],
+      [
+        "scroll gesture cancels the decorative press",
+        true
+      ],
+      [
+        "reduced motion cancels laps and stops budget sheen",
+        true
+      ],
+      [
+        "mobile FAB opens transaction menu within release dispatch",
+        true
+      ],
+      [
+        "only same-origin source requests from the lab",
+        true
+      ],
+      [
+        "no uncaught browser errors",
+        true
+      ]
+    ],
+    "overflow": [
+      [
+        320,
+        -15
+      ],
+      [
+        390,
+        -15
+      ],
+      [
+        680,
+        -15
+      ],
+      [
+        768,
+        -15
+      ],
+      [
+        1024,
+        -15
+      ],
+      [
+        1440,
+        -15
+      ]
+    ],
+    "requests": [
+      "/favicon.ico",
+      "/scratch/design-lab/",
+      "/scratch/design-lab/lab.css",
+      "/scratch/design-lab/lab.js"
+    ],
+    "pathLength": 400.07318115234375,
+    "lapSamples": [
+      [
+        90,
+        -40.0073,
+        "29px, 371.073px"
+      ],
+      [
+        270,
+        -120.022,
+        "29px, 371.073px"
+      ],
+      [
+        450,
+        -200.037,
+        "29px, 371.073px"
+      ],
+      [
+        630,
+        -280.051,
+        "29px, 371.073px"
+      ],
+      [
+        810,
+        -360.066,
+        "29px, 371.073px"
+      ]
+    ]
+  },
+  "performance": [
+    {
+      "tag": "desktop-A1-0",
+      "mode": "desktop",
+      "variant": "A1",
+      "intervals": 82,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.700000000000045,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.121448,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.011387,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 34,
+        "ms": 28.129
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 4.345
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "desktop-A2-0",
+      "mode": "desktop",
+      "variant": "A2",
+      "intervals": 82,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.12762900000000002,
+      "LayoutDuration": 0.00014599999999999997,
+      "RecalcStyleDuration": 0.012848,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 35,
+        "ms": 25.822
+      },
+      "PrePaint": {
+        "count": 86,
+        "ms": 5.746
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.111
+      }
+    },
+    {
+      "tag": "desktop-A3-0",
+      "mode": "desktop",
+      "variant": "A3",
+      "intervals": 82,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.183319,
+      "LayoutDuration": 9.900000000000002e-05,
+      "RecalcStyleDuration": 0.013035999999999999,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 131,
+        "ms": 74.138
+      },
+      "PrePaint": {
+        "count": 86,
+        "ms": 5.856
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.071
+      }
+    },
+    {
+      "tag": "desktop-A1-1",
+      "mode": "desktop",
+      "variant": "A1",
+      "intervals": 82,
+      "largestFrameMs": 16.799999999999272,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.12337500000000001,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.011127999999999999,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 34,
+        "ms": 28.153
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 4.463
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "desktop-A2-1",
+      "mode": "desktop",
+      "variant": "A2",
+      "intervals": 82,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.09500900000000001,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.009240000000000005,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 34,
+        "ms": 16.758
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 4.248
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "desktop-A3-1",
+      "mode": "desktop",
+      "variant": "A3",
+      "intervals": 82,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.15865299999999993,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.010907999999999994,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 130,
+        "ms": 69.269
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 4.668
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "desktop-A1-2",
+      "mode": "desktop",
+      "variant": "A1",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.11292199999999997,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.011947,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 34,
+        "ms": 26.676
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 4.279
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "desktop-A2-2",
+      "mode": "desktop",
+      "variant": "A2",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.1260239999999999,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.014005000000000004,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 34,
+        "ms": 26.16
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 5.484
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "desktop-A3-2",
+      "mode": "desktop",
+      "variant": "A3",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.15694000000000008,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.011568999999999996,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 130,
+        "ms": 68.221
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 4.444
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "desktop-A1-3",
+      "mode": "desktop",
+      "variant": "A1",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.04358799999999996,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.00514400000000001,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 34,
+        "ms": 10.455
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 1.673
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "desktop-A2-3",
+      "mode": "desktop",
+      "variant": "A2",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.031797000000000075,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.003942999999999988,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 34,
+        "ms": 6.761
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 1.42
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "desktop-A3-3",
+      "mode": "desktop",
+      "variant": "A3",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.12165399999999993,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.01217,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 130,
+        "ms": 45.08
+      },
+      "PrePaint": {
+        "count": 85,
+        "ms": 4.486
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "mobile-A1-0",
+      "mode": "mobile",
+      "variant": "A1",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000291,
+      "medianFrameMs": 16.700000000000728,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.134274,
+      "LayoutDuration": 0.0004730000000000012,
+      "RecalcStyleDuration": 0.01183099999999998,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 35,
+        "ms": 26.194
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 4.692
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.442
+      }
+    },
+    {
+      "tag": "mobile-A2-0",
+      "mode": "mobile",
+      "variant": "A2",
+      "intervals": 82,
+      "largestFrameMs": 16.799999999999272,
+      "medianFrameMs": 16.69999999999709,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.12564900000000012,
+      "LayoutDuration": 0.00048799999999999885,
+      "RecalcStyleDuration": 0.012456000000000023,
+      "LayoutCount": 2,
+      "Paint": {
+        "count": 36,
+        "ms": 26.417
+      },
+      "PrePaint": {
+        "count": 97,
+        "ms": 5.237
+      },
+      "Layout": {
+        "count": 2,
+        "ms": 0.431
+      }
+    },
+    {
+      "tag": "mobile-A3-0",
+      "mode": "mobile",
+      "variant": "A3",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000291,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.2070780000000001,
+      "LayoutDuration": 0.0004730000000000012,
+      "RecalcStyleDuration": 0.014909999999999979,
+      "LayoutCount": 2,
+      "Paint": {
+        "count": 116,
+        "ms": 80.124
+      },
+      "PrePaint": {
+        "count": 97,
+        "ms": 6.471
+      },
+      "Layout": {
+        "count": 2,
+        "ms": 0.417
+      }
+    },
+    {
+      "tag": "mobile-A1-1",
+      "mode": "mobile",
+      "variant": "A1",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000291,
+      "medianFrameMs": 16.700000000000728,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.12249299999999996,
+      "LayoutDuration": 0.00033199999999999896,
+      "RecalcStyleDuration": 0.011790000000000023,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 35,
+        "ms": 26.69
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 4.493
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.305
+      }
+    },
+    {
+      "tag": "mobile-A2-1",
+      "mode": "mobile",
+      "variant": "A2",
+      "intervals": 82,
+      "largestFrameMs": 16.799999999999272,
+      "medianFrameMs": 16.69999999999709,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.12773400000000024,
+      "LayoutDuration": 0.0003130000000000008,
+      "RecalcStyleDuration": 0.013269999999999976,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 35,
+        "ms": 26.415
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 5.08
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.284
+      }
+    },
+    {
+      "tag": "mobile-A3-1",
+      "mode": "mobile",
+      "variant": "A3",
+      "intervals": 82,
+      "largestFrameMs": 16.799999999999272,
+      "medianFrameMs": 16.700000000000728,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.23190100000000013,
+      "LayoutDuration": 0.0002920000000000006,
+      "RecalcStyleDuration": 0.017953000000000024,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 115,
+        "ms": 91.059
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 6.991
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.264
+      }
+    },
+    {
+      "tag": "mobile-A1-2",
+      "mode": "mobile",
+      "variant": "A1",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000291,
+      "medianFrameMs": 16.700000000000728,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.09037899999999999,
+      "LayoutDuration": 0.0002950000000000001,
+      "RecalcStyleDuration": 0.010476000000000013,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 35,
+        "ms": 21.91
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 3.461
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.269
+      }
+    },
+    {
+      "tag": "mobile-A2-2",
+      "mode": "mobile",
+      "variant": "A2",
+      "intervals": 82,
+      "largestFrameMs": 16.799999999999272,
+      "medianFrameMs": 16.69999999999709,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.037993000000000166,
+      "LayoutDuration": 0.00012599999999999938,
+      "RecalcStyleDuration": 0.005060999999999982,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 35,
+        "ms": 7.592
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 1.72
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.117
+      }
+    },
+    {
+      "tag": "mobile-A3-2",
+      "mode": "mobile",
+      "variant": "A3",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000291,
+      "medianFrameMs": 16.700000000000728,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.062180000000000124,
+      "LayoutDuration": 0.00017099999999999928,
+      "RecalcStyleDuration": 0.005871000000000015,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 115,
+        "ms": 24.486
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 2.053
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.165
+      }
+    },
+    {
+      "tag": "mobile-A1-3",
+      "mode": "mobile",
+      "variant": "A1",
+      "intervals": 82,
+      "largestFrameMs": 16.799999999999272,
+      "medianFrameMs": 16.700000000000728,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.045484999999999776,
+      "LayoutDuration": 8.700000000000027e-05,
+      "RecalcStyleDuration": 0.0039759999999999796,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 35,
+        "ms": 7.39
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 1.436
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.082
+      }
+    },
+    {
+      "tag": "mobile-A2-3",
+      "mode": "mobile",
+      "variant": "A2",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000291,
+      "medianFrameMs": 16.69999999999709,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.039213000000000164,
+      "LayoutDuration": 0.00011700000000000078,
+      "RecalcStyleDuration": 0.004740000000000022,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 35,
+        "ms": 7.171
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 1.555
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.111
+      }
+    },
+    {
+      "tag": "mobile-A3-3",
+      "mode": "mobile",
+      "variant": "A3",
+      "intervals": 82,
+      "largestFrameMs": 16.80000000000291,
+      "medianFrameMs": 16.69999999999709,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.10187000000000035,
+      "LayoutDuration": 0.00010999999999999899,
+      "RecalcStyleDuration": 0.007065999999999961,
+      "LayoutCount": 1,
+      "Paint": {
+        "count": 115,
+        "ms": 34.351
+      },
+      "PrePaint": {
+        "count": 96,
+        "ms": 3.282
+      },
+      "Layout": {
+        "count": 1,
+        "ms": 0.105
+      }
+    }
+  ],
+  "clips": {
+    "desktop": {
+      "frames": 220,
+      "elapsed": 8.313252925872803
+    },
+    "toolbar": {
+      "frames": 196,
+      "elapsed": 4.49698805809021
+    },
+    "budget": {
+      "frames": 132,
+      "elapsed": 4.512127876281738
+    },
+    "mobile": {
+      "frames": 209,
+      "elapsed": 5.683105945587158
+    }
+  },
+  "glassScrollPerformance": [
+    {
+      "tag": "glass-C1-0",
+      "mode": "glass",
+      "variant": "C1",
+      "intervals": 70,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.700000000000045,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.057234,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 71,
+        "ms": 3.313
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C2-0",
+      "mode": "glass",
+      "variant": "C2",
+      "intervals": 69,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.05949200000000002,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 70,
+        "ms": 3.499
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C3-0",
+      "mode": "glass",
+      "variant": "C3",
+      "intervals": 70,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.05463899999999999,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 71,
+        "ms": 3.288
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C1-1",
+      "mode": "glass",
+      "variant": "C1",
+      "intervals": 69,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.05887899999999999,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 70,
+        "ms": 3.462
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C2-1",
+      "mode": "glass",
+      "variant": "C2",
+      "intervals": 69,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.059307,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 70,
+        "ms": 3.407
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C3-1",
+      "mode": "glass",
+      "variant": "C3",
+      "intervals": 70,
+      "largestFrameMs": 16.800000000000182,
+      "medianFrameMs": 16.699999999999818,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.05889,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 71,
+        "ms": 3.601
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C1-2",
+      "mode": "glass",
+      "variant": "C1",
+      "intervals": 70,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.05873400000000001,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 71,
+        "ms": 3.315
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C2-2",
+      "mode": "glass",
+      "variant": "C2",
+      "intervals": 69,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.054921,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 70,
+        "ms": 2.932
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C3-2",
+      "mode": "glass",
+      "variant": "C3",
+      "intervals": 70,
+      "largestFrameMs": 16.799999999999272,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.05563399999999996,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 71,
+        "ms": 3.349
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C1-3",
+      "mode": "glass",
+      "variant": "C1",
+      "intervals": 69,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.030437000000000047,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 70,
+        "ms": 1.963
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C2-3",
+      "mode": "glass",
+      "variant": "C2",
+      "intervals": 69,
+      "largestFrameMs": 16.799999999999272,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.019537000000000027,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 70,
+        "ms": 1.163
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    },
+    {
+      "tag": "glass-C3-3",
+      "mode": "glass",
+      "variant": "C3",
+      "intervals": 69,
+      "largestFrameMs": 16.80000000000109,
+      "medianFrameMs": 16.69999999999891,
+      "intervalsOver25ms": 0,
+      "TaskDuration": 0.0218020000000001,
+      "LayoutDuration": 0.0,
+      "RecalcStyleDuration": 0.0,
+      "LayoutCount": 0,
+      "Paint": {
+        "count": 0,
+        "ms": 0.0
+      },
+      "PrePaint": {
+        "count": 70,
+        "ms": 1.441
+      },
+      "Layout": {
+        "count": 0,
+        "ms": 0.0
+      }
+    }
+  ]
+}
