@@ -670,7 +670,8 @@
 
                         <!-- Quick Add Button -->
                         <button class="btn btn-primary btn-sm header-action-btn"
-                            id="header-add-transaction">
+                            id="header-add-transaction" data-signature-action>
+                            <svg class="action-rim" aria-hidden="true" focusable="false"><rect/></svg>
                             <i data-lucide="plus"></i>
                             <span>Add transaction</span>
                         </button>
@@ -866,7 +867,7 @@
                                 <div class="collapsible-wrapper" id="jp-categories-wrap">
                                     <div class="collapsible-inner">
                                         <!-- Central Japan Budget Bar Section (4.1 Repositioned & Balanced) -->
-                                        <div class="card budget-central-card" id="budget-overview-card">
+                                        <div class="card budget-central-card" id="budget-overview-card" data-budget-summary>
                                             <!-- Populated dynamically by app.renderBudgetOverviewCard -->
                                         </div>
                                         <div class="category-grid" id="jp-categories-grid">
@@ -890,7 +891,7 @@
                                 <div class="collapsible-wrapper collapsed" id="in-categories-wrap"
                                     style="display: none;">
                                     <div class="collapsible-inner">
-                                        <div class="card budget-central-card" id="budget-overview-card-in"
+                                        <div class="card budget-central-card" id="budget-overview-card-in" data-budget-summary
                                             style="display: none;">
                                             <!-- Populated dynamically if budget enabled for IN -->
                                         </div>
@@ -916,7 +917,7 @@
                                 <div class="collapsible-wrapper collapsed" id="de-categories-wrap"
                                     style="display: none;">
                                     <div class="collapsible-inner">
-                                        <div class="card budget-central-card" id="budget-overview-card-de"
+                                        <div class="card budget-central-card" id="budget-overview-card-de" data-budget-summary
                                             style="display: none;">
                                             <!-- Populated dynamically if budget enabled for DE -->
                                         </div>
@@ -2016,7 +2017,7 @@
                             </div>
 
                             <!-- Consolidated Budgets Overview Card (Reuses Dashboard Summary Component) -->
-                            <div class="budgets-summary-wrap" id="budgets-summary-banner">
+                            <div class="budgets-summary-wrap" id="budgets-summary-banner" data-budget-summary>
                                 <!-- Populated dynamically by app.renderBudgetOverviewCard() -->
                             </div>
 
@@ -3112,7 +3113,8 @@
     </main>
 
     <!-- Floating Action Button (Mobile Add Transaction) -->
-    <button class="fab" id="main-fab" aria-label="Add Transaction">
+    <button class="fab" id="main-fab" aria-label="Add Transaction" data-signature-action>
+        <svg class="action-rim" aria-hidden="true" focusable="false"><rect/></svg>
         <i data-lucide="plus"></i>
     </button>
 

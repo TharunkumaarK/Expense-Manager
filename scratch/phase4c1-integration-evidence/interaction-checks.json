@@ -1,0 +1,317 @@
+{
+  "checks": [
+    [
+      "exactly two visible-or-hidden signature controls and reusable rims",
+      true
+    ],
+    [
+      "rest and accent gradient",
+      true
+    ],
+    [
+      "filled graphite label",
+      true
+    ],
+    [
+      "arc length advances evenly over one lap with fixed dash",
+      true
+    ],
+    [
+      "fill returns to outlined state",
+      true
+    ],
+    [
+      "privacy uses quiet hover",
+      true
+    ],
+    [
+      "Tab reaches Add and exposes focus ring",
+      true
+    ],
+    [
+      "Space opens actual selector without starting rim",
+      true
+    ],
+    [
+      "disabled suppresses activation and decoration",
+      true
+    ],
+    [
+      "aria-disabled suppresses activation and decoration",
+      true
+    ],
+    [
+      "aria-busy suppresses activation and decoration",
+      true
+    ],
+    [
+      "contact starts mobile fill and lap",
+      true
+    ],
+    [
+      "release opens FAB menu during hold with fixed rim geometry",
+      true
+    ],
+    [
+      "short release clears fill",
+      true
+    ],
+    [
+      "second tap closes menu",
+      true
+    ],
+    [
+      "native cancellation clears press and lap",
+      true
+    ],
+    [
+      "scroll from FAB cancels feedback and action",
+      true
+    ],
+    [
+      "reduced-motion FAB still opens without a lap",
+      true
+    ],
+    [
+      "reduced-motion budget has no sheen",
+      true
+    ],
+    [
+      "visible mobile summary gets the 3.5s sheen",
+      true
+    ],
+    [
+      "budget track is 3.5px",
+      true
+    ],
+    [
+      "hidden budget summary stops",
+      true
+    ]
+  ],
+  "viewWidths": [
+    [
+      1440,
+      "home",
+      1425
+    ],
+    [
+      1440,
+      "transactions",
+      1440
+    ],
+    [
+      1440,
+      "analytics",
+      1425
+    ],
+    [
+      1440,
+      "budgets",
+      1425
+    ],
+    [
+      1440,
+      "wallets",
+      1425
+    ],
+    [
+      1440,
+      "reports",
+      1425
+    ],
+    [
+      1440,
+      "settings",
+      1440
+    ],
+    [
+      1920,
+      "home",
+      1905
+    ],
+    [
+      1920,
+      "transactions",
+      1920
+    ],
+    [
+      1920,
+      "analytics",
+      1905
+    ],
+    [
+      1920,
+      "budgets",
+      1905
+    ],
+    [
+      1920,
+      "wallets",
+      1905
+    ],
+    [
+      1920,
+      "reports",
+      1905
+    ],
+    [
+      1920,
+      "settings",
+      1920
+    ],
+    [
+      1024,
+      "home",
+      1009
+    ],
+    [
+      1024,
+      "transactions",
+      1024
+    ],
+    [
+      1024,
+      "analytics",
+      1009
+    ],
+    [
+      1024,
+      "budgets",
+      1009
+    ],
+    [
+      1024,
+      "wallets",
+      1009
+    ],
+    [
+      1024,
+      "reports",
+      1009
+    ],
+    [
+      1024,
+      "settings",
+      1009
+    ],
+    [
+      768,
+      "home",
+      753
+    ],
+    [
+      768,
+      "transactions",
+      768
+    ],
+    [
+      768,
+      "analytics",
+      753
+    ],
+    [
+      768,
+      "budgets",
+      753
+    ],
+    [
+      768,
+      "wallets",
+      753
+    ],
+    [
+      768,
+      "reports",
+      753
+    ],
+    [
+      768,
+      "settings",
+      753
+    ],
+    [
+      390,
+      "home",
+      390
+    ],
+    [
+      390,
+      "transactions",
+      390
+    ],
+    [
+      390,
+      "analytics",
+      390
+    ],
+    [
+      390,
+      "budgets",
+      390
+    ],
+    [
+      390,
+      "wallets",
+      390
+    ],
+    [
+      390,
+      "reports",
+      390
+    ],
+    [
+      390,
+      "settings",
+      390
+    ],
+    [
+      360,
+      "home",
+      360
+    ],
+    [
+      360,
+      "transactions",
+      360
+    ],
+    [
+      360,
+      "analytics",
+      360
+    ],
+    [
+      360,
+      "budgets",
+      360
+    ],
+    [
+      360,
+      "wallets",
+      360
+    ],
+    [
+      360,
+      "reports",
+      360
+    ],
+    [
+      360,
+      "settings",
+      360
+    ]
+  ],
+  "arc": {
+    "length": 327.7639465332031,
+    "samples": [
+      0,
+      -65.5528,
+      -131.106,
+      -196.658,
+      -262.211,
+      -327.76
+    ],
+    "dash": "29px, 298.764px",
+    "ms": 900
+  }
+}

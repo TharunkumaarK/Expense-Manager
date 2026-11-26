@@ -254,23 +254,23 @@
     --duration-smooth: 320ms;
 
     /* Surfaces, controls and interaction feedback */
+    --ambient-warm: rgb(155 121 75 / .19);
+    --ambient-neutral: rgb(177 178 179 / .065);
     --workspace-ambient:
-        radial-gradient(ellipse 58rem 35rem at 5% 0%, rgba(155, 121, 75, 0.16), transparent 78%),
-        radial-gradient(ellipse 55rem 38rem at 100% 100%, rgba(130, 140, 155, 0.06), transparent 78%);
-    --glass-bg: rgba(30, 30, 30, 0.94);
-    --glass-bg-subtle: rgba(23, 23, 23, 0.86);
-    --glass-bg-card: rgba(37, 37, 37, 0.72);
-    --glass-bg-elevated: #282828;
-    --glass-border: 1px solid var(--border-default);
-    --glass-border-highlight: 1px solid rgba(255, 255, 255, 0.18);
-    --glass-border-subtle: 1px solid var(--border-subtle);
+        radial-gradient(ellipse clamp(28rem, 65vw, 76rem) 45rem at 3% 0%, var(--ambient-warm), transparent 78%),
+        radial-gradient(ellipse clamp(24rem, 55vw, 68rem) 42rem at 100% 100%, var(--ambient-neutral), transparent 80%);
+    --glass-bg: linear-gradient(145deg, rgb(46 45 43 / .94), rgb(24 24 24 / .90));
+    --glass-bg-card: linear-gradient(150deg, rgb(228 219 203 / .13), rgb(28 28 28 / .32) 63%),
+        linear-gradient(137deg, rgb(247 239 222 / .075), rgb(255 255 255 / .018) 46%, rgb(255 255 255 / .055));
+    --glass-bg-elevated: linear-gradient(150deg, rgb(48 47 44 / .98), rgb(31 31 31 / .97) 68%);
+    --glass-border: 1px solid rgb(238 231 219 / .17);
+    --glass-border-highlight: 1px solid rgb(248 239 221 / .23);
     --glass-blur: blur(9px);
     --glass-blur-heavy: blur(14px);
-    --glass-shadow: var(--shadow-sm);
-    --glass-shadow-elevated: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.09);
-    --glass-reflection: none;
-    --glass-glow-hover: 0 4px 18px rgba(0, 0, 0, 0.28);
-    --surface-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    --surface-highlight: inset 0 1px 0 rgb(255 248 230 / .08), inset 1px 0 0 rgb(255 248 230 / .03);
+    --glass-shadow: var(--surface-highlight), 0 5px 16px rgb(0 0 0 / .20);
+    --glass-shadow-elevated: var(--surface-highlight), var(--shadow-lg);
+    --glass-glow-hover: var(--surface-highlight), 0 4px 18px rgb(0 0 0 / .28);
     --control-surface: #191919;
     --control-hover: #303030;
     --control-border: #505050;
@@ -280,8 +280,15 @@
     --action-text: #E7CBA3;
     --action-focus-halo: rgba(197, 166, 124, 0.18);
     --focus-ring: var(--action-text);
-    --button-glimmer-duration: 950ms;
-    --button-glimmer-neutral: #c4c8cd;
+    --action-interior: linear-gradient(155deg, rgb(66 62 55 / .69), rgb(22 22 22 / .86) 68%);
+    --action-stroke: 1px;
+    --action-fill-time: 110ms;
+    --action-release-time: 170ms;
+    --rim-travel-time: 900ms;
+    --rim-length: 29px;
+    --rim-opacity: .67;
+    --rim-highlight: color-mix(in srgb, var(--action-text), white 65%);
+    --budget-sheen-period: 3.5s;
     --budget-sheen: rgba(255, 255, 255, 0.22);
     --budget-track: #393939;
     --budget-safe: linear-gradient(90deg, #10b981, #34d399);
@@ -998,7 +1005,7 @@ button {
     transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
 }
 
-.icon-btn-subtle.button-hover {
+.icon-btn-subtle:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
     color: var(--text-primary);
     background: var(--bg-surface-hover);
 }
@@ -1289,7 +1296,7 @@ button {
     transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
 }
 
-.desktop-privacy-btn.button-hover {
+.desktop-privacy-btn:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.06);
 }
@@ -1834,14 +1841,14 @@ body.drawer-open {
 }
 
 .fab i,
-.fab svg {
+.fab svg:not(.action-rim) {
     width: 24px;
     height: 24px;
     transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .fab.open i,
-.fab.open svg {
+.fab.open svg:not(.action-rim) {
     transform: rotate(45deg);
 }
 
@@ -2211,44 +2218,52 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     height: 14px;
 }
 
-/* The gradient stays fixed while the graphite interior crossfades. */
-:where(button:not(.desktop-nav-item, .bottom-nav-item), a.btn) {
-    position: relative;
-}
+/* A static gradient rim surrounds translucent glass. Only the fill crossfades. */
+.btn-primary { position: relative; }
 
 :is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *)) {
+    --fill-opacity: 0;
+    --fill-time: calc(var(--action-fill-time) + 40ms);
     isolation: isolate;
     color: var(--action-text);
-    background: var(--action-gradient) border-box;
-    border-color: transparent;
+    background: var(--action-interior);
+    border: var(--action-stroke) solid var(--action-edge);
     box-shadow: var(--surface-highlight), var(--shadow-xs);
-    transition: color var(--duration-instant) var(--ease-out);
+    transition: color var(--fill-time) var(--ease-out);
 }
 
-.fab {
-    box-shadow: var(--shadow-fab), var(--surface-highlight);
-}
+.fab { box-shadow: var(--shadow-fab), var(--surface-highlight); }
 
-:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *))::before {
+:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *))::before,
+:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *))::after {
     content: "";
     position: absolute;
-    inset: -1px;
-    border: 1px solid transparent;
+    inset: calc(-1 * var(--action-stroke));
     border-radius: inherit;
-    background: var(--control-surface) padding-box;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    z-index: -1;
+    background: var(--action-gradient);
     pointer-events: none;
-    transition: opacity var(--duration-button) var(--ease-out);
+    z-index: -1;
 }
 
-:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *, :disabled, [aria-disabled="true"], [aria-busy="true"])):is(.button-hover, .button-press, :focus-visible:active) {
+:is(.btn-primary, .fab)::before {
+    opacity: var(--fill-opacity);
+    transition: opacity var(--fill-time) var(--ease-out);
+}
+
+:is(.btn-primary, .fab)::after {
+    padding: var(--action-stroke);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+}
+
+@supports not (mask-composite: exclude) {
+    :is(.btn-primary, .fab)::after { display: none; }
+}
+
+:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *, :disabled, [aria-disabled="true"], [aria-busy="true"])):is(.button-hover, .button-press, :active) {
+    --fill-opacity: 1;
+    --fill-time: var(--action-fill-time);
     color: var(--action-ink);
-}
-
-:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *, :disabled, [aria-disabled="true"], [aria-busy="true"])):is(.button-hover, .button-press, :focus-visible:active)::before {
-    opacity: 0;
-    transition-duration: var(--duration-instant);
 }
 
 /* Authentication and setup keep their neutral primary action. */
@@ -2275,7 +2290,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 :where(#auth-screen, #reset-password-screen, #sync-error-screen, #onboarding-screen) .btn-primary.button-hover,
-:is(.btn-secondary, .btn-ghost).button-hover:not(:where(.text-rose, .text-danger, :disabled, [aria-disabled="true"], [aria-busy="true"])) {
+:is(.btn-secondary, .btn-ghost):is(.button-hover, :active):not(:where(.text-rose, .text-danger, :disabled, [aria-disabled="true"], [aria-busy="true"])) {
     background: var(--control-hover);
     color: var(--text-primary);
 }
@@ -2287,67 +2302,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     }
 }
 
-/* Semantic glimmer colors follow the action, including speed-dial icons. */
-:where(.btn-primary, .fab) {
-    --button-glimmer-color: #fff1dc;
-}
-
-:where(#auth-screen, #reset-password-screen, #sync-error-screen, #onboarding-screen) .btn-primary {
-    --button-glimmer-color: var(--button-glimmer-neutral);
-}
-
-:where(.btn-tx-income, [data-action-accent="income"]) {
-    --button-glimmer-color: var(--income);
-}
-
-:where(.btn-tx-expense, [data-action-accent="expense"]) {
-    --button-glimmer-color: var(--expense);
-}
-
-:where(.btn-tx-transfer, .btn-tx-remittance, [data-action-accent="transfer"]) {
-    --button-glimmer-color: var(--transfer);
-}
-
-:where([data-action-accent="warning"]) {
-    --button-glimmer-color: var(--warning);
-}
-
-:where(.btn-danger, .btn-danger-ghost, .text-rose, .text-danger, [data-action-accent="destructive"]) {
-    --button-glimmer-color: #e88b92;
-}
-
-/* Rotate the light behind a fixed mask. Only the highlighted perimeter is visible. */
-.button-glimmer {
+/* SVG user units match CSS pixels on the two signature controls. */
+[data-signature-action] > .action-rim {
     position: absolute;
-    inset: 0;
-    container-type: size;
-    contain: layout paint;
-    border-radius: inherit;
-    padding: 1.5px;
+    inset: calc(-1 * var(--action-stroke));
+    width: calc(100% + 2 * var(--action-stroke));
+    height: calc(100% + 2 * var(--action-stroke));
+    fill: none;
     pointer-events: none;
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask-composite: exclude;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .button-glimmer:not(:where(:disabled *, [aria-disabled="true"] *, [aria-busy="true"] *))::after {
-        content: "";
-        position: absolute;
-        inset: 50% auto auto 50%;
-        inline-size: max(150cqw, 150cqh);
-        aspect-ratio: 1;
-        translate: -50% -50%;
-        background: conic-gradient(transparent, var(--button-glimmer-color, var(--button-glimmer-neutral)) 12deg,
-            transparent 30deg);
-        animation: button-perimeter var(--button-glimmer-duration) linear both;
-    }
+.action-rim rect {
+    x: 1.35px;
+    y: 1.35px;
+    width: calc(100% - 2.7px);
+    height: calc(100% - 2.7px);
+    rx: calc(var(--radius-button) - 1.35px);
+    stroke: var(--rim-highlight);
+    stroke-width: calc(var(--action-stroke) + .45px);
+    stroke-linecap: round;
+    opacity: 0;
 }
 
-@keyframes button-perimeter {
-    from { transform: rotate(0turn); opacity: 0; }
-    6% { opacity: 0.85; }
-    94% { opacity: 0.85; }
-    to { transform: rotate(1turn); opacity: 0; }
+.fab .action-rim rect { rx: 50%; }
+
+[data-signature-action]:is(:disabled, [aria-disabled="true"], [aria-busy="true"]) .action-rim {
+    visibility: hidden;
 }
 
 /* Top-Level Toolbar & Header Primary Action Buttons (Natural Content Width with min-width) */
@@ -2437,7 +2417,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     font-weight: 510;
 }
 
-.btn-danger.button-hover {
+.btn-danger:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
     background: #c93b34;
     border-color: #b3322c;
     color: #ffffff;
@@ -2484,7 +2464,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     stroke: var(--expense);
 }
 
-.btn-tx-expense.button-hover {
+.btn-tx-expense:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
     background: rgba(244, 63, 94, 0.20);
     border-color: rgba(244, 63, 94, 0.45);
     box-shadow: 0 2px 12px rgba(244, 63, 94, 0.2);
@@ -2501,7 +2481,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     stroke: var(--income);
 }
 
-.btn-tx-income.button-hover {
+.btn-tx-income:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
     background: rgba(16, 185, 129, 0.20);
     border-color: rgba(16, 185, 129, 0.45);
     box-shadow: 0 2px 12px rgba(16, 185, 129, 0.2);
@@ -2518,7 +2498,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     stroke: var(--transfer);
 }
 
-.btn-tx-transfer.button-hover {
+.btn-tx-transfer:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
     background: rgba(56, 189, 248, 0.20);
     border-color: rgba(56, 189, 248, 0.45);
     box-shadow: 0 2px 12px rgba(56, 189, 248, 0.2);
@@ -2535,7 +2515,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     stroke: #c084fc;
 }
 
-.btn-tx-remittance.button-hover {
+.btn-tx-remittance:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
     background: rgba(192, 132, 252, 0.20);
     border-color: rgba(192, 132, 252, 0.45);
     box-shadow: 0 2px 12px rgba(192, 132, 252, 0.2);
@@ -2699,20 +2679,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 /* --- V2 NEON PROGRESS UI --- */
 
-@keyframes pulse-glow {
-    0% {
-        filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
-    }
-
-    50% {
-        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.8));
-    }
-
-    100% {
-        filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
-    }
-}
-
 .neon-row {
     background: var(--glass-bg-card);
     border: 1px solid var(--border-subtle);
@@ -2803,39 +2769,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     overflow: hidden;
 }
 
-/* Subtle Glimmer Effect (Pass 4 Requirement) */
-.budget-streak-fill::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg,
-            transparent 0%,
-            var(--budget-sheen) 50%,
-            transparent 100%);
-    animation: budget-bar-glimmer 3.5s ease-in-out infinite;
-    border-radius: inherit;
-    pointer-events: none;
+/* Animate only visible summary streaks. Dense category and loan bars stay still. */
+@media (prefers-reduced-motion: no-preference) {
+    .budget-summary-visible .budget-streak-fill::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent 35%, var(--budget-sheen) 50%, transparent 65%);
+        animation: budget-bar-glimmer var(--budget-sheen-period) ease-in-out infinite;
+        pointer-events: none;
+    }
 }
 
 @keyframes budget-bar-glimmer {
-    0% {
-        transform: translateX(-125%);
-    }
-
-    100% {
-        transform: translateX(125%);
-    }
-}
-
-@media (max-width: 768px),
-(prefers-reduced-motion: reduce) {
-    .budget-streak-fill::after {
-        animation: none !important;
-        display: none !important;
-    }
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
 }
 
 /* Gradients for different statuses */
@@ -3767,11 +3715,8 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 .monthly-stat-card {
-    background: var(--bg-surface-2);
-    border: 1px solid var(--border-default);
     border-radius: var(--radius-card);
     padding: 18px 20px;
-    box-shadow: none;
     cursor: default;
     display: flex;
     flex-direction: column;
@@ -4057,8 +4002,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
 /* 5. Right Contextual Rail Card Upgrades */
 .rail-card {
-    background: var(--bg-surface-2);
-    border: 1px solid var(--border-default);
     border-radius: var(--radius-lg);
     padding: 18px 20px;
     box-sizing: border-box;
@@ -4144,10 +4087,10 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     width: 100%;
     max-width: 980px;
     max-height: 85vh;
-    background: var(--bg-surface-1);
-    border: 1px solid var(--border-hover);
+    background: var(--glass-bg-elevated);
+    border: var(--glass-border-highlight);
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-lg), 0 0 50px rgba(0, 0, 0, 0.7);
+    box-shadow: var(--glass-shadow-elevated);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -5153,7 +5096,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 .wallet-menu-btn.button-hover,
-.wallet-card-menu-btn.button-hover {
+.wallet-card-menu-btn:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
     background: rgba(255, 255, 255, 0.18);
     color: #ffffff;
 }
@@ -5537,7 +5480,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         transform var(--duration-instant) var(--ease-out);
 }
 
-.btn-danger-ghost.button-hover {
+.btn-danger-ghost:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
     background: rgba(222, 74, 66, 0.12);
     border-color: rgba(222, 74, 66, 0.45);
     color: #f87171;
@@ -5739,9 +5682,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         position: sticky;
         top: 0;
         z-index: 100;
-        background: rgba(10, 10, 15, 0.90);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
         border-bottom: 1px solid var(--border-subtle);
         padding: 0 14px;
         height: 56px;
@@ -5782,7 +5722,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         transition: background-color var(--duration-fast), border-color var(--duration-fast);
     }
 
-    .mobile-menu-toggle.button-hover {
+    .mobile-menu-toggle:is(.button-hover, :active):not(:where(:disabled, [aria-busy="true"], [aria-disabled="true"])) {
         background: rgba(255, 255, 255, 0.09);
         border-color: rgba(255, 255, 255, 0.2);
     }
@@ -5809,9 +5749,9 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         z-index: var(--sidebar-overlay-elevation);
         transform: translateX(-100%);
         transition: transform var(--duration-normal) var(--ease-drawer);
-        background: rgba(14, 14, 20, 0.98);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
+        background: var(--glass-bg-elevated);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
         border-right: 1px solid var(--border-subtle);
         box-shadow: none;
         overflow: hidden;
@@ -7345,12 +7285,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
 .ledger-toolbar-card {
     padding: 14px 18px;
-    background: rgba(18, 18, 26, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-lg);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -8796,28 +8731,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     overflow: hidden;
 }
 
-.liquid-glass::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: var(--glass-reflection);
-    border-radius: inherit;
-    opacity: 0.9;
-}
-
-@supports not (backdrop-filter: blur(1px)) {
-
-    .liquid-glass,
-    .card:not(.country-card-jp):not(.country-card-in):not(.country-card-de),
-    .budget-central-card,
-    .reports-chart-card,
-    .reports-data-table-card,
-    .custom-report-panel {
-        background: #14151c !important;
-    }
-}
-
 /* Shared financial surfaces */
 .card:not(.country-card-jp):not(.country-card-in):not(.country-card-de),
 .rail-card,
@@ -8834,9 +8747,11 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .custom-report-panel,
 .budget-central-card,
 .monthly-stat-card {
+    backdrop-filter: var(--card-backdrop, var(--glass-blur));
+    -webkit-backdrop-filter: var(--card-backdrop, var(--glass-blur));
     background: var(--glass-bg-card) !important;
     border: var(--glass-border) !important;
-    box-shadow: var(--surface-highlight);
+    box-shadow: var(--glass-shadow);
     border-radius: var(--radius-card);
     position: relative;
 }
@@ -8938,24 +8853,12 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .reports-kpi-card,
 .reports-budget-perf-card {
     cursor: default;
-    box-shadow: none !important;
 }
 
-.monthly-stat-card:hover,
-#dashboard-expense-chart-card:hover,
-#dashboard-recent-tx-card:hover,
-.dashboard-chart-card:hover,
-.dashboard-recent-card:hover,
-.rail-card:hover,
-.reports-chart-card:hover,
-.reports-data-table-card:hover,
-.analytics-chart-card:hover,
-.reports-kpi-card:hover,
-.reports-budget-perf-card:hover {
-    transform: none !important;
-    box-shadow: none !important;
-    border-color: rgba(255, 255, 255, 0.07) !important;
-    background-color: var(--glass-bg-card) !important;
+/* Rows and nested cards use tonal depth without another backdrop sample. */
+:is(.card, .rail-card, .settings-section-card, .reports-snapshot-banner) > *,
+.reports-data-table-card {
+    --card-backdrop: none;
 }
 
 /* ==========================================================================
@@ -8974,11 +8877,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     width: 100%;
     padding: 20px 24px;
     border-radius: var(--radius-lg);
-    background: var(--glass-bg-card);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: var(--glass-border-highlight);
-    box-shadow: var(--glass-shadow);
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -9278,11 +9176,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     gap: 16px;
     padding: 16px 20px;
     border-radius: var(--radius-card);
-    background: var(--glass-bg-card);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: var(--glass-border);
-    box-shadow: none;
 }
 
 .report-month-selector-wrap {
@@ -9315,11 +9208,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .reports-snapshot-banner {
     padding: 20px 24px;
     border-radius: var(--radius-card);
-    background: var(--glass-bg-card);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: var(--glass-border);
-    box-shadow: none;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -9467,10 +9355,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 /* Cards inside the Reports Snapshot Section */
 .reports-kpi-card,
 .card.reports-kpi-card {
-    background: var(--glass-bg-card) !important;
-    border: var(--glass-border) !important;
     border-radius: var(--radius-card) !important;
-    box-shadow: none !important;
     position: relative;
     padding: 18px 20px !important;
     min-height: 120px;
@@ -9484,10 +9369,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
 .reports-budget-perf-card,
 .card.reports-budget-perf-card {
-    background: var(--glass-bg-card) !important;
-    border: var(--glass-border) !important;
     border-radius: var(--radius-card) !important;
-    box-shadow: none !important;
     position: relative;
     margin-bottom: 0 !important;
     width: 100%;
@@ -9548,11 +9430,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .reports-chart-card {
     border-radius: var(--radius-card);
     padding: 22px;
-    background: var(--glass-bg-card);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: var(--glass-border);
-    box-shadow: none;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -9715,11 +9592,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .reports-data-table-card {
     border-radius: var(--radius-card);
     padding: 20px 22px;
-    background: var(--glass-bg-card);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: var(--glass-border);
-    box-shadow: none;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -9931,11 +9803,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .custom-report-panel {
     border-radius: var(--radius-card);
     padding: 24px;
-    background: var(--glass-bg-card);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: var(--glass-border);
-    box-shadow: none;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -10111,11 +9978,9 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .closing-modal-sheet {
     width: 100%;
     max-width: 680px;
-    background: rgba(18, 19, 26, 0.96);
-    backdrop-filter: blur(36px) saturate(130%);
-    -webkit-backdrop-filter: blur(36px) saturate(130%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 24px 64px 0 rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    background: var(--glass-bg-elevated);
+    border: var(--glass-border-highlight);
+    box-shadow: var(--glass-shadow-elevated);
     border-radius: 19px;
     display: flex;
     flex-direction: column;
@@ -11828,11 +11693,9 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .action-selector-card {
     width: 100%;
     max-width: 480px;
-    background: linear-gradient(180deg, rgba(20, 20, 26, 0.96) 0%, rgba(12, 12, 16, 0.98) 100%);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    background: var(--glass-bg-elevated);
+    border: var(--glass-border-highlight);
+    box-shadow: var(--glass-shadow-elevated);
     border-radius: var(--radius-xl);
     padding: 24px 22px;
     box-sizing: border-box;
