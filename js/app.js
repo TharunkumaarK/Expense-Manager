@@ -2023,7 +2023,7 @@ class App {
         this.closeUnifiedTransactionSelector();
         this._lastDetailTxId = null;
         this._txModalSource = null;
-        for (const id of ['edit-wallet-modal', 'quick-edit-modal', 'category-manage-modal',
+        for (const id of ['edit-wallet-modal', 'quick-edit-modal', 'log-emi-modal', 'category-manage-modal',
             'overall-budget-modal', 'closing-wizard-modal', 'budget-recovery-modal']) {
             this.closeModal(id);
         }
@@ -2042,7 +2042,8 @@ class App {
         this.focusCurrentRegion = null;
         for (const id of ['edit-wallet-id', 'edit-wallet-name', 'edit-wallet-balance',
             'quick-edit-id', 'quick-edit-region', 'quick-edit-type', 'quick-edit-amount',
-            'cat-edit-id', 'cat-edit-name', 'cat-edit-budget', 'overall-budget-input']) {
+            'cat-edit-id', 'cat-edit-name', 'cat-edit-budget', 'overall-budget-input',
+            'log-emi-date', 'log-emi-amount', 'log-emi-note']) {
             const field = document.getElementById(id);
             if (field) field.value = '';
         }
@@ -2050,14 +2051,17 @@ class App {
             'tx-detail-subtitle', 'tx-detail-wallet-val', 'tx-detail-category-val', 'tx-detail-dest-val',
             'tx-detail-rate-val', 'tx-detail-note-val', 'tx-detail-id-val', 'modal-title',
             'edit-wallet-title', 'quick-edit-title', 'focus-modal-title', 'focus-back-label',
-            'cat-modal-title', 'overall-budget-cat-sum', 'overall-budget-cushion-val']) {
+            'cat-modal-title', 'overall-budget-cat-sum', 'overall-budget-cushion-val',
+            'log-emi-preview-principal', 'log-emi-preview-dues']) {
             const field = document.getElementById(id);
             if (field) field.textContent = '';
         }
         for (const id of ['modal-content', 'focus-primary-panel', 'focus-secondary-panel',
-            'closing-step-content', 'budget-recovery-content']) {
+            'closing-step-content', 'budget-recovery-content', 'log-emi-wallet']) {
             document.getElementById(id)?.replaceChildren();
         }
+        const emiAmountLabel = document.getElementById('log-emi-amount-label');
+        if (emiAmountLabel) emiAmountLabel.textContent = 'EMI Amount';
         this.jpAnalyticsUserId = null;
         this.jpExclusions = new Set();
         this.closeCategoryDrilldown();
