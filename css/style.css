@@ -133,8 +133,8 @@
        Background & Surface Elevations (Neutral Black Specification)
        ========================================================================== */
     --bg-app: #000000;
-    --bg-workspace: #11141b;
-    --bg-sidebar: #151922;
+    --bg-workspace: #141414;
+    --bg-sidebar: #171717;
     --bg-surface-1: #0a0a0a;
     --bg-surface-2: #121212;
     --bg-surface-3: #181818;
@@ -253,14 +253,14 @@
     --duration-panel: 300ms;
     --duration-smooth: 320ms;
 
-    /* Surfaces, controls and reflections */
+    /* Surfaces, controls and interaction feedback */
     --workspace-ambient:
-        radial-gradient(ellipse 72rem 38rem at 86% -8rem, #283344 0%, transparent 72%),
-        radial-gradient(ellipse 52rem 32rem at 2% 9rem, #27201d 0%, transparent 75%);
-    --glass-bg: rgba(25, 29, 38, 0.94);
-    --glass-bg-subtle: rgba(19, 21, 27, 0.86);
-    --glass-bg-card: #1b1f28;
-    --glass-bg-elevated: #242832;
+        radial-gradient(ellipse 58rem 35rem at 5% 0%, rgba(155, 121, 75, 0.16), transparent 78%),
+        radial-gradient(ellipse 55rem 38rem at 100% 100%, rgba(130, 140, 155, 0.06), transparent 78%);
+    --glass-bg: rgba(30, 30, 30, 0.94);
+    --glass-bg-subtle: rgba(23, 23, 23, 0.86);
+    --glass-bg-card: rgba(37, 37, 37, 0.72);
+    --glass-bg-elevated: #282828;
     --glass-border: 1px solid var(--border-default);
     --glass-border-highlight: 1px solid rgba(255, 255, 255, 0.18);
     --glass-border-subtle: 1px solid var(--border-subtle);
@@ -271,18 +271,19 @@
     --glass-reflection: none;
     --glass-glow-hover: 0 4px 18px rgba(0, 0, 0, 0.28);
     --surface-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.045);
-    --control-surface: #151922;
-    --control-hover: #303744;
-    --control-border: #4a5363;
-    --action-gradient: linear-gradient(165deg, #f4d9a0, #d3a96c);
-    --action-ink: #231a10;
-    --action-edge: #deb981;
-    --action-hover: #f6dbab;
-    --focus-ring: #efcb91;
-    --button-sheen: rgba(255, 250, 228, 0.38);
-    --button-glimmer-duration: 280ms;
-    --budget-sheen: rgba(255, 255, 255, 0.28);
-    --budget-track: #343b49;
+    --control-surface: #191919;
+    --control-hover: #303030;
+    --control-border: #505050;
+    --action-gradient: linear-gradient(90.81deg, #9B794B 0%, #E7CBA3 99.75%);
+    --action-ink: #14110C;
+    --action-edge: #C5A67C;
+    --action-text: #E7CBA3;
+    --action-focus-halo: rgba(197, 166, 124, 0.18);
+    --focus-ring: var(--action-text);
+    --button-glimmer-duration: 950ms;
+    --button-glimmer-neutral: #c4c8cd;
+    --budget-sheen: rgba(255, 255, 255, 0.22);
+    --budget-track: #393939;
     --budget-safe: linear-gradient(90deg, #10b981, #34d399);
     --budget-warning: linear-gradient(90deg, #f59e0b, #fbbf24);
     --budget-danger: linear-gradient(90deg, #f43f5e, #fb7185);
@@ -299,7 +300,7 @@
     --sidebar-drawer-width: 280px;
     --sidebar-overlay-elevation: 1000;
     --sidebar-nav-height: 40px;
-    --sidebar-nav-active: #262938;
+    --sidebar-nav-active: #2B2722;
     --header-height: 64px;
     --page-gutter: clamp(20px, 2vw, 28px);
     --page-top: var(--space-6);
@@ -623,10 +624,6 @@ button {
     background: var(--bg-surface-hover);
 }
 
-.sidebar-toggle:active {
-    transform: scale(0.92);
-}
-
 .sidebar-toggle-icon {
     width: 18px;
     height: 18px;
@@ -704,10 +701,6 @@ button {
     background-color: var(--bg-surface-hover);
 }
 
-.desktop-nav-item:active {
-    transform: scale(0.98);
-}
-
 .desktop-nav-item.active {
     color: var(--text-primary);
     background-color: var(--sidebar-nav-active);
@@ -722,7 +715,7 @@ button {
     bottom: 8px;
     width: 3px;
     border-radius: 0 4px 4px 0;
-    background-color: var(--action-edge);
+    background: var(--action-gradient);
 }
 
 .desktop-nav-item svg {
@@ -887,13 +880,9 @@ button {
     transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
 }
 
-.account-logout-btn:hover {
+.account-logout-btn.button-hover {
     color: var(--red);
     background: rgba(222, 74, 66, 0.12);
-}
-
-.account-logout-btn:active {
-    transform: scale(0.92);
 }
 
 .account-logout-btn svg {
@@ -1009,13 +998,9 @@ button {
     transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
 }
 
-.icon-btn-subtle:hover {
+.icon-btn-subtle.button-hover {
     color: var(--text-primary);
     background: var(--bg-surface-hover);
-}
-
-.icon-btn-subtle:active {
-    transform: scale(0.92);
 }
 
 .icon-btn-subtle svg {
@@ -1304,13 +1289,9 @@ button {
     transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
 }
 
-.desktop-privacy-btn:hover {
+.desktop-privacy-btn.button-hover {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.06);
-}
-
-.desktop-privacy-btn:active {
-    transform: scale(0.92);
 }
 
 .desktop-privacy-btn.revealed {
@@ -1844,21 +1825,12 @@ body.drawer-open {
     width: 54px;
     height: 54px;
     border-radius: 50%;
-    background: var(--action-gradient);
-    border: 1px solid var(--action-edge);
-    color: var(--action-ink);
+    border: 1px solid transparent;
     touch-action: manipulation;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: var(--shadow-fab), var(--surface-highlight);
     z-index: 100;
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.fab:active {
-    background: var(--action-hover);
-    transform: scale(0.96);
 }
 
 .fab i,
@@ -1936,6 +1908,7 @@ body.drawer-open {
 }
 
 .fab-icon {
+    position: relative;
     width: 48px;
     height: 48px;
     border-radius: 50%;
@@ -2169,7 +2142,7 @@ input {
 select:focus,
 input:focus {
     border-color: var(--action-edge);
-    box-shadow: 0 0 0 2px rgba(222, 185, 129, 0.18);
+    box-shadow: 0 0 0 2px var(--action-focus-halo);
 }
 
 input[type="date"] {
@@ -2206,19 +2179,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     white-space: nowrap;
     text-decoration: none;
     touch-action: manipulation;
-    transition: transform var(--duration-button) var(--ease-out),
-        background-color var(--duration-fast), border-color var(--duration-fast),
+    transition: background-color var(--duration-fast), border-color var(--duration-fast),
         color var(--duration-fast);
-}
-
-.btn:active {
-    transform: scale(0.98);
 }
 
 .btn:is(:disabled, [aria-disabled="true"]) {
     opacity: 0.48;
     cursor: not-allowed;
-    transform: none;
 }
 
 .btn[aria-busy="true"] {
@@ -2244,14 +2211,47 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     height: 14px;
 }
 
-.btn-primary {
-    color: var(--action-ink);
-    background: var(--action-gradient);
-    border-color: var(--action-edge);
-    box-shadow: var(--surface-highlight), var(--shadow-xs);
+/* The gradient stays fixed while the graphite interior crossfades. */
+:where(button:not(.desktop-nav-item, .bottom-nav-item), a.btn) {
+    position: relative;
 }
 
-/* Authentication and setup use their own neutral action treatment. */
+:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *)) {
+    isolation: isolate;
+    color: var(--action-text);
+    background: var(--action-gradient) border-box;
+    border-color: transparent;
+    box-shadow: var(--surface-highlight), var(--shadow-xs);
+    transition: color var(--duration-instant) var(--ease-out);
+}
+
+.fab {
+    box-shadow: var(--shadow-fab), var(--surface-highlight);
+}
+
+:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *))::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border: 1px solid transparent;
+    border-radius: inherit;
+    background: var(--control-surface) padding-box;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    z-index: -1;
+    pointer-events: none;
+    transition: opacity var(--duration-button) var(--ease-out);
+}
+
+:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *, :disabled, [aria-disabled="true"], [aria-busy="true"])):is(.button-hover, .button-press, :focus-visible:active) {
+    color: var(--action-ink);
+}
+
+:is(.btn-primary, .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *, :disabled, [aria-disabled="true"], [aria-busy="true"])):is(.button-hover, .button-press, :focus-visible:active)::before {
+    opacity: 0;
+    transition-duration: var(--duration-instant);
+}
+
+/* Authentication and setup keep their neutral primary action. */
 :where(#auth-screen, #reset-password-screen, #sync-error-screen, #onboarding-screen) .btn-primary {
     color: var(--text-primary);
     background: linear-gradient(155deg, #41434a, #2b2d34);
@@ -2274,52 +2274,80 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     outline-offset: 2px;
 }
 
-@media (hover: hover) and (pointer: fine) {
-    .btn-primary:not(:is(:disabled, [aria-disabled="true"])):hover {
-        background: var(--action-hover);
-    }
+:where(#auth-screen, #reset-password-screen, #sync-error-screen, #onboarding-screen) .btn-primary.button-hover,
+:is(.btn-secondary, .btn-ghost).button-hover:not(:where(.text-rose, .text-danger, :disabled, [aria-disabled="true"], [aria-busy="true"])) {
+    background: var(--control-hover);
+    color: var(--text-primary);
+}
 
-    :where(#auth-screen, #reset-password-screen, #sync-error-screen, #onboarding-screen) .btn-primary:not(:disabled):hover,
-    :is(.btn-secondary, .btn-ghost):not(:is(:disabled, [aria-disabled="true"])):hover {
-        background: var(--control-hover);
-        color: var(--text-primary);
+@media (prefers-reduced-motion: reduce) {
+    :is(.btn-primary, .fab)::before,
+    .fab :is(i, svg) {
+        transition: none;
     }
 }
 
-/* Reflections stay inside the button and have no hit area. */
-:where(.btn-primary, .btn-secondary, .btn-tx-submit, .btn-ghost:not(.text-rose), .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *)) {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
+/* Semantic glimmer colors follow the action, including speed-dial icons. */
+:where(.btn-primary, .fab) {
+    --button-glimmer-color: #fff1dc;
+}
+
+:where(#auth-screen, #reset-password-screen, #sync-error-screen, #onboarding-screen) .btn-primary {
+    --button-glimmer-color: var(--button-glimmer-neutral);
+}
+
+:where(.btn-tx-income, [data-action-accent="income"]) {
+    --button-glimmer-color: var(--income);
+}
+
+:where(.btn-tx-expense, [data-action-accent="expense"]) {
+    --button-glimmer-color: var(--expense);
+}
+
+:where(.btn-tx-transfer, .btn-tx-remittance, [data-action-accent="transfer"]) {
+    --button-glimmer-color: var(--transfer);
+}
+
+:where([data-action-accent="warning"]) {
+    --button-glimmer-color: var(--warning);
+}
+
+:where(.btn-danger, .btn-danger-ghost, .text-rose, .text-danger, [data-action-accent="destructive"]) {
+    --button-glimmer-color: #e88b92;
+}
+
+/* Rotate the light behind a fixed mask. Only the highlighted perimeter is visible. */
+.button-glimmer {
+    position: absolute;
+    inset: 0;
+    container-type: size;
+    contain: layout paint;
+    border-radius: inherit;
+    padding: 1.5px;
+    pointer-events: none;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-    :where(.btn-primary, .btn-secondary, .btn-tx-submit, .btn-ghost:not(.text-rose), .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *, :disabled, [aria-disabled="true"], [aria-busy="true"]))::after {
+    .button-glimmer:not(:where(:disabled *, [aria-disabled="true"] *, [aria-busy="true"] *))::after {
         content: "";
         position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        pointer-events: none;
-        background: linear-gradient(110deg, transparent 30%, var(--button-sheen) 50%, transparent 70%);
-        transform: translateX(-100%);
-        opacity: 0;
-    }
-
-    .button-reflect:not(:is(:disabled, [aria-disabled="true"], [aria-busy="true"]))::after {
-        animation: button-reflect var(--button-glimmer-duration) var(--ease-out) both;
-    }
-
-    @media (hover: hover) and (pointer: fine) {
-        :where(.btn-primary, .btn-secondary, .btn-tx-submit, .btn-ghost:not(.text-rose), .fab):not(:where(#auth-screen *, #reset-password-screen *, #sync-error-screen *, #onboarding-screen *, :disabled, [aria-disabled="true"], [aria-busy="true"])):hover::after {
-            animation: button-reflect var(--button-glimmer-duration) var(--ease-out) both;
-        }
+        inset: 50% auto auto 50%;
+        inline-size: max(150cqw, 150cqh);
+        aspect-ratio: 1;
+        translate: -50% -50%;
+        background: conic-gradient(transparent, var(--button-glimmer-color, var(--button-glimmer-neutral)) 12deg,
+            transparent 30deg);
+        animation: button-perimeter var(--button-glimmer-duration) linear both;
     }
 }
 
-@keyframes button-reflect {
-    0% { transform: translateX(-72%); opacity: 0.55; }
-    40% { opacity: 0.75; }
-    100% { transform: translateX(100%); opacity: 0; }
+@keyframes button-perimeter {
+    from { transform: rotate(0turn); opacity: 0; }
+    6% { opacity: 0.85; }
+    94% { opacity: 0.85; }
+    to { transform: rotate(1turn); opacity: 0; }
 }
 
 /* Top-Level Toolbar & Header Primary Action Buttons (Natural Content Width with min-width) */
@@ -2409,14 +2437,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     font-weight: 510;
 }
 
-.btn-danger:hover {
+.btn-danger.button-hover {
     background: #c93b34;
     border-color: #b3322c;
     color: #ffffff;
-}
-
-.btn-danger:active {
-    transform: scale(0.98);
 }
 
 .btn-danger:focus-visible {
@@ -2440,12 +2464,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     box-sizing: border-box;
     transition: background var(--duration-fast) var(--ease-out),
         border-color var(--duration-fast) var(--ease-out),
-        box-shadow var(--duration-fast) var(--ease-out),
-        transform var(--duration-instant) var(--ease-out);
-}
-
-.btn-tx-submit:active {
-    transform: scale(0.985);
+        box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .btn-tx-submit svg {
@@ -2465,7 +2484,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     stroke: var(--expense);
 }
 
-.btn-tx-expense:hover {
+.btn-tx-expense.button-hover {
     background: rgba(244, 63, 94, 0.20);
     border-color: rgba(244, 63, 94, 0.45);
     box-shadow: 0 2px 12px rgba(244, 63, 94, 0.2);
@@ -2482,7 +2501,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     stroke: var(--income);
 }
 
-.btn-tx-income:hover {
+.btn-tx-income.button-hover {
     background: rgba(16, 185, 129, 0.20);
     border-color: rgba(16, 185, 129, 0.45);
     box-shadow: 0 2px 12px rgba(16, 185, 129, 0.2);
@@ -2499,7 +2518,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     stroke: var(--transfer);
 }
 
-.btn-tx-transfer:hover {
+.btn-tx-transfer.button-hover {
     background: rgba(56, 189, 248, 0.20);
     border-color: rgba(56, 189, 248, 0.45);
     box-shadow: 0 2px 12px rgba(56, 189, 248, 0.2);
@@ -2516,7 +2535,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     stroke: #c084fc;
 }
 
-.btn-tx-remittance:hover {
+.btn-tx-remittance.button-hover {
     background: rgba(192, 132, 252, 0.20);
     border-color: rgba(192, 132, 252, 0.45);
     box-shadow: 0 2px 12px rgba(192, 132, 252, 0.2);
@@ -2768,7 +2787,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .neon-bar-bg,
 .budget-streak-track {
     width: 100%;
-    height: 4px;
+    height: 3.5px;
     background: var(--budget-track);
     border-radius: var(--radius-pill);
     overflow: hidden;
@@ -2855,13 +2874,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .color-swatch:hover {
-    transform: scale(1.2);
+    border-color: var(--border-hover);
 }
 
 .color-swatch.selected {
     border-color: #ffffff;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
-    transform: scale(1.15);
 }
 
 /* ==========================================================================
@@ -3007,7 +3025,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .auth-card-jp:hover {
     border-color: rgba(225, 29, 72, 0.45) !important;
     box-shadow: 0 0 0 1px rgba(225, 29, 72, 0.35), 0 16px 36px rgba(225, 29, 72, 0.22), 0 16px 36px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
-    transform: translateY(-3px);
 }
 
 /* INR Showcase Card: Layered Saffron/Emerald Radial Blooms (Matching Dashboard Country Balance Cards) */
@@ -3025,7 +3042,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .auth-card-in:hover {
     border-color: rgba(245, 158, 11, 0.45) !important;
     box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 22px 48px rgba(245, 158, 11, 0.22), 0 22px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
-    transform: translateY(-3px);
 }
 
 .auth-card-top {
@@ -3587,10 +3603,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
-.country-card:active {
-    transform: scale(0.985);
-}
-
 /* Japan Card: Layered Crimson/Rose Radial Blooms */
 .country-card-jp {
     background: radial-gradient(circle at 10% 15%, rgba(225, 29, 72, 0.28), transparent 50%),
@@ -3704,7 +3716,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .country-card:hover .expand-indicator {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.12);
-    transform: translate(2px, -2px);
 }
 
 .expand-indicator svg {
@@ -3843,12 +3854,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     display: flex;
     align-items: center;
     gap: 12px;
-    transition: border-color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
-}
-
-.summary-stat-card:hover {
-    border-color: var(--border-hover);
-    background: var(--bg-surface-3);
 }
 
 .stat-icon-wrap {
@@ -4204,7 +4209,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .focus-back-btn:hover svg,
 .focus-back-btn:hover i {
     color: var(--text-primary);
-    transform: translateX(-2px);
 }
 
 .focus-header-divider {
@@ -4919,7 +4923,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
 .wallets-kpi-card:hover .wallets-kpi-hint {
     opacity: 1;
-    transform: translateX(5px);
 }
 
 /* Wallets Accordion Headers */
@@ -5000,10 +5003,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     background: rgba(255, 255, 255, 0.09);
     color: var(--text-primary);
     border-color: var(--border-hover);
-}
-
-.wallets-collapse-btn:active {
-    transform: scale(0.96);
 }
 
 .wallets-accordion-body {
@@ -5153,8 +5152,8 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     z-index: 3;
 }
 
-.wallet-menu-btn:hover,
-.wallet-card-menu-btn:hover {
+.wallet-menu-btn.button-hover,
+.wallet-card-menu-btn.button-hover {
     background: rgba(255, 255, 255, 0.18);
     color: #ffffff;
 }
@@ -5162,7 +5161,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .wallet-menu-btn:active,
 .wallet-card-menu-btn:active {
     background: rgba(255, 255, 255, 0.28);
-    transform: scale(0.94);
 }
 
 /* Balance Wrap */
@@ -5539,14 +5537,10 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         transform var(--duration-instant) var(--ease-out);
 }
 
-.btn-danger-ghost:hover {
+.btn-danger-ghost.button-hover {
     background: rgba(222, 74, 66, 0.12);
     border-color: rgba(222, 74, 66, 0.45);
     color: #f87171;
-}
-
-.btn-danger-ghost:active {
-    transform: scale(0.98);
 }
 
 /* 9. Theme Picker Gallery in Modals (Corrected Minimal Fintech Grid) */
@@ -5788,13 +5782,9 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         transition: background-color var(--duration-fast), border-color var(--duration-fast);
     }
 
-    .mobile-menu-toggle:hover {
+    .mobile-menu-toggle.button-hover {
         background: rgba(255, 255, 255, 0.09);
         border-color: rgba(255, 255, 255, 0.2);
-    }
-
-    .mobile-menu-toggle:active {
-        transform: scale(0.96);
     }
 
     .mobile-menu-toggle svg,
@@ -6339,9 +6329,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     .desktop-main-wrapper {
         --page-gutter: var(--space-3);
         --page-top: var(--space-3);
-        --workspace-ambient:
-            radial-gradient(ellipse 34rem 30rem at 100% 0, #263140 0%, transparent 76%),
-            radial-gradient(ellipse 24rem 28rem at -15% 20rem, #312520 0%, transparent 82%);
     }
 
     /* System-wide Mobile Typography Scale */
@@ -7307,7 +7294,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
 .segment-btn {
     background: transparent;
-    border: none;
+    border: 1px solid transparent;
     color: var(--text-muted);
     font-family: var(--font-sans);
     font-size: 0.78rem;
@@ -7326,21 +7313,21 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     user-select: none;
 }
 
-.segment-btn:hover:not(.active) {
+.segment-btn.button-hover:not(.active) {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.06);
 }
 
 .segment-btn.active {
-    background: rgba(255, 255, 255, 0.14);
-    color: #ffffff;
+    background: var(--sidebar-nav-active);
+    color: var(--action-text);
     font-weight: 600;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-color: var(--action-edge);
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .segment-btn:focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.25);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 1px;
 }
 
@@ -7486,14 +7473,14 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     transition: all var(--duration-fast);
 }
 
-.ledger-country-segment .segment-btn:hover {
+.ledger-country-segment .segment-btn.button-hover {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.04);
 }
 
 .ledger-country-segment .segment-btn.active {
-    background: rgba(255, 255, 255, 0.12);
-    color: var(--text-primary);
+    background: var(--sidebar-nav-active);
+    color: var(--action-text);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
@@ -7608,7 +7595,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 .filter-amount-input:focus {
     border-color: var(--action-edge);
     background: var(--control-surface);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 2px var(--action-focus-halo);
 }
 
 .filter-date-inputs,
@@ -7783,8 +7770,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     border: 1px solid rgba(255, 255, 255, 0.07);
     transition: background var(--duration-fast) var(--ease-out),
         border-color var(--duration-fast) var(--ease-out),
-        box-shadow var(--duration-fast) var(--ease-out),
-        transform var(--duration-instant) var(--ease-out);
+        box-shadow var(--duration-fast) var(--ease-out);
     cursor: pointer;
     gap: 16px;
 }
@@ -8889,17 +8875,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
         flex-shrink: 0;
     }
 
-    @media (prefers-reduced-motion: no-preference) {
-        .btn:active,
-        .btn-tx-submit:active,
-        .quick-action-pill:active,
-        .desktop-nav-item:active,
-        .mobile-menu-toggle:active {
-            transform: scale(0.97) !important;
-            transition-duration: var(--duration-instant) !important;
-        }
-    }
-
 }
 
 @media (max-width: 360px) {
@@ -8927,7 +8902,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
 /* Card Subtle Elevation & Hover Illumination - Interactive Elements (Glow, NOT Lift) */
 .interactive-card,
-.action-type-card,
 .category-card.interactive,
 .budget-central-card.interactive {
     transition: border-color var(--duration-fast) var(--ease-out),
@@ -8937,7 +8911,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 .interactive-card:not(.country-card-jp):not(.country-card-in):not(.country-card-de):hover,
-.action-type-card:hover,
 .category-card.interactive:hover,
 .budget-central-card.interactive:hover {
     border-color: rgba(255, 255, 255, 0.22) !important;
@@ -8947,7 +8920,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 .interactive-card:active,
-.action-type-card:active,
 .category-card.interactive:active {
     transform: none !important;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
@@ -10591,8 +10563,8 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 }
 
 .budgets-cat-segmented .segment-btn.active {
-    background: rgba(255, 255, 255, 0.12);
-    color: var(--text-primary);
+    background: var(--sidebar-nav-active);
+    color: var(--action-text);
 }
 
 /* Category Cards Grid (Pass 4: Desktop 3-Column Grid) */
@@ -10927,7 +10899,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     transition: all var(--duration-fast) var(--ease-out);
 }
 
-.icon-group-pill:hover {
+.icon-group-pill.button-hover {
     background: rgba(255, 255, 255, 0.08);
     color: var(--text-primary);
 }
@@ -10988,7 +10960,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     transition: all var(--duration-fast) var(--ease-out);
 }
 
-.icon-picker-cell:hover {
+.icon-picker-cell.button-hover {
     background: rgba(255, 255, 255, 0.08);
     color: var(--text-primary);
     border-color: rgba(255, 255, 255, 0.12);
@@ -11777,7 +11749,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     color: var(--text-primary);
 }
 
-.settings-toggle-btn.btn-active:hover {
+.settings-toggle-btn.btn-active.button-hover {
     background: rgba(239, 68, 68, 0.15);
     border-color: rgba(239, 68, 68, 0.35);
     color: #f87171;
@@ -11789,7 +11761,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     color: var(--text-muted);
 }
 
-.settings-toggle-btn.btn-inactive:hover {
+.settings-toggle-btn.btn-inactive.button-hover {
     border-color: rgba(48, 209, 88, 0.5);
     color: #30d158;
     background: rgba(48, 209, 88, 0.08);
@@ -11932,18 +11904,16 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     box-sizing: border-box;
     transition: background-color var(--duration-fast) var(--ease-out),
         border-color var(--duration-fast) var(--ease-out),
-        box-shadow var(--duration-fast) var(--ease-out),
-        transform var(--duration-instant) var(--ease-out);
+        box-shadow var(--duration-fast) var(--ease-out);
 }
 
-.action-type-card:hover {
+.action-type-card.button-hover {
     background: rgba(255, 255, 255, 0.07);
     border-color: rgba(255, 255, 255, 0.20);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
-.action-type-card:active {
-    transform: scale(0.985);
+.action-type-card:is(.button-press, :active) {
     background: rgba(255, 255, 255, 0.09);
 }
 
@@ -12024,7 +11994,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-.action-type-card:hover .action-chevron {
+.action-type-card.button-hover .action-chevron {
     opacity: 1;
     color: var(--text-primary);
 }
@@ -12598,7 +12568,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
 @media (hover: hover) and (pointer: fine) {
     .onboarding-wallet-showcase .auth-card-preview:hover {
         z-index: 10;
-        transform: translateY(-4px);
         box-shadow: 0 24px 48px rgba(0, 0, 0, 0.75), 0 0 32px rgba(255, 255, 255, 0.08);
     }
 }
@@ -12751,10 +12720,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
         background: rgba(255, 255, 255, 0.05);
         border-color: rgba(255, 255, 255, 0.18);
     }
-}
-
-.onboarding-country-card:active {
-    transform: scale(0.98);
 }
 
 .onboarding-country-card:focus-visible {
@@ -13026,10 +12991,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     }
 }
 
-.onboarding-btn-add-wallet:active {
-    transform: scale(0.97);
-}
-
 .onboarding-btn-add-wallet:focus-visible {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
@@ -13168,10 +13129,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     }
 }
 
-.onboarding-wallet-row-left:active {
-    transform: scale(0.99);
-}
-
 .onboarding-wallet-delete-btn,
 .onboarding-wallet-edit-btn {
     background: none;
@@ -13200,11 +13157,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
         color: #60a5fa;
         background: rgba(96, 165, 250, 0.1);
     }
-}
-
-.onboarding-wallet-delete-btn:active,
-.onboarding-wallet-edit-btn:active {
-    transform: scale(0.95);
 }
 
 .onboarding-wallet-delete-btn:focus-visible {
@@ -13582,10 +13534,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     }
 }
 
-.onboarding-btn-back:active {
-    transform: scale(0.97);
-}
-
 .onboarding-btn-back:focus-visible {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
@@ -13606,10 +13554,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-.onboarding-btn-next:active {
-    transform: scale(0.97);
-}
-
 .onboarding-btn-next:focus-visible {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
@@ -13627,7 +13571,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
 .auth-card-de:hover {
     border-color: rgba(59, 130, 246, 0.45) !important;
     box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35), 0 22px 48px rgba(37, 99, 235, 0.22), 0 22px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
-    transform: translateY(-3px);
 }
 
 /* ==========================================================================

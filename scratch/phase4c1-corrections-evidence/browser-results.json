@@ -1,0 +1,2739 @@
+{
+  "baseline": {
+    "visual": {
+      "results": [
+        {
+          "width": 1920,
+          "view": "home",
+          "overflow": -15,
+          "nodes": 2842
+        },
+        {
+          "width": 1920,
+          "view": "transactions",
+          "overflow": -15,
+          "nodes": 3038
+        },
+        {
+          "width": 1920,
+          "view": "analytics",
+          "overflow": -15,
+          "nodes": 3146
+        },
+        {
+          "width": 1920,
+          "view": "budgets",
+          "overflow": -15,
+          "nodes": 3730
+        },
+        {
+          "width": 1920,
+          "view": "wallets",
+          "overflow": -15,
+          "nodes": 3830
+        },
+        {
+          "width": 1920,
+          "view": "reports",
+          "overflow": -15,
+          "nodes": 4049
+        },
+        {
+          "width": 1920,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4206
+        },
+        {
+          "width": 1440,
+          "view": "home",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "transactions",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "analytics",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "budgets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "wallets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "reports",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "home",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "transactions",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "analytics",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "budgets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "wallets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "reports",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "settings",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "home",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "transactions",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "analytics",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "budgets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "wallets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "reports",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "settings",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "home",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "transactions",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "analytics",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "budgets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "wallets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "reports",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "home",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "transactions",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "analytics",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "budgets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "wallets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "reports",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "home",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "transactions",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "analytics",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "budgets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "wallets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "reports",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4253
+        }
+      ],
+      "metrics": {
+        "dashboard": {
+          "renderMonthlySummary": 1,
+          "renderDashboardExpenseChart": 1
+        },
+        "walletRefresh": 1,
+        "desktopGlimmer": "budget-bar-glimmer"
+      },
+      "rawMarkup": null,
+      "exceptions": [],
+      "visual_state": {
+        "walletImages": [
+          "radial-gradient(circle at 12% 18%, rgba(16, 185, 129, 0.34), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 88% 85%, rgba(4, 120, 87, 0.24), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(5, 26, 20), rgb(2, 16, 12))",
+          "radial-gradient(circle at 12% 18%, rgba(245, 158, 11, 0.32), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 88% 85%, rgba(180, 83, 9, 0.22), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(28, 21, 7), rgb(18, 13, 4))",
+          "radial-gradient(circle at 12% 18%, rgba(151, 20, 77, 0.38), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 88% 85%, rgba(92, 9, 45, 0.26), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(26, 6, 16), rgb(16, 2, 8))",
+          "radial-gradient(circle at 12% 18%, rgba(16, 185, 129, 0.34), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 88% 85%, rgba(4, 120, 87, 0.24), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(5, 26, 20), rgb(2, 16, 12))"
+        ],
+        "countryImages": [
+          "radial-gradient(circle at 10% 15%, rgba(225, 29, 72, 0.28), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(24, 17, 22), rgb(16, 11, 16))",
+          "radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.24), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(23, 21, 16), rgb(12, 18, 14))",
+          "radial-gradient(circle at 10% 15%, rgba(220, 38, 38, 0.2), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 90% 85%, rgba(234, 179, 8, 0.16), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(22, 24, 29), rgb(13, 15, 20))"
+        ],
+        "streaks": [
+          [
+            4,
+            "linear-gradient(90deg, rgb(16, 185, 129), rgb(52, 211, 153))",
+            "40%"
+          ],
+          [
+            4,
+            "linear-gradient(90deg, rgb(245, 158, 11), rgb(251, 191, 36))",
+            "85%"
+          ],
+          [
+            4,
+            "linear-gradient(90deg, rgb(244, 63, 94), rgb(251, 113, 133))",
+            "100%"
+          ]
+        ],
+        "background": "radial-gradient(1152px 608px at 86% -128px, rgb(40, 51, 68) 0%, rgba(0, 0, 0, 0) 72%), radial-gradient(832px 512px at 2% 144px, rgb(39, 32, 29) 0%, rgba(0, 0, 0, 0) 75%), none",
+        "base": "rgb(17, 20, 27)"
+      }
+    },
+    "perimeterTrace": [
+      {
+        "width": 1440,
+        "loop": 0,
+        "LayoutCount": 0,
+        "RecalcStyleCount": 17,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0.0063479999999999995,
+        "TaskDuration": 0.036765,
+        "Paint": {
+          "count": 9,
+          "ms": 2.852
+        },
+        "PrePaint": {
+          "count": 20,
+          "ms": 2.412
+        },
+        "UpdateLayer": {
+          "count": 59,
+          "ms": 0.346
+        },
+        "RasterTask": {
+          "count": 39,
+          "ms": 16.383
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 1440,
+        "loop": 1,
+        "LayoutCount": 0,
+        "RecalcStyleCount": 16,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0.005631000000000001,
+        "TaskDuration": 0.029915999999999998,
+        "Paint": {
+          "count": 9,
+          "ms": 2.0
+        },
+        "PrePaint": {
+          "count": 19,
+          "ms": 2.025
+        },
+        "UpdateLayer": {
+          "count": 59,
+          "ms": 0.226
+        },
+        "RasterTask": {
+          "count": 39,
+          "ms": 18.373
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 1440,
+        "loop": 2,
+        "LayoutCount": 0,
+        "RecalcStyleCount": 15,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0.006789999999999999,
+        "TaskDuration": 0.040263999999999994,
+        "Paint": {
+          "count": 9,
+          "ms": 2.603
+        },
+        "PrePaint": {
+          "count": 20,
+          "ms": 2.679
+        },
+        "UpdateLayer": {
+          "count": 59,
+          "ms": 0.307
+        },
+        "RasterTask": {
+          "count": 39,
+          "ms": 27.669
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 1440,
+        "loop": 3,
+        "LayoutCount": 0,
+        "RecalcStyleCount": 16,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0.006714000000000001,
+        "TaskDuration": 0.032734999999999986,
+        "Paint": {
+          "count": 9,
+          "ms": 2.216
+        },
+        "PrePaint": {
+          "count": 19,
+          "ms": 2.425
+        },
+        "UpdateLayer": {
+          "count": 59,
+          "ms": 0.229
+        },
+        "RasterTask": {
+          "count": 39,
+          "ms": 29.431
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 1440,
+        "loop": 4,
+        "LayoutCount": 0,
+        "RecalcStyleCount": 16,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0.007281999999999997,
+        "TaskDuration": 0.03712599999999999,
+        "Paint": {
+          "count": 9,
+          "ms": 2.739
+        },
+        "PrePaint": {
+          "count": 19,
+          "ms": 2.69
+        },
+        "UpdateLayer": {
+          "count": 59,
+          "ms": 0.241
+        },
+        "RasterTask": {
+          "count": 39,
+          "ms": 29.774
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 0,
+        "LayoutCount": 7,
+        "RecalcStyleCount": 16,
+        "LayoutDuration": 0.0013880000000000003,
+        "RecalcStyleDuration": 0.007513999999999993,
+        "TaskDuration": 0.027038000000000006,
+        "Paint": {
+          "count": 17,
+          "ms": 1.029
+        },
+        "PrePaint": {
+          "count": 31,
+          "ms": 2.836
+        },
+        "UpdateLayer": {
+          "count": 64,
+          "ms": 0.099
+        },
+        "RasterTask": {
+          "count": 13,
+          "ms": 4.901
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 1,
+        "LayoutCount": 1,
+        "RecalcStyleCount": 21,
+        "LayoutDuration": 0.00013499999999999623,
+        "RecalcStyleDuration": 0.008576,
+        "TaskDuration": 0.029046000000000016,
+        "Paint": {
+          "count": 18,
+          "ms": 2.121
+        },
+        "PrePaint": {
+          "count": 32,
+          "ms": 1.716
+        },
+        "UpdateLayer": {
+          "count": 103,
+          "ms": 0.224
+        },
+        "RasterTask": {
+          "count": 28,
+          "ms": 12.352
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 2,
+        "LayoutCount": 1,
+        "RecalcStyleCount": 21,
+        "LayoutDuration": 0.00015700000000001824,
+        "RecalcStyleDuration": 0.007805000000000006,
+        "TaskDuration": 0.021902000000000033,
+        "Paint": {
+          "count": 18,
+          "ms": 1.144
+        },
+        "PrePaint": {
+          "count": 31,
+          "ms": 1.382
+        },
+        "UpdateLayer": {
+          "count": 93,
+          "ms": 0.101
+        },
+        "RasterTask": {
+          "count": 28,
+          "ms": 7.803
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 3,
+        "LayoutCount": 1,
+        "RecalcStyleCount": 21,
+        "LayoutDuration": 0.00017100000000000448,
+        "RecalcStyleDuration": 0.008407999999999999,
+        "TaskDuration": 0.023206999999999978,
+        "Paint": {
+          "count": 18,
+          "ms": 1.151
+        },
+        "PrePaint": {
+          "count": 31,
+          "ms": 1.366
+        },
+        "UpdateLayer": {
+          "count": 93,
+          "ms": 0.139
+        },
+        "RasterTask": {
+          "count": 28,
+          "ms": 7.687
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 4,
+        "LayoutCount": 1,
+        "RecalcStyleCount": 21,
+        "LayoutDuration": 0.00016599999999999948,
+        "RecalcStyleDuration": 0.017034999999999995,
+        "TaskDuration": 0.03665300000000005,
+        "Paint": {
+          "count": 18,
+          "ms": 1.834
+        },
+        "PrePaint": {
+          "count": 32,
+          "ms": 1.764
+        },
+        "UpdateLayer": {
+          "count": 93,
+          "ms": 0.167
+        },
+        "RasterTask": {
+          "count": 28,
+          "ms": 13.71
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      }
+    ],
+    "navigationTrace": {
+      "loads": [
+        {
+          "dcl": 371.1000000014901,
+          "load": 377.70000000298023,
+          "cssTime": 7.199999999254942,
+          "cssBytes": 341527,
+          "paint": [
+            [
+              "first-paint",
+              340
+            ],
+            [
+              "first-contentful-paint",
+              340
+            ]
+          ],
+          "longTasks": [],
+          "dom": 2536,
+          "assets": [
+            [
+              "/css/style.css",
+              341527,
+              200
+            ],
+            [
+              "/js/supabase-config.js",
+              370,
+              200
+            ],
+            [
+              "/js/supabaseClient.js",
+              24667,
+              200
+            ],
+            [
+              "/js/country-config.js",
+              12970,
+              200
+            ],
+            [
+              "/js/charts.js",
+              33864,
+              200
+            ],
+            [
+              "/js/wallet.js",
+              58049,
+              200
+            ],
+            [
+              "/js/storage.js",
+              198451,
+              200
+            ],
+            [
+              "/js/startup.js",
+              2018,
+              200
+            ],
+            [
+              "/js/onboarding.js",
+              79063,
+              200
+            ],
+            [
+              "/js/app.js",
+              533372,
+              200
+            ],
+            [
+              "/manifest.json",
+              430,
+              200
+            ],
+            [
+              "/icons/icon.svg",
+              3064,
+              200
+            ],
+            [
+              "/icons/icon.svg",
+              3064,
+              200
+            ]
+          ]
+        },
+        {
+          "dcl": 218.5,
+          "load": 224.19999999925494,
+          "cssTime": 8.199999999254942,
+          "cssBytes": 341527,
+          "paint": [
+            [
+              "first-paint",
+              204
+            ],
+            [
+              "first-contentful-paint",
+              204
+            ]
+          ],
+          "longTasks": [],
+          "dom": 2536,
+          "assets": [
+            [
+              "/js/supabase-config.js",
+              370,
+              200
+            ],
+            [
+              "/css/style.css",
+              341527,
+              200
+            ],
+            [
+              "/js/supabaseClient.js",
+              24667,
+              200
+            ],
+            [
+              "/js/country-config.js",
+              12970,
+              200
+            ],
+            [
+              "/js/storage.js",
+              198451,
+              200
+            ],
+            [
+              "/js/charts.js",
+              33864,
+              200
+            ],
+            [
+              "/js/wallet.js",
+              58049,
+              200
+            ],
+            [
+              "/js/onboarding.js",
+              79063,
+              200
+            ],
+            [
+              "/js/startup.js",
+              2018,
+              200
+            ],
+            [
+              "/js/app.js",
+              533372,
+              200
+            ],
+            [
+              "/manifest.json",
+              430,
+              200
+            ],
+            [
+              "/icons/icon.svg",
+              3064,
+              200
+            ]
+          ]
+        },
+        {
+          "dcl": 245,
+          "load": 251.90000000223517,
+          "cssTime": 4.600000001490116,
+          "cssBytes": 341527,
+          "paint": [
+            [
+              "first-paint",
+              264
+            ],
+            [
+              "first-contentful-paint",
+              264
+            ]
+          ],
+          "longTasks": [],
+          "dom": 2536,
+          "assets": [
+            [
+              "/css/style.css",
+              341527,
+              200
+            ],
+            [
+              "/js/supabase-config.js",
+              370,
+              200
+            ],
+            [
+              "/js/supabaseClient.js",
+              24667,
+              200
+            ],
+            [
+              "/js/country-config.js",
+              12970,
+              200
+            ],
+            [
+              "/js/storage.js",
+              198451,
+              200
+            ],
+            [
+              "/js/charts.js",
+              33864,
+              200
+            ],
+            [
+              "/js/wallet.js",
+              58049,
+              200
+            ],
+            [
+              "/js/onboarding.js",
+              79063,
+              200
+            ],
+            [
+              "/js/startup.js",
+              2018,
+              200
+            ],
+            [
+              "/js/app.js",
+              533372,
+              200
+            ],
+            [
+              "/manifest.json",
+              430,
+              200
+            ],
+            [
+              "/icons/icon.svg",
+              3064,
+              200
+            ]
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "width": 1440,
+          "sample": {
+            "home": 28.199999999254942,
+            "transactions": 49.899999998509884,
+            "analytics": 68,
+            "budgets": 33.600000001490116,
+            "wallets": 49.399999998509884,
+            "reports": 54.400000002235174,
+            "settings": 30.199999999254942,
+            "modalOpen": 48.69999999925494,
+            "modalClose": 57.900000002235174
+          },
+          "delta": {
+            "LayoutCount": 24,
+            "RecalcStyleCount": 32,
+            "LayoutDuration": 0.036139000000000004,
+            "RecalcStyleDuration": 0.040952,
+            "ScriptDuration": 0.023643,
+            "TaskDuration": 0.26019200000000003
+          },
+          "nodes": 71964
+        },
+        {
+          "width": 1440,
+          "sample": {
+            "home": 45,
+            "transactions": 29,
+            "analytics": 58.19999999925494,
+            "budgets": 50.69999999925494,
+            "wallets": 27.300000000745058,
+            "reports": 47.19999999925494,
+            "settings": 33.30000000074506,
+            "modalOpen": 33.5,
+            "modalClose": 60
+          },
+          "delta": {
+            "LayoutCount": 21,
+            "RecalcStyleCount": 31,
+            "LayoutDuration": 0.02488,
+            "RecalcStyleDuration": 0.054171,
+            "ScriptDuration": 0.021579,
+            "TaskDuration": 0.27511699999999994
+          },
+          "nodes": 54461
+        },
+        {
+          "width": 1440,
+          "sample": {
+            "home": 42.19999999925494,
+            "transactions": 36.900000002235174,
+            "analytics": 50.5,
+            "budgets": 34.69999999925494,
+            "wallets": 31.399999998509884,
+            "reports": 39.30000000074506,
+            "settings": 44.19999999925494,
+            "modalOpen": 33.5,
+            "modalClose": 56
+          },
+          "delta": {
+            "LayoutCount": 21,
+            "RecalcStyleCount": 31,
+            "LayoutDuration": 0.021947000000000008,
+            "RecalcStyleDuration": 0.047954,
+            "ScriptDuration": 0.017019000000000006,
+            "TaskDuration": 0.23397099999999993
+          },
+          "nodes": 97510
+        },
+        {
+          "width": 390,
+          "sample": {
+            "home": 53.69999999925494,
+            "transactions": 44.69999999925494,
+            "analytics": 65,
+            "budgets": 34.19999999925494,
+            "wallets": 32.80000000074506,
+            "reports": 49.599999997764826,
+            "settings": 32.900000002235174,
+            "modalOpen": 34.19999999925494,
+            "modalClose": 33.100000001490116
+          },
+          "delta": {
+            "LayoutCount": 19,
+            "RecalcStyleCount": 29,
+            "LayoutDuration": 0.05021500000000001,
+            "RecalcStyleDuration": 0.05635699999999999,
+            "ScriptDuration": 0.018515000000000004,
+            "TaskDuration": 0.2851190000000001
+          },
+          "nodes": 140576
+        },
+        {
+          "width": 390,
+          "sample": {
+            "home": 38.20000000298023,
+            "transactions": 35.5,
+            "analytics": 50.79999999701977,
+            "budgets": 35.70000000298023,
+            "wallets": 30.399999998509884,
+            "reports": 50.29999999701977,
+            "settings": 32.70000000298023,
+            "modalOpen": 34.099999997764826,
+            "modalClose": 33.19999999925494
+          },
+          "delta": {
+            "LayoutCount": 19,
+            "RecalcStyleCount": 29,
+            "LayoutDuration": 0.02051900000000001,
+            "RecalcStyleDuration": 0.046128999999999976,
+            "ScriptDuration": 0.014813999999999994,
+            "TaskDuration": 0.23459999999999992
+          },
+          "nodes": 54325
+        },
+        {
+          "width": 390,
+          "sample": {
+            "home": 46.099999997764826,
+            "transactions": 25.800000000745058,
+            "analytics": 50.399999998509884,
+            "budgets": 33.30000000074506,
+            "wallets": 33.30000000074506,
+            "reports": 50.30000000074506,
+            "settings": 33,
+            "modalOpen": 33.400000002235174,
+            "modalClose": 33.599999997764826
+          },
+          "delta": {
+            "LayoutCount": 19,
+            "RecalcStyleCount": 29,
+            "LayoutDuration": 0.020500000000000018,
+            "RecalcStyleDuration": 0.048574000000000006,
+            "ScriptDuration": 0.014620000000000022,
+            "TaskDuration": 0.21046299999999984
+          },
+          "nodes": 97374
+        }
+      ],
+      "result": [],
+      "listeners": [
+        1,
+        1
+      ],
+      "runtime": {
+        "manifest": true,
+        "activeWorker": false,
+        "workers": 0,
+        "activeBlurs": 4,
+        "glimmer": "none"
+      },
+      "exceptions": []
+    }
+  },
+  "current": {
+    "visual": {
+      "results": [
+        {
+          "width": 1920,
+          "view": "home",
+          "overflow": -15,
+          "nodes": 2842
+        },
+        {
+          "width": 1920,
+          "view": "transactions",
+          "overflow": -15,
+          "nodes": 3038
+        },
+        {
+          "width": 1920,
+          "view": "analytics",
+          "overflow": -15,
+          "nodes": 3146
+        },
+        {
+          "width": 1920,
+          "view": "budgets",
+          "overflow": -15,
+          "nodes": 3730
+        },
+        {
+          "width": 1920,
+          "view": "wallets",
+          "overflow": -15,
+          "nodes": 3830
+        },
+        {
+          "width": 1920,
+          "view": "reports",
+          "overflow": -15,
+          "nodes": 4049
+        },
+        {
+          "width": 1920,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4206
+        },
+        {
+          "width": 1440,
+          "view": "home",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "transactions",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "analytics",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "budgets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "wallets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "reports",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1440,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "home",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "transactions",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "analytics",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "budgets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "wallets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "reports",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 1024,
+          "view": "settings",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "home",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "transactions",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "analytics",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "budgets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "wallets",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "reports",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 768,
+          "view": "settings",
+          "overflow": -15,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "home",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "transactions",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "analytics",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "budgets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "wallets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "reports",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 430,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "home",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "transactions",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "analytics",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "budgets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "wallets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "reports",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 390,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "home",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "transactions",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "analytics",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "budgets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "wallets",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "reports",
+          "overflow": 0,
+          "nodes": 4253
+        },
+        {
+          "width": 360,
+          "view": "settings",
+          "overflow": 0,
+          "nodes": 4253
+        }
+      ],
+      "metrics": {
+        "dashboard": {
+          "renderMonthlySummary": 1,
+          "renderDashboardExpenseChart": 1
+        },
+        "walletRefresh": 1,
+        "desktopGlimmer": "budget-bar-glimmer"
+      },
+      "rawMarkup": null,
+      "exceptions": [],
+      "visual_state": {
+        "walletImages": [
+          "radial-gradient(circle at 12% 18%, rgba(16, 185, 129, 0.34), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 88% 85%, rgba(4, 120, 87, 0.24), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(5, 26, 20), rgb(2, 16, 12))",
+          "radial-gradient(circle at 12% 18%, rgba(245, 158, 11, 0.32), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 88% 85%, rgba(180, 83, 9, 0.22), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(28, 21, 7), rgb(18, 13, 4))",
+          "radial-gradient(circle at 12% 18%, rgba(151, 20, 77, 0.38), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 88% 85%, rgba(92, 9, 45, 0.26), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(26, 6, 16), rgb(16, 2, 8))",
+          "radial-gradient(circle at 12% 18%, rgba(16, 185, 129, 0.34), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 88% 85%, rgba(4, 120, 87, 0.24), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(5, 26, 20), rgb(2, 16, 12))"
+        ],
+        "countryImages": [
+          "radial-gradient(circle at 10% 15%, rgba(225, 29, 72, 0.28), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(24, 17, 22), rgb(16, 11, 16))",
+          "radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.24), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(23, 21, 16), rgb(12, 18, 14))",
+          "radial-gradient(circle at 10% 15%, rgba(220, 38, 38, 0.2), rgba(0, 0, 0, 0) 50%), radial-gradient(circle at 90% 85%, rgba(234, 179, 8, 0.16), rgba(0, 0, 0, 0) 55%), linear-gradient(145deg, rgb(22, 24, 29), rgb(13, 15, 20))"
+        ],
+        "streaks": [
+          [
+            3.5,
+            "linear-gradient(90deg, rgb(16, 185, 129), rgb(52, 211, 153))",
+            "40%"
+          ],
+          [
+            3.5,
+            "linear-gradient(90deg, rgb(245, 158, 11), rgb(251, 191, 36))",
+            "85%"
+          ],
+          [
+            3.5,
+            "linear-gradient(90deg, rgb(244, 63, 94), rgb(251, 113, 133))",
+            "100%"
+          ]
+        ],
+        "background": "radial-gradient(928px 560px at 5% 0%, rgba(155, 121, 75, 0.16), rgba(0, 0, 0, 0) 78%), radial-gradient(880px 608px at 100% 100%, rgba(130, 140, 155, 0.06), rgba(0, 0, 0, 0) 78%), none",
+        "base": "rgb(20, 20, 20)"
+      }
+    },
+    "perimeterTrace": [
+      {
+        "width": 1440,
+        "loop": 0,
+        "LayoutCount": 2,
+        "RecalcStyleCount": 26,
+        "LayoutDuration": 0.001248,
+        "RecalcStyleDuration": 0.022219,
+        "TaskDuration": 0.084415,
+        "Paint": {
+          "count": 35,
+          "ms": 7.153
+        },
+        "PrePaint": {
+          "count": 30,
+          "ms": 5.789
+        },
+        "UpdateLayer": {
+          "count": 165,
+          "ms": 0.877
+        },
+        "RasterTask": {
+          "count": 30,
+          "ms": 21.271
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 1440,
+        "loop": 1,
+        "LayoutCount": 2,
+        "RecalcStyleCount": 24,
+        "LayoutDuration": 0.001509,
+        "RecalcStyleDuration": 0.023796,
+        "TaskDuration": 0.08234300000000001,
+        "Paint": {
+          "count": 33,
+          "ms": 7.024
+        },
+        "PrePaint": {
+          "count": 28,
+          "ms": 5.731
+        },
+        "UpdateLayer": {
+          "count": 143,
+          "ms": 0.789
+        },
+        "RasterTask": {
+          "count": 29,
+          "ms": 12.725
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 1440,
+        "loop": 2,
+        "LayoutCount": 2,
+        "RecalcStyleCount": 23,
+        "LayoutDuration": 0.0011580000000000002,
+        "RecalcStyleDuration": 0.021657999999999997,
+        "TaskDuration": 0.07744999999999999,
+        "Paint": {
+          "count": 33,
+          "ms": 6.543
+        },
+        "PrePaint": {
+          "count": 27,
+          "ms": 5.218
+        },
+        "UpdateLayer": {
+          "count": 143,
+          "ms": 0.753
+        },
+        "RasterTask": {
+          "count": 29,
+          "ms": 14.027
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 1440,
+        "loop": 3,
+        "LayoutCount": 2,
+        "RecalcStyleCount": 25,
+        "LayoutDuration": 0.0013930000000000001,
+        "RecalcStyleDuration": 0.023931000000000008,
+        "TaskDuration": 0.08064199999999996,
+        "Paint": {
+          "count": 35,
+          "ms": 7.105
+        },
+        "PrePaint": {
+          "count": 29,
+          "ms": 5.603
+        },
+        "UpdateLayer": {
+          "count": 154,
+          "ms": 0.832
+        },
+        "RasterTask": {
+          "count": 30,
+          "ms": 13.221
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 1440,
+        "loop": 4,
+        "LayoutCount": 2,
+        "RecalcStyleCount": 24,
+        "LayoutDuration": 0.0011009999999999995,
+        "RecalcStyleDuration": 0.018012,
+        "TaskDuration": 0.06668600000000002,
+        "Paint": {
+          "count": 33,
+          "ms": 5.481
+        },
+        "PrePaint": {
+          "count": 29,
+          "ms": 4.221
+        },
+        "UpdateLayer": {
+          "count": 151,
+          "ms": 0.571
+        },
+        "RasterTask": {
+          "count": 29,
+          "ms": 10.012
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 0,
+        "LayoutCount": 7,
+        "RecalcStyleCount": 35,
+        "LayoutDuration": 0.001827000000000023,
+        "RecalcStyleDuration": 0.02371899999999999,
+        "TaskDuration": 0.06602699999999995,
+        "Paint": {
+          "count": 41,
+          "ms": 2.848
+        },
+        "PrePaint": {
+          "count": 47,
+          "ms": 6.316
+        },
+        "UpdateLayer": {
+          "count": 187,
+          "ms": 0.518
+        },
+        "RasterTask": {
+          "count": 30,
+          "ms": 11.554
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 1,
+        "LayoutCount": 2,
+        "RecalcStyleCount": 37,
+        "LayoutDuration": 0.00026999999999999247,
+        "RecalcStyleDuration": 0.014891000000000015,
+        "TaskDuration": 0.03998199999999996,
+        "Paint": {
+          "count": 41,
+          "ms": 1.988
+        },
+        "PrePaint": {
+          "count": 45,
+          "ms": 2.536
+        },
+        "UpdateLayer": {
+          "count": 201,
+          "ms": 0.312
+        },
+        "RasterTask": {
+          "count": 27,
+          "ms": 5.209
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 2,
+        "LayoutCount": 2,
+        "RecalcStyleCount": 35,
+        "LayoutDuration": 0.0002560000000000062,
+        "RecalcStyleDuration": 0.012025999999999981,
+        "TaskDuration": 0.034802,
+        "Paint": {
+          "count": 41,
+          "ms": 1.777
+        },
+        "PrePaint": {
+          "count": 45,
+          "ms": 2.414
+        },
+        "UpdateLayer": {
+          "count": 201,
+          "ms": 0.305
+        },
+        "RasterTask": {
+          "count": 27,
+          "ms": 4.547
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 3,
+        "LayoutCount": 2,
+        "RecalcStyleCount": 36,
+        "LayoutDuration": 0.00025399999999997647,
+        "RecalcStyleDuration": 0.01291500000000001,
+        "TaskDuration": 0.03615499999999994,
+        "Paint": {
+          "count": 39,
+          "ms": 1.914
+        },
+        "PrePaint": {
+          "count": 44,
+          "ms": 2.399
+        },
+        "UpdateLayer": {
+          "count": 191,
+          "ms": 0.297
+        },
+        "RasterTask": {
+          "count": 26,
+          "ms": 4.557
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      },
+      {
+        "width": 390,
+        "loop": 4,
+        "LayoutCount": 2,
+        "RecalcStyleCount": 35,
+        "LayoutDuration": 0.00029500000000001747,
+        "RecalcStyleDuration": 0.012415999999999983,
+        "TaskDuration": 0.032803999999999944,
+        "Paint": {
+          "count": 40,
+          "ms": 1.613
+        },
+        "PrePaint": {
+          "count": 43,
+          "ms": 2.112
+        },
+        "UpdateLayer": {
+          "count": 189,
+          "ms": 0.269
+        },
+        "RasterTask": {
+          "count": 27,
+          "ms": 4.399
+        },
+        "DrawFrame": {
+          "count": 0,
+          "ms": 0.0
+        }
+      }
+    ],
+    "navigationTrace": {
+      "loads": [
+        {
+          "dcl": 335.19999999925494,
+          "load": 342.9000000022352,
+          "cssTime": 6.600000001490116,
+          "cssBytes": 340758,
+          "paint": [
+            [
+              "first-paint",
+              304
+            ],
+            [
+              "first-contentful-paint",
+              304
+            ]
+          ],
+          "longTasks": [],
+          "dom": 2536,
+          "assets": [
+            [
+              "/css/style.css",
+              340758,
+              200
+            ],
+            [
+              "/js/supabase-config.js",
+              370,
+              200
+            ],
+            [
+              "/js/supabaseClient.js",
+              24667,
+              200
+            ],
+            [
+              "/js/country-config.js",
+              12970,
+              200
+            ],
+            [
+              "/js/storage.js",
+              198451,
+              200
+            ],
+            [
+              "/js/charts.js",
+              33864,
+              200
+            ],
+            [
+              "/js/wallet.js",
+              58049,
+              200
+            ],
+            [
+              "/js/startup.js",
+              4656,
+              200
+            ],
+            [
+              "/js/onboarding.js",
+              79063,
+              200
+            ],
+            [
+              "/js/app.js",
+              533405,
+              200
+            ],
+            [
+              "/manifest.json",
+              430,
+              200
+            ],
+            [
+              "/icons/icon.svg",
+              3064,
+              200
+            ],
+            [
+              "/icons/icon.svg",
+              3064,
+              200
+            ]
+          ]
+        },
+        {
+          "dcl": 319.69999999925494,
+          "load": 325.80000000074506,
+          "cssTime": 8.299999997019768,
+          "cssBytes": 340758,
+          "paint": [
+            [
+              "first-paint",
+              324
+            ],
+            [
+              "first-contentful-paint",
+              324
+            ]
+          ],
+          "longTasks": [],
+          "dom": 2536,
+          "assets": [
+            [
+              "/css/style.css",
+              340758,
+              200
+            ],
+            [
+              "/js/supabase-config.js",
+              370,
+              200
+            ],
+            [
+              "/js/supabaseClient.js",
+              24667,
+              200
+            ],
+            [
+              "/js/country-config.js",
+              12970,
+              200
+            ],
+            [
+              "/js/storage.js",
+              198451,
+              200
+            ],
+            [
+              "/js/wallet.js",
+              58049,
+              200
+            ],
+            [
+              "/js/charts.js",
+              33864,
+              200
+            ],
+            [
+              "/js/onboarding.js",
+              79063,
+              200
+            ],
+            [
+              "/js/startup.js",
+              4656,
+              200
+            ],
+            [
+              "/js/app.js",
+              533405,
+              200
+            ],
+            [
+              "/manifest.json",
+              430,
+              200
+            ],
+            [
+              "/icons/icon.svg",
+              3064,
+              200
+            ]
+          ]
+        },
+        {
+          "dcl": 286.80000000074506,
+          "load": 293.3999999985099,
+          "cssTime": 6.800000000745058,
+          "cssBytes": 340758,
+          "paint": [
+            [
+              "first-paint",
+              292
+            ],
+            [
+              "first-contentful-paint",
+              292
+            ]
+          ],
+          "longTasks": [],
+          "dom": 2536,
+          "assets": [
+            [
+              "/css/style.css",
+              340758,
+              200
+            ],
+            [
+              "/js/supabase-config.js",
+              370,
+              200
+            ],
+            [
+              "/js/supabaseClient.js",
+              24667,
+              200
+            ],
+            [
+              "/js/country-config.js",
+              12970,
+              200
+            ],
+            [
+              "/js/storage.js",
+              198451,
+              200
+            ],
+            [
+              "/js/charts.js",
+              33864,
+              200
+            ],
+            [
+              "/js/wallet.js",
+              58049,
+              200
+            ],
+            [
+              "/js/onboarding.js",
+              79063,
+              200
+            ],
+            [
+              "/js/app.js",
+              533405,
+              200
+            ],
+            [
+              "/js/startup.js",
+              4656,
+              200
+            ],
+            [
+              "/manifest.json",
+              430,
+              200
+            ],
+            [
+              "/icons/icon.svg",
+              3064,
+              200
+            ]
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "width": 1440,
+          "sample": {
+            "home": 51.5,
+            "transactions": 44.400000002235174,
+            "analytics": 63.29999999701977,
+            "budgets": 34.900000002235174,
+            "wallets": 48.30000000074506,
+            "reports": 51,
+            "settings": 48.69999999925494,
+            "modalOpen": 33.599999997764826,
+            "modalClose": 68
+          },
+          "delta": {
+            "LayoutCount": 24,
+            "RecalcStyleCount": 32,
+            "LayoutDuration": 0.041393,
+            "RecalcStyleDuration": 0.055761,
+            "ScriptDuration": 0.024077,
+            "TaskDuration": 0.307481
+          },
+          "nodes": 71927
+        },
+        {
+          "width": 1440,
+          "sample": {
+            "home": 45.5,
+            "transactions": 33.100000001490116,
+            "analytics": 49.600000001490116,
+            "budgets": 50.899999998509884,
+            "wallets": 30.699999999254942,
+            "reports": 50.19999999925494,
+            "settings": 33.70000000298023,
+            "modalOpen": 29.799999997019768,
+            "modalClose": 71.30000000074506
+          },
+          "delta": {
+            "LayoutCount": 21,
+            "RecalcStyleCount": 31,
+            "LayoutDuration": 0.02294700000000001,
+            "RecalcStyleDuration": 0.055277999999999994,
+            "ScriptDuration": 0.019842000000000012,
+            "TaskDuration": 0.269883
+          },
+          "nodes": 54422
+        },
+        {
+          "width": 1440,
+          "sample": {
+            "home": 49,
+            "transactions": 24.100000001490116,
+            "analytics": 50.30000000074506,
+            "budgets": 36.79999999701977,
+            "wallets": 30.600000001490116,
+            "reports": 50,
+            "settings": 36.80000000074506,
+            "modalOpen": 29.099999997764826,
+            "modalClose": 61.20000000298023
+          },
+          "delta": {
+            "LayoutCount": 21,
+            "RecalcStyleCount": 31,
+            "LayoutDuration": 0.022149999999999975,
+            "RecalcStyleDuration": 0.057723,
+            "ScriptDuration": 0.01644900000000002,
+            "TaskDuration": 0.2489920000000001
+          },
+          "nodes": 97460
+        },
+        {
+          "width": 390,
+          "sample": {
+            "home": 51.400000002235174,
+            "transactions": 28.800000000745058,
+            "analytics": 54.599999997764826,
+            "budgets": 43.19999999925494,
+            "wallets": 33.69999999925494,
+            "reports": 49.69999999925494,
+            "settings": 33.30000000074506,
+            "modalOpen": 33.80000000074506,
+            "modalClose": 33
+          },
+          "delta": {
+            "LayoutCount": 19,
+            "RecalcStyleCount": 29,
+            "LayoutDuration": 0.04516500000000001,
+            "RecalcStyleDuration": 0.05088900000000002,
+            "ScriptDuration": 0.016856999999999983,
+            "TaskDuration": 0.2620910000000001
+          },
+          "nodes": 140515
+        },
+        {
+          "width": 390,
+          "sample": {
+            "home": 46.19999999925494,
+            "transactions": 29,
+            "analytics": 51.5,
+            "budgets": 32.600000001490116,
+            "wallets": 32.19999999925494,
+            "reports": 49.19999999925494,
+            "settings": 33,
+            "modalOpen": 33.80000000074506,
+            "modalClose": 33.400000002235174
+          },
+          "delta": {
+            "LayoutCount": 19,
+            "RecalcStyleCount": 29,
+            "LayoutDuration": 0.022241999999999984,
+            "RecalcStyleDuration": 0.055055999999999994,
+            "ScriptDuration": 0.015608999999999984,
+            "TaskDuration": 0.25467400000000007
+          },
+          "nodes": 54286
+        },
+        {
+          "width": 390,
+          "sample": {
+            "home": 41.100000001490116,
+            "transactions": 30.699999999254942,
+            "analytics": 50.30000000074506,
+            "budgets": 33.099999997764826,
+            "wallets": 33.100000001490116,
+            "reports": 50.5,
+            "settings": 33.100000001490116,
+            "modalOpen": 33.69999999925494,
+            "modalClose": 33.19999999925494
+          },
+          "delta": {
+            "LayoutCount": 19,
+            "RecalcStyleCount": 29,
+            "LayoutDuration": 0.02024899999999996,
+            "RecalcStyleDuration": 0.051536000000000026,
+            "ScriptDuration": 0.014314999999999967,
+            "TaskDuration": 0.21408099999999974
+          },
+          "nodes": 97324
+        }
+      ],
+      "result": [],
+      "listeners": [
+        1,
+        1
+      ],
+      "runtime": {
+        "manifest": true,
+        "activeWorker": false,
+        "workers": 0,
+        "activeBlurs": 4,
+        "glimmer": "none"
+      },
+      "exceptions": []
+    }
+  },
+  "sourceInteractions": {
+    "tests": [
+      [
+        "primary has exact gradient with opaque graphite interior and bronze text",
+        "PASS",
+        ""
+      ],
+      [
+        "primary fill opacity is interpolated in between both endpoints",
+        "PASS",
+        ""
+      ],
+      [
+        "hover preserves geometry and shows exact fill and graphite foreground",
+        "PASS",
+        ""
+      ],
+      [
+        "one 950ms clockwise lap uses a 1.5px noninteractive perimeter",
+        "PASS",
+        ""
+      ],
+      [
+        "stationary pointer retains fill and clears completed lap",
+        "PASS",
+        ""
+      ],
+      [
+        "pointer departure smoothly returns to outlined state",
+        "PASS",
+        ""
+      ],
+      [
+        "keyboard focus displays a 2px outline with resting surface",
+        "PASS",
+        ""
+      ],
+      [
+        "Space press gives fill without glimmer or movement",
+        "PASS",
+        ""
+      ],
+      [
+        "keyboard activation opens selector immediately",
+        "PASS",
+        ""
+      ],
+      [
+        "transaction choices inherit emerald, crimson and sapphire",
+        "PASS",
+        ""
+      ],
+      [
+        "busy primary holds resting fill and stops current animation",
+        "PASS",
+        ""
+      ],
+      [
+        "disabled primary has no animation and cannot enter filled state",
+        "PASS",
+        ""
+      ],
+      [
+        "secondary modal action has neutral silver glimmer",
+        "PASS",
+        ""
+      ],
+      [
+        "warning amber follows shared glimmer",
+        "PASS",
+        ""
+      ],
+      [
+        "destructive rose follows shared glimmer",
+        "PASS",
+        ""
+      ],
+      [
+        "neutral icon silver follows shared glimmer",
+        "PASS",
+        ""
+      ],
+      [
+        "budget track renders at 3.5px with independent 3.5s white sheen",
+        "PASS",
+        ""
+      ],
+      [
+        "country card does not lift on hover",
+        "PASS",
+        ""
+      ],
+      [
+        "transaction row does not move on hover",
+        "PASS",
+        ""
+      ],
+      [
+        "FAB opens menu in native touchEnd dispatch",
+        "PASS",
+        ""
+      ],
+      [
+        "FAB tap retains exact gradient fill on a stationary 54px circle",
+        "PASS",
+        ""
+      ],
+      [
+        "quick tap feedback expires without a sticky filled or hover state",
+        "PASS",
+        ""
+      ],
+      [
+        "second tap closes FAB menu immediately",
+        "PASS",
+        ""
+      ],
+      [
+        "rapid taps execute both clicks immediately and restart one lap",
+        "PASS",
+        ""
+      ],
+      [
+        "pointer cancellation clears feedback without activating",
+        "PASS",
+        ""
+      ],
+      [
+        "scroll gesture cancels feedback and does not click",
+        "PASS",
+        ""
+      ],
+      [
+        "busy changes clear the mobile class and pseudo animation",
+        "PASS",
+        ""
+      ],
+      [
+        "removed action does not retain feedback classes",
+        "PASS",
+        ""
+      ],
+      [
+        "preference changes stop in-flight motion",
+        "PASS",
+        ""
+      ],
+      [
+        "reduced-motion tap gives static fill and immediately closes menu",
+        "PASS",
+        ""
+      ]
+    ],
+    "state": {
+      "rest": {
+        "color": "rgb(231, 203, 163)",
+        "backgroundImage": "linear-gradient(90.81deg, rgb(155, 121, 75) 0%, rgb(231, 203, 163) 99.75%)",
+        "transform": "none",
+        "outlineColor": "rgb(231, 203, 163)",
+        "outlineWidth": "3px",
+        "outlineStyle": "none",
+        "borderRadius": "8px",
+        "fill": "1",
+        "interior": "rgb(25, 25, 25)",
+        "animation": "none",
+        "angle": "0.0000deg",
+        "accent": "none",
+        "mask": "add",
+        "stroke": "0px",
+        "events": "auto",
+        "duration": "0s",
+        "classes": "btn btn-primary btn-sm header-action-btn",
+        "nativeHover": false,
+        "focus": false
+      },
+      "hover": {
+        "color": "rgb(20, 17, 12)",
+        "backgroundImage": "linear-gradient(90.81deg, rgb(155, 121, 75) 0%, rgb(231, 203, 163) 99.75%)",
+        "transform": "none",
+        "outlineColor": "rgb(20, 17, 12)",
+        "outlineWidth": "3px",
+        "outlineStyle": "none",
+        "borderRadius": "8px",
+        "fill": "0",
+        "interior": "rgb(25, 25, 25)",
+        "animation": "button-perimeter",
+        "angle": "75.7759deg",
+        "accent": "conic-gradient(rgba(0, 0, 0, 0), rgb(255, 241, 220) 12deg, rgba(0, 0, 0, 0) 30deg)",
+        "mask": "exclude, exclude",
+        "stroke": "1.5px",
+        "events": "none",
+        "duration": "0.95s",
+        "classes": "btn btn-primary btn-sm header-action-btn button-hover",
+        "nativeHover": true,
+        "focus": false
+      },
+      "desktopAngles": [
+        "21.2210deg",
+        "89.8105deg",
+        "180.0000deg",
+        "269.8105deg",
+        "338.0210deg",
+        "357.3474deg"
+      ],
+      "crossfade": {
+        "enter": [
+          1.0,
+          0.39691,
+          0.39691,
+          0.123096,
+          0.034203
+        ],
+        "exit": [
+          0.0,
+          0.463693,
+          0.755569,
+          0.896867,
+          0.958596
+        ]
+      },
+      "semantic": {
+        "income": "conic-gradient(rgba(0, 0, 0, 0), rgb(52, 211, 153) 12deg, rgba(0, 0, 0, 0) 30deg)",
+        "expense": "conic-gradient(rgba(0, 0, 0, 0), rgb(251, 113, 133) 12deg, rgba(0, 0, 0, 0) 30deg)",
+        "transfer": "conic-gradient(rgba(0, 0, 0, 0), rgb(56, 189, 248) 12deg, rgba(0, 0, 0, 0) 30deg)"
+      },
+      "budget": {
+        "height": 3.5,
+        "track": "rgba(255, 255, 255, 0.04)",
+        "fill": "none",
+        "sheen": "linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgba(255, 255, 255, 0.22) 50%, rgba(0, 0, 0, 0) 100%)",
+        "loop": "3.5s",
+        "name": "budget-bar-glimmer"
+      },
+      "ambient": [
+        "rgb(20, 20, 20)",
+        "radial-gradient(928px 560px at 5% 0%, rgba(155, 121, 75, 0.16), rgba(0, 0, 0, 0) 78%), radial-gradient(880px 608px at 100% 100%, rgba(130, 140, 155, 0.06), rgba(0, 0, 0, 0) 78%), none"
+      ],
+      "mobile": {
+        "touchDispatchWallMs": 44.5783079994726,
+        "press": {
+          "color": "rgb(20, 17, 12)",
+          "backgroundImage": "linear-gradient(90.81deg, rgb(155, 121, 75) 0%, rgb(231, 203, 163) 99.75%)",
+          "transform": "none",
+          "outlineColor": "rgb(20, 17, 12)",
+          "outlineWidth": "3px",
+          "outlineStyle": "none",
+          "borderRadius": "50%",
+          "fill": "0",
+          "interior": "rgb(25, 25, 25)",
+          "animation": "button-perimeter",
+          "angle": "63.1440deg",
+          "accent": "conic-gradient(rgba(0, 0, 0, 0), rgb(255, 241, 220) 12deg, rgba(0, 0, 0, 0) 30deg)",
+          "mask": "exclude, exclude",
+          "stroke": "1.5px",
+          "events": "none",
+          "duration": "0.95s",
+          "classes": "fab button-press open",
+          "nativeHover": true,
+          "focus": false
+        },
+        "rect": {
+          "x": 316,
+          "y": 770,
+          "width": 54,
+          "height": 54
+        }
+      },
+      "rapid": {
+        "firstLapMs": 199.94200000105167,
+        "restartedLapMs": 16.600000000000392,
+        "firstClickMs": 9585.5,
+        "secondClickMs": 9817.199999999255
+      }
+    },
+    "exceptions": []
+  },
+  "buildInteractions": {
+    "tests": [
+      [
+        "primary has exact gradient with opaque graphite interior and bronze text",
+        "PASS",
+        ""
+      ],
+      [
+        "primary fill opacity is interpolated in between both endpoints",
+        "PASS",
+        ""
+      ],
+      [
+        "hover preserves geometry and shows exact fill and graphite foreground",
+        "PASS",
+        ""
+      ],
+      [
+        "one 950ms clockwise lap uses a 1.5px noninteractive perimeter",
+        "PASS",
+        ""
+      ],
+      [
+        "stationary pointer retains fill and clears completed lap",
+        "PASS",
+        ""
+      ],
+      [
+        "pointer departure smoothly returns to outlined state",
+        "PASS",
+        ""
+      ],
+      [
+        "keyboard focus displays a 2px outline with resting surface",
+        "PASS",
+        ""
+      ],
+      [
+        "Space press gives fill without glimmer or movement",
+        "PASS",
+        ""
+      ],
+      [
+        "keyboard activation opens selector immediately",
+        "PASS",
+        ""
+      ],
+      [
+        "transaction choices inherit emerald, crimson and sapphire",
+        "PASS",
+        ""
+      ],
+      [
+        "busy primary holds resting fill and stops current animation",
+        "PASS",
+        ""
+      ],
+      [
+        "disabled primary has no animation and cannot enter filled state",
+        "PASS",
+        ""
+      ],
+      [
+        "secondary modal action has neutral silver glimmer",
+        "PASS",
+        ""
+      ],
+      [
+        "warning amber follows shared glimmer",
+        "PASS",
+        ""
+      ],
+      [
+        "destructive rose follows shared glimmer",
+        "PASS",
+        ""
+      ],
+      [
+        "neutral icon silver follows shared glimmer",
+        "PASS",
+        ""
+      ],
+      [
+        "budget track renders at 3.5px with independent 3.5s white sheen",
+        "PASS",
+        ""
+      ],
+      [
+        "country card does not lift on hover",
+        "PASS",
+        ""
+      ],
+      [
+        "transaction row does not move on hover",
+        "PASS",
+        ""
+      ],
+      [
+        "FAB opens menu in native touchEnd dispatch",
+        "PASS",
+        ""
+      ],
+      [
+        "FAB tap retains exact gradient fill on a stationary 54px circle",
+        "PASS",
+        ""
+      ],
+      [
+        "quick tap feedback expires without a sticky filled or hover state",
+        "PASS",
+        ""
+      ],
+      [
+        "second tap closes FAB menu immediately",
+        "PASS",
+        ""
+      ],
+      [
+        "rapid taps execute both clicks immediately and restart one lap",
+        "PASS",
+        ""
+      ],
+      [
+        "pointer cancellation clears feedback without activating",
+        "PASS",
+        ""
+      ],
+      [
+        "scroll gesture cancels feedback and does not click",
+        "PASS",
+        ""
+      ],
+      [
+        "busy changes clear the mobile class and pseudo animation",
+        "PASS",
+        ""
+      ],
+      [
+        "removed action does not retain feedback classes",
+        "PASS",
+        ""
+      ],
+      [
+        "preference changes stop in-flight motion",
+        "PASS",
+        ""
+      ],
+      [
+        "reduced-motion tap gives static fill and immediately closes menu",
+        "PASS",
+        ""
+      ],
+      [
+        "built workspace privacy control changes concealment",
+        "PASS",
+        ""
+      ],
+      [
+        "built wallet form creates an EUR wallet and persists balance",
+        "PASS",
+        ""
+      ],
+      [
+        "built form creates transaction and clears actual busy state",
+        "PASS",
+        ""
+      ],
+      [
+        "built form edits transaction and reconciles balance",
+        "PASS",
+        ""
+      ],
+      [
+        "built wallet form renames wallet without changing its balance",
+        "PASS",
+        ""
+      ],
+      [
+        "built budget view has a 3.5px progress track",
+        "PASS",
+        ""
+      ],
+      [
+        "built account switch removes previous wallet and private note",
+        "PASS",
+        ""
+      ]
+    ],
+    "state": {
+      "rest": {
+        "color": "rgb(231, 203, 163)",
+        "backgroundImage": "linear-gradient(90.81deg, rgb(155, 121, 75) 0%, rgb(231, 203, 163) 99.75%)",
+        "transform": "none",
+        "outlineColor": "rgb(231, 203, 163)",
+        "outlineWidth": "3px",
+        "outlineStyle": "none",
+        "borderRadius": "8px",
+        "fill": "1",
+        "interior": "rgb(25, 25, 25)",
+        "animation": "none",
+        "angle": "0.0000deg",
+        "accent": "none",
+        "mask": "add",
+        "stroke": "0px",
+        "events": "auto",
+        "duration": "0s",
+        "classes": "btn btn-primary btn-sm header-action-btn",
+        "nativeHover": false,
+        "focus": false
+      },
+      "hover": {
+        "color": "rgb(20, 17, 12)",
+        "backgroundImage": "linear-gradient(90.81deg, rgb(155, 121, 75) 0%, rgb(231, 203, 163) 99.75%)",
+        "transform": "none",
+        "outlineColor": "rgb(20, 17, 12)",
+        "outlineWidth": "3px",
+        "outlineStyle": "none",
+        "borderRadius": "8px",
+        "fill": "0",
+        "interior": "rgb(25, 25, 25)",
+        "animation": "button-perimeter",
+        "angle": "69.4853deg",
+        "accent": "conic-gradient(rgba(0, 0, 0, 0), rgb(255, 241, 220) 12deg, rgba(0, 0, 0, 0) 30deg)",
+        "mask": "exclude, exclude",
+        "stroke": "1.5px",
+        "events": "none",
+        "duration": "0.95s",
+        "classes": "btn btn-primary btn-sm header-action-btn button-hover",
+        "nativeHover": true,
+        "focus": false
+      },
+      "desktopAngles": [
+        "21.2210deg",
+        "89.8105deg",
+        "180.0000deg",
+        "269.8105deg",
+        "338.0210deg",
+        "357.3474deg"
+      ],
+      "crossfade": {
+        "enter": [
+          1.0,
+          1.0,
+          0.397798,
+          0.122807,
+          0.0341129
+        ],
+        "exit": [
+          0.0,
+          0.46202,
+          0.755912,
+          0.89702,
+          0.958662
+        ]
+      },
+      "semantic": {
+        "income": "conic-gradient(rgba(0, 0, 0, 0), rgb(52, 211, 153) 12deg, rgba(0, 0, 0, 0) 30deg)",
+        "expense": "conic-gradient(rgba(0, 0, 0, 0), rgb(251, 113, 133) 12deg, rgba(0, 0, 0, 0) 30deg)",
+        "transfer": "conic-gradient(rgba(0, 0, 0, 0), rgb(56, 189, 248) 12deg, rgba(0, 0, 0, 0) 30deg)"
+      },
+      "budget": {
+        "height": 3.5,
+        "track": "rgba(255, 255, 255, 0.04)",
+        "fill": "none",
+        "sheen": "linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgba(255, 255, 255, 0.22) 50%, rgba(0, 0, 0, 0) 100%)",
+        "loop": "3.5s",
+        "name": "budget-bar-glimmer"
+      },
+      "ambient": [
+        "rgb(20, 20, 20)",
+        "radial-gradient(928px 560px at 5% 0%, rgba(155, 121, 75, 0.16), rgba(0, 0, 0, 0) 78%), radial-gradient(880px 608px at 100% 100%, rgba(130, 140, 155, 0.06), rgba(0, 0, 0, 0) 78%), none"
+      ],
+      "mobile": {
+        "touchDispatchWallMs": 27.531096999155125,
+        "press": {
+          "color": "rgb(20, 17, 12)",
+          "backgroundImage": "linear-gradient(90.81deg, rgb(155, 121, 75) 0%, rgb(231, 203, 163) 99.75%)",
+          "transform": "none",
+          "outlineColor": "rgb(20, 17, 12)",
+          "outlineWidth": "3px",
+          "outlineStyle": "none",
+          "borderRadius": "50%",
+          "fill": "0",
+          "interior": "rgb(25, 25, 25)",
+          "animation": "button-perimeter",
+          "angle": "50.5356deg",
+          "accent": "conic-gradient(rgba(0, 0, 0, 0), rgb(255, 241, 220) 12deg, rgba(0, 0, 0, 0) 30deg)",
+          "mask": "exclude, exclude",
+          "stroke": "1.5px",
+          "events": "none",
+          "duration": "0.95s",
+          "classes": "fab button-press open",
+          "nativeHover": false,
+          "focus": false
+        },
+        "rect": {
+          "x": 316,
+          "y": 770,
+          "width": 54,
+          "height": 54
+        }
+      },
+      "rapid": {
+        "firstLapMs": 200.0679999997903,
+        "restartedLapMs": 16.70000000000016,
+        "firstClickMs": 9122.10000000149,
+        "secondClickMs": 9354.5
+      }
+    },
+    "exceptions": []
+  },
+  "desktopRenderedFrameDeltas": [
+    {
+      "ms": 56,
+      "pixelsWithDeltaAtLeast14": 19,
+      "locus": [
+        87.3,
+        6.5
+      ],
+      "cropSize": [
+        153,
+        42
+      ]
+    },
+    {
+      "ms": 237,
+      "pixelsWithDeltaAtLeast14": 47,
+      "locus": [
+        129.2,
+        33.9
+      ],
+      "cropSize": [
+        153,
+        42
+      ]
+    },
+    {
+      "ms": 475,
+      "pixelsWithDeltaAtLeast14": 7,
+      "locus": [
+        73,
+        35
+      ],
+      "cropSize": [
+        153,
+        42
+      ]
+    },
+    {
+      "ms": 712,
+      "pixelsWithDeltaAtLeast14": 113,
+      "locus": [
+        22.8,
+        8.3
+      ],
+      "cropSize": [
+        153,
+        42
+      ]
+    },
+    {
+      "ms": 892,
+      "pixelsWithDeltaAtLeast14": 12,
+      "locus": [
+        74.5,
+        6.5
+      ],
+      "cropSize": [
+        153,
+        42
+      ]
+    },
+    {
+      "ms": 943,
+      "pixelsWithDeltaAtLeast14": 0,
+      "locus": [],
+      "cropSize": [
+        153,
+        42
+      ]
+    }
+  ],
+  "referenceContrast": {
+    "restLabel": "E7CBA3/191919",
+    "restRatio": 11.28,
+    "filledLabelWorstEnd": "14110C/9B794B",
+    "filledRatio": 4.69,
+    "focusRingAgainstRaisedCardRatio": 9.46
+  }
+}

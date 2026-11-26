@@ -112,6 +112,7 @@ function createMockEnvironment(options = {}) {
     function getOrCreateElement(id) {
         if (!domElements[id]) {
             const classes = new Set();
+            const attributes = new Map();
             domElements[id] = {
                 id,
                 value: '',
@@ -120,6 +121,8 @@ function createMockEnvironment(options = {}) {
                 style: {},
                 options: [],
                 selectedIndex: 0,
+                setAttribute: (name, value) => attributes.set(name, String(value)),
+                removeAttribute: (name) => attributes.delete(name),
                 classList: {
                     add: (c) => classes.add(c),
                     remove: (c) => classes.delete(c),

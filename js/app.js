@@ -5228,7 +5228,7 @@ class App {
                             ${balanceHtml}
                         </div>
                         <div style="display:flex; align-items:center; gap:12px; margin-top:2px;">
-                            <button class="icon-btn" data-month-key="${this.escapeHtml(h.monthKey)}" onclick="app.deleteLedger(this.dataset.monthKey)" style="color:var(--red)"><i data-lucide="trash-2"></i></button>
+                            <button class="icon-btn" data-action-accent="destructive" data-month-key="${this.escapeHtml(h.monthKey)}" onclick="app.deleteLedger(this.dataset.monthKey)" style="color:var(--red)"><i data-lucide="trash-2"></i></button>
                             <i data-lucide="chevron-down" style="color:var(--text-muted); cursor:pointer;" onclick="app.toggleHistoryCard(${index})"></i>
                         </div>
                     </div>
@@ -8476,7 +8476,7 @@ class App {
         }
     }
 
-    scheduleReportPrint(job, delay, prepare = () => {}) {
+    scheduleReportPrint(job, delay, prepare = () => { }) {
         job.timer = setTimeout(() => {
             if (this._currentReportPrint !== job) return;
             prepare();

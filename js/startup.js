@@ -9,26 +9,95 @@ document.querySelectorAll('[data-privacy-toggle]').forEach(button => {
 
 document.getElementById('main-fab').addEventListener('click', () => app.toggleFabMenu());
 
-const reflectableButtons = '.btn-primary, .btn-secondary, .btn-tx-submit, .btn-ghost:not(.text-rose), .fab';
+const actionButtons = 'button:not(.desktop-nav-item, .bottom-nav-item), a.btn';
+const unavailableAction = ':disabled, [aria-disabled="true"], [aria-busy="true"]';
+const finePointer = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-document.addEventListener('pointerdown', event => {
-    if (!event.isPrimary || (event.pointerType !== 'touch' && event.pointerType !== 'pen') ||
-        reducedMotion.matches || !(event.target instanceof Element)) return;
-    const button = event.target.closest(reflectableButtons);
-    if (!button || button.matches(':disabled, [aria-disabled="true"], [aria-busy="true"]') ||
-        button.closest('#auth-screen, #reset-password-screen, #sync-error-screen, #onboarding-screen')) return;
-    button.classList.add('button-reflect');
-    button.addEventListener('animationend', clearButtonReflection);
-    button.addEventListener('animationcancel', clearButtonReflection);
+const perimeterSupported = CSS.supports('mask-composite: exclude') &&
+    CSS.supports('background: conic-gradient(red, blue)') && CSS.supports('width: 1cqw');
+const pressFeedbackDuration = 1100;
+let buttonPress;
+
+function findActionButton(target) {
+    return target instanceof Element ? target.closest(actionButtons) : null;
+}
+
+function startButtonGlimmer(button) {
+    if (reducedMotion.matches || !perimeterSupported) return;
+    const perimeter = button.querySelector('.fab-icon') || button;
+    const existing = perimeter.querySelector('.button-glimmer');
+    if (existing) {
+        // A rapid second press replays the existing CSS animation.
+        const glimmer = existing.getAnimations({ subtree: true })
+            .find(animation => animation.animationName === 'button-perimeter');
+        if (glimmer) glimmer.currentTime = 0;
+        return;
+    }
+    const overlay = document.createElement('span');
+    overlay.className = 'button-glimmer';
+    overlay.setAttribute('aria-hidden', 'true');
+    perimeter.append(overlay);
+}
+
+document.addEventListener('pointerover', event => {
+    if (event.pointerType !== 'mouse' || !finePointer.matches) return;
+    const button = findActionButton(event.target);
+    if (!button || button.contains(event.relatedTarget) || button.matches(unavailableAction)) return;
+    button.classList.add('button-hover');
+    startButtonGlimmer(button);
 }, { passive: true });
 
-function clearButtonReflection(event) {
-    if (event.target !== event.currentTarget || event.animationName !== 'button-reflect') return;
-    const button = event.currentTarget;
-    button.classList.remove('button-reflect');
-    button.removeEventListener('animationend', clearButtonReflection);
-    button.removeEventListener('animationcancel', clearButtonReflection);
+document.addEventListener('pointerout', event => {
+    if (event.pointerType !== 'mouse') return;
+    const button = findActionButton(event.target);
+    if (button && !button.contains(event.relatedTarget)) button.classList.remove('button-hover');
+}, { passive: true });
+
+document.addEventListener('pointerdown', event => {
+    if (!event.isPrimary || (event.pointerType !== 'touch' && event.pointerType !== 'pen')) return;
+    const button = findActionButton(event.target);
+    if (!button || button.matches(unavailableAction)) return;
+    if (buttonPress?.button === button) clearTimeout(buttonPress.timer);
+    else clearButtonPress();
+
+    button.classList.remove('button-hover');
+    button.classList.add('button-press');
+    startButtonGlimmer(button);
+    buttonPress = { button, pointerId: event.pointerId, timer: setTimeout(clearButtonPress, pressFeedbackDuration) };
+    pressObserver.observe(button, { attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'aria-busy'] });
+    pressObserver.observe(document.body, { childList: true, subtree: true });
+}, { passive: true });
+
+const pressObserver = new MutationObserver(() => {
+    if (buttonPress && (!buttonPress.button.isConnected || buttonPress.button.matches(unavailableAction))) {
+        clearButtonPress();
+    }
+});
+
+function clearButtonPress() {
+    if (!buttonPress) return;
+    clearTimeout(buttonPress.timer);
+    pressObserver.disconnect();
+    buttonPress.button.classList.remove('button-press');
+    buttonPress.button.querySelector('.button-glimmer')?.remove();
+    buttonPress = undefined;
 }
+
+document.addEventListener('pointercancel', event => {
+    if (event.pointerId === buttonPress?.pointerId) clearButtonPress();
+}, { passive: true });
+
+function clearFinishedGlimmer(event) {
+    if (event.animationName === 'button-perimeter' && event.target.classList.contains('button-glimmer')) {
+        event.target.remove();
+    }
+}
+
+document.addEventListener('animationend', clearFinishedGlimmer);
+document.addEventListener('animationcancel', clearFinishedGlimmer);
+reducedMotion.addEventListener('change', () => {
+    if (reducedMotion.matches) clearButtonPress();
+});
 
 if (typeof EXPENSE_DEPLOYMENT !== 'undefined' && 'serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {

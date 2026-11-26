@@ -3119,19 +3119,19 @@
     <!-- FAB Overlay Menu -->
     <div class="fab-menu-overlay" id="fab-menu" onclick="if(event.target === this) app.toggleFabMenu()">
         <div class="fab-actions">
-            <button class="fab-action" onclick="app.openTransactionModal('expense')">
+            <button class="fab-action" data-action-accent="expense" onclick="app.openTransactionModal('expense')">
                 <span class="fab-label">Expense</span>
                 <div class="fab-icon fab-icon-expense"><i data-lucide="arrow-up-right"></i></div>
             </button>
-            <button class="fab-action" onclick="app.openTransactionModal('transfer')">
+            <button class="fab-action" data-action-accent="transfer" onclick="app.openTransactionModal('transfer')">
                 <span class="fab-label">Transfer</span>
                 <div class="fab-icon fab-icon-transfer"><i data-lucide="arrow-left-right"></i></div>
             </button>
-            <button class="fab-action" id="fab-action-remittance" onclick="app.openTransactionModal('remittance')">
+            <button class="fab-action" id="fab-action-remittance" data-action-accent="transfer" onclick="app.openTransactionModal('remittance')">
                 <span class="fab-label">International Transfer</span>
                 <div class="fab-icon fab-icon-remittance"><i data-lucide="send"></i></div>
             </button>
-            <button class="fab-action" onclick="app.openTransactionModal('income')">
+            <button class="fab-action" data-action-accent="income" onclick="app.openTransactionModal('income')">
                 <span class="fab-label">Income</span>
                 <div class="fab-icon fab-icon-income"><i data-lucide="arrow-down-left"></i></div>
             </button>
@@ -3475,7 +3475,7 @@
                 </button>
             </div>
             <div class="action-selector-grid">
-                <button type="button" class="action-type-card" onclick="app.selectTransactionType('expense')"
+                <button type="button" class="action-type-card" data-action-accent="expense" onclick="app.selectTransactionType('expense')"
                     id="btn-select-tx-expense">
                     <div class="action-icon-wrap action-icon-expense">
                         <i data-lucide="arrow-up-right"></i>
@@ -3486,7 +3486,7 @@
                     </div>
                     <i data-lucide="chevron-right" class="action-chevron"></i>
                 </button>
-                <button type="button" class="action-type-card" onclick="app.selectTransactionType('income')"
+                <button type="button" class="action-type-card" data-action-accent="income" onclick="app.selectTransactionType('income')"
                     id="btn-select-tx-income">
                     <div class="action-icon-wrap action-icon-income">
                         <i data-lucide="arrow-down-left"></i>
@@ -3497,7 +3497,7 @@
                     </div>
                     <i data-lucide="chevron-right" class="action-chevron"></i>
                 </button>
-                <button type="button" class="action-type-card" onclick="app.selectTransactionType('transfer')"
+                <button type="button" class="action-type-card" data-action-accent="transfer" onclick="app.selectTransactionType('transfer')"
                     id="btn-select-tx-transfer">
                     <div class="action-icon-wrap action-icon-transfer">
                         <i data-lucide="arrow-left-right"></i>
@@ -3508,7 +3508,7 @@
                     </div>
                     <i data-lucide="chevron-right" class="action-chevron"></i>
                 </button>
-                <button type="button" class="action-type-card" onclick="app.selectTransactionType('remittance')"
+                <button type="button" class="action-type-card" data-action-accent="transfer" onclick="app.selectTransactionType('remittance')"
                     id="btn-select-tx-remittance">
                     <div class="action-icon-wrap action-icon-remittance">
                         <i data-lucide="send"></i>
@@ -3675,7 +3675,7 @@
                         <span>Continue</span>
                         <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i>
                     </button>
-                    <button class="btn btn-primary" id="closing-btn-confirm" style="display:none;"
+                    <button class="btn btn-primary" id="closing-btn-confirm" data-action-accent="warning" style="display:none;"
                         onclick="app.executeMonthlyClosing()">
                         <i data-lucide="lock" style="width: 14px; height: 14px;"></i>
                         <span>Confirm & Close Month</span>
