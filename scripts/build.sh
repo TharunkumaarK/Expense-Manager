@@ -12,37 +12,31 @@ echo "Detected Netlify Context : ${BUILD_CONTEXT}"
 echo "Detected Git Branch      : ${BUILD_BRANCH}"
 
 # 1. Automated Environment Selection
-if [ "${BUILD_CONTEXT}" = "production" ] || [ "${BUILD_BRANCH}" = "main" ]; then
+if [ "${BUILD_CONTEXT}" = "production" ] && [ "${BUILD_BRANCH}" = "main" ]; then
     echo "==> Target Environment: PRODUCTION (xrovzkibilgbpawnunle)"
-    if [ ! -f "js/supabase-config.prod.js" ]; then
-        echo "ERROR: Missing js/supabase-config.prod.js! Failing closed." >&2
-        exit 1
-    fi
-    cp js/supabase-config.prod.js js/supabase-config.js
-    echo "Activated js/supabase-config.prod.js -> js/supabase-config.js"
-
-elif [ "${BUILD_CONTEXT}" = "deploy-preview" ] || [ "${BUILD_CONTEXT}" = "branch-deploy" ] || [ "${BUILD_BRANCH}" = "test" ] || [ "${BUILD_BRANCH}" = "development" ]; then
+    selected_config="js/supabase-config.prod.js"
+elif { [ "${BUILD_CONTEXT}" = "deploy-preview" ] || [ "${BUILD_CONTEXT}" = "branch-deploy" ]; } &&
+    [ "${BUILD_BRANCH}" != "main" ] && [ "${BUILD_BRANCH}" != "unknown" ]; then
     echo "==> Target Environment: DEVELOPMENT (nyetklojxqnawdtrrhma)"
-    if [ ! -f "js/supabase-config.dev.js" ]; then
-        echo "ERROR: Missing js/supabase-config.dev.js! Failing closed." >&2
-        exit 1
-    fi
-    cp js/supabase-config.dev.js js/supabase-config.js
-    echo "Activated js/supabase-config.dev.js -> js/supabase-config.js"
-
+    selected_config="js/supabase-config.dev.js"
 else
-    echo "ERROR: Unknown build context '${BUILD_CONTEXT}' and branch '${BUILD_BRANCH}'! Failing closed." >&2
+    echo "ERROR: Unsupported build context '${BUILD_CONTEXT}' and branch '${BUILD_BRANCH}' combination. Failing closed." >&2
     exit 1
 fi
 
-# 2. Security Invariant & Credential Leakage Pre-flight Check
-echo "==> Running security pre-flight assertion on active configuration..."
+if [ ! -f "$selected_config" ]; then
+    echo "ERROR: Missing $selected_config. Failing closed." >&2
+    exit 1
+fi
+
+# 2. Validate the selected configuration before activating it.
+echo "==> Running security pre-flight assertion on selected configuration..."
 node -e "
 const fs = require('fs');
-const content = fs.readFileSync('js/supabase-config.js', 'utf8');
+const content = fs.readFileSync(process.argv[1], 'utf8');
 
 // Never allow service-role or secret keys in client bundles
-if (content.includes('service_role') || content.includes('secretKey') || content.includes('serviceRoleKey')) {
+if (content.includes('service_role') || content.includes('secretKey') || content.includes('serviceRoleKey') || content.includes('sb_secret_')) {
     console.error('FATAL: Privileged or secret credentials detected in active frontend configuration!');
     process.exit(1);
 }
@@ -54,7 +48,14 @@ if (!content.includes('sb_publishable_')) {
 }
 
 console.log('Security pre-flight assertion PASSED: Configuration is secure.');
-"
+" "$selected_config"
 
+# Activate with an atomic rename in the same directory.
+pending_config=$(mktemp js/.supabase-config.XXXXXXXX)
+trap 'rm -f -- "$pending_config"' EXIT
+cp "$selected_config" "$pending_config"
+chmod 644 "$pending_config"
+mv -f -- "$pending_config" js/supabase-config.js
+echo "Activated $selected_config -> js/supabase-config.js"
 echo "==> Build successfully completed."
 

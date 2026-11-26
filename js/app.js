@@ -877,7 +877,7 @@ class App {
                 </div>
                 <div class="form-group">
                     <label>Amount</label>
-                    <input type="number" id="tx-amount" placeholder="0">
+                    <input type="number" id="tx-amount" step="any" placeholder="0">
                 </div>
                 <div class="form-group">
                     <label>Note (Optional)</label>
@@ -1009,7 +1009,7 @@ class App {
                 </div>
                 <div class="form-group">
                     <label>Amount</label>
-                    <input type="number" id="tx-amount" placeholder="0">
+                    <input type="number" id="tx-amount" step="any" placeholder="0">
                 </div>
                 <div class="form-group">
                     <label>Note / Source</label>
@@ -2017,6 +2017,47 @@ class App {
     clearViewsOnLogout() {
         this._cancelLedgerSearchTimer();
         this.ledgerSearchQuery = '';
+        this.cancelCurrentReportPrint();
+        this.closeTransactionDetail();
+        this.closeModal('transaction-modal');
+        this.closeUnifiedTransactionSelector();
+        this._lastDetailTxId = null;
+        this._txModalSource = null;
+        for (const id of ['edit-wallet-modal', 'quick-edit-modal', 'category-manage-modal',
+            'overall-budget-modal', 'closing-wizard-modal', 'budget-recovery-modal']) {
+            this.closeModal(id);
+        }
+        this.editingCatId = null;
+        this.editingCatRegion = null;
+        this.overallBudgetModalRegion = null;
+        this.closingWizardState = { step: 1, monthKey: null, nextMonthKey: null };
+        this.budgetRecoveryState = { option: 'review', customAdjustments: {}, preview: null };
+
+        const focusOverlay = document.getElementById('focus-overlay');
+        if (focusOverlay) {
+            focusOverlay.classList.remove('active');
+            focusOverlay.style.display = 'none';
+        }
+        this.focusHistory = [];
+        this.focusCurrentRegion = null;
+        for (const id of ['edit-wallet-id', 'edit-wallet-name', 'edit-wallet-balance',
+            'quick-edit-id', 'quick-edit-region', 'quick-edit-type', 'quick-edit-amount',
+            'cat-edit-id', 'cat-edit-name', 'cat-edit-budget', 'overall-budget-input']) {
+            const field = document.getElementById(id);
+            if (field) field.value = '';
+        }
+        for (const id of ['tx-detail-type-badge', 'tx-detail-date-display', 'tx-detail-amount-val',
+            'tx-detail-subtitle', 'tx-detail-wallet-val', 'tx-detail-category-val', 'tx-detail-dest-val',
+            'tx-detail-rate-val', 'tx-detail-note-val', 'tx-detail-id-val', 'modal-title',
+            'edit-wallet-title', 'quick-edit-title', 'focus-modal-title', 'focus-back-label',
+            'cat-modal-title', 'overall-budget-cat-sum', 'overall-budget-cushion-val']) {
+            const field = document.getElementById(id);
+            if (field) field.textContent = '';
+        }
+        for (const id of ['modal-content', 'focus-primary-panel', 'focus-secondary-panel',
+            'closing-step-content', 'budget-recovery-content']) {
+            document.getElementById(id)?.replaceChildren();
+        }
         this.jpAnalyticsUserId = null;
         this.jpExclusions = new Set();
         this.closeCategoryDrilldown();
@@ -5681,7 +5722,7 @@ class App {
             // Mock a ledger structure for current month scoped to currentMonthKey
             const currentTxs = typeof walletManager !== 'undefined' && typeof walletManager.getTransactions === 'function'
                 ? walletManager.getTransactions({ monthKey: storage.state.currentMonthKey })
-                : (storage.state.transactions || []).filter(t => t.date && t.date.startsWith(storage.state.currentMonthKey));
+                : (storage.state.transactions || []).filter(t => this.isTransactionInMonth(t, storage.state.currentMonthKey));
             ledgersToPrint.push({
                 monthKey: storage.state.currentMonthKey,
                 label: storage.state.currentMonthKey + ' (Current)',
@@ -6429,7 +6470,7 @@ class App {
             const subtotalChips = Object.entries(currencyNets)
                 .filter(([_, net]) => net !== 0)
                 .map(([sym, net]) => {
-                    const formatted = this.formatMoney(Math.abs(net), sym);
+                    const formatted = this.escapeHtml(this.formatMoney(Math.abs(net), sym));
                     return net > 0 ? `+${formatted}` : `-${formatted}`;
                 });
             const subtotalHtml = subtotalChips.join(' &bull; ');
@@ -6487,48 +6528,48 @@ class App {
                 // Refined typographic metadata line
                 let metaItemsHtml = '';
                 if (effectiveType === 'expense') {
-                    metaItemsHtml += `<span class="ledger-tx-meta-item category">${categoryName}</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item category">${this.escapeHtml(categoryName)}</span>`;
                     metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
-                    metaItemsHtml += `<span class="ledger-tx-meta-item account">${walletName}</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item account">${this.escapeHtml(walletName)}</span>`;
                     if (tx.note && tx.note !== title) {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
-                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${this.escapeHtml(tx.note)}"</span>`;
                     }
                 } else if (effectiveType === 'income') {
-                    metaItemsHtml += `<span class="ledger-tx-meta-item category">${categoryName}</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item category">${this.escapeHtml(categoryName)}</span>`;
                     metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
-                    metaItemsHtml += `<span class="ledger-tx-meta-item account">${walletName}</span>`;
+                    metaItemsHtml += `<span class="ledger-tx-meta-item account">${this.escapeHtml(walletName)}</span>`;
                     if (tx.note && tx.note !== title) {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
-                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${this.escapeHtml(tx.note)}"</span>`;
                     }
                 } else if (effectiveType === 'transfer') {
                     metaItemsHtml += `<span class="ledger-tx-meta-item category">Internal Transfer</span>`;
                     if (tx.note) {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
-                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${this.escapeHtml(tx.note)}"</span>`;
                     }
                 } else if (effectiveType === 'remittance') {
                     metaItemsHtml += `<span class="ledger-tx-meta-item category">Cross-Border Remittance</span>`;
                     if (tx.exchangeRate) {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
-                        metaItemsHtml += `<span class="ledger-tx-meta-item rate">Rate: ${tx.exchangeRate}</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item rate">Rate: ${this.escapeHtml(tx.exchangeRate)}</span>`;
                     }
                     if (tx.note) {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
-                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${tx.note}"</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-item note">"${this.escapeHtml(tx.note)}"</span>`;
                     }
                 }
 
                 html += `
-                    <div class="ledger-tx-row" onclick="app.openTransactionDetail('${tx.id}')" title="Inspect details and actions">
+                    <div class="ledger-tx-row" data-transaction-id="${this.escapeHtml(tx.id)}" onclick="app.openTransactionDetail(this.dataset.transactionId)" title="Inspect details and actions">
                         <div class="ledger-tx-left">
                             <div class="tx-type-icon ${typeCls}">
                                 <i data-lucide="${icon}"></i>
                             </div>
                             <div class="ledger-tx-details">
                                 <div class="ledger-tx-primary-line">
-                                    <span class="ledger-tx-title">${title}</span>
+                                    <span class="ledger-tx-title">${this.escapeHtml(title)}</span>
                                     ${flag ? `<span class="tx-flag-pill">${flag}</span>` : ''}
                                 </div>
                                 <div class="ledger-tx-meta">
@@ -6537,7 +6578,7 @@ class App {
                             </div>
                         </div>
                         <div class="ledger-tx-right">
-                            <span class="ledger-tx-amount ${typeCls} privacy-blur">${amountHtml}</span>
+                            <span class="ledger-tx-amount ${typeCls} privacy-blur">${this.escapeHtml(amountHtml)}</span>
                         </div>
                     </div>
                 `;
@@ -7946,6 +7987,11 @@ class App {
     // PHASE 4: REPORTS WORKSPACE & SNAPSHOTS
     // =========================================================================
 
+    isTransactionInMonth(tx, monthKey) {
+        return typeof tx.date === 'string' && tx.date.slice(0, 7) === monthKey &&
+            Number.isFinite(getTransactionUtcDay(tx.date));
+    }
+
     setReportRegion(region) {
         if (!storage.getActiveCountries().includes(region)) return;
         this.reportRegion = region;
@@ -7985,7 +8031,7 @@ class App {
         this.reportSnapshotsCache = storage.state.reportSnapshots;
 
         const allTxs = storage.state.transactions || [];
-        const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
+        const reportTxs = allTxs.filter(tx => tx.region === this.reportRegion && this.isTransactionInMonth(tx, this.reportMonthKey));
         let expTotal = 0;
         let incTotal = 0;
         reportTxs.forEach(t => {
@@ -8030,8 +8076,10 @@ class App {
     }
 
     printCurrentReport() {
-        const savedPrivacy = this.isPrivacyHidden;
-        this.isPrivacyHidden = false;
+        this.cancelCurrentReportPrint();
+        const printContainer = document.getElementById('print-container');
+        if (!printContainer) return;
+        const formatMoney = (amount, currency) => this.formatMoney(amount, currency, { ignorePrivacy: true });
 
         const monthKey = this.reportMonthKey || (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
         const region = this.reportRegion || 'JP';
@@ -8041,7 +8089,7 @@ class App {
         const currencyCode = (countryCfg && countryCfg.currencyCode) || (region === 'JP' ? 'JPY' : region === 'DE' ? 'EUR' : 'INR');
 
         const allTxs = storage.state.transactions || [];
-        const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(monthKey) && tx.region === region);
+        const reportTxs = allTxs.filter(tx => tx.region === region && this.isTransactionInMonth(tx, monthKey));
 
         // 1. Calculate Financial Aggregates
         let totalIncome = 0;
@@ -8143,9 +8191,6 @@ class App {
         const activeCategories = allCategoriesList.filter(c => c.spent > 0);
 
         // 5. Build HTML Structure
-        const printContainer = document.getElementById('print-container');
-        if (!printContainer) return;
-
         const incomeCount = reportTxs.filter(t => t.type === 'income').length;
         const expenseCount = reportTxs.filter(t => t.type === 'expense').length;
 
@@ -8173,18 +8218,18 @@ class App {
             <div class="print-kpi-grid">
                 <div class="print-kpi-card">
                     <span class="print-kpi-label">Total Income</span>
-                    <span class="print-kpi-value income">+${this.formatMoney(totalIncome, currency)}</span>
+                    <span class="print-kpi-value income">+${formatMoney(totalIncome, currency)}</span>
                     <span class="print-kpi-sub">${incomeCount} income credit${incomeCount === 1 ? '' : 's'}</span>
                 </div>
                 <div class="print-kpi-card">
                     <span class="print-kpi-label">Total Expenses</span>
-                    <span class="print-kpi-value expense">-${this.formatMoney(totalExpense, currency)}</span>
+                    <span class="print-kpi-value expense">-${formatMoney(totalExpense, currency)}</span>
                     <span class="print-kpi-sub">${expenseCount} expense debit${expenseCount === 1 ? '' : 's'}</span>
                 </div>
                 <div class="print-kpi-card">
                     <span class="print-kpi-label">Net Savings / Surplus</span>
                     <span class="print-kpi-value ${netSavings >= 0 ? 'savings-pos' : 'savings-neg'}">
-                        ${netSavings >= 0 ? '+' : '-'}${this.formatMoney(Math.abs(netSavings), currency)}
+                        ${netSavings >= 0 ? '+' : '-'}${formatMoney(Math.abs(netSavings), currency)}
                     </span>
                     <span class="print-kpi-sub">${netSavings >= 0 ? `${savingsRate}% savings retained` : 'Deficit spent'}</span>
                 </div>
@@ -8198,15 +8243,15 @@ class App {
                     <div class="print-budget-header">
                         <h3 class="print-budget-title">Monthly Budget Allocation & Performance</h3>
                         <span class="print-budget-status ${isOverBudget ? 'over' : 'safe'}">
-                            ${isOverBudget ? `${this.formatMoney(Math.abs(budgetRem), currency)} Over Budget` : `+${this.formatMoney(budgetRem, currency)} Cushion Remaining`}
+                            ${isOverBudget ? `${formatMoney(Math.abs(budgetRem), currency)} Over Budget` : `+${formatMoney(budgetRem, currency)} Cushion Remaining`}
                         </span>
                     </div>
                     <div class="print-budget-bar-track">
                         <div class="print-budget-bar-fill ${budgetBarClass}" style="width: ${budgetPct}%;"></div>
                     </div>
                     <div class="print-budget-stats">
-                        <span>Spent: <strong>${this.formatMoney(totalExpense, currency)}</strong> (${budgetPct}% consumed)</span>
-                        <span>Monthly Limit: <strong>${this.formatMoney(periodTotalBudget, currency)}</strong></span>
+                        <span>Spent: <strong>${formatMoney(totalExpense, currency)}</strong> (${budgetPct}% consumed)</span>
+                        <span>Monthly Limit: <strong>${formatMoney(periodTotalBudget, currency)}</strong></span>
                     </div>
                 </div>
             `;
@@ -8229,11 +8274,11 @@ class App {
                     <div class="print-legend-item">
                         <div class="print-legend-left">
                             <span class="print-legend-dot" style="background: ${color};"></span>
-                            <span class="print-legend-name">${c.name}</span>
+                            <span class="print-legend-name">${this.escapeHtml(c.name)}</span>
                         </div>
                         <div class="print-legend-right">
                             <span class="print-legend-pct">${c.pctOfTotal}%</span>
-                            <span class="print-legend-amt">${this.formatMoney(c.spent, currency)}</span>
+                            <span class="print-legend-amt">${formatMoney(c.spent, currency)}</span>
                         </div>
                     </div>
                 `;
@@ -8269,15 +8314,15 @@ class App {
         const tableRowsHtml = (displayedCats.length > 0 ? displayedCats : allCategoriesList.slice(0, 8)).map(cat => {
             const varianceHtml = cat.variance !== null
                 ? (cat.variance >= 0
-                    ? `<span style="color:#34d399;font-weight:600;">+${this.formatMoney(cat.variance, currency)}</span>`
-                    : `<span style="color:#fb7185;font-weight:600;">${this.formatMoney(cat.variance, currency)}</span>`)
+                    ? `<span style="color:#34d399;font-weight:600;">+${formatMoney(cat.variance, currency)}</span>`
+                    : `<span style="color:#fb7185;font-weight:600;">${formatMoney(cat.variance, currency)}</span>`)
                 : '<span style="color:#6b6b78;">—</span>';
 
             return `
                 <tr>
-                    <td style="font-weight: 600; color: #ffffff;">${cat.name}</td>
-                    <td>${cat.budgetLimit > 0 ? this.formatMoney(cat.budgetLimit, currency) : '<span style="color:#6b6b78;">—</span>'}</td>
-                    <td style="font-weight: 600;">${this.formatMoney(cat.spent, currency)}</td>
+                    <td style="font-weight: 600; color: #ffffff;">${this.escapeHtml(cat.name)}</td>
+                    <td>${cat.budgetLimit > 0 ? formatMoney(cat.budgetLimit, currency) : '<span style="color:#6b6b78;">—</span>'}</td>
+                    <td style="font-weight: 600;">${formatMoney(cat.spent, currency)}</td>
                     <td>${varianceHtml}</td>
                     <td style="color:#8b8b99;font-weight:600;">${cat.pctOfTotal}%</td>
                     <td style="color:#8b8b99;">${cat.txCount}</td>
@@ -8331,11 +8376,11 @@ class App {
 
                     return `
                         <tr>
-                            <td style="width: 25%; font-weight: 500; color: #ffffff;">${noteText}</td>
-                            <td style="width: 25%; color: #8b8b99;">${catName}</td>
-                            <td style="width: 25%; color: #8b8b99;">${walletName}</td>
+                            <td style="width: 25%; font-weight: 500; color: #ffffff;">${this.escapeHtml(noteText)}</td>
+                            <td style="width: 25%; color: #8b8b99;">${this.escapeHtml(catName)}</td>
+                            <td style="width: 25%; color: #8b8b99;">${this.escapeHtml(walletName)}</td>
                             <td style="width: 25%;" class="${isIncome ? 'tx-amount-in' : 'tx-amount-out'}">
-                                ${isIncome ? '+' : '-'}${this.formatMoney(tx.amount, currency)}
+                                ${isIncome ? '+' : '-'}${formatMoney(tx.amount, currency)}
                             </td>
                         </tr>
                     `;
@@ -8371,37 +8416,34 @@ class App {
             </div>
         `;
 
-        printContainer.innerHTML = `
-            <div class="print-report-wrapper">
-                ${headerHtml}
-                ${kpisHtml}
-                ${budgetHtml}
-                ${pieHtml}
-                ${tableHtml}
-                ${txsHtml}
-                ${footerHtml}
-            </div>
-        `;
-
-        const triggerBrowserPrint = () => {
+        const job = { container: printContainer, timer: null, chart: null };
+        this._currentReportPrint = job;
+        try {
+            printContainer.innerHTML = `
+                <div class="print-report-wrapper">
+                    ${headerHtml}
+                    ${kpisHtml}
+                    ${budgetHtml}
+                    ${pieHtml}
+                    ${tableHtml}
+                    ${txsHtml}
+                    ${footerHtml}
+                </div>
+            `;
             if (window.lucide && typeof window.lucide.createIcons === 'function') {
                 lucide.createIcons({ root: printContainer });
             }
+        } catch (error) {
+            this.cancelCurrentReportPrint();
+            throw error;
+        }
 
-            setTimeout(() => {
-                window.print();
-                this.isPrivacyHidden = savedPrivacy;
-                setTimeout(() => {
-                    printContainer.replaceChildren();
-                }, 1000);
-            }, 300);
-        };
-
+        let canvasEl;
         if (region === 'JP' && chartData && chartData.data.length > 0 && typeof Chart !== 'undefined') {
-            const canvasEl = document.getElementById(chartData.id);
+            canvasEl = document.getElementById(chartData.id);
             if (canvasEl) {
                 try {
-                    const printChart = new Chart(canvasEl, {
+                    job.chart = new Chart(canvasEl, {
                         type: 'doughnut',
                         data: {
                             labels: chartData.labels,
@@ -8424,35 +8466,61 @@ class App {
                             }
                         }
                     });
-
-                    setTimeout(() => {
-                        try {
-                            const img = document.createElement('img');
-                            img.src = canvasEl.toDataURL('image/png');
-                            img.style.width = '190px';
-                            img.style.height = '190px';
-                            img.style.display = 'block';
-                            img.style.margin = '0 auto';
-                            canvasEl.parentNode.replaceChild(img, canvasEl);
-                            printChart.destroy();
-                        } catch (err) {
-                            console.warn('[Print] Canvas toDataURL fallback:', err);
-                        }
-                        triggerBrowserPrint();
-                    }, 100);
-                    return;
                 } catch (e) {
+                    job.chart = Chart.getChart?.(canvasEl);
+                    canvasEl = null;
                     console.warn('[Print] Chart rendering failed:', e);
                 }
             }
         }
 
-        triggerBrowserPrint();
+        job.timer = setTimeout(() => {
+            if (this._currentReportPrint !== job) return;
+            if (canvasEl && job.chart) {
+                try {
+                    const img = document.createElement('img');
+                    img.src = canvasEl.toDataURL('image/png');
+                    img.style.width = '190px';
+                    img.style.height = '190px';
+                    img.style.display = 'block';
+                    img.style.margin = '0 auto';
+                    canvasEl.replaceWith(img);
+                } catch (error) {
+                    console.warn('[Print] Canvas toDataURL fallback:', error);
+                }
+            }
+            try {
+                window.print();
+            } catch (error) {
+                console.warn('[Print] Browser print failed:', error);
+                if (this._currentReportPrint === job) this.cancelCurrentReportPrint();
+                return;
+            }
+            if (this._currentReportPrint === job) {
+                job.timer = setTimeout(() => {
+                    if (this._currentReportPrint === job) this.cancelCurrentReportPrint();
+                }, 1000);
+            }
+        }, job.chart ? 400 : 300);
+    }
+
+    cancelCurrentReportPrint() {
+        const job = this._currentReportPrint;
+        if (!job) return;
+        this._currentReportPrint = null;
+        clearTimeout(job.timer);
+        try {
+            job.chart?.destroy();
+        } catch (error) {
+            console.warn('[Print] Chart cleanup failed:', error);
+        } finally {
+            job.container.replaceChildren();
+        }
     }
 
     exportReportCsv() {
         const allTxs = storage.state.transactions || [];
-        const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
+        const reportTxs = allTxs.filter(tx => tx.region === this.reportRegion && this.isTransactionInMonth(tx, this.reportMonthKey));
 
         let csv = 'Transaction ID,Date,Region,Wallet,Category,Type,Amount,Currency,Note\n';
         reportTxs.forEach(tx => {
@@ -8515,7 +8583,7 @@ class App {
             Object.keys(storage.state.closedMonths).forEach(m => availableMonthsSet.add(m));
         }
         allTxs.forEach(tx => {
-            if (tx.date && tx.date.length >= 7) {
+            if (Number.isFinite(getTransactionUtcDay(tx.date))) {
                 availableMonthsSet.add(tx.date.slice(0, 7));
             }
         });
@@ -8536,7 +8604,7 @@ class App {
         }
 
         // 3. Filter transactions strictly by transaction date (Section 5 rule)
-        const reportTxs = allTxs.filter(tx => (tx.date || '').startsWith(this.reportMonthKey) && tx.region === this.reportRegion);
+        const reportTxs = allTxs.filter(tx => tx.region === this.reportRegion && this.isTransactionInMonth(tx, this.reportMonthKey));
 
         // 4. Calculate Financial Aggregates
         let totalIncome = 0;
@@ -8866,7 +8934,7 @@ class App {
                 closedMonthsList.innerHTML = `<p class="text-muted text-sm" style="padding: 12px 0;">No closed months recorded in audit history yet. Run Monthly Closing to create your first permanent month snapshot.</p>`;
             } else {
                 closedMonthsList.innerHTML = closedList.map(h => {
-                    const closedTxsCount = allTxs.filter(t => (t.date || '').startsWith(h.monthKey)).length;
+                    const closedTxsCount = allTxs.filter(t => this.isTransactionInMonth(t, h.monthKey)).length;
                     const closedDateFormatted = h.closedAt ? new Date(h.closedAt).toLocaleDateString() : 'Recorded';
                     return `
                         <div class="history-snapshot-item">
@@ -9064,7 +9132,7 @@ class App {
 
         const allTxs = storage.state.transactions || [];
         const customTxs = allTxs.filter(tx => {
-            if (!tx.date || tx.date < start || tx.date > end) return false;
+            if (!Number.isFinite(getTransactionUtcDay(tx.date)) || tx.date < start || tx.date > end) return false;
             if (selRegion !== 'ALL' && tx.region !== selRegion) return false;
             if (selWallet !== 'ALL' && tx.walletId !== selWallet) return false;
             if (selCategory !== 'ALL' && tx.categoryId !== selCategory) return false;
@@ -9722,7 +9790,7 @@ class App {
         const curMonth = this.closingWizardState.monthKey;
         const nextMonth = this.closingWizardState.nextMonthKey;
         const allTxs = storage.state.transactions || [];
-        const monthTxs = allTxs.filter(t => (t.date || '').startsWith(curMonth));
+        const monthTxs = allTxs.filter(t => this.isTransactionInMonth(t, curMonth));
 
         let monthIncome = 0;
         let monthExpense = 0;
@@ -9895,6 +9963,7 @@ class App {
     async executeMonthlyClosing() {
         const curMonth = this.closingWizardState.monthKey;
         const nextMonth = this.closingWizardState.nextMonthKey;
+        if (!curMonth || !nextMonth) return;
 
         if (walletManager.isMonthClosed(curMonth)) {
             alert(`Month ${curMonth} is already closed and sealed. Duplicate closing operations are prevented.`);
@@ -10047,7 +10116,7 @@ class App {
 
         // Transactions in active month for active region
         const allTxs = storage.state.transactions || [];
-        const monthTxs = allTxs.filter(t => (t.date || '').startsWith(curMonth) && t.region === region);
+        const monthTxs = allTxs.filter(t => t.region === region && this.isTransactionInMonth(t, curMonth));
 
         // Calculate totals spent per category
         const totals = {};
