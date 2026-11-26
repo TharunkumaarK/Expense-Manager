@@ -663,16 +663,16 @@
                         </div>
 
                         <!-- Monetary Concealment Toggle (Icon-Only Control) -->
-                        <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
+                        <button class="global-privacy-btn desktop-privacy-btn" data-privacy-toggle
                             aria-label="Toggle monetary concealment" title="Toggle monetary concealment">
                             <i data-lucide="eye-off"></i>
                         </button>
 
                         <!-- Quick Add Button -->
                         <button class="btn btn-primary btn-sm header-action-btn"
-                            onclick="app.openUnifiedTransactionSelector()">
+                            id="header-add-transaction">
                             <i data-lucide="plus"></i>
-                            <span>Add Transaction</span>
+                            <span>Add transaction</span>
                         </button>
                     </div>
                 </header>
@@ -1698,7 +1698,7 @@
                                     <i data-lucide="download"></i>
                                     <span class="btn-text">Export CSV</span>
                                 </button>
-                                <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
+                                <button class="global-privacy-btn desktop-privacy-btn" data-privacy-toggle
                                     aria-label="Toggle monetary concealment" title="Toggle monetary concealment">
                                     <i data-lucide="eye-off"></i>
                                 </button>
@@ -1939,7 +1939,7 @@
                                     <i data-lucide="plus"></i>
                                     <span class="btn-text">Add Category</span>
                                 </button>
-                                <button class="global-privacy-btn desktop-privacy-btn" onclick="app.togglePrivacy()"
+                                <button class="global-privacy-btn desktop-privacy-btn" data-privacy-toggle
                                     aria-label="Toggle monetary concealment" title="Toggle monetary concealment">
                                     <i data-lucide="eye-off"></i>
                                 </button>
@@ -3112,7 +3112,7 @@
     </main>
 
     <!-- Floating Action Button (Mobile Add Transaction) -->
-    <button class="fab" id="main-fab" onclick="app.toggleFabMenu()" aria-label="Add Transaction">
+    <button class="fab" id="main-fab" aria-label="Add Transaction">
         <i data-lucide="plus"></i>
     </button>
 

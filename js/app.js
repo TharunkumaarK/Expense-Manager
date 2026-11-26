@@ -872,25 +872,25 @@ class App {
             title.innerText = 'Log Expense';
             formInnerHtml = `
                 <div class="form-group">
-                    <label>Date</label>
+                    <label for="tx-date">Date</label>
                     <input type="date" id="tx-date" value="${currentDate}">
                 </div>
                 <div class="form-group">
-                    <label>Wallet</label>
+                    <label for="tx-wallet">Wallet</label>
                     <select id="tx-wallet" onchange="app.updateExpenseCategories()">
                         ${allWalletOpts}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Category</label>
+                    <label for="tx-category">Category</label>
                     <select id="tx-category" onchange="app.handleCategoryChange()"></select>
                 </div>
                 <div class="form-group hidden" id="tx-subcategory-group">
-                    <label>Specific Utility</label>
+                    <label for="tx-subcategory">Specific Utility</label>
                     <select id="tx-subcategory"></select>
                 </div>
                 <div class="form-group">
-                    <label>Amount</label>
+                    <label for="tx-amount">Amount</label>
                     <input type="number" id="tx-amount" step="any" placeholder="0">
                 </div>
                 <div class="form-group">
@@ -917,7 +917,7 @@ class App {
 
             formInnerHtml = `
                 <div class="form-group">
-                    <label>Date</label>
+                    <label for="tx-date">Date</label>
                     <input type="date" id="tx-date" value="${currentDate}">
                 </div>
                 <div class="form-group">
@@ -933,7 +933,7 @@ class App {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Amount</label>
+                    <label for="tx-amount">Amount</label>
                     <input type="number" id="tx-amount" step="any" placeholder="0" oninput="app.updateTransferPreview('transfer')">
                 </div>
                 <div class="form-group">
@@ -968,7 +968,7 @@ class App {
 
             formInnerHtml = `
                 <div class="form-group">
-                    <label>Date</label>
+                    <label for="tx-date">Date</label>
                     <input type="date" id="tx-date" value="${currentDate}">
                 </div>
                 <div class="form-group">
@@ -1012,7 +1012,7 @@ class App {
             title.innerText = 'Add Income / Credit';
             formInnerHtml = `
                 <div class="form-group">
-                    <label>Date</label>
+                    <label for="tx-date">Date</label>
                     <input type="date" id="tx-date" value="${currentDate}">
                 </div>
                 <div class="form-group">
@@ -1022,7 +1022,7 @@ class App {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Amount</label>
+                    <label for="tx-amount">Amount</label>
                     <input type="number" id="tx-amount" step="any" placeholder="0">
                 </div>
                 <div class="form-group">
@@ -1394,6 +1394,8 @@ class App {
         if (this._isSubmitting) return false;
 
         this._isSubmitting = true;
+        const submitButton = document.getElementById('tx-submit-btn');
+        submitButton?.setAttribute('aria-busy', 'true');
         try {
             const dateEl = document.getElementById('tx-date');
             const date = (dateEl && dateEl.value) ? dateEl.value : (typeof getLocalDateString === 'function' ? getLocalDateString() : new Date().toISOString().split('T')[0]);
@@ -1582,6 +1584,7 @@ class App {
             alert(err?.message || 'An error occurred while saving the transaction. Please try again.');
             return false;
         } finally {
+            submitButton?.removeAttribute('aria-busy');
             this._isSubmitting = false;
         }
     }
