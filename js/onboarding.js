@@ -593,7 +593,7 @@
                                     <span class="auth-input-icon" style="font-weight: 700; font-size: 1.05rem;">${symbol}</span>
                                     <input type="number" min="0" step="any" class="auth-input" 
                                            placeholder="e.g. 50000"
-                                           value="${bConfig.monthlyTotal > 0 ? bConfig.monthlyTotal : ''}"
+                                           value="${bConfig.monthlyTotal > 0 ? Number(bConfig.monthlyTotal) : ''}"
                                            oninput="onboardingController.setBudgetAmount('${code}', this.value)">
                                 </div>
                             </div>
@@ -677,12 +677,13 @@
                     const escapedName = this.escapeHtml(w.name || w.id);
                     const escapedType = this.escapeHtml((w.type || 'bank').toUpperCase());
                     const themeObj = this.getThemeForWallet(w);
-                    const escapedColor = this.escapeHtml(w.color || themeObj.color || '#333');
+                    const color = typeof w.color === 'string' && /^#(?:[a-f0-9]{3}|[a-f0-9]{6})$/i.test(w.color)
+                        ? w.color : themeObj.color;
 
                     html += `
                         <div class="onboarding-wallet-row" data-wallet-id="${escapedId}">
                             <div class="onboarding-wallet-row-left" data-wallet-id="${escapedId}" title="Click to customize account">
-                                <div class="onboarding-wallet-icon-box" style="border-color: ${escapedColor}">
+                                <div class="onboarding-wallet-icon-box" style="border-color: ${color}">
                                     <i data-lucide="${typeIcon}"></i>
                                 </div>
                                 <div class="onboarding-wallet-row-info">
@@ -697,7 +698,7 @@
                                     <input type="number" min="0" step="any" class="auth-input onboarding-balance-input"
                                            placeholder="0"
                                            data-wallet-id="${escapedId}"
-                                           value="${w.balance !== 0 ? w.balance : ''}">
+                                           value="${Number(w.balance) || ''}">
                                 </div>
                                 <button type="button" class="onboarding-wallet-edit-btn" title="Customize account"
                                         data-wallet-id="${escapedId}">
@@ -736,7 +737,7 @@
          * Resolve the appropriate theme for a given wallet object.
          */
         getThemeForWallet(w) {
-            const allThemes = (typeof window !== 'undefined' && window.WALLET_THEMES) || ONBOARDING_WALLET_THEMES;
+            const allThemes = typeof WALLET_THEMES !== 'undefined' ? WALLET_THEMES : ONBOARDING_WALLET_THEMES;
             if (!w) return allThemes[0];
             if (w.theme) {
                 const found = allThemes.find(t => t.id === w.theme);
@@ -769,7 +770,7 @@
             const container = document.getElementById(containerId);
             if (!container) return;
 
-            const allThemes = (typeof window !== 'undefined' && window.WALLET_THEMES) || ONBOARDING_WALLET_THEMES;
+            const allThemes = typeof WALLET_THEMES !== 'undefined' ? WALLET_THEMES : ONBOARDING_WALLET_THEMES;
 
             // Prioritize themes by country context
             const countryThemes = {
@@ -868,7 +869,7 @@
 
             const countryNames = { JP: 'Japan', IN: 'India', DE: 'Germany' };
             const defaultNames = { JP: 'Savings Account', IN: 'Emergency Fund', DE: 'Savings Account' };
-            const allThemes = (typeof window !== 'undefined' && window.WALLET_THEMES) || ONBOARDING_WALLET_THEMES;
+            const allThemes = typeof WALLET_THEMES !== 'undefined' ? WALLET_THEMES : ONBOARDING_WALLET_THEMES;
 
             let initialThemeId = 'emerald-salary';
             if (mode === 'edit' && walletId && this.draft.wallets[walletId]) {
@@ -1039,7 +1040,7 @@
 
         _createWallet(countryCode, trimmedName, chosenType = 'bank', chosenThemeId = null) {
             const currencySymbols = { JP: '¥', IN: '₹', DE: '€' };
-            const allThemes = (typeof window !== 'undefined' && window.WALLET_THEMES) || ONBOARDING_WALLET_THEMES;
+            const allThemes = typeof WALLET_THEMES !== 'undefined' ? WALLET_THEMES : ONBOARDING_WALLET_THEMES;
 
             let uniqueId = trimmedName;
             let counter = 1;
@@ -1159,7 +1160,7 @@
                                     <div class="auth-input-wrapper">
                                         <span class="auth-input-icon" style="font-weight: 700;">${loanSymbol}</span>
                                         <input type="number" min="0" class="auth-input" placeholder="e.g. 500000"
-                                               value="${lConfig.totalPrincipal > 0 ? lConfig.totalPrincipal : ''}"
+                                               value="${lConfig.totalPrincipal > 0 ? Number(lConfig.totalPrincipal) : ''}"
                                                oninput="onboardingController.setLoanField('totalPrincipal', this.value)">
                                     </div>
                                 </div>
@@ -1168,7 +1169,7 @@
                                     <div class="auth-input-wrapper">
                                         <span class="auth-input-icon" style="font-weight: 700;">${loanSymbol}</span>
                                         <input type="number" min="0" class="auth-input" placeholder="e.g. 420000"
-                                               value="${lConfig.principalLeft > 0 ? lConfig.principalLeft : ''}"
+                                               value="${lConfig.principalLeft > 0 ? Number(lConfig.principalLeft) : ''}"
                                                oninput="onboardingController.setLoanField('principalLeft', this.value)">
                                     </div>
                                 </div>
@@ -1177,7 +1178,7 @@
                                     <div class="auth-input-wrapper">
                                         <span class="auth-input-icon" style="font-weight: 700;">${loanSymbol}</span>
                                         <input type="number" min="0" class="auth-input" placeholder="e.g. 12500"
-                                               value="${lConfig.emi > 0 ? lConfig.emi : ''}"
+                                               value="${lConfig.emi > 0 ? Number(lConfig.emi) : ''}"
                                                oninput="onboardingController.setLoanField('emi', this.value)">
                                     </div>
                                 </div>
@@ -1186,7 +1187,7 @@
                                     <div class="auth-input-wrapper">
                                         <span class="auth-input-icon" style="font-weight: 700;">%</span>
                                         <input type="number" min="0" step="0.01" class="auth-input" placeholder="e.g. 8.5"
-                                               value="${lConfig.annualInterestRate > 0 ? lConfig.annualInterestRate : ''}"
+                                               value="${lConfig.annualInterestRate > 0 ? Number(lConfig.annualInterestRate) : ''}"
                                                oninput="onboardingController.setLoanField('annualInterestRate', this.value)">
                                     </div>
                                 </div>
@@ -1500,7 +1501,7 @@
                 } else {
                     // Cloud push failed (offline, 503, network drop).
                     // Enforce Blocking Cloud Requirement: remain on Step 4 and show retry action.
-                    console.warn('[Onboarding] Cloud synchronization could not be confirmed:', result.error);
+                    console.warn('[Onboarding] Cloud synchronization could not be confirmed:');
                     this.showError(`Configuration saved locally, but cloud synchronization failed (${result.error || 'Network offline'}). Please check your connection and retry.`);
                     if (nextText) nextText.textContent = 'Retry Cloud Sync';
                     if (nextBtn) {
@@ -1509,7 +1510,7 @@
                     }
                 }
             } catch (e) {
-                console.error('[Onboarding] Exception during confirmation:', e);
+                console.error('[Onboarding] Exception during confirmation:');
                 this.showError(`An error occurred: ${e.message || String(e)}. Please retry.`);
                 if (nextText) nextText.textContent = 'Retry Cloud Sync';
                 if (nextBtn) {
@@ -1595,7 +1596,7 @@
         }
     }
 
-    global.OnboardingController = OnboardingController;
+    if (typeof EXPENSE_DEPLOYMENT === 'undefined') global.OnboardingController = OnboardingController;
     global.onboardingController = new OnboardingController();
 
 })(typeof window !== 'undefined' ? window : this);

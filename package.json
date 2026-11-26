@@ -1,0 +1,19 @@
+{
+  "name": "expense-manager",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "test:deployment": "node --test scripts/test-deployment.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.119.2",
+    "chart.js": "4.6.2",
+    "lucide": "1.80.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

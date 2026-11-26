@@ -15,13 +15,13 @@
     <!-- Local Typography: SF Pro font family integrated via css/style.css -->
 
     <!-- Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@1.80.0/dist/umd/lucide.min.js"></script>
 
     <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js"></script>
 
     <!-- Charts -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.2/dist/chart.umd.min.js"></script>
 
     <!-- Styles -->
     <link rel="stylesheet" href="css/style.css?v=20261118_v123">
@@ -2827,7 +2827,7 @@
                                                 </div>
                                                 <div class="settings-control-wrap">
                                                     <button class="btn btn-secondary btn-sm"
-                                                        onclick="storage.exportJSON()" style="width:fit-content;">
+                                                        id="backup-export-button" style="width:fit-content;">
                                                         <i data-lucide="hard-drive"></i>
                                                         <span>Download Full Backup (JSON)</span>
                                                     </button>
@@ -4006,16 +4006,7 @@
     <script src="js/wallet.js?v=20261118_v123"></script>
     <script src="js/onboarding.js?v=20261118_v123"></script>
     <script src="js/app.js?v=20261118_v123"></script>
-    <script>
-        lucide.createIcons();
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function (registrations) {
-                for (let registration of registrations) {
-                    registration.unregister();
-                }
-            });
-        }
-    </script>
+    <script src="js/startup.js"></script>
 </body>
 
 </html>

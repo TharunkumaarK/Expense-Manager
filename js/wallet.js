@@ -4,10 +4,7 @@ function getLocalDateString(d = new Date()) {
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
-if (typeof window !== 'undefined') {
-    window.getLocalDateString = getLocalDateString;
-}
-if (typeof globalThis !== 'undefined') {
+if (typeof EXPENSE_DEPLOYMENT === 'undefined' && typeof globalThis !== 'undefined') {
     globalThis.getLocalDateString = getLocalDateString;
 }
 
@@ -209,7 +206,7 @@ class WalletManager {
 
         const numAmount = Number(amount);
         if (!this.isValidAmount(numAmount, wallet.currency)) {
-            console.warn(`[WalletManager] Invalid expense amount or precision: ${amount} for ${wallet.currency}`);
+            console.warn('[WalletManager] Invalid expense amount or precision.');
             return false;
         }
 
@@ -246,7 +243,7 @@ class WalletManager {
             }
             return true;
         } catch (err) {
-            console.error('[WalletManager] addExpense failed. Rolling back completely...', err);
+            console.error('[WalletManager] addExpense failed. Rolling back completely...');
             wallet.balance = preBalance;
             storage.state.transactions = preCommitTransactions;
             return false;
@@ -266,7 +263,7 @@ class WalletManager {
 
         const numAmount = Number(amount);
         if (!this.isValidAmount(numAmount, wallet.currency)) {
-            console.warn(`[WalletManager] Invalid income amount or precision: ${amount} for ${wallet.currency}`);
+            console.warn('[WalletManager] Invalid income amount or precision.');
             return false;
         }
 
@@ -302,7 +299,7 @@ class WalletManager {
             }
             return true;
         } catch (err) {
-            console.error('[WalletManager] addIncome failed. Rolling back completely...', err);
+            console.error('[WalletManager] addIncome failed. Rolling back completely...');
             wallet.balance = preBalance;
             storage.state.transactions = preCommitTransactions;
             return false;
@@ -462,7 +459,7 @@ class WalletManager {
 
         const preview = this.getTransferPreview('transfer', sourceId, destId, amount);
         if (!preview.valid) {
-            console.warn(`[WalletManager] Transfer rejected: ${preview.error}`);
+            console.warn('[WalletManager] Transfer rejected.');
             return false;
         }
 
@@ -505,7 +502,7 @@ class WalletManager {
             }
             return true;
         } catch (err) {
-            console.error('[WalletManager] Transfer commit failed. Rolling back completely...', err);
+            console.error('[WalletManager] Transfer commit failed. Rolling back completely...');
             source.balance = preCommit[sourceId];
             dest.balance = preCommit[destId];
             storage.state.transactions = preCommitTransactions;
@@ -523,7 +520,7 @@ class WalletManager {
 
         const preview = this.getTransferPreview('remittance', sourceId, destId, sourceAmount, destAmount);
         if (!preview.valid) {
-            console.warn(`[WalletManager] International transfer rejected: ${preview.error}`);
+            console.warn('[WalletManager] International transfer rejected.');
             return false;
         }
 
@@ -570,7 +567,7 @@ class WalletManager {
             }
             return true;
         } catch (err) {
-            console.error('[WalletManager] Remittance commit failed. Rolling back completely...', err);
+            console.error('[WalletManager] Remittance commit failed. Rolling back completely...');
             source.balance = preCommit[sourceId];
             dest.balance = preCommit[destId];
             storage.state.transactions = preCommitTransactions;
@@ -770,7 +767,7 @@ class WalletManager {
     reverseTransactionEffects(tx) {
         const check = this.validateTransactionForReversal(tx);
         if (!check.valid) {
-            console.warn(`[WalletManager] reverseTransactionEffects aborted: ${check.error}`);
+            console.warn('[WalletManager] reverseTransactionEffects aborted.');
             return false;
         }
 
@@ -798,7 +795,7 @@ class WalletManager {
     applyTransactionEffects(tx) {
         const check = this.validateTransactionForApplication(tx);
         if (!check.valid) {
-            console.warn(`[WalletManager] applyTransactionEffects aborted: ${check.error}`);
+            console.warn('[WalletManager] applyTransactionEffects aborted.');
             return false;
         }
 
@@ -841,14 +838,14 @@ class WalletManager {
         // Validate date format
         const targetDate = updatedData.date || tx.date;
         if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
-            console.warn(`[WalletManager] Invalid date format: ${targetDate}`);
+            console.warn('[WalletManager] Invalid date format.');
             return false;
         }
 
         // 1. Prepare phase: Validate that existing transaction CAN be reversed
         const revCheck = this.validateTransactionForReversal(tx);
         if (!revCheck.valid) {
-            console.warn(`[WalletManager] Update aborted - existing transaction cannot be reversed: ${revCheck.error}`);
+            console.warn('[WalletManager] Update aborted - existing transaction cannot be reversed.');
             return false;
         }
 
@@ -897,7 +894,7 @@ class WalletManager {
         // 3. Prepare phase: Validate prospective updated clone before modifying ANY state
         const applyCheck = this.validateTransactionForApplication(prospectiveTx);
         if (!applyCheck.valid) {
-            console.warn(`[WalletManager] Update aborted - proposed transaction invalid: ${applyCheck.error}`);
+            console.warn('[WalletManager] Update aborted - proposed transaction invalid.');
             return false;
         }
 
@@ -919,7 +916,7 @@ class WalletManager {
         for (const wId of affectedWalletIds) {
             const w = storage.state.wallets[wId];
             if (!w || typeof w !== 'object' || typeof w.balance !== 'number' || !isFinite(w.balance)) {
-                console.warn(`[WalletManager] Update aborted - affected wallet '${wId}' is invalid or missing.`);
+                console.warn('[WalletManager] Update aborted: an affected wallet is invalid or missing.');
                 return false;
             }
         }
@@ -960,7 +957,7 @@ class WalletManager {
             const cur = storage.state.wallets[wId].currency;
             tentativeBalances[wId] = this.roundCurrency(tentativeBalances[wId], cur);
             if (typeof tentativeBalances[wId] !== 'number' || isNaN(tentativeBalances[wId]) || !isFinite(tentativeBalances[wId])) {
-                console.warn(`[WalletManager] Update aborted - resulting balance for '${wId}' is nonfinite.`);
+                console.warn('[WalletManager] Update aborted: an affected wallet balance is nonfinite.');
                 return false;
             }
         }
@@ -1009,7 +1006,7 @@ class WalletManager {
             }
             return true;
         } catch (commitErr) {
-            console.error('[WalletManager] Unexpected error during atomic update commit. Rolling back completely...', commitErr);
+            console.error('[WalletManager] Unexpected error during atomic update commit. Rolling back completely...');
             affectedWalletIds.forEach(wId => {
                 storage.state.wallets[wId].balance = preCommitBalances[wId];
             });
@@ -1047,7 +1044,7 @@ class WalletManager {
         // 1. Prepare phase: Validate that transaction CAN be reversed before touching anything
         const revCheck = this.validateTransactionForReversal(tx);
         if (!revCheck.valid) {
-            console.warn(`[WalletManager] Cannot delete transaction due to invalid or missing wallet reference: ${revCheck.error}`);
+            console.warn('[WalletManager] Cannot delete transaction due to invalid or missing wallet reference.');
             return false;
         }
 
@@ -1064,7 +1061,7 @@ class WalletManager {
         for (const wId of affectedWalletIds) {
             const w = storage.state.wallets[wId];
             if (!w || typeof w !== 'object' || typeof w.balance !== 'number' || !isFinite(w.balance)) {
-                console.warn(`[WalletManager] Delete aborted - affected wallet '${wId}' is invalid.`);
+                console.warn('[WalletManager] Delete aborted: an affected wallet is invalid.');
                 return false;
             }
             tentativeBalances[wId] = w.balance;
@@ -1086,7 +1083,7 @@ class WalletManager {
             const cur = storage.state.wallets[wId].currency;
             tentativeBalances[wId] = this.roundCurrency(tentativeBalances[wId], cur);
             if (!isFinite(tentativeBalances[wId])) {
-                console.warn(`[WalletManager] Delete aborted - resulting balance for '${wId}' is nonfinite.`);
+                console.warn('[WalletManager] Delete aborted: an affected wallet balance is nonfinite.');
                 return false;
             }
         }
@@ -1153,7 +1150,7 @@ class WalletManager {
             }
             return true;
         } catch (commitErr) {
-            console.error('[WalletManager] Unexpected error during atomic delete commit. Rolling back completely...', commitErr);
+            console.error('[WalletManager] Unexpected error during atomic delete commit. Rolling back completely...');
             affectedWalletIds.forEach(wId => {
                 storage.state.wallets[wId].balance = preCommitBalances[wId];
             });
@@ -1290,4 +1287,4 @@ class WalletManager {
 }
 
 const walletManager = new WalletManager();
-window.walletManager = walletManager;
+if (typeof EXPENSE_DEPLOYMENT === 'undefined') window.walletManager = walletManager;

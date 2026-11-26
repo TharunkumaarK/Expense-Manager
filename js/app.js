@@ -22,11 +22,11 @@ const WALLET_THEMES = [
     { id: 'frankfurt-slate', name: 'Frankfurt Slate', cls: 'wallet-theme-frankfurt-slate', color: '#1e293b', region: 'DE', match: ['checking', 'sparkasse', 'n26', 'deutsche', 'commerzbank'] }
 ];
 
-if (typeof window !== 'undefined') {
+if (typeof EXPENSE_DEPLOYMENT === 'undefined' && typeof window !== 'undefined') {
     window.WALLET_THEMES = WALLET_THEMES;
     window.WALLET_COLORS = WALLET_COLORS;
 }
-if (typeof global !== 'undefined') {
+if (typeof EXPENSE_DEPLOYMENT === 'undefined' && typeof global !== 'undefined') {
     global.WALLET_THEMES = WALLET_THEMES;
     global.WALLET_COLORS = WALLET_COLORS;
 }
@@ -108,7 +108,9 @@ class App {
         this.updatePrivacyUI();
         this.updateDesktopAccountInfo();
         this.renderAll();
-        if (this.currentView === 'analytics-view') this.renderAnalyticsPage();
+        if (['analytics-view', 'budgets-view', 'reports-view', 'transactions-view', 'history-view'].includes(this.currentView)) {
+            this.switchView(this.currentView);
+        }
 
         // Gated Budget Recovery & Reconciliation Check
         if (typeof storage !== 'undefined' && storage.getBudgetRecoveryStatus() === 'BUDGET_RECOVERY_REQUIRED') {
@@ -127,6 +129,14 @@ class App {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
+    }
+
+    safeWalletColor(color) {
+        return typeof color === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color) ? color : '#3351d6';
+    }
+
+    categoryIcon(icon) {
+        return typeof icon === 'string' && /^[a-z0-9-]+$/.test(icon) ? icon : 'tag';
     }
 
     getCountryFlagSvg(region, width = 18, height = 13.5) {
@@ -184,7 +194,7 @@ class App {
         if (this.isPrivacyHidden && !options.ignorePrivacy && !options.forceVisible) {
             return '******';
         }
-        let sym = currency || '';
+        let sym = typeof currency === 'string' && /^(?:[A-Z]{3}|\p{Sc})$/u.test(currency) ? currency : '';
         if (sym === 'JPY') sym = '¥';
         else if (sym === 'INR') sym = '₹';
         else if (sym === 'EUR') sym = '€';
@@ -598,7 +608,7 @@ class App {
         try {
             localStorage.setItem('em_sidebar_collapsed', isCollapsed ? 'true' : 'false');
         } catch (e) {
-            console.warn('[UI] Failed to save sidebar collapse state:', e);
+            console.warn('[UI] Failed to save sidebar collapse state:');
         }
     }
 
@@ -609,7 +619,7 @@ class App {
                 if (sidebar) sidebar.classList.add('collapsed');
             }
         } catch (e) {
-            console.warn('[UI] Failed to read sidebar collapse state:', e);
+            console.warn('[UI] Failed to read sidebar collapse state:');
         }
     }
 
@@ -739,7 +749,7 @@ class App {
             if (!groups[reg]) groups[reg] = [];
             const sel = (w.id === selectedWalletId) ? ' selected' : '';
             const escId = this.escapeHtml(w.id);
-            groups[reg].push(`<option value="${escId}"${sel}>${escId} (${w.currency || ''})</option>`);
+            groups[reg].push(`<option value="${escId}"${sel}>${escId} (${this.escapeHtml(w.currency)})</option>`);
         });
 
         if (regionFilter) {
@@ -1568,7 +1578,7 @@ class App {
             }
             return true;
         } catch (err) {
-            console.error('[handleFormSubmit] Transaction submission error:', err);
+            console.error('[handleFormSubmit] Transaction submission error:');
             alert(err?.message || 'An error occurred while saving the transaction. Please try again.');
             return false;
         } finally {
@@ -1621,7 +1631,7 @@ class App {
             }
             return true;
         } catch (err) {
-            console.error('[deleteTx] Deletion error:', err);
+            console.error('[deleteTx] Deletion error:');
             alert(err?.message || 'An error occurred while deleting the transaction.');
             return false;
         } finally {
@@ -1698,7 +1708,7 @@ class App {
         const bannerHtml = `
             <i data-lucide="alert-triangle"></i>
             <div class="modal-conflict-text">
-                <strong>Financial Update in Another Window (Rev #${newRevision})</strong>
+                <strong>Financial Update in Another Window (Rev #${this.escapeHtml(newRevision)})</strong>
                 <span>Ledger balances were updated elsewhere. Your inputs are preserved. Click Save to re-validate and apply against current balances.</span>
             </div>
         `;
@@ -1806,7 +1816,7 @@ class App {
                 break;
         }
 
-        pill.innerHTML = `${iconHtml}<span class="sync-pill-text">${label}</span>`;
+        pill.innerHTML = `${iconHtml}<span class="sync-pill-text">${this.escapeHtml(label)}</span>`;
         if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
     }
 
@@ -1827,13 +1837,13 @@ class App {
                 <div class="conflict-comparison-row">
                     <div class="conflict-col">
                         <span class="conflict-badge-label">This Device (Local)</span>
-                        <strong>Revision #${storage.activeConflict.localRevision || 1}</strong>
+                        <strong>Revision #${this.escapeHtml(storage.activeConflict.localRevision || 1)}</strong>
                         <span>${locTx} transactions</span>
                     </div>
                     <div class="conflict-col-vs">vs</div>
                     <div class="conflict-col">
                         <span class="conflict-badge-label">Cloud (Other Device)</span>
-                        <strong>Revision #${storage.activeConflict.remoteRevision || 1}</strong>
+                        <strong>Revision #${this.escapeHtml(storage.activeConflict.remoteRevision || 1)}</strong>
                         <span>${remTx} transactions</span>
                     </div>
                 </div>
@@ -1962,16 +1972,16 @@ class App {
             const utils = activeJP.filter(c => c.id.startsWith('jp-utility-'));
             const others = activeJP.filter(c => !c.id.startsWith('jp-utility-'));
 
-            html = others.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            html = others.map(c => `<option value="${this.escapeHtml(c.id)}">${this.escapeHtml(c.name)}</option>`).join('');
             if (utils.length > 0) {
                 html += `<option value="utility-group">Utilities</option>`;
                 if (subSelect) {
-                    subSelect.innerHTML = utils.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                    subSelect.innerHTML = utils.map(c => `<option value="${this.escapeHtml(c.id)}">${this.escapeHtml(c.name)}</option>`).join('');
                 }
             }
         } else {
             const activeIN = (storage.state.categories[region] || []).filter(c => c.isActive !== false);
-            html = activeIN.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            html = activeIN.map(c => `<option value="${this.escapeHtml(c.id)}">${this.escapeHtml(c.name)}</option>`).join('');
         }
 
         catSelect.innerHTML = html;
@@ -2017,7 +2027,8 @@ class App {
         this._lastDetailTxId = null;
         this._txModalSource = null;
         for (const id of ['edit-wallet-modal', 'quick-edit-modal', 'log-emi-modal', 'category-manage-modal',
-            'overall-budget-modal', 'closing-wizard-modal', 'budget-recovery-modal']) {
+            'overall-budget-modal', 'closing-wizard-modal', 'budget-recovery-modal',
+            'add-wallet-modal', 'pdf-modal', 'conflict-resolution-modal']) {
             this.closeModal(id);
         }
         this.editingCatId = null;
@@ -2036,7 +2047,8 @@ class App {
         for (const id of ['edit-wallet-id', 'edit-wallet-name', 'edit-wallet-balance',
             'quick-edit-id', 'quick-edit-region', 'quick-edit-type', 'quick-edit-amount',
             'cat-edit-id', 'cat-edit-name', 'cat-edit-budget', 'overall-budget-input',
-            'log-emi-date', 'log-emi-amount', 'log-emi-note']) {
+            'log-emi-date', 'log-emi-amount', 'log-emi-note', 'add-wallet-name', 'add-wallet-balance',
+            'setting-profile-name', 'budgets-cat-search-input']) {
             const field = document.getElementById(id);
             if (field) field.value = '';
         }
@@ -2061,6 +2073,11 @@ class App {
         this.setPrivacyHidden(true);
         this.clearInactivityTimer();
         this.viewingMonthKey = null;
+        this.reportSnapshotsCache = {};
+        this.budgetsCatSearch = '';
+        this.resetCustomRangeReport();
+        this.cancelRestore();
+        this.updateDesktopAccountInfo();
         if (this.renderedHistoryCharts && typeof this.renderedHistoryCharts.clear === 'function') {
             this.renderedHistoryCharts.clear();
         }
@@ -2091,23 +2108,33 @@ class App {
 
         const elIds = [
             'jp-wallets-list', 'in-wallets-list',
-            'jp-categories-list', 'in-categories-list',
+            'jp-categories-grid', 'in-categories-grid', 'de-categories-grid',
+            'jp-categories-list', 'in-categories-list', 'monthly-financial-summary',
             'recent-transactions-list', 'settings-wallets-list',
             'settings-categories-list', 'settings-in-categories-list',
-            'jp-exclusions-chips', 'jp-category-ranking-list', 'jp-insights-list'
+            'jp-exclusions-chips', 'jp-category-ranking-list', 'jp-insights-list', 'jp-budget-perf-body',
+            'in-recent-tx-list', 'de-recent-tx-list', 'ledger-timeline-container', 'ledger-active-chips',
+            'wallets-page-jp-grid', 'wallets-page-in-grid', 'wallets-page-de-grid', 'dash-donut-legend',
+            'history-list', 'report-snapshot-hero', 'report-pie-legend', 'report-category-breakdown-card',
+            'report-closed-months-list', 'report-month-select', 'pdf-from-month', 'pdf-to-month',
+            'budgets-summary-banner', 'budgets-categories-grid', 'settings-country-budgets-list',
+            'settings-loan-config-container', 'restore-preview-details', 'conflict-summary-comparison',
+            'print-container', 'account-email-display'
         ];
         elIds.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.replaceChildren();
         });
 
-        const jpBal = document.getElementById('jp-total-balance');
-        if (jpBal) jpBal.innerText = '******';
-        const inBal = document.getElementById('in-total-balance');
-        if (inBal) inBal.innerText = '******';
+        document.querySelectorAll('#app-content .privacy-blur, #app-content .financial-amount').forEach(el => {
+            el.textContent = '******';
+        });
 
         const loanWidget = document.getElementById('loan-tracker-widget');
-        if (loanWidget) loanWidget.style.display = 'none';
+        if (loanWidget) {
+            loanWidget.replaceChildren();
+            loanWidget.style.display = 'none';
+        }
 
         if (typeof charts !== 'undefined' && typeof charts.destroyCharts === 'function') {
             charts.destroyCharts();
@@ -2143,13 +2170,13 @@ class App {
                 Object.values(storage.state.wallets).forEach(w => {
                     const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
                     walletHtml += `
-                        <div class="draggable-item" data-id="${w.id}" data-type="wallet" draggable="true" style="padding:12px 0; border-bottom:1px solid var(--border);">
+                        <div class="draggable-item" data-id="${this.escapeHtml(w.id)}" data-type="wallet" draggable="true" style="padding:12px 0; border-bottom:1px solid var(--border);">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <span style="display:flex; align-items:center; gap:8px; font-size:0.9rem;">
-                                    <span style="width:10px;height:10px;border-radius:50%;background:${w.color};flex-shrink:0;"></span>
-                                    <i data-lucide="${icon}"></i> ${w.id} <small class="text-muted">(${w.currency})</small>
+                                    <span style="width:10px;height:10px;border-radius:50%;background:${this.safeWalletColor(w.color)};flex-shrink:0;"></span>
+                                    <i data-lucide="${icon}"></i> ${this.escapeHtml(w.id)} <small class="text-muted">(${this.escapeHtml(w.currency)})</small>
                                 </span>
-                                <input type="number" value="${w.balance}" onblur="app.updateWalletBalance('${w.id}', this.value)" style="width:100px;">
+                                <input type="number" value="${this.escapeHtml(w.balance)}" data-wallet-id="${this.escapeHtml(w.id)}" onblur="app.updateWalletBalance(this.dataset.walletId, this.value)" style="width:100px;">
                             </div>
                         </div>
                     `;
@@ -2214,7 +2241,7 @@ class App {
                         <div class="settings-country-card-header">
                             <div class="settings-country-card-title">
                                 ${c.flag}
-                                <span class="settings-country-card-name">${c.name}</span>
+                                <span class="settings-country-card-name">${this.escapeHtml(c.name)}</span>
                                 <span class="currency-code-pill">${c.curr}</span>
                                 ${isPrimary ? '<span class="settings-badge-primary">Primary</span>' : ''}
                             </div>
@@ -2312,7 +2339,7 @@ class App {
                     ${regionalWallets.map(w => {
                     const isSel = loanCfg.repaymentWallet === w.id ? 'selected' : '';
                     const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
-                    return `<option value="${this.escapeHtml(w.id)}" ${isSel}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
+                    return `<option value="${this.escapeHtml(w.id)}" ${isSel}>${this.escapeHtml(w.id)} (${this.escapeHtml(balFormatted)})</option>`;
                 }).join('')}
                 `;
             }
@@ -2375,39 +2402,39 @@ class App {
 
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06);">
                             <div>
-                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Total Principal (${loanCurrency})</label>
-                                <input type="number" class="settings-input" id="setting-loan-total-principal" value="${loanCfg.totalPrincipal || 0}" onblur="app.updateLoanPref('totalPrincipal', this.value)" style="width: 100%;">
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Total Principal (${this.escapeHtml(loanCurrency)})</label>
+                                <input type="number" class="settings-input" id="setting-loan-total-principal" value="${this.escapeHtml(loanCfg.totalPrincipal || 0)}" onblur="app.updateLoanPref('totalPrincipal', this.value)" style="width: 100%;">
                             </div>
                             <div>
-                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Principal Left (${loanCurrency})</label>
-                                <input type="number" class="settings-input" id="setting-loan-principal" value="${loanCfg.principalLeft || 0}" onblur="app.updateLoanPref('principalLeft', this.value)" style="width: 100%;">
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Principal Left (${this.escapeHtml(loanCurrency)})</label>
+                                <input type="number" class="settings-input" id="setting-loan-principal" value="${this.escapeHtml(loanCfg.principalLeft || 0)}" onblur="app.updateLoanPref('principalLeft', this.value)" style="width: 100%;">
                             </div>
                             <div>
                                 <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Annual Interest Rate (%)</label>
-                                <input type="number" step="0.01" min="0" class="settings-input" id="setting-loan-interest-rate" value="${annualInterestRate || 0}" onblur="app.updateLoanPref('annualInterestRate', this.value)" style="width: 100%;" placeholder="e.g. 8.5">
+                                <input type="number" step="0.01" min="0" class="settings-input" id="setting-loan-interest-rate" value="${this.escapeHtml(annualInterestRate || 0)}" onblur="app.updateLoanPref('annualInterestRate', this.value)" style="width: 100%;" placeholder="e.g. 8.5">
                             </div>
                             <div>
                                 <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Total Dues (Months)</label>
-                                <input type="number" class="settings-input" id="setting-loan-total-dues" value="${loanCfg.totalDues || 0}" onblur="app.updateLoanPref('totalDues', this.value)" style="width: 100%;">
+                                <input type="number" class="settings-input" id="setting-loan-total-dues" value="${this.escapeHtml(loanCfg.totalDues || 0)}" onblur="app.updateLoanPref('totalDues', this.value)" style="width: 100%;">
                             </div>
                             <div>
                                 <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Dues Paid (Months)</label>
-                                <input type="number" class="settings-input" id="setting-loan-dues" value="${loanCfg.duesPaid || 0}" onblur="app.updateLoanPref('duesPaid', this.value)" style="width: 100%;">
+                                <input type="number" class="settings-input" id="setting-loan-dues" value="${this.escapeHtml(loanCfg.duesPaid || 0)}" onblur="app.updateLoanPref('duesPaid', this.value)" style="width: 100%;">
                             </div>
                             <div>
-                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Monthly EMI Amount (${loanCurrency})</label>
-                                <input type="number" class="settings-input" id="setting-loan-emi" value="${loanCfg.emi || 0}" onblur="app.updateLoanPref('emi', this.value)" style="width: 100%;">
+                                <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Monthly EMI Amount (${this.escapeHtml(loanCurrency)})</label>
+                                <input type="number" class="settings-input" id="setting-loan-emi" value="${this.escapeHtml(loanCfg.emi || 0)}" onblur="app.updateLoanPref('emi', this.value)" style="width: 100%;">
                             </div>
                             <div>
                                 <label class="text-xs text-muted" style="display:block; margin-bottom: 4px;">Monthly Draw Date (1-31)</label>
-                                <input type="number" class="settings-input" id="setting-loan-date" value="${loanCfg.emiDrawDate || 7}" onblur="app.updateLoanPref('emiDrawDate', this.value)" style="width: 100%;">
+                                <input type="number" class="settings-input" id="setting-loan-date" value="${this.escapeHtml(loanCfg.emiDrawDate || 7)}" onblur="app.updateLoanPref('emiDrawDate', this.value)" style="width: 100%;">
                             </div>
                         </div>
 
                         ${totalExpected > 0 ? `
                             <div style="margin-top: 14px; padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                                <span>Total Obligation: <strong style="color: var(--text-primary); font-weight: 600;">${loanCurrency}${totalExpected.toLocaleString()}</strong></span>
-                                <span>Estimated Total Interest: <strong style="color: #f59e0b; font-weight: 600;">${loanCurrency}${totalInterest.toLocaleString()}</strong></span>
+                                <span>Total Obligation: <strong style="color: var(--text-primary); font-weight: 600;">${this.escapeHtml(loanCurrency)}${totalExpected.toLocaleString()}</strong></span>
+                                <span>Estimated Total Interest: <strong style="color: #f59e0b; font-weight: 600;">${this.escapeHtml(loanCurrency)}${totalInterest.toLocaleString()}</strong></span>
                             </div>
                         ` : ''}
                     ` : ''}
@@ -2733,7 +2760,9 @@ class App {
         if (!previewContainer) return;
 
         const reader = new FileReader();
+        const accountId = storage.currentUserId;
         reader.onload = (e) => {
+            if (storage.currentUserId !== accountId || event.target.files?.[0] !== file) return;
             try {
                 const parsed = JSON.parse(e.target.result);
                 const validation = storage.validateBackupData(parsed);
@@ -2900,7 +2929,8 @@ class App {
 
     // Converts a hex color into inline gradient styles for wallet cards
     getWalletStyle(hexColor) {
-        const hex = (hexColor || '#3351d6').replace('#', '');
+        const color = this.safeWalletColor(hexColor).slice(1);
+        const hex = color.length === 3 ? Array.from(color, digit => digit + digit).join('') : color;
         const r = parseInt(hex.slice(0, 2), 16);
         const g = parseInt(hex.slice(2, 4), 16);
         const b = parseInt(hex.slice(4, 6), 16);
@@ -3349,7 +3379,7 @@ class App {
         const mKey = this.activeMonthKey;
         if (mKey) {
             const [y, m] = mKey.split('-');
-            headerStr = `${monthNames[parseInt(m) - 1]} ${y}`;
+            headerStr = `${monthNames[parseInt(m) - 1]} ${this.escapeHtml(y)}`;
             if (this.isViewingPast()) {
                 headerStr = `<span style="color:var(--orange)">${headerStr} (Past)</span>`;
             }
@@ -3439,7 +3469,7 @@ class App {
             </div>
         ` : '';
 
-        const titleText = options.title || 'Monthly Budget';
+        const titleText = this.escapeHtml(options.title || 'Monthly Budget');
         const cardClass = options.cardClass ? ` ${options.cardClass}` : '';
         const interactiveAttr = options.isInteractive ? `onclick="app.openOverallBudgetModal('${region}')" style="cursor: pointer;" title="Configure Overall Monthly Limit"` : '';
         const interactiveCls = options.isInteractive ? ' interactive' : '';
@@ -3453,7 +3483,7 @@ class App {
                             <div class="budget-central-title-group">
                                 ${this.getCountryFlagSvg(region, 20, 15)}
                                 <h3 class="budget-central-title">${titleText}</h3>
-                                <span class="text-xs text-muted font-numeric budget-central-month">(${monthKey})</span>
+                                <span class="text-xs text-muted font-numeric budget-central-month">(${this.escapeHtml(monthKey)})</span>
                             </div>
                             ${editButtonHtml}
                         </div>
@@ -3480,7 +3510,7 @@ class App {
                             <div class="budget-central-title-group">
                                 ${this.getCountryFlagSvg(region, 20, 15)}
                                 <h3 class="budget-central-title">${titleText}</h3>
-                                <span class="text-xs text-muted font-numeric budget-central-month">(${monthKey})</span>
+                                <span class="text-xs text-muted font-numeric budget-central-month">(${this.escapeHtml(monthKey)})</span>
                             </div>
                             <button type="button" class="btn btn-secondary btn-xs" onclick="event.stopPropagation(); app.openOverallBudgetModal('${region}')" style="gap: 5px; font-size: 0.75rem;" title="Configure Monthly Budget">
                                 <i data-lucide="sliders" style="width: 12px; height: 12px;"></i>
@@ -3505,7 +3535,7 @@ class App {
                         <div class="budget-central-title-group">
                             ${this.getCountryFlagSvg(region, 20, 15)}
                             <h3 class="budget-central-title">${titleText}</h3>
-                            <span class="text-xs text-muted font-numeric budget-central-month">(${monthKey})</span>
+                            <span class="text-xs text-muted font-numeric budget-central-month">(${this.escapeHtml(monthKey)})</span>
                         </div>
                         ${editButtonHtml}
                     </div>
@@ -3671,9 +3701,9 @@ class App {
             }
 
             html += `
-                <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 14px; cursor: pointer;" onclick="app.openCategoryManageModal('${c.id}', '${region}')" title="Click to manage ${c.name}">
+                <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 14px; cursor: pointer;" data-category-id="${this.escapeHtml(c.id)}" data-region="${this.escapeHtml(region)}" onclick="app.openCategoryManageModal(this.dataset.categoryId, this.dataset.region)" title="Click to manage ${this.escapeHtml(c.name)}">
                     <div class="neon-header" style="margin-bottom: 8px;">
-                        <span class="neon-title"><i data-lucide="${c.icon || 'tag'}"></i> ${c.name}</span>
+                        <span class="neon-title"><i data-lucide="${this.categoryIcon(c.icon)}"></i> ${this.escapeHtml(c.name)}</span>
                     </div>
                     ${progressHtml}
                 </div>
@@ -3791,18 +3821,18 @@ class App {
                 : this.formatMoney(tx.amount, tx.currency, { prefix: sign });
 
             html += `
-                <div class="dash-recent-row" onclick="app.editTransaction('${tx.id}')" role="button" tabindex="0" title="Click to view/edit">
+                <div class="dash-recent-row" data-transaction-id="${this.escapeHtml(tx.id)}" onclick="app.editTransaction(this.dataset.transactionId)" role="button" tabindex="0" title="Click to view/edit">
                     <div class="dash-recent-left">
                         <div class="dash-recent-icon-wrap ${typeCls}">
                             <i data-lucide="${icon}"></i>
                         </div>
                         <div class="dash-recent-info">
-                            <span class="dash-recent-title">${title}</span>
-                            <span class="dash-recent-meta">${meta}</span>
+                            <span class="dash-recent-title">${this.escapeHtml(title)}</span>
+                            <span class="dash-recent-meta">${this.escapeHtml(meta)}</span>
                         </div>
                     </div>
                     <div class="dash-recent-right">
-                        <span class="dash-recent-amount ${amountCls} privacy-blur financial-amount">${amt}</span>
+                        <span class="dash-recent-amount ${amountCls} privacy-blur financial-amount">${this.escapeHtml(amt)}</span>
                     </div>
                 </div>
             `;
@@ -4059,7 +4089,7 @@ class App {
                         </div>
                         <div class="wallet-card-top-right">
                             ${secondaryBadge}
-                            <button class="wallet-menu-btn" data-edit-wallet-id="${escId}" onclick="event.stopPropagation(); app.openEditWalletModal('${escId}')" title="Edit wallet settings" aria-label="Edit wallet settings">
+                            <button class="wallet-menu-btn" data-edit-wallet-id="${escId}" onclick="event.stopPropagation(); app.openEditWalletModal(this.dataset.editWalletId)" title="Edit wallet settings" aria-label="Edit wallet settings">
                                 <i data-lucide="more-vertical" style="width: 15px; height: 15px;"></i>
                             </button>
                         </div>
@@ -4501,7 +4531,7 @@ class App {
                 <div class="focus-tx-empty-state">
                     <i data-lucide="receipt"></i>
                     <div class="focus-empty-title">No transactions found</div>
-                    <div class="focus-empty-subtitle">New expenses, income or transfers logged to ${w.id} will appear here.</div>
+                    <div class="focus-empty-subtitle">New expenses, income or transfers logged to ${escId} will appear here.</div>
                 </div>
             `;
         } else {
@@ -4535,14 +4565,14 @@ class App {
                 const metaParts = [formattedDate, catName, (tx.note && tx.note !== label ? tx.note : '')].filter(Boolean);
                 const metaLine = metaParts.join(' • ');
                 txHtml += `
-                    <div class="tx-row focus-activity-row" onclick="app.editTransaction('${tx.id}')">
+                    <div class="tx-row focus-activity-row" data-transaction-id="${this.escapeHtml(tx.id)}" onclick="app.editTransaction(this.dataset.transactionId)">
                         <div class="focus-tx-left">
                             <div class="focus-tx-icon-wrap">
                                 <i data-lucide="${icon}"></i>
                             </div>
                             <div class="focus-tx-details">
-                                <div class="focus-tx-label" title="${label}">${label}</div>
-                                <div class="focus-tx-meta" title="${metaLine}">${metaLine}</div>
+                                <div class="focus-tx-label" title="${this.escapeHtml(label)}">${this.escapeHtml(label)}</div>
+                                <div class="focus-tx-meta" title="${this.escapeHtml(metaLine)}">${this.escapeHtml(metaLine)}</div>
                             </div>
                         </div>
                         <div class="financial-amount privacy-blur focus-tx-amount ${colorCls === 'text-emerald' ? 'text-emerald' : colorCls === 'text-rose' ? 'text-rose' : 'text-secondary'}">
@@ -4952,7 +4982,7 @@ class App {
         }
     }
 
-    getTransactionHtml(tx, editable = false, showDateInMeta = true) {
+    getTransactionHtml(tx, editable = false, showDateInMeta = true, ignorePrivacy = false) {
         const effectiveType = tx.type || (tx.isIncome ? 'income' : (tx.sourceId && tx.destId ? 'transfer' : 'expense'));
         let icon = 'arrow-up-right';
         let colorCls = 'debit';
@@ -4964,22 +4994,22 @@ class App {
             icon = 'arrow-down-left';
             colorCls = 'credit';
             title = tx.note || catName;
-            amt = this.formatMoney(tx.amount, tx.currency, { prefix: '+' });
+            amt = this.formatMoney(tx.amount, tx.currency, { prefix: '+', ignorePrivacy });
         } else if (effectiveType === 'transfer') {
             icon = 'repeat';
             colorCls = 'text-muted';
             title = `Transfer: ${this.getWalletName(tx.sourceId)} \u2192 ${this.getWalletName(tx.destId)}`;
-            amt = this.formatMoney(tx.amount, tx.currency);
+            amt = this.formatMoney(tx.amount, tx.currency, { ignorePrivacy });
         } else if (effectiveType === 'remittance') {
             icon = 'globe';
             colorCls = 'text-muted';
             title = tx.note || 'Remittance';
-            amt = this.formatRemittanceAmount(tx);
+            amt = this.formatRemittanceAmount(tx, { ignorePrivacy });
         } else {
             // expense
             title = tx.note || catName;
             const currency = tx.currency || (tx.region === 'JP' ? '¥' : (tx.region === 'DE' ? '€' : '₹'));
-            amt = this.formatMoney(tx.amount, currency, { prefix: '-' });
+            amt = this.formatMoney(tx.amount, currency, { prefix: '-', ignorePrivacy });
         }
 
         const date = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
@@ -4992,19 +5022,19 @@ class App {
         if (tx.note && tx.note !== title) metaParts.push(tx.note);
         const metaString = metaParts.join(' \u2022 ');
 
-        const clickAttr = editable ? `onclick="app.editTransaction('${tx.id}')" style="cursor:pointer;"` : '';
+        const clickAttr = editable ? `data-transaction-id="${this.escapeHtml(tx.id)}" onclick="app.editTransaction(this.dataset.transactionId)" style="cursor:pointer;"` : '';
 
         return `
             <div class="tx-item" ${clickAttr}>
                 <div class="tx-left">
                     <div class="tx-icon"><i data-lucide="${icon}"></i></div>
                     <div class="tx-details">
-                        <span class="tx-title">${title}</span>
-                        <span class="tx-meta">${metaString}</span>
+                        <span class="tx-title">${this.escapeHtml(title)}</span>
+                        <span class="tx-meta">${this.escapeHtml(metaString)}</span>
                     </div>
                 </div>
                 <div class="tx-right">
-                    <span class="tx-amount ${colorCls}">${amt}</span>
+                    <span class="tx-amount ${colorCls}">${this.escapeHtml(amt)}</span>
                 </div>
             </div>
         `;
@@ -5091,7 +5121,7 @@ class App {
                     catCardsHtml += `
                         <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 12px;">
                             <div class="neon-header" style="margin-bottom: 8px;">
-                                <span class="neon-title"><i data-lucide="${catDef.icon || 'tag'}"></i> ${catDef.name}</span>
+                                <span class="neon-title"><i data-lucide="${this.categoryIcon(catDef.icon)}"></i> ${this.escapeHtml(catDef.name)}</span>
                             </div>
                             ${catProgressHtml}
                         </div>
@@ -5190,12 +5220,12 @@ class App {
                 <div class="card" style="margin-bottom: 16px;">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                         <div style="cursor:pointer; flex: 1;" onclick="app.toggleHistoryCard(${index})">
-                            <h3 style="margin:0;">${h.label || h.monthKey}</h3>
+                            <h3 style="margin:0;">${this.escapeHtml(h.label || h.monthKey)}</h3>
                             <p class="text-muted text-sm mt-1 mb-0">${h.transactions.length} transactions recorded</p>
                             ${balanceHtml}
                         </div>
                         <div style="display:flex; align-items:center; gap:12px; margin-top:2px;">
-                            <button class="icon-btn" onclick="app.deleteLedger('${h.monthKey}')" style="color:var(--red)"><i data-lucide="trash-2"></i></button>
+                            <button class="icon-btn" data-month-key="${this.escapeHtml(h.monthKey)}" onclick="app.deleteLedger(this.dataset.monthKey)" style="color:var(--red)"><i data-lucide="trash-2"></i></button>
                             <i data-lucide="chevron-down" style="color:var(--text-muted); cursor:pointer;" onclick="app.toggleHistoryCard(${index})"></i>
                         </div>
                     </div>
@@ -5442,12 +5472,12 @@ class App {
             const matchingWallets = allWallets.filter(w => w.region === loanCountry || w.currency === loanCurrency);
 
             if (matchingWallets.length === 0) {
-                walletSelect.innerHTML = `<option value="" disabled selected>No wallets available in ${loanCountry}</option>`;
+                walletSelect.innerHTML = `<option value="" disabled selected>No wallets available in ${this.escapeHtml(loanCountry)}</option>`;
             } else {
                 walletSelect.innerHTML = matchingWallets.map(w => {
                     const isSelected = (cfg.repaymentWallet && cfg.repaymentWallet === w.id) ? 'selected' : '';
                     const balFormatted = (w.currency || '') + (w.balance !== undefined ? Number(w.balance).toLocaleString() : '0');
-                    return `<option value="${this.escapeHtml(w.id)}" ${isSelected}>${this.escapeHtml(w.id)} (${balFormatted})</option>`;
+                    return `<option value="${this.escapeHtml(w.id)}" ${isSelected}>${this.escapeHtml(w.id)} (${this.escapeHtml(balFormatted)})</option>`;
                 }).join('');
             }
         }
@@ -5645,8 +5675,8 @@ class App {
 
         months.forEach(m => {
             const label = m === storage.state.currentMonthKey ? `${m} (Current)` : m;
-            fromSelect.innerHTML += `<option value="${m}">${label}</option>`;
-            toSelect.innerHTML += `<option value="${m}">${label}</option>`;
+            fromSelect.innerHTML += `<option value="${this.escapeHtml(m)}">${this.escapeHtml(label)}</option>`;
+            toSelect.innerHTML += `<option value="${this.escapeHtml(m)}">${this.escapeHtml(label)}</option>`;
         });
 
         // Select the earliest month for "From" and latest for "To"
@@ -5659,16 +5689,16 @@ class App {
     }
 
     generatePdf() {
-        // PDF exports always contain actual financial values regardless of privacy state
-        const savedPrivacy = this.isPrivacyHidden;
-        this.isPrivacyHidden = false;
+        this.cancelCurrentReportPrint();
+        const printContainer = document.getElementById('print-container');
+        if (!printContainer) return;
+        const money = (amount, currency, options) => this.formatMoney(amount, currency, { ...options, ignorePrivacy: true });
 
         const fromMonth = document.getElementById('pdf-from-month').value;
         const toMonth = document.getElementById('pdf-to-month').value;
 
         if (fromMonth.localeCompare(toMonth) > 0) {
             alert('Invalid range. "From Month" must be before or equal to "To Month".');
-            this.isPrivacyHidden = savedPrivacy;
             return;
         }
 
@@ -5695,7 +5725,6 @@ class App {
 
         if (ledgersToPrint.length === 0) {
             alert("No transactions found in this range. Nothing to generate.");
-            this.isPrivacyHidden = savedPrivacy;
             return;
         }
 
@@ -5729,8 +5758,8 @@ class App {
             if (h.walletsSnapshot) {
                 balanceHtml = `
                     <div style="display:flex; gap:16px; margin-top:8px; font-size:0.8rem;">
-                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">JP:</span> ${this.formatMoney(jpBalance, '¥')}</span>
-                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">IN:</span> ${this.formatMoney(inBalance, '₹', { locale: 'en-IN' })}</span>
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">JP:</span> ${money(jpBalance, '¥')}</span>
+                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">IN:</span> ${money(inBalance, '₹', { locale: 'en-IN' })}</span>
                     </div>
                 `;
             }
@@ -5763,18 +5792,18 @@ class App {
                                 <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                             </div>
                             <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
-                                <span>${this.formatMoney(spent, currency)}</span>
-                                <span>${this.formatMoney(activeBudget, currency)}</span>
+                                <span>${money(spent, currency)}</span>
+                                <span>${money(activeBudget, currency)}</span>
                             </div>
                         `;
                     } else {
-                        catProgressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${this.formatMoney(spent, currency)}</div>`;
+                        catProgressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${money(spent, currency)}</div>`;
                     }
 
                     catCardsHtml += `
                         <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 12px;">
                             <div class="neon-header" style="margin-bottom: 8px;">
-                                <span class="neon-title"><i data-lucide="${catDef.icon || 'tag'}"></i> ${catDef.name}</span>
+                                <span class="neon-title"><i data-lucide="${this.categoryIcon(catDef.icon)}"></i> ${this.escapeHtml(catDef.name)}</span>
                             </div>
                             ${catProgressHtml}
                         </div>
@@ -5805,15 +5834,15 @@ class App {
                                 <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                             </div>
                             <div class="neon-amount-sub" style="margin-top: 6px; display:flex; justify-content:space-between;">
-                                <span>Spent: ${this.formatMoney(regionSpent, currency)}</span>
-                                <span>Budget: ${this.formatMoney(regionBudget, currency)}</span>
+                                <span>Spent: ${money(regionSpent, currency)}</span>
+                                <span>Budget: ${money(regionBudget, currency)}</span>
                             </div>
                         </div>
                     `;
                 } else {
                     overallHtml = `
                         <div class="neon-row" style="padding:12px; margin-bottom:16px;">
-                            <div class="neon-amount-sub">Total Spent: ${this.formatMoney(regionSpent, currency)}</div>
+                            <div class="neon-amount-sub">Total Spent: ${money(regionSpent, currency)}</div>
                         </div>
                     `;
                 }
@@ -5861,7 +5890,7 @@ class App {
                             <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; padding-left: 4px; border-left: 2px solid var(--accent);">${dateStr}</div>
                     `;
                     groupedTxs[dateStr].forEach(tx => {
-                        txsHtml += this.getTransactionHtml(tx, false, false); // editable=false
+                        txsHtml += this.getTransactionHtml(tx, false, false, true); // editable=false
                     });
                     txsHtml += `</div>`;
                 });
@@ -5872,7 +5901,7 @@ class App {
 
             html += `
                 <div class="card" style="margin-bottom: 24px; page-break-after: always; box-shadow: none; border: 1px solid rgba(255,255,255,0.1);">
-                    <h3 style="margin:0;">${h.label || h.monthKey}</h3>
+                    <h3 style="margin:0;">${this.escapeHtml(h.label || h.monthKey)}</h3>
                     <p class="text-muted text-sm mt-1 mb-0">${h.transactions.length} transactions recorded</p>
                     ${balanceHtml}
                     <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top:16px;">
@@ -5883,42 +5912,33 @@ class App {
             `;
         });
 
-        document.getElementById('print-container').innerHTML = html;
-        document.getElementById('pdf-modal').classList.remove('active');
-        lucide.createIcons({ root: document.getElementById('print-container') });
+        const job = { container: printContainer, timer: null, charts: [] };
+        this._currentReportPrint = job;
+        try {
+            printContainer.innerHTML = html;
+            this.closeModal('pdf-modal');
+            this.refreshIcons(printContainer);
 
-        // Render all the charts for the print view
-        chartDataToRender.forEach(chart => {
-            charts.renderHistoryDonut(chart.id, chart.region, chart.totals, true);
-        });
-
-        // Convert canvases to images to guarantee they print in all browsers
-        setTimeout(() => {
-            chartDataToRender.forEach(chart => {
+            for (const chart of chartDataToRender) {
                 const canvas = document.getElementById(chart.id);
-                if (canvas) {
-                    const img = document.createElement('img');
-                    img.src = canvas.toDataURL('image/png');
-                    img.style.width = '100%';
-                    img.style.height = '100%';
-                    img.style.objectFit = 'contain';
-                    img.style.display = 'block';
-                    canvas.parentNode.replaceChild(img, canvas);
+                try {
+                    charts.renderHistoryDonut(chart.id, chart.region, chart.totals, true);
+                } catch {
+                    console.warn('[Print] History chart rendering failed.');
                 }
-            });
+                const instance = canvas && window.Chart?.getChart?.(canvas);
+                if (instance) job.charts.push(instance);
+            }
+        } catch (error) {
+            this.cancelCurrentReportPrint();
+            throw error;
+        }
 
-            // Let UI update, then print
-            setTimeout(() => {
-                window.print();
-                // Restore privacy state after printing
-                this.isPrivacyHidden = savedPrivacy;
-                // Optional: clear it after
-                setTimeout(() => {
-                    const printEl = document.getElementById('print-container');
-                    if (printEl) printEl.replaceChildren();
-                }, 1000);
-            }, 500);
-        }, 500);
+        this.scheduleReportPrint(job, 500, () => {
+            for (const chart of job.charts) {
+                this.replacePrintCanvas(chart.canvas, { width: '100%', height: '100%', objectFit: 'contain' });
+            }
+        });
     }
 
     /* ==========================================================================
@@ -6078,12 +6098,12 @@ class App {
     }
 
     // Helper: Format Remittance Amount String
-    formatRemittanceAmount(tx) {
-        if (this.isPrivacyHidden) return '******';
+    formatRemittanceAmount(tx, { ignorePrivacy = false } = {}) {
+        if (this.isPrivacyHidden && !ignorePrivacy) return '******';
         if (!tx) return '0';
         const { srcCur, dstCur } = this.getRemittanceCurrencies(tx);
-        const srcFormatted = this.formatMoney(Number(tx.sourceAmount || 0), srcCur);
-        const dstFormatted = this.formatMoney(Number(tx.destAmount || 0), dstCur);
+        const srcFormatted = this.formatMoney(Number(tx.sourceAmount || 0), srcCur, { ignorePrivacy });
+        const dstFormatted = this.formatMoney(Number(tx.destAmount || 0), dstCur, { ignorePrivacy });
         return `${srcFormatted} → ${dstFormatted}`;
     }
 
@@ -7024,7 +7044,7 @@ class App {
             if (destWrap) {
                 destWrap.style.display = 'flex';
                 const { dstCur } = this.getRemittanceCurrencies(tx);
-                const dstFormatted = this.formatMoney(Number(tx.destAmount || 0), dstCur);
+                const dstFormatted = this.formatMoney(Number(tx.destAmount || 0), dstCur, { ignorePrivacy });
                 if (destVal) destVal.innerText = `${this.getWalletName(tx.destId)} (${dstFormatted})`;
             }
             if (rateWrap) {
@@ -7629,7 +7649,7 @@ class App {
                             <i data-lucide="${direction < 0 ? 'trending-down' : direction > 0 ? 'trending-up' : 'minus'}"></i>
                         </div>
                         <div class="insight-content">
-                            <span class="insight-title">${title}</span>
+                            <span class="insight-title">${this.escapeHtml(title)}</span>
                             <p class="insight-desc">Outflows are ${change} ${comparison.label}.</p>
                         </div>
                     </div>
@@ -7696,7 +7716,7 @@ class App {
             state.analyticsExclusions = [...exclusions];
             return true;
         }).catch(error => {
-            console.error('Could not save Analytics exclusions:', error);
+            console.error('Could not save Analytics exclusions:');
             return false;
         });
         const saved = await this.jpExclusionSave === true;
@@ -7844,17 +7864,17 @@ class App {
                     let sign = tx.type === 'income' ? '+' : '-';
                     let typeCls = tx.type === 'income' ? 'income' : 'expense';
                     html += `
-                        <div class="ledger-tx-row" onclick="app.openTransactionDetail('${tx.id}')">
+                        <div class="ledger-tx-row" data-transaction-id="${this.escapeHtml(tx.id)}" onclick="app.openTransactionDetail(this.dataset.transactionId)">
                             <div class="ledger-tx-left">
                                 <div class="tx-type-icon ${typeCls}"><i data-lucide="${tx.type === 'income' ? 'arrow-down-left' : 'arrow-up-right'}"></i></div>
                                 <div class="ledger-tx-details">
                                     <div class="ledger-tx-primary-line">
-                                        <span class="ledger-tx-title">${tx.note || this.getTransactionCategory(tx)}</span>
+                                        <span class="ledger-tx-title">${this.escapeHtml(tx.note || this.getTransactionCategory(tx))}</span>
                                     </div>
                                     <div class="tx-meta-pills">
-                                        <span class="tx-pill">${tx.date}</span>
-                                        <span class="tx-pill">${this.getWalletName(tx.walletId)}</span>
-                                        <span class="tx-pill">${this.getTransactionCategory(tx)}</span>
+                                        <span class="tx-pill">${this.escapeHtml(tx.date)}</span>
+                                        <span class="tx-pill">${this.escapeHtml(this.getWalletName(tx.walletId))}</span>
+                                        <span class="tx-pill">${this.escapeHtml(this.getTransactionCategory(tx))}</span>
                                     </div>
                                 </div>
                             </div>
@@ -8160,14 +8180,14 @@ class App {
                         ${this.getCountryFlagSvg(region, 18, 13)}
                         <span>EXPENSE MANAGER</span>
                     </div>
-                    <h1 class="print-report-title">${monthKey} Financial Statement</h1>
+                    <h1 class="print-report-title">${this.escapeHtml(monthKey)} Financial Statement</h1>
                     <p class="print-report-subtitle">${countryName} Portfolio (${currencyCode} ${currency}) • Monthly Financial Snapshot & Continuous Audit</p>
                 </div>
                 <div class="print-header-right">
                     <span class="print-status-badge ${isClosed ? 'closed' : 'active'}">
                         ${isClosed ? '● Closed & Reconciled' : '● Active Ledger Snapshot'}
                     </span>
-                    <span class="print-meta-line">Generated: ${snapshotMeta.generatedAt || new Date().toLocaleString()} (Rev ${snapshotMeta.revisionsCount || 1})</span>
+                    <span class="print-meta-line">Generated: ${this.escapeHtml(snapshotMeta.generatedAt || new Date().toLocaleString())} (Rev ${this.escapeHtml(snapshotMeta.revisionsCount || 1)})</span>
                     <span class="print-meta-line">${reportTxs.length} Transactions Captured</span>
                 </div>
             </div>
@@ -8370,7 +8390,7 @@ class App {
 
         const footerHtml = `
             <div class="print-footer">
-                <span>Expense Manager • Financial Statement Snapshot (${monthKey} • ${region})</span>
+                <span>Expense Manager • Financial Statement Snapshot (${this.escapeHtml(monthKey)} • ${region})</span>
                 <span>Continuous Ledger Integrity Verified • Generated ${new Date().toLocaleDateString()}</span>
             </div>
         `;
@@ -8428,30 +8448,39 @@ class App {
                 } catch (e) {
                     job.chart = Chart.getChart?.(canvasEl);
                     canvasEl = null;
-                    console.warn('[Print] Chart rendering failed:', e);
+                    console.warn('[Print] Chart rendering failed:');
                 }
             }
         }
 
+        this.scheduleReportPrint(job, job.chart ? 400 : 300, () => {
+            if (canvasEl && job.chart) {
+                this.replacePrintCanvas(canvasEl, {
+                    width: '190px', height: '190px', display: 'block', margin: '0 auto'
+                });
+            }
+        });
+    }
+
+    replacePrintCanvas(canvas, style) {
+        try {
+            const image = document.createElement('img');
+            image.src = canvas.toDataURL('image/png');
+            Object.assign(image.style, style);
+            canvas.replaceWith(image);
+        } catch {
+            console.warn('[Print] Canvas image unavailable.');
+        }
+    }
+
+    scheduleReportPrint(job, delay, prepare = () => {}) {
         job.timer = setTimeout(() => {
             if (this._currentReportPrint !== job) return;
-            if (canvasEl && job.chart) {
-                try {
-                    const img = document.createElement('img');
-                    img.src = canvasEl.toDataURL('image/png');
-                    img.style.width = '190px';
-                    img.style.height = '190px';
-                    img.style.display = 'block';
-                    img.style.margin = '0 auto';
-                    canvasEl.replaceWith(img);
-                } catch (error) {
-                    console.warn('[Print] Canvas toDataURL fallback:', error);
-                }
-            }
+            prepare();
             try {
                 window.print();
             } catch (error) {
-                console.warn('[Print] Browser print failed:', error);
+                console.warn('[Print] Browser print failed:');
                 if (this._currentReportPrint === job) this.cancelCurrentReportPrint();
                 return;
             }
@@ -8460,7 +8489,7 @@ class App {
                     if (this._currentReportPrint === job) this.cancelCurrentReportPrint();
                 }, 1000);
             }
-        }, job.chart ? 400 : 300);
+        }, delay);
     }
 
     cancelCurrentReportPrint() {
@@ -8468,13 +8497,14 @@ class App {
         if (!job) return;
         this._currentReportPrint = null;
         clearTimeout(job.timer);
-        try {
-            job.chart?.destroy();
-        } catch (error) {
-            console.warn('[Print] Chart cleanup failed:', error);
-        } finally {
-            job.container.replaceChildren();
+        for (const chart of job.charts || (job.chart ? [job.chart] : [])) {
+            try {
+                chart.destroy();
+            } catch {
+                console.warn('[Print] Chart cleanup failed.');
+            }
         }
+        job.container.replaceChildren();
     }
 
     exportReportCsv() {
@@ -8558,7 +8588,7 @@ class App {
         if (monthSelect) {
             monthSelect.innerHTML = sortedMonths.map(m => {
                 const isClosed = storage.state.closedMonths && storage.state.closedMonths[m];
-                return `<option value="${m}" ${m === this.reportMonthKey ? 'selected' : ''}>${m}${isClosed ? ' [Closed]' : ''}</option>`;
+                return `<option value="${this.escapeHtml(m)}" ${m === this.reportMonthKey ? 'selected' : ''}>${this.escapeHtml(m)}${isClosed ? ' [Closed]' : ''}</option>`;
             }).join('');
         }
 
@@ -8653,14 +8683,14 @@ class App {
                         <div class="report-snapshot-title-row">
                             <div class="report-snapshot-title-group">
                                 ${this.getCountryFlagSvg(this.reportRegion, 20, 15)}
-                                <h2 class="reports-snapshot-title">${this.reportMonthKey} Financial Snapshot</h2>
+                                <h2 class="reports-snapshot-title">${this.escapeHtml(this.reportMonthKey)} Financial Snapshot</h2>
                             </div>
                             <div class="report-snapshot-badge-wrap">
                                 ${statusBadge}
                             </div>
                         </div>
                         <div class="report-meta-text">
-                            <span class="report-meta-item">Updated: <strong>${snapshotMeta.refreshedAt || snapshotMeta.generatedAt}</strong>${snapshotMeta.revisionsCount && snapshotMeta.revisionsCount > 1 ? ` <span class="report-rev-tag">Rev ${snapshotMeta.revisionsCount}</span>` : ''}</span>
+                            <span class="report-meta-item">Updated: <strong>${this.escapeHtml(snapshotMeta.refreshedAt || snapshotMeta.generatedAt)}</strong>${snapshotMeta.revisionsCount && snapshotMeta.revisionsCount > 1 ? ` <span class="report-rev-tag">Rev ${this.escapeHtml(snapshotMeta.revisionsCount)}</span>` : ''}</span>
                             <span class="report-meta-dot">•</span>
                             <span class="report-meta-item">Transactions: <strong>${reportTxs.length}</strong></span>
                         </div>
@@ -8670,7 +8700,7 @@ class App {
                             <span style="color: var(--text-muted); font-weight: 600;">Revision History (${snapshotMeta.revisions.length} retained):</span>
                             <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 3px; color: var(--text-secondary);">
                                 ${snapshotMeta.revisions.slice(0, 3).map(r => `
-                                    <div>• Rev ${r.rev} (${r.timestamp}): ${r.txCount} txs, Spent ${this.formatMoney(r.totalExpense, currency)}</div>
+                                    <div>• Rev ${this.escapeHtml(r.rev)} (${this.escapeHtml(r.timestamp)}): ${this.escapeHtml(r.txCount)} txs, Spent ${this.formatMoney(r.totalExpense, currency)}</div>
                                 `).join('')}
                             </div>
                         </div>
@@ -8736,7 +8766,7 @@ class App {
                 ${historicalBudgetNote ? `
                     <div style="padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-sm); font-size: 0.78rem; color: #93c5fd; display: flex; align-items: center; gap: 8px;">
                         <i data-lucide="info" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
-                        <span>${historicalBudgetNote}</span>
+                        <span>${this.escapeHtml(historicalBudgetNote)}</span>
                     </div>
                 ` : ''}
             `;
@@ -8797,9 +8827,9 @@ class App {
                         <td>
                             <div class="category-cell">
                                 <div class="category-icon-box">
-                                    <i data-lucide="${cat.icon || 'tag'}" style="width: 14px; height: 14px;"></i>
+                                    <i data-lucide="${this.categoryIcon(cat.icon)}" style="width: 14px; height: 14px;"></i>
                                 </div>
-                                <span>${cat.name}</span>
+                                <span>${this.escapeHtml(cat.name)}</span>
                             </div>
                         </td>
                         <td class="privacy-blur">${cat.budgetLimit > 0 ? this.formatMoney(cat.budgetLimit, currency) : '<span class="text-muted">—</span>'}</td>
@@ -8902,12 +8932,12 @@ class App {
                                     <i data-lucide="shield-check" style="width: 18px; height: 18px;"></i>
                                 </div>
                                 <div class="history-snapshot-info">
-                                    <h4 style="margin: 0; font-size: 0.95rem;">${h.label || h.monthKey}</h4>
+                                    <h4 style="margin: 0; font-size: 0.95rem;">${this.escapeHtml(h.label || h.monthKey)}</h4>
                                     <span class="text-xs text-muted">Closed on ${closedDateFormatted} • ${closedTxsCount} transactions captured • Overall limit: ${this.formatMoney(h.jpTotalBudget || 0, '¥')}</span>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-secondary btn-sm" onclick="app.reportMonthKey='${h.monthKey}'; app.renderReportsPage();" title="Inspect snapshot">
+                                <button class="btn btn-secondary btn-sm" data-month-key="${this.escapeHtml(h.monthKey)}" onclick="app.reportMonthKey=this.dataset.monthKey; app.renderReportsPage();" title="Inspect snapshot">
                                     <i data-lucide="eye"></i>
                                     <span>View Snapshot</span>
                                 </button>
@@ -8941,7 +8971,7 @@ class App {
             : wallets.filter(w => w.region === selectedRegion);
 
         walletSelect.innerHTML = '<option value="ALL">All Wallets</option>' +
-            filteredWallets.map(w => `<option value="${w.id}" ${w.id === currentWallet ? 'selected' : ''}>${w.id} (${w.currency || (w.region === 'JP' ? '¥' : (w.region === 'DE' ? '€' : '₹'))})</option>`).join('');
+            filteredWallets.map(w => `<option value="${this.escapeHtml(w.id)}" ${w.id === currentWallet ? 'selected' : ''}>${this.escapeHtml(w.id)} (${this.escapeHtml(w.currency || (w.region === 'JP' ? '¥' : w.region === 'DE' ? '€' : '₹'))})</option>`).join('');
 
         // Categories
         let cats = [];
@@ -8961,7 +8991,7 @@ class App {
         }
 
         catSelect.innerHTML = '<option value="ALL">All Categories</option>' +
-            cats.map(c => `<option value="${c.id}" ${c.id === currentCat ? 'selected' : ''}>${c.name}</option>`).join('');
+            cats.map(c => `<option value="${this.escapeHtml(c.id)}" ${c.id === currentCat ? 'selected' : ''}>${this.escapeHtml(c.name)}</option>`).join('');
     }
 
     onCustomReportRegionChange() {
@@ -9208,8 +9238,8 @@ class App {
                 return `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.82rem;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                        <i data-lucide="${c.icon}" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                                        <span>${c.name}</span>
+                                        <i data-lucide="${this.categoryIcon(c.icon)}" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                                        <span>${this.escapeHtml(c.name)}</span>
                                         <span class="text-xs text-muted">(${c.count} txs)</span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -9229,7 +9259,7 @@ class App {
             <div style="padding: 18px 20px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 14px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
                     <div>
-                        <h4 style="margin: 0; font-size: 1.02rem; font-weight: 600;">Statement: ${start} to ${end}</h4>
+                        <h4 style="margin: 0; font-size: 1.02rem; font-weight: 600;">Statement: ${this.escapeHtml(start)} to ${this.escapeHtml(end)}</h4>
                         <span class="text-xs text-muted">Filtered: Region ${selRegion} • Wallet ${selWallet} • Category ${selCategory}</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -9264,8 +9294,7 @@ class App {
         const printContainer = document.getElementById('print-container');
         if (!printContainer) return;
 
-        const savedPrivacy = this.isPrivacyHidden;
-        this.isPrivacyHidden = false;
+        this.cancelCurrentReportPrint();
         const fmt = (val, cur) => this.formatMoney(val, cur, { ignorePrivacy: true });
 
         let sectionsHtml = '';
@@ -9308,10 +9337,10 @@ class App {
                         <tbody>
                             ${txs.map(t => `
                                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                                    <td style="padding: 6px 8px;">${t.date}</td>
-                                    <td style="padding: 6px 8px;">${t.walletId || '-'}</td>
-                                    <td style="padding: 6px 8px;">${this.getTransactionCategory(t)}</td>
-                                    <td style="padding: 6px 8px; color: #aaa;">${t.note || '-'}</td>
+                                    <td style="padding: 6px 8px;">${this.escapeHtml(t.date)}</td>
+                                    <td style="padding: 6px 8px;">${this.escapeHtml(t.walletId || '-')}</td>
+                                    <td style="padding: 6px 8px;">${this.escapeHtml(this.getTransactionCategory(t))}</td>
+                                    <td style="padding: 6px 8px; color: #aaa;">${this.escapeHtml(t.note || '-')}</td>
                                     <td style="padding: 6px 8px; text-align: right; font-weight: 600; color: ${t.type === 'income' ? '#34d399' : '#ffffff'};">
                                         ${t.type === 'income' ? '+' : '-'}${fmt(t.amount, cur)}
                                     </td>
@@ -9341,26 +9370,24 @@ class App {
         }
 
         const now = new Date().toLocaleString();
-        printContainer.innerHTML = `
+        const job = { container: printContainer, timer: null };
+        this._currentReportPrint = job;
+        try {
+            printContainer.innerHTML = `
             <div class="print-header">
                 <h1>Expense Manager Statement</h1>
-                <p>Statement Period: <strong>${data.startDate}</strong> to <strong>${data.endDate}</strong> • Scope: ${data.region} (${data.wallet} / ${data.category})</p>
+                <p>Statement Period: <strong>${this.escapeHtml(data.startDate)}</strong> to <strong>${this.escapeHtml(data.endDate)}</strong> • Scope: ${this.escapeHtml(data.region)} (${this.escapeHtml(data.wallet)} / ${this.escapeHtml(data.category)})</p>
                 <p style="font-size: 0.78rem; color: #888; margin-top: 4px;">Generated on ${now} • Continuous Ledger Audit Snapshot</p>
             </div>
             ${sectionsHtml}
         `;
 
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            lucide.createIcons({ root: printContainer });
+            this.refreshIcons(printContainer);
+        } catch (error) {
+            this.cancelCurrentReportPrint();
+            throw error;
         }
-
-        setTimeout(() => {
-            window.print();
-            this.isPrivacyHidden = savedPrivacy;
-            setTimeout(() => {
-                printContainer.replaceChildren();
-            }, 1000);
-        }, 300);
+        this.scheduleReportPrint(job, 300);
     }
 
     // =========================================================================
@@ -9568,7 +9595,7 @@ class App {
                                 ${this.getProvenanceBadge(c.provenance)}
                             </div>
                             ${option === 'review' ? `
-                                <input type="number" class="recovery-input-budget" value="${c.baseBudget}"
+                                <input type="number" class="recovery-input-budget" value="${this.escapeHtml(c.baseBudget)}"
                                     onchange="app.onRecoveryAdjustmentChange('${m.monthKey}', '${code}', 'baseBudget', this.value)">
                             ` : `
                                 <span style="font-weight:500;color:#f8fafc;">${sym} ${c.baseBudget.toLocaleString()}</span>
@@ -9748,6 +9775,11 @@ class App {
 
         const curMonth = this.closingWizardState.monthKey;
         const nextMonth = this.closingWizardState.nextMonthKey;
+        const monthKeyPattern = /^\d{4}-(?:0[1-9]|1[0-2])$/;
+        if (!monthKeyPattern.test(curMonth) || !monthKeyPattern.test(nextMonth)) {
+            contentEl.textContent = 'The closing period is invalid.';
+            return;
+        }
         const allTxs = storage.state.transactions || [];
         const monthTxs = allTxs.filter(t => this.isTransactionInMonth(t, curMonth));
 
@@ -9764,7 +9796,7 @@ class App {
             contentEl.innerHTML = `
                 <div style="display: flex; flex-direction: column; gap: 14px;">
                     <div style="padding: 14px 18px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-md);">
-                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #93c5fd;">Step 1: Review Closing Period Summary (${curMonth})</h4>
+                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #93c5fd;">Step 1: Review Closing Period Summary (${this.escapeHtml(curMonth)})</h4>
                         <p class="text-xs text-muted" style="margin: 0;">Review financial performance before proceeding with the closing reconciliation.</p>
                     </div>
 
@@ -9784,7 +9816,7 @@ class App {
                     </div>
 
                     <div style="padding: 12px; background: rgba(0, 0, 0, 0.2); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-secondary);">
-                        Total <strong>${monthTxs.length}</strong> transactions recorded in month <code>${curMonth}</code> will be sealed into the audit snapshot.
+                        Total <strong>${monthTxs.length}</strong> transactions recorded in month <code>${this.escapeHtml(curMonth)}</code> will be sealed into the audit snapshot.
                     </div>
                 </div>
             `;
@@ -9795,7 +9827,7 @@ class App {
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05);">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         ${this.getCountryFlagSvg(w.region, 18, 13.5)}
-                        <strong style="font-size: 0.88rem;">${w.id}</strong>
+                        <strong style="font-size: 0.88rem;">${this.escapeHtml(w.id)}</strong>
                     </div>
                     <div class="font-bold privacy-blur" style="font-size: 0.95rem;">${this.formatMoney(w.balance, w.currency || (w.region === 'JP' ? '¥' : (w.region === 'DE' ? '€' : '₹')))}</div>
                 </div>
@@ -9821,7 +9853,7 @@ class App {
             contentEl.innerHTML = `
                 <div style="display: flex; flex-direction: column; gap: 14px;">
                     <div style="padding: 14px 18px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: var(--radius-md);">
-                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #fbbf24;">Step 3: Configure Budgets for Next Month (${nextMonth})</h4>
+                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #fbbf24;">Step 3: Configure Budgets for Next Month (${this.escapeHtml(nextMonth)})</h4>
                         <p class="text-xs text-muted" style="margin: 0;"><strong>Rule 6.2 Carry-Forward Guarantee:</strong> Carry forward the allocated budget limit, NOT the unspent budget cushion. Unspent money is never treated as an automatic budget limit increase.</p>
                     </div>
 
@@ -9842,7 +9874,7 @@ class App {
                                 ${opt === 'manual' ? `
                                     <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
                                         <label class="text-xs text-muted">Overall Japan Limit (¥):</label>
-                                        <input type="number" id="closing-manual-jp-input" value="${this.closingWizardState.customJpBudget}" step="1000" min="0" style="width: 140px; padding: 6px 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;" onchange="app.closingWizardState.customJpBudget = Number(this.value)">
+                                        <input type="number" id="closing-manual-jp-input" value="${this.escapeHtml(this.closingWizardState.customJpBudget)}" step="1000" min="0" style="width: 140px; padding: 6px 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: var(--text-primary); font-size: 0.85rem;" onchange="app.closingWizardState.customJpBudget = Number(this.value)">
                                     </div>
                                 ` : ''}
                             </div>
@@ -9860,14 +9892,14 @@ class App {
             contentEl.innerHTML = `
                 <div style="display: flex; flex-direction: column; gap: 14px;">
                     <div style="padding: 14px 18px; background: rgba(62, 99, 221, 0.08); border: 1px solid rgba(62, 99, 221, 0.2); border-radius: var(--radius-md);">
-                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #a5b4fc;">Step 4: Preview Opening State for ${nextMonth}</h4>
+                        <h4 style="margin: 0 0 4px 0; font-size: 0.95rem; color: #a5b4fc;">Step 4: Preview Opening State for ${this.escapeHtml(nextMonth)}</h4>
                         <p class="text-xs text-muted" style="margin: 0;">Verify next month's opening state prior to final confirmation.</p>
                     </div>
 
                     <div class="closing-stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
                         <div style="background: rgba(255, 255, 255, 0.02); padding: 14px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.06);">
                             <span class="text-xs text-muted">Next Active Month</span>
-                            <div class="font-bold text-primary" style="font-size: 1.15rem; margin-top: 4px;">${nextMonth}</div>
+                            <div class="font-bold text-primary" style="font-size: 1.15rem; margin-top: 4px;">${this.escapeHtml(nextMonth)}</div>
                             <span class="text-xs text-muted mt-2" style="display: block;">Continuous ledger transitions forward</span>
                         </div>
                         <div style="background: rgba(255, 255, 255, 0.02); padding: 14px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.06);">
@@ -9890,15 +9922,15 @@ class App {
                         <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); color: #34d399; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
                             <i data-lucide="lock" style="width: 22px; height: 22px;"></i>
                         </div>
-                        <h3 style="margin: 0 0 6px 0; font-size: 1.15rem; font-weight: 600;">Final Confirmation: Close Month ${curMonth}</h3>
+                        <h3 style="margin: 0 0 6px 0; font-size: 1.15rem; font-weight: 600;">Final Confirmation: Close Month ${this.escapeHtml(curMonth)}</h3>
                         <p class="text-xs text-muted" style="margin: 0;">
                             Month <code>${curMonth}</code> will be sealed against further transaction edits. The application will advance to active month <code>${nextMonth}</code>.
                         </p>
                     </div>
 
                     <div style="padding: 12px 14px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; display: flex; flex-direction: column; gap: 6px;">
-                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="lock" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Transactions in ${curMonth} will be locked against future edits or accidental deletion.</span></div>
-                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Wallet balances continue seamlessly into ${nextMonth} without artificial resets.</span></div>
+                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="lock" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Transactions in ${this.escapeHtml(curMonth)} will be locked against future edits or accidental deletion.</span></div>
+                        <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Wallet balances continue seamlessly into ${this.escapeHtml(nextMonth)} without artificial resets.</span></div>
                         <div style="display: flex; align-items: center; gap: 8px;"><i data-lucide="check" style="width: 14px; height: 14px; color: var(--emerald); flex-shrink: 0;"></i><span>Continuous transaction ledger remains intact across all historical periods.</span></div>
                     </div>
                 </div>
@@ -10184,16 +10216,16 @@ class App {
                     }
 
                     return `
-                        <div class="card budget-cat-card interactive-card ${isOver ? 'is-overbudget' : ''}" id="budget-cat-card-${c.id}" onclick="app.openCategoryManageModal('${c.id}', '${region}')">
+                        <div class="card budget-cat-card interactive-card ${isOver ? 'is-overbudget' : ''}" id="budget-cat-card-${this.escapeHtml(c.id)}" data-category-id="${this.escapeHtml(c.id)}" data-region="${this.escapeHtml(region)}" onclick="app.openCategoryManageModal(this.dataset.categoryId, this.dataset.region)">
                             <!-- Card Header -->
                             <div class="budget-cat-card-header">
                                 <div class="budget-cat-identity">
                                     <div class="budget-cat-icon-box">
-                                        <i data-lucide="${c.icon || 'tag'}" style="width: 18px; height: 18px;"></i>
+                                        <i data-lucide="${this.categoryIcon(c.icon)}" style="width: 18px; height: 18px;"></i>
                                     </div>
                                     <div class="budget-cat-info">
                                         <div class="budget-cat-title-row">
-                                            <h4 class="budget-cat-name" title="${c.name}">${c.name}</h4>
+                                            <h4 class="budget-cat-name" title="${this.escapeHtml(c.name)}">${this.escapeHtml(c.name)}</h4>
                                             ${c.isActive === false ? '<span class="budget-badge-archived">Archived</span>' : ''}
                                         </div>
                                         <div class="budget-cat-meta-row">
@@ -10204,7 +10236,7 @@ class App {
                                 </div>
                                 <div class="budget-cat-header-right">
                                     ${isOver ? `<span class="budget-overspend-pill font-numeric privacy-blur financial-amount">+${this.formatMoney(Math.abs(rem), currency)} over</span>` : ''}
-                                    <button class="budget-cat-config-btn" onclick="event.stopPropagation(); app.openCategoryManageModal('${c.id}', '${region}')" title="Configure Category & Limit">
+                                    <button class="budget-cat-config-btn" onclick="event.stopPropagation(); const card = this.closest('.budget-cat-card'); app.openCategoryManageModal(card.dataset.categoryId, card.dataset.region)" title="Configure Category & Limit">
                                         <i data-lucide="sliders" style="width: 13px; height: 13px;"></i>
                                     </button>
                                 </div>
@@ -10575,7 +10607,7 @@ class App {
             const matchedIcons = allIcons.filter(name => name.includes(q));
 
             if (matchedIcons.length === 0) {
-                html = `<div style="grid-column: 1 / -1; padding: 18px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">No icons matching "${q}"</div>`;
+                html = `<div style="grid-column: 1 / -1; padding: 18px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">No icons matching "${this.escapeHtml(q)}"</div>`;
             } else {
                 html = `
                     <div class="icon-picker-grid">

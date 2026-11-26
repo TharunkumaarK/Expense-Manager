@@ -220,7 +220,7 @@ class StorageManager {
         try {
             raw = localStorage.getItem(this.getActiveStorageKey());
         } catch (storageErr) {
-            console.error('[StorageManager] Failed to reload authoritative local state (access error):', storageErr);
+            console.error('[StorageManager] Failed to reload authoritative local state (access error):');
             this._lastReloadError = {
                 ok: false,
                 code: 'STORAGE_UNAVAILABLE',
@@ -249,7 +249,7 @@ class StorageManager {
         try {
             parsed = JSON.parse(raw);
         } catch (jsonErr) {
-            console.error('[StorageManager] Authoritative local state malformed JSON:', jsonErr);
+            console.error('[StorageManager] Authoritative local state malformed JSON:');
             this._lastReloadError = {
                 ok: false,
                 code: 'INVALID_STORED_STATE',
@@ -295,7 +295,7 @@ class StorageManager {
             }
             return true;
         } catch (e) {
-            console.error('[StorageManager] _saveDataDirect failed:', e);
+            console.error('[StorageManager] _saveDataDirect failed:');
             return false;
         }
     }
@@ -597,7 +597,7 @@ class StorageManager {
                 this.syncChannel = new BroadcastChannel('expense_manager_sync');
                 this.syncChannel.onmessage = (event) => this.handleSyncMessage(event.data);
             } catch (e) {
-                console.warn('[StorageManager] BroadcastChannel unavailable, using storage event fallback:', e);
+                console.warn('[StorageManager] BroadcastChannel unavailable, using storage event fallback:');
             }
         }
         if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
@@ -717,7 +717,7 @@ class StorageManager {
             try {
                 localStorage.setItem(`${this.getActiveStorageKey()}_conflict_stash`, JSON.stringify(conflictRecord));
             } catch (e) {
-                console.error('[StorageManager] Failed to persist conflict stash:', e);
+                console.error('[StorageManager] Failed to persist conflict stash:');
             }
         }
         return conflictRecord;
@@ -833,7 +833,7 @@ class StorageManager {
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
                 } catch (e) {
-                    console.warn('[StorageManager] Could not trigger download directly:', e);
+                    console.warn('[StorageManager] Could not trigger download directly:');
                 }
             }
 
@@ -957,19 +957,19 @@ class StorageManager {
                     }
                 }
             } catch (e) {
-                console.warn('[Storage] Error verifying legacy storage ownership:', e);
+                console.warn('[Storage] Error verifying legacy storage ownership:');
             }
 
             if (isVerifiedOwner) {
-                console.log('[Storage] Verified ownership. Migrating legacy local storage to user-scoped key for:', userId);
+                console.log('[Storage] Verified ownership. Migrating legacy local storage to the account scope.');
                 try {
                     localStorage.setItem(userKey, legacyData);
                     localStorage.removeItem(BASE_STORAGE_KEY);
                 } catch (e) {
-                    console.error('[Storage] Error migrating legacy storage:', e);
+                    console.error('[Storage] Error migrating legacy storage:');
                 }
             } else {
-                console.warn('[Storage] Legacy un-scoped data detected but ownership cannot be verified for user:', userId, '- Leaving legacy data intact without assigning to this account.');
+                console.warn('[Storage] Legacy data ownership could not be verified. Its contents were preserved in the original scope.');
             }
         }
 
@@ -1022,7 +1022,7 @@ class StorageManager {
                     this._attachBudgetAccessors(preview.migratedState);
                     return preview.migratedState;
                 } else {
-                    console.error('[Storage] Local data migration validation failed. Safe-halting storage load:', preview.error);
+                    console.error('[Storage] Local data migration validation failed. Safe-halting storage load:');
                     this.migrationError = preview.error;
                     const safeHaltedState = JSON.parse(JSON.stringify(defaultState));
                     safeHaltedState._haltedMigration = true;
@@ -1031,7 +1031,7 @@ class StorageManager {
                 }
             }
         } catch (e) {
-            console.error("Failed to load local data", e);
+            console.error("Failed to load local data");
         }
         const fallbackState = JSON.parse(JSON.stringify(defaultState));
         this._attachBudgetAccessors(fallbackState);
@@ -1041,7 +1041,7 @@ class StorageManager {
     parseAndMergeData(parsed) {
         const preview = this.previewContinuousLedgerMigration(parsed);
         if (!preview.success) {
-            console.error('[Storage] parseAndMergeData validation failed:', preview.error);
+            console.error('[Storage] parseAndMergeData validation failed:');
             throw new Error(preview.error);
         }
         this._attachHistoryGetters(preview.migratedState);
@@ -1741,7 +1741,7 @@ class StorageManager {
                 console.log('[Migration] Emergency local snapshot preserved at:', backupKey);
             }
         } catch (e) {
-            console.warn('[Migration] Could not save emergency local snapshot:', e);
+            console.warn('[Migration] Could not save emergency local snapshot:');
         }
 
         // 2. Attach non-enumerable getters and budget accessors
@@ -1755,7 +1755,7 @@ class StorageManager {
         try {
             localStorage.setItem(this.getActiveStorageKey(), JSON.stringify(this.state));
         } catch (e) {
-            console.error('[Migration] Failed to write migrated state to localStorage:', e);
+            console.error('[Migration] Failed to write migrated state to localStorage:');
             return false;
         }
 
@@ -1849,7 +1849,7 @@ class StorageManager {
                         // Intentionally do NOT push placeholder default wallets to cloud yet!
                     }
                 } else {
-                    console.error('[Sync] Error fetching from Supabase:', error);
+                    console.error('[Sync] Error fetching from Supabase:');
                     // Network or server error: fail closed!
                     this.accountStatus = 'SYNC_FAILED';
                     this.cloudSyncStatus = 'FAILED';
@@ -1889,7 +1889,7 @@ class StorageManager {
                 // Authoritative remote is structurally valid — run full migration preview
                 const preview = this.previewContinuousLedgerMigration(remote);
                 if (!preview.success) {
-                    console.error('[Sync] Migration of authoritative remote state failed validation. Halting sync:', preview.error);
+                    console.error('[Sync] Migration of authoritative remote state failed validation. Halting sync:');
                     this.accountStatus = 'SYNC_FAILED';
                     this.cloudSyncStatus = 'FAILED';
                     this.syncError = preview.error;
@@ -2043,7 +2043,7 @@ class StorageManager {
                     const reason = (hasPendingLocalEdits && hasRemoteAdvanced)
                         ? `Branch divergence detected! Local rev ${localRev}, Remote rev ${remoteRev}, Last confirmed rev ${lastConfirmedRev}.`
                         : `Persisted content divergence detected at revision local ${localRev} vs remote ${remoteRev}.`;
-                    console.warn(`[Sync] ${reason}`);
+                    console.warn('[Sync] A conflict requires review.');
                     this.stashConflictState(this.state, remote);
                     this.accountStatus = 'EXISTING_USER';
                     this.cloudSyncStatus = 'CONFLICT';
@@ -2059,7 +2059,7 @@ class StorageManager {
                 }
             }
         } catch (e) {
-            console.error('[Sync] Supabase sync failed with exception:', e);
+            console.error('[Sync] Supabase sync failed with exception:');
             this.accountStatus = 'SYNC_FAILED';
             this.cloudSyncStatus = 'FAILED';
             this.syncError = e.message || String(e);
@@ -2200,7 +2200,7 @@ class StorageManager {
                         }
                         return false;
                     }
-                    console.error("[Sync] Initial cloud row insert failed:", insertErr);
+                    console.error("[Sync] Initial cloud row insert failed:");
                     this.syncError = insertErr.message || String(insertErr);
                     this.cloudSyncStatus = 'FAILED';
                     if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
@@ -2213,7 +2213,7 @@ class StorageManager {
                 let confirmedRev = outboundRevision;
                 const serverRow = Array.isArray(data) ? data[0] : data;
                 if (serverRow && serverRow.user_id && serverRow.user_id !== requestUserId) {
-                    console.error('[Sync] Account mismatch on insert: server response belongs to another user:', serverRow.user_id);
+                    console.error('[Sync] Account mismatch on insert: server response belongs to another user:');
                     this.syncError = 'Account mismatch in server response.';
                     this.cloudSyncStatus = 'FAILED';
                     if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
@@ -2294,7 +2294,7 @@ class StorageManager {
             }
 
             if (error) {
-                console.error("[Sync] Conditional CAS update failed:", error);
+                console.error("[Sync] Conditional CAS update failed:");
                 this.syncError = error.message || String(error);
                 this.cloudSyncStatus = 'FAILED';
                 if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
@@ -2361,7 +2361,7 @@ class StorageManager {
             let confirmedRev = outboundRevision;
             const serverRow = Array.isArray(data) ? data[0] : data;
             if (serverRow && serverRow.user_id && serverRow.user_id !== requestUserId) {
-                console.error('[Sync] Account mismatch: server response belongs to another user:', serverRow.user_id);
+                console.error('[Sync] Account mismatch: server response belongs to another user:');
                 this.syncError = 'Account mismatch in server response.';
                 this.cloudSyncStatus = 'FAILED';
                 if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
@@ -2422,7 +2422,7 @@ class StorageManager {
             }
             return true;
         } catch (e) {
-            console.error("[Sync] Push to Supabase failed:", e);
+            console.error("[Sync] Push to Supabase failed:");
             this.syncError = e.message || String(e);
             this.cloudSyncStatus = 'FAILED';
             if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
@@ -2493,7 +2493,7 @@ class StorageManager {
         console.log(`[Realtime] Remote state is newer (Rev ${remoteRev} vs local ${localRev}). Applying...`);
         const preview = this.previewContinuousLedgerMigration(remoteState);
         if (!preview.success) {
-            console.error('[Realtime] Incoming update failed migration preview:', preview.error);
+            console.error('[Realtime] Incoming update failed migration preview:');
             return false;
         }
         this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
@@ -2546,7 +2546,7 @@ class StorageManager {
             }
             return true;
         } catch (e) {
-            console.error("Failed to save data", e);
+            console.error("Failed to save data");
             return false;
         }
     }
@@ -2832,7 +2832,7 @@ class StorageManager {
 
             return `B:{${budgetsPart}}|W:{${walletsPart}}|C:{${closedPart}}|P:{${prefPart}}|CAT:{${categoriesPart}}|L:{${loanPart}}|M:${monthPart}|TX:{${txsPart}}`;
         } catch (e) {
-            console.warn('[Storage] Failed to canonicalize persisted state:', e);
+            console.warn('[Storage] Failed to canonicalize persisted state:');
             return '';
         }
     }
@@ -3308,7 +3308,7 @@ class StorageManager {
 
                 return { success: true, reconciledMonths: unfinalized };
             } catch (commitErr) {
-                console.error('[StorageManager] commitBudgetRecovery failed during commit. Rolling back completely...', commitErr);
+                console.error('[StorageManager] commitBudgetRecovery failed during commit. Rolling back completely...');
                 this.state = preCommitStateSnapshot;
                 this.budgetRecoveryState = preCommitRecoveryState;
                 this.unfinalizedMonths = preCommitUnfinalized;
@@ -3671,9 +3671,9 @@ class StorageManager {
      * @returns {Array<string>}
      */
     getActiveCountries() {
-        return (this.state.preferences && Array.isArray(this.state.preferences.activeCountries))
-            ? [...this.state.preferences.activeCountries]
-            : ['JP', 'IN'];
+        const saved = this.state.preferences?.activeCountries;
+        const supported = Array.isArray(saved) ? saved.filter(code => ['JP', 'IN', 'DE'].includes(code)) : [];
+        return supported.length ? supported : ['JP', 'IN'];
     }
 
     /**
@@ -3689,10 +3689,8 @@ class StorageManager {
      * @returns {string}
      */
     getPrimaryCountry() {
-        return (this.state.preferences && this.state.preferences.defaultCountry)
-            || (this.state.regionalPreferences && this.state.regionalPreferences.defaultCountry)
-            || this.getActiveCountries()[0]
-            || 'JP';
+        const saved = this.state.preferences?.defaultCountry || this.state.regionalPreferences?.defaultCountry;
+        return ['JP', 'IN', 'DE'].includes(saved) ? saved : this.getActiveCountries()[0];
     }
 
     /**
@@ -4138,4 +4136,4 @@ class StorageManager {
 }
 
 const storage = new StorageManager();
-window.storage = storage;
+if (typeof EXPENSE_DEPLOYMENT === 'undefined') window.storage = storage;

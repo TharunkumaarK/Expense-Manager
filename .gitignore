@@ -57,3 +57,8 @@ skills-lock.json
 .windsurf/
 .zcode/
 .zencoder/
+
+# Local build dependencies and generated deployment output
+/node_modules/
+/dist/
+/.dist-*/

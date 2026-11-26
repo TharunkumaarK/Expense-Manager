@@ -224,7 +224,7 @@ const supabaseClient = {
         try {
             await this.client.auth.signOut();
         } catch (e) {
-            console.error('[Auth] Sign out error:', e);
+            console.error('[Auth] Sign out error:');
         }
         this.session = null;
 
@@ -542,7 +542,7 @@ const supabaseClient = {
 
         } catch (err) {
             this._showResetError('An unexpected error occurred. Please try again.');
-            console.error('[ResetPassword] Error:', err);
+            console.error('[ResetPassword] Error:');
             btn.innerText = 'Update Password';
             btn.disabled = false;
         }

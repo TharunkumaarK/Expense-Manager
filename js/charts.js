@@ -493,14 +493,14 @@ class ChartManager {
                 const color = glassStyles.borders[i % glassStyles.borders.length];
                 const formattedAmt = typeof app !== 'undefined' ? app.formatMoney(val, currency) : `${currency}${val.toLocaleString()}`;
                 return `
-                    <div class="dash-legend-item" onclick="app.openCategoryManageModal('${c.id}', '${region}')" title="Inspect ${c.name} (${pct}%)">
+                    <div class="dash-legend-item" data-category-id="${app.escapeHtml(c.id)}" data-region="${app.escapeHtml(region)}" onclick="app.openCategoryManageModal(this.dataset.categoryId, this.dataset.region)" title="Inspect ${app.escapeHtml(c.name)} (${pct}%)">
                         <div class="dash-legend-left">
                             <span class="dash-legend-dot" style="background: ${color};"></span>
-                            <span class="dash-legend-name">${c.name}</span>
+                            <span class="dash-legend-name">${app.escapeHtml(c.name)}</span>
                         </div>
                         <div class="dash-legend-right">
                             <span class="dash-legend-pct">${pct}%</span>
-                            <span class="dash-legend-amt privacy-blur financial-amount">${formattedAmt}</span>
+                            <span class="dash-legend-amt privacy-blur financial-amount">${app.escapeHtml(formattedAmt)}</span>
                         </div>
                     </div>
                 `;
@@ -591,14 +591,14 @@ class ChartManager {
                 const color = glassStyles.borders[i % glassStyles.borders.length];
                 const formattedAmt = typeof app !== 'undefined' ? app.formatMoney(val, currency) : `${currency}${val.toLocaleString()}`;
                 return `
-                    <div class="pie-legend-item" title="${c.name}: ${pct}% of total spent">
+                    <div class="pie-legend-item" title="${app.escapeHtml(c.name)}: ${pct}% of total spent">
                         <div class="pie-legend-left">
                             <span class="legend-dot" style="background: ${color};"></span>
-                            <span class="legend-cat-name">${c.name}</span>
+                            <span class="legend-cat-name">${app.escapeHtml(c.name)}</span>
                         </div>
                         <div class="pie-legend-right">
                             <span class="legend-pct">${pct}%</span>
-                            <span class="legend-amt privacy-blur">${formattedAmt}</span>
+                            <span class="legend-amt privacy-blur">${app.escapeHtml(formattedAmt)}</span>
                         </div>
                     </div>
                 `;
@@ -783,4 +783,4 @@ class ChartManager {
 }
 
 const charts = new ChartManager();
-window.charts = charts;
+if (typeof EXPENSE_DEPLOYMENT === 'undefined') window.charts = charts;
