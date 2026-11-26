@@ -41,6 +41,7 @@ class App {
         this.lastActivityTime = Date.now();
         this.inactivityTimeoutMs = 3 * 60 * 1000; // 3 minutes
         this.inactivityEventsRegistered = false;
+        this.navigationEventsRegistered = false;
         this.activityThrottleTimer = null;
         this._isSubmitting = false;
         this.dashboardChartRegion = 'JP'; // Pass 1: Dashboard Category Chart Active Region (JP or IN)
@@ -382,13 +383,16 @@ class App {
     }
 
     setupNavigation() {
+        // These controls live in the static shell across account changes and resyncs.
+        if (this.navigationEventsRegistered) return;
+        this.navigationEventsRegistered = true;
+
         // Desktop & Mobile drawer navigation items
         document.querySelectorAll('.desktop-nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
                 const target = e.currentTarget.getAttribute('data-target');
                 this.switchView(target);
-                this.closeMobileSidebar();
             });
         });
 
@@ -1995,17 +1999,6 @@ class App {
         this.renderLoanTracker();
         this.renderCategories();
         this.renderTransactions();
-        this.renderMonthlySummary();
-
-        // Modern Web Guidance: Only render canvas chart when home-view is active
-        if (this.currentView === 'home-view' || !this.currentView) {
-            this.renderDashboardExpenseChart();
-        }
-
-        // Modern Web Guidance: Only render wallets view when it is the active screen
-        if (this.currentView === 'wallets-view') {
-            this.renderWalletsPage();
-        }
 
         this.renderSettings();
 
@@ -2840,7 +2833,6 @@ class App {
         });
         if (res && res.success !== false) {
             this.renderAll();
-            this.renderWallets();
         }
     }
 
@@ -3318,48 +3310,11 @@ class App {
         const activeCountries = storage.getActiveCountries();
         const countryTotals = { JP: 0, IN: 0, DE: 0 };
         const countryCounts = { JP: 0, IN: 0, DE: 0 };
-        const countryHtml = { JP: '', IN: '', DE: '' };
 
         Object.values(storage.state.wallets || {}).forEach(w => {
-            const ws = this.getWalletStyle(w.color);
-            const icon = w.type === 'bank' ? 'landmark' : w.type === 'card' ? 'credit-card' : w.type === 'cash' ? 'banknote' : 'smartphone';
-            const escId = this.escapeHtml(w.id);
-            const html = `
-                <div class="wallet-item" data-wallet-id="${escId}" style="cursor:pointer; ${ws.card}">
-                    <div class="wallet-name" style="color:${ws.text};">
-                        <i data-lucide="${icon}"></i>
-                        <span class="wallet-name-label">${escId}</span>
-                    </div>
-                    <div class="wallet-balance" style="color:${ws.text};">${this.formatMoney(w.balance, w.currency)}</div>
-                </div>
-            `;
             const reg = (w.region === 'DE' ? 'DE' : w.region === 'IN' ? 'IN' : 'JP');
-            if (countryHtml[reg] !== undefined) {
-                countryHtml[reg] += html;
-                countryTotals[reg] += (w.balance || 0);
-                countryCounts[reg]++;
-            }
-        });
-
-        const jpel = document.getElementById('jp-wallets');
-        if (jpel) jpel.innerHTML = countryHtml.JP;
-        const inel = document.getElementById('in-wallets');
-        if (inel) inel.innerHTML = countryHtml.IN;
-        const deel = document.getElementById('de-wallets');
-        if (deel) deel.innerHTML = countryHtml.DE;
-
-        ['jp-wallets', 'in-wallets', 'de-wallets'].forEach(id => {
-            const container = document.getElementById(id);
-            if (container && !container._hasDelegatedWalletClick) {
-                container._hasDelegatedWalletClick = true;
-                container.addEventListener('click', (e) => {
-                    const item = e.target.closest('[data-wallet-id]');
-                    if (item) {
-                        const wId = item.getAttribute('data-wallet-id');
-                        if (wId) this.openWalletFocus(wId);
-                    }
-                });
-            }
+            countryTotals[reg] += w.balance || 0;
+            countryCounts[reg]++;
         });
 
         const jpCard = document.getElementById('jp-country-card');

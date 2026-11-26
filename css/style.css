@@ -1,3 +1,11 @@
+/*
+ * Styles are served as a single stylesheet. Source order preserves the cascade
+ * across the app shell, page styles, and responsive and print overrides.
+ * Shared transaction icons live with ledger rows. Wallet accordion styles live
+ * with the Wallets portfolio. Budget cushion styles are shared by Dashboard
+ * and Budgets.
+ */
+
 /* ==========================================================================
    SF Pro Typography & Local Font Faces (Apple Design System)
    ========================================================================== */
@@ -1332,7 +1340,6 @@ button {
    ========================================================================== */
 .financial-amount,
 .region-total,
-.wallet-balance,
 .category-budget,
 .category-spent,
 .summary-amount,
@@ -1465,34 +1472,6 @@ button {
     font-weight: 600;
     font-size: 1.1rem;
     color: var(--text-main);
-}
-
-/* Wallet Grid */
-.wallet-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-}
-
-.wallet-item {
-    background: var(--bg-elevated);
-    padding: 12px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-}
-
-.wallet-name {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.wallet-balance {
-    font-size: 1rem;
-    font-weight: 600;
 }
 
 /* Wallet Themes */
@@ -2958,10 +2937,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     height: 100dvh;
     z-index: 9999;
     background-color: #000000;
-    background-image: url('../images/auth-bg.png');
-    background-position: center center;
-    background-size: cover;
-    background-repeat: no-repeat;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3206,27 +3181,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     color: var(--text-muted);
 }
 
-.auth-brand-footer {
-    display: flex;
-    align-items: center;
-}
-
-.auth-status-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.78rem;
-    color: var(--text-muted);
-}
-
-.auth-status-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background-color: #10b981;
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
-}
-
 /* ===== Right Pane: Authentication Workspace (+20-25% Scaled) ===== */
 .auth-form-pane {
     display: flex;
@@ -3450,15 +3404,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     letter-spacing: -0.01em;
 }
 
-.auth-form-footnote {
-    display: none;
-}
-
-.auth-lock-icon {
-    flex-shrink: 0;
-    opacity: 0.65;
-}
-
 /* ===== Reset Password Experience ===== */
 .auth-reset-container {
     width: 100%;
@@ -3601,17 +3546,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     }
 }
 
-/* Password input with toggle */
-.password-input-wrapper {
-    position: relative;
-    width: 100%;
-}
-
-.password-input-wrapper input {
-    width: 100%;
-    padding-right: 44px;
-}
-
+/* Password visibility toggle */
 .password-toggle-btn {
     position: absolute;
     right: 8px;
@@ -4119,45 +4054,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     align-items: center;
     gap: 12px;
     min-width: 0;
-}
-
-.tx-type-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.tx-type-icon.expense {
-    background: rgba(244, 63, 94, 0.12);
-    color: #fb7185;
-    border: 1px solid rgba(244, 63, 94, 0.22);
-}
-
-.tx-type-icon.income {
-    background: rgba(16, 185, 129, 0.12);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.22);
-}
-
-.tx-type-icon.transfer {
-    background: rgba(56, 189, 248, 0.12);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.22);
-}
-
-.tx-type-icon.remittance {
-    background: rgba(192, 132, 252, 0.12);
-    color: #c084fc;
-    border: 1px solid rgba(192, 132, 252, 0.22);
-}
-
-.tx-type-icon svg {
-    width: 16px;
-    height: 16px;
 }
 
 .tx-main-details {
@@ -4935,53 +4831,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     display: flex;
     flex-direction: column;
     gap: 16px;
-}
-
-.wallets-group-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 4px;
-}
-
-.group-title-wrap {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.group-title-wrap h3 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.group-count-badge {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    background: var(--bg-surface-3);
-    border: 1px solid var(--border-default);
-    padding: 2px 8px;
-    border-radius: var(--radius-pill);
-}
-
-.group-total-wrap {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-}
-
-.group-total-label {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-}
-
-.group-total-val {
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: var(--text-primary);
 }
 
 /* Wallets Portfolio Overview & Liquid Net Position KPI Grid */
@@ -7917,12 +7766,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     gap: 16px;
 }
 
-.ledger-date-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
 .ledger-date-header {
     position: sticky;
     top: 60px;
@@ -7968,7 +7811,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     font-variant-numeric: tabular-nums;
 }
 
-/* Refined Ledger Row */
+/* Ledger rows and transaction type icons shared by the Transactions and Analytics screens */
 .ledger-date-group {
     display: flex;
     flex-direction: column;
@@ -9299,26 +9142,6 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     text-transform: lowercase;
 }
 
-.budgets-kpi-edit-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--text-secondary);
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-    flex-shrink: 0;
-}
-
-.budgets-kpi-edit-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.2);
-    color: var(--text-primary);
-}
-
 .budget-central-badges-row {
     display: flex;
     justify-content: flex-end;
@@ -9330,30 +9153,27 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     margin-bottom: 6px;
 }
 
-.budget-cushion-pill {
+.budget-cushion-pill,
+.budget-cushion-badge {
     font-size: 0.74rem;
     font-weight: 500;
-    color: #34d399;
-    background: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-    padding: 0 !important;
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
     white-space: nowrap;
     letter-spacing: 0.01em;
     font-family: var(--font-numeric);
 }
 
+.budget-cushion-pill {
+    color: #34d399;
+}
+
 .budget-cushion-badge {
-    font-size: 0.74rem;
-    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
     color: #818cf8;
-    background: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-    padding: 0 !important;
-    white-space: nowrap;
-    letter-spacing: 0.01em;
-    font-family: var(--font-numeric);
 }
 
 .budget-central-progress-wrap {
@@ -9463,11 +9283,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
 
     .budget-cushion-pill,
     .budget-cushion-badge {
-        font-size: 0.7rem !important;
-        padding: 0 !important;
-        background: none !important;
-        border: none !important;
-        border-radius: 0 !important;
+        font-size: 0.7rem;
     }
 
     .budgets-kpi-edit-btn {
@@ -10698,6 +10514,7 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    flex-shrink: 0;
     transition: all var(--duration-fast) var(--ease-out);
 }
 
@@ -14494,18 +14311,6 @@ body:has(#onboarding-screen:not([style*="display: none"])) #app-content {
     padding: 6px 12px;
     font-size: 0.8rem;
     color: #cbd5e1;
-}
-
-.budget-cushion-badge {
-    display: inline-flex;
-    align-items: center;
-    font-size: 0.74rem;
-    font-weight: 500;
-    color: #818cf8;
-    background: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-    padding: 0 !important;
 }
 
 /* ==========================================================================
