@@ -4,8 +4,8 @@
   "description": "Connected Wallet Expense Tracker for JP & IN",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#0a0a0f",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
   "orientation": "portrait-primary",
   "icons": [
     {

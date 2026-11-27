@@ -11,10 +11,20 @@ class ChartManager {
         this.utilityLine = null;
 
         if (typeof Chart !== 'undefined' && Chart.defaults) {
-            Chart.defaults.color = '#8b8b99';
-            if (Chart.defaults.font) {
-                Chart.defaults.font.family = "'SF Pro', -apple-system, BlinkMacSystemFont, sans-serif";
-            }
+            const tokens = getComputedStyle(document.documentElement);
+            const family = tokens.getPropertyValue('--font-sans').trim();
+            this.printFontFamily = tokens.getPropertyValue('--font-print').trim();
+            Chart.defaults.color = '#a1a1aa';
+            // A different initial family also gives Chart.js a fresh text-measurement
+            // cache key when it redraws using the loaded variable face.
+            Chart.defaults.font.family = document.fonts.check('400 12px Geist') ? family : 'system-ui, sans-serif';
+            document.fonts.load('400 12px Geist').then(() => {
+                if (Chart.defaults.font.family === family) return;
+                Chart.defaults.font.family = family;
+                for (const chart of Object.values(Chart.instances)) {
+                    if (!chart.canvas.closest('#print-container')) chart.update('none');
+                }
+            }).catch(() => { /* Chart keeps its system font if the local face could not load. */ });
         }
     }
 
@@ -618,6 +628,7 @@ class ChartManager {
         };
         if (isPrint) {
             options.animation = false;
+            options.font = { family: this.printFontFamily };
         }
         return {
             type: 'doughnut',
@@ -763,8 +774,11 @@ class ChartManager {
         const labels = categories.map(c => c.name);
         const data = categories.map(c => totals[c.id]);
         const glassStyles = this.getGlassStyles(ctx.getContext('2d'), data.length);
-        let options = this.getDonutOptions(region);
-        if (isPrint) options.animation = false;
+        const options = this.getDonutOptions(region);
+        if (isPrint) {
+            options.animation = false;
+            options.font = { family: this.printFontFamily };
+        }
         return new Chart(ctx, {
             type: 'doughnut',
             data: {

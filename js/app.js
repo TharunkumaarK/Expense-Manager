@@ -439,6 +439,7 @@ class App {
             if (e.key === 'Escape') {
                 if (sidebar && sidebar.classList.contains('mobile-open')) {
                     this.closeMobileSidebar();
+                    document.querySelector('.mobile-menu-toggle')?.focus();
                     return;
                 }
                 const fabMenu = document.getElementById('fab-menu');
@@ -612,6 +613,7 @@ class App {
         }
 
         this.currentView = resolvedId;
+        document.getElementById('desktop-content-area').scrollTop = 0;
 
         // View-specific render execution
         if (resolvedId === 'transactions-view') {
@@ -657,6 +659,8 @@ class App {
         const sidebar = document.getElementById('desktop-sidebar');
         const backdrop = document.getElementById('mobile-sidebar-backdrop');
         if (sidebar) sidebar.classList.add('mobile-open');
+        document.querySelector('.mobile-menu-toggle')?.setAttribute('aria-expanded', 'true');
+        sidebar?.querySelector('[aria-current="page"]')?.focus({ preventScroll: true });
         if (backdrop) backdrop.classList.add('active');
         document.body.classList.add('drawer-open');
     }
@@ -665,6 +669,7 @@ class App {
         const sidebar = document.getElementById('desktop-sidebar');
         const backdrop = document.getElementById('mobile-sidebar-backdrop');
         if (sidebar) sidebar.classList.remove('mobile-open');
+        document.querySelector('.mobile-menu-toggle')?.setAttribute('aria-expanded', 'false');
         if (backdrop) backdrop.classList.remove('active');
         document.body.classList.remove('drawer-open');
     }
@@ -739,8 +744,10 @@ class App {
     toggleFabMenu() {
         const fab = document.getElementById('main-fab');
         const menu = document.getElementById('fab-menu');
-        fab.classList.toggle('open');
-        menu.classList.toggle('active');
+        const open = fab.classList.toggle('open');
+        fab.setAttribute('aria-expanded', String(open));
+        menu.classList.toggle('active', open);
+        menu.inert = !open;
     }
 
     toggleCollapse(wrapId, iconId) {
@@ -884,8 +891,7 @@ class App {
         if (context) {
             this.currentTxContext = context;
         }
-        document.getElementById('main-fab').classList.remove('open');
-        document.getElementById('fab-menu').classList.remove('active');
+        if (document.getElementById('main-fab').classList.contains('open')) this.toggleFabMenu();
 
         const modal = document.getElementById('transaction-modal');
         const title = document.getElementById('modal-title');
@@ -3506,7 +3512,7 @@ class App {
             </div>
         ` : '';
 
-        const titleText = this.escapeHtml(options.title || 'Monthly Budget');
+        const titleText = this.escapeHtml(options.title || 'Overall budget');
         const cardClass = options.cardClass ? ` ${options.cardClass}` : '';
         const interactiveAttr = options.isInteractive ? `onclick="app.openOverallBudgetModal('${region}')" style="cursor: pointer;" title="Configure Overall Monthly Limit"` : '';
         const interactiveCls = options.isInteractive ? ' interactive' : '';
@@ -3557,7 +3563,7 @@ class App {
                         ${badgesRowHtml}
                     </div>
                     <div class="budget-central-stats-row" style="margin-top: 8px;">
-                        <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
+                        <span class="budget-stat-item-left privacy-blur">Spent: <strong data-figure="budget-summary">${this.formatMoney(totalSpent, currency)}</strong></span>
                         <span class="budget-stat-item-right" style="color: var(--text-muted); font-size: 0.8rem;">Limit: Not Set</span>
                     </div>
                     <p class="text-xs text-muted" style="margin: 6px 0 0 0; line-height: 1.4;">Expense tracking continues without a spending limit. Tap to configure a monthly budget.</p>
@@ -3584,7 +3590,7 @@ class App {
                     </div>
                 </div>
                 <div class="budget-central-stats-row">
-                    <span class="budget-stat-item-left privacy-blur">Spent: <strong>${this.formatMoney(totalSpent, currency)}</strong></span>
+                    <span class="budget-stat-item-left privacy-blur">Spent: <strong data-figure="budget-summary">${this.formatMoney(totalSpent, currency)}</strong></span>
                     ${isOver
                 ? `<span class="budget-stat-item-right privacy-blur">Over limit: <strong class="text-danger">${this.formatMoney(Math.abs(remaining), currency)}</strong></span>`
                 : `<span class="budget-stat-item-right privacy-blur">Remaining: <strong>${this.formatMoney(remaining, currency)}</strong></span>`
@@ -3725,24 +3731,28 @@ class App {
                 else if (pct > 75) barClass = 'neon-warn';
 
                 progressHtml = `
+                    <div class="neon-amount-sub budget-category-tally">
+                        <span class="privacy-blur" data-figure="category">${this.formatMoney(spent, currency)}</span>
+                        <span class="privacy-blur">of ${this.formatMoney(activeBudget, currency)}</span>
+                    </div>
                     <div class="neon-bar-bg">
                         <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
                     </div>
-                    <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
-                        <span class="privacy-blur">${this.formatMoney(spent, currency)}</span>
-                        <span class="privacy-blur">${this.formatMoney(activeBudget, currency)}</span>
-                    </div>
                 `;
             } else {
-                progressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: <span class="privacy-blur">${this.formatMoney(spent, currency)}</span></div>`;
+                progressHtml = `<div class="neon-amount-sub budget-category-tally">Spent <span class="privacy-blur" data-figure="category">${this.formatMoney(spent, currency)}</span></div>`;
             }
 
             html += `
-                <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 14px; cursor: pointer;" data-category-id="${this.escapeHtml(c.id)}" data-region="${this.escapeHtml(region)}" onclick="app.openCategoryManageModal(this.dataset.categoryId, this.dataset.region)" title="Click to manage ${this.escapeHtml(c.name)}">
-                    <div class="neon-header" style="margin-bottom: 8px;">
-                        <span class="neon-title"><i data-lucide="${this.categoryIcon(c.icon)}"></i> ${this.escapeHtml(c.name)}</span>
+                <div class="neon-row ${isOver ? 'is-overbudget' : ''}" data-budget-reflection>
+                    <div class="neon-header">
+                        <span class="neon-title" data-type-role="card-label"><i data-lucide="${this.categoryIcon(c.icon)}"></i> ${this.escapeHtml(c.name)}</span>
                     </div>
                     ${progressHtml}
+                    <span class="budget-edge-spot" aria-hidden="true"></span>
+                    <button type="button" class="budget-card-hit" data-category-id="${this.escapeHtml(c.id)}"
+                        data-region="${this.escapeHtml(region)}" aria-label="Manage ${this.escapeHtml(c.name)}"
+                        onclick="app.openCategoryManageModal(this.dataset.categoryId, this.dataset.region)"></button>
                 </div>
             `;
         });
@@ -3963,7 +3973,7 @@ class App {
                 <div class="monthly-stat-sub">Spent this month</div>
             </div>
 
-            <div class="monthly-stat-card">
+            <div class="monthly-stat-card" data-material="signature">
                 <div class="monthly-stat-header">
                     <span class="monthly-stat-label">Net Savings</span>
                     <span class="monthly-stat-icon">
@@ -4133,10 +4143,10 @@ class App {
                     </div>
                     <div class="wallet-balance-wrap">
                         <span class="wallet-balance-label">Current Balance</span>
-                        <div class="wallet-balance-val financial-amount privacy-blur">${this.formatMoney(w.balance, w.currency)}</div>
+                        <div data-figure="wallet" class="wallet-balance-val financial-amount privacy-blur">${this.formatMoney(w.balance, w.currency)}</div>
                     </div>
                     <div class="wallet-card-footer">
-                        <div class="wallet-name">${escId}</div>
+                        <div class="wallet-name" data-type-role="card-label">${escId}</div>
                     </div>
                 </div>
             `;
@@ -4521,12 +4531,12 @@ class App {
                 </div>
                 <div class="wallet-balance-wrap">
                     <span class="wallet-balance-label">Current Balance</span>
-                    <div class="wallet-balance-val financial-amount privacy-blur">
+                    <div data-figure="wallet" class="wallet-balance-val financial-amount privacy-blur">
                         ${this.formatMoney(w.balance, w.currency)}
                     </div>
                 </div>
                 <div class="wallet-card-footer">
-                    <div class="wallet-name" title="${escId}">${escId}</div>
+                    <div class="wallet-name" data-type-role="card-label" title="${escId}">${escId}</div>
                     <div class="wallet-type-tag">${this.escapeHtml(w.type || 'Account')} • ${this.escapeHtml(w.currency)}</div>
                 </div>
             </div>
@@ -8720,7 +8730,7 @@ class App {
                         <div class="report-snapshot-title-row">
                             <div class="report-snapshot-title-group">
                                 ${this.getCountryFlagSvg(this.reportRegion, 20, 15)}
-                                <h2 class="reports-snapshot-title">${this.escapeHtml(this.reportMonthKey)} Financial Snapshot</h2>
+                                <h2 class="reports-snapshot-title" data-type-role="editorial-heading">${this.escapeHtml(this.reportMonthKey)} Financial Snapshot</h2>
                             </div>
                             <div class="report-snapshot-badge-wrap">
                                 ${statusBadge}
@@ -8751,7 +8761,7 @@ class App {
                             <div class="kpi-icon-wrap income"><i data-lucide="arrow-down-left"></i></div>
                         </div>
                         <div class="kpi-value-row">
-                            <span class="kpi-value reports-kpi-val text-emerald positive privacy-blur">${this.formatMoney(totalIncome, currency)}</span>
+                            <span data-figure="kpi" class="kpi-value reports-kpi-val text-emerald positive privacy-blur">${this.formatMoney(totalIncome, currency)}</span>
                         </div>
                         <div class="kpi-meta">
                             <span class="text-faint">${incomeCount} income credit${incomeCount === 1 ? '' : 's'}</span>
@@ -8764,7 +8774,7 @@ class App {
                             <div class="kpi-icon-wrap expense"><i data-lucide="arrow-up-right"></i></div>
                         </div>
                         <div class="kpi-value-row">
-                            <span class="kpi-value reports-kpi-val text-rose negative privacy-blur">${this.formatMoney(totalExpense, currency)}</span>
+                            <span data-figure="kpi" class="kpi-value reports-kpi-val text-rose negative privacy-blur">${this.formatMoney(totalExpense, currency)}</span>
                         </div>
                         <div class="kpi-meta">
                             <span class="text-faint">${expenseCount} expense debit${expenseCount === 1 ? '' : 's'}</span>
@@ -8777,7 +8787,7 @@ class App {
                             <div class="kpi-icon-wrap savings"><i data-lucide="piggy-bank"></i></div>
                         </div>
                         <div class="kpi-value-row">
-                            <span class="kpi-value reports-kpi-val ${netSavings >= 0 ? 'text-emerald positive' : 'text-rose negative'} privacy-blur">${this.formatMoney(netSavings, currency)}</span>
+                            <span data-figure="kpi" class="kpi-value reports-kpi-val ${netSavings >= 0 ? 'text-emerald positive' : 'text-rose negative'} privacy-blur">${this.formatMoney(netSavings, currency)}</span>
                         </div>
                         <div class="kpi-meta">
                             <span class="text-faint">${netSavings >= 0 ? 'Surplus retained' : 'Deficit spent'}</span>
@@ -8793,7 +8803,7 @@ class App {
                 carryover: closedMeta ? (closedMeta[`${this.reportRegion}CarryoverPrior`] || 0) : 0,
                 totalSpent: totalExpense,
                 sumCatBudgets: Object.values(periodCatBudgets).reduce((s, b) => s + (Number(b) || 0), 0),
-                title: 'Monthly Budget',
+                title: 'Overall budget',
                 showEditButton: false,
                 isInteractive: false,
                 enabled: isClosed ? (periodTotalBudget > 0) : undefined,
@@ -8896,7 +8906,7 @@ class App {
             breakdownCard.innerHTML = `
                 <div class="category-breakdown-header">
                     <div>
-                        <h3 class="breakdown-title">Category Expense Breakdown</h3>
+                        <h3 class="breakdown-title" data-type-role="panel-heading">Category Expense Breakdown</h3>
                         <p class="text-xs text-muted" style="margin: 3px 0 0 0;">Budget allocation, actual debits and cushion variance</p>
                     </div>
                     <div class="breakdown-controls">
@@ -9715,27 +9725,17 @@ class App {
         if (!container) {
             container = document.createElement('div');
             container.id = 'app-toast-container';
-            container.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+            container.setAttribute('role', 'status');
             document.body.appendChild(container);
         }
         const toast = document.createElement('div');
-        const bg = type === 'error' ? 'rgba(239, 68, 68, 0.95)' : type === 'warning' ? 'rgba(245, 158, 11, 0.95)' : type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(15, 23, 42, 0.95)';
-        const border = type === 'error' ? 'rgba(248, 113, 113, 0.4)' : type === 'warning' ? 'rgba(251, 191, 36, 0.4)' : type === 'success' ? 'rgba(52, 211, 153, 0.4)' : 'rgba(59, 130, 246, 0.4)';
-        toast.style.cssText = `background:${bg};color:#ffffff;border:1px solid ${border};padding:12px 18px;border-radius:8px;font-size:0.85rem;box-shadow:0 10px 25px -5px rgba(0,0,0,0.5);pointer-events:auto;transition:all 0.3s ease;transform:translateY(10px);opacity:0;max-width:380px;line-height:1.4;`;
+        toast.className = 'app-toast';
+        toast.dataset.status = type;
         toast.textContent = message;
         container.appendChild(toast);
-        if (typeof requestAnimationFrame === 'function') {
-            requestAnimationFrame(() => {
-                toast.style.transform = 'translateY(0)';
-                toast.style.opacity = '1';
-            });
-        } else {
-            toast.style.transform = 'translateY(0)';
-            toast.style.opacity = '1';
-        }
+        requestAnimationFrame(() => toast.classList.add('visible'));
         setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(10px)';
+            toast.classList.remove('visible');
             setTimeout(() => toast.remove(), 300);
         }, 4000);
     }
@@ -10253,7 +10253,8 @@ class App {
                     }
 
                     return `
-                        <div class="card budget-cat-card interactive-card ${isOver ? 'is-overbudget' : ''}" id="budget-cat-card-${this.escapeHtml(c.id)}" data-category-id="${this.escapeHtml(c.id)}" data-region="${this.escapeHtml(region)}" onclick="app.openCategoryManageModal(this.dataset.categoryId, this.dataset.region)">
+                        <div class="card budget-cat-card interactive-card ${isOver ? 'is-overbudget' : ''}" id="budget-cat-card-${this.escapeHtml(c.id)}" data-budget-reflection data-category-id="${this.escapeHtml(c.id)}" data-region="${this.escapeHtml(region)}" onclick="app.openCategoryManageModal(this.dataset.categoryId, this.dataset.region)">
+                            <span class="budget-edge-spot" aria-hidden="true"></span>
                             <!-- Card Header -->
                             <div class="budget-cat-card-header">
                                 <div class="budget-cat-identity">
@@ -10262,7 +10263,7 @@ class App {
                                     </div>
                                     <div class="budget-cat-info">
                                         <div class="budget-cat-title-row">
-                                            <h4 class="budget-cat-name" title="${this.escapeHtml(c.name)}">${this.escapeHtml(c.name)}</h4>
+                                            <h4 class="budget-cat-name" data-type-role="card-label" title="${this.escapeHtml(c.name)}">${this.escapeHtml(c.name)}</h4>
                                             ${c.isActive === false ? '<span class="budget-badge-archived">Archived</span>' : ''}
                                         </div>
                                         <div class="budget-cat-meta-row">
@@ -10283,7 +10284,7 @@ class App {
                             <div class="budget-cat-figures">
                                 <div class="budget-figure-col">
                                     <span class="figure-label">Spent</span>
-                                    <span class="figure-value text-primary font-numeric privacy-blur financial-amount">${this.formatMoney(spent, currency)}</span>
+                                    <span class="figure-value text-primary privacy-blur" data-figure="category">${this.formatMoney(spent, currency)}</span>
                                 </div>
                                 <div class="budget-figure-col right-align">
                                     <span class="figure-label">Monthly Limit</span>

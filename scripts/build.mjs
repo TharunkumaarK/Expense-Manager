@@ -19,6 +19,10 @@ const libraries = [
     ['@supabase/supabase-js', 'dist/umd/supabase.js', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js'],
     ['chart.js', 'dist/chart.umd.min.js', 'https://cdn.jsdelivr.net/npm/chart.js@4.6.2/dist/chart.umd.min.js']
 ];
+const typefaces = [
+    ['geist-variable', 'Geist-OFL.txt'],
+    ['playfair-display-variable', 'Playfair-OFL.txt']
+];
 const sha = (value) => createHash('sha256').update(value).digest('hex').slice(0, 20);
 
 async function loadConfig() {
@@ -62,6 +66,9 @@ async function licenseNotice() {
                 if (error.code !== 'ENOENT') throw error;
             }
         }
+    }
+    for (const [name, license] of typefaces) {
+        notices.push(`${name}\n${(await readFile(join('typefaces', license), 'utf8')).trim()}`);
     }
     return notices.join('\n\n') + '\n';
 }
@@ -156,9 +163,16 @@ async function build() {
             html = html.replace(tag, index === 0 ? `<script src="${bundle}"></script>` : '');
         }
 
-        const sourceCss = await readFile('css/style.css', 'utf8');
-        // Only local font faces are deployable from this checkout. Keep the source fallbacks for local development.
-        const deployCss = sourceCss.replace(/,\s*url\('\.\.\/fonts\/[^']+'\) format\('[a-z]+'\)/g, '');
+        let deployCss = await readFile('css/style.css', 'utf8');
+        for (const [name] of typefaces) {
+            const source = `typefaces/${name}.woff2`;
+            const output = await asset(name, 'woff2', await readFile(source));
+            if (!deployCss.includes(`../${source}`) || !html.includes(`href="${source}"`)) {
+                throw new Error(`Missing CSS or preload entry for ${name}.`);
+            }
+            deployCss = deployCss.replaceAll(`../${source}`, output.slice('assets/'.length));
+            html = html.replace(`href="${source}"`, `href="${output}"`);
+        }
         const css = await transform(deployCss, {
             loader: 'css', target: 'esnext', minify: true, charset: 'utf8'
         });

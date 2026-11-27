@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +11,7 @@ const root = resolve(import.meta.dirname, '..');
 function fixture(t) {
     const dir = mkdtempSync(join(tmpdir(), 'expense-build-test-'));
     t.after(() => rmSync(dir, { recursive: true, force: true }));
-    for (const path of ['css', 'icons', 'index.html', 'js', 'manifest.json', 'scripts', 'sw.js']) {
+    for (const path of ['css', 'icons', 'index.html', 'js', 'manifest.json', 'scripts', 'sw.js', 'typefaces']) {
         cpSync(join(root, path), join(dir, path), { recursive: true });
     }
     symlinkSync(join(root, 'node_modules'), join(dir, 'node_modules'), 'dir');
@@ -30,7 +31,7 @@ function output(dir) {
         .filter(entry => entry.isFile())
         .map(entry => {
             const path = join(entry.parentPath, entry.name);
-            return [path.slice(dist.length + 1), readFileSync(path, 'utf8')];
+            return [path.slice(dist.length + 1), readFileSync(path, entry.name.endsWith('.woff2') ? null : 'utf8')];
         }).sort(([a], [b]) => a.localeCompare(b)));
 }
 
@@ -43,9 +44,24 @@ function verifyOutput(files, environment) {
     assert.deepEqual(Object.keys(files).filter(path => !path.startsWith('assets/')),
         ['_headers', 'icons/icon.svg', 'index.html', 'manifest.json', 'sw.js']);
     const assets = Object.keys(files).filter(path => path.startsWith('assets/'));
-    assert.equal(assets.length, 6);
-    assert.ok(assets.every(path => /^assets\/(app|chart\.js|lucide|style|supabase-js|third-party-licenses)-[a-f0-9]{20}\.(js|css|txt)$/.test(path)));
-    assert.ok(assets.filter(path => /\.(js|css)$/.test(path)).every(path => files['index.html'].includes(path)));
+    const expectedAssets = [
+        'app.js', 'chart.js.js', 'lucide.js', 'style.css', 'supabase-js.js', 'third-party-licenses.txt',
+        'geist-variable.woff2', 'playfair-display-variable.woff2'
+    ];
+    assert.deepEqual(assets.map(path => path.replace(/^assets\//, '').replace(/-[a-f0-9]{20}\./, '.')).sort(),
+        expectedAssets.sort());
+    assert.ok(assets.filter(path => !path.endsWith('.txt')).every(path => files['index.html'].includes(path)));
+    const stylesheet = files[assets.find(path => path.endsWith('.css'))];
+    const licenses = files[assets.find(path => path.endsWith('.txt'))];
+    for (const [name, notice] of [['geist-variable', 'Geist-OFL.txt'], ['playfair-display-variable', 'Playfair-OFL.txt']]) {
+        const source = readFileSync(join(root, 'typefaces', `${name}.woff2`));
+        const hash = createHash('sha256').update(source).digest('hex').slice(0, 20);
+        const filename = `${name}-${hash}.woff2`;
+        assert.deepEqual(files[`assets/${filename}`], source);
+        assert.ok(stylesheet.includes(`url(${filename})`));
+        assert.ok(files['sw.js'].includes(`"assets/${filename}"`));
+        assert.ok(licenses.includes(readFileSync(join(root, 'typefaces', notice), 'utf8').trim()));
+    }
     assert.doesNotMatch(files['index.html'], /<script>|https:\/\/(?:cdn\.jsdelivr\.net|unpkg\.com)/);
     assert.ok(Object.values(files).every(contents => !/sourceMappingURL=|sb_secret_[\w-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(contents)));
     const ref = projects[environment];
@@ -58,6 +74,7 @@ function verifyOutput(files, environment) {
     assert.ok(!bundle.includes(sandbox.window.SUPABASE_CONFIG.publishableKey), 'alternate public key is absent');
     assert.match(files._headers, /script-src 'self'; script-src-attr 'unsafe-inline'/);
     assert.match(files._headers, /frame-ancestors 'none'/);
+    assert.match(files._headers, /font-src 'self'/);
     assert.match(files._headers, new RegExp(`connect-src 'self' https://${ref}\\.supabase\\.co wss://${ref}\\.supabase\\.co`));
     assert.ok(!files._headers.includes(otherRef));
 }
@@ -149,9 +166,9 @@ test('worker precaches only anonymous static assets and cleans only owned caches
     await lifecycle('install');
     await lifecycle('activate');
     assert.deepEqual(state, { claimed: true, skipped: true });
-    assert.equal(seenRequests.length, 5);
+    assert.equal(seenRequests.length, 7);
     assert.ok(seenRequests.every(request => request.credentials === 'omit' && request.redirect === 'error'));
-    assert.ok(seenRequests.every(request => /^\/assets\/.+\.(js|css)$/.test(new URL(request.url).pathname)));
+    assert.ok(seenRequests.every(request => /^\/assets\/.+\.(js|css|woff2)$/.test(new URL(request.url).pathname)));
     assert.deepEqual(removed, ['em-v123', `expense-manager:static:${scope}:old`]);
     let intercepted;
     const request = (url, method = 'GET', mode = 'cors') => {

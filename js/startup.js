@@ -3,8 +3,13 @@ if (window.lucide) window.lucide.createIcons();
 document.getElementById('backup-export-button').addEventListener('click', () => storage.exportJSON());
 
 const unavailableAction = ':disabled, [aria-disabled="true"], [aria-busy="true"]';
+const actionControl = 'button, a.btn, summary.btn';
 const finePointer = matchMedia('(any-hover: hover) and (any-pointer: fine)');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const budgetCardSelector = '[data-budget-reflection]';
+let pendingBudgetReflection;
+let budgetReflection;
+let budgetTouch;
 
 document.getElementById('main-fab').addEventListener('click', event => {
     if (!event.currentTarget.matches(unavailableAction)) app.toggleFabMenu();
@@ -47,10 +52,43 @@ function playRim(button) {
     ], { duration: timeInMilliseconds(style.getPropertyValue('--rim-travel-time')), easing: 'linear' });
 }
 
+function clearBudgetReflection() {
+    clearTimeout(pendingBudgetReflection?.timer);
+    pendingBudgetReflection = undefined;
+    budgetReflection?.cancel();
+    budgetReflection = undefined;
+    budgetTouch = undefined;
+}
+
+function scheduleBudgetReflection(card, dwell) {
+    clearTimeout(pendingBudgetReflection?.timer);
+    if (reducedMotion.matches) return;
+
+    const timer = setTimeout(() => {
+        pendingBudgetReflection = undefined;
+        if (!card.isConnected || !card.closest('.view.active')) return;
+        budgetReflection?.cancel();
+        // B1 uses a single feathered top-edge reflection.
+        budgetReflection = card.querySelector('.budget-edge-spot').animate([
+            { transform: 'translateX(-36%)', opacity: 0 },
+            { offset: .19, opacity: .56 },
+            { offset: .68, opacity: .56 },
+            { transform: 'translateX(36%)', opacity: 0 }
+        ], { duration: 790, easing: 'linear' });
+        const animation = budgetReflection;
+        animation.onfinish = () => {
+            if (budgetReflection === animation) budgetReflection = undefined;
+        };
+    }, dwell);
+    pendingBudgetReflection = { card, timer };
+}
+
 // Delegated surface feedback also covers controls replaced by financial renders.
 document.addEventListener('pointerover', event => {
     if (event.pointerType !== 'mouse' || !finePointer.matches) return;
-    const button = event.target.closest('button, a.btn');
+    const card = event.target.closest(budgetCardSelector);
+    if (card && !card.contains(event.relatedTarget)) scheduleBudgetReflection(card, 105);
+    const button = event.target.closest(actionControl);
     if (!button || button.contains(event.relatedTarget) || button.matches(unavailableAction)) return;
     button.classList.add('button-hover');
     playRim(button);
@@ -58,6 +96,11 @@ document.addEventListener('pointerover', event => {
 
 document.addEventListener('pointerout', event => {
     if (event.pointerType !== 'mouse') return;
+    const card = pendingBudgetReflection?.card;
+    if (card?.contains(event.target) && !card.contains(event.relatedTarget)) {
+        clearTimeout(pendingBudgetReflection.timer);
+        pendingBudgetReflection = undefined;
+    }
     const button = event.target.closest('.button-hover');
     if (button && !button.contains(event.relatedTarget)) button.classList.remove('button-hover');
 }, { passive: true });
@@ -74,7 +117,13 @@ function clearPress(cancelRim = false) {
 document.addEventListener('pointerdown', event => {
     if (!event.isPrimary || event.pointerType === 'mouse') return;
     clearPress(true);
-    const button = event.target.closest('button, a.btn');
+    clearBudgetReflection();
+    const card = event.target.closest(budgetCardSelector);
+    if (card && !reducedMotion.matches) {
+        budgetTouch = { id: event.pointerId, x: event.clientX, y: event.clientY };
+        scheduleBudgetReflection(card, 80);
+    }
+    const button = event.target.closest(actionControl);
     button?.classList.remove('button-hover');
     if (!button?.matches('.btn-primary, .btn-secondary, [data-signature-action]') || button.matches(unavailableAction)) return;
     button.classList.add('button-press');
@@ -83,12 +132,17 @@ document.addEventListener('pointerdown', event => {
 }, { passive: true });
 
 document.addEventListener('pointermove', event => {
+    if (budgetTouch?.id === event.pointerId &&
+        Math.hypot(event.clientX - budgetTouch.x, event.clientY - budgetTouch.y) > 11) {
+        clearBudgetReflection();
+    }
     if (press?.id === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 12) {
         clearPress(true);
     }
 }, { passive: true });
 
 document.addEventListener('pointerup', event => {
+    if (budgetTouch?.id === event.pointerId) budgetTouch = undefined;
     if (press?.id !== event.pointerId) return;
     press.id = null;
     const delay = timeInMilliseconds(getComputedStyle(press.button).getPropertyValue('--action-release-time'));
@@ -97,18 +151,21 @@ document.addEventListener('pointerup', event => {
 
 for (const type of ['pointercancel', 'lostpointercapture']) {
     document.addEventListener(type, event => {
+        if (budgetTouch?.id === event.pointerId) clearBudgetReflection();
         if (press?.id === event.pointerId) clearPress(true);
     }, { passive: true });
 }
 
 function resetFeedback() {
     clearPress(true);
+    clearBudgetReflection();
     document.querySelectorAll('.button-hover').forEach(button => button.classList.remove('button-hover'));
     document.querySelectorAll('[data-signature-action]').forEach(stopRim);
 }
 window.addEventListener('blur', resetFeedback);
 reducedMotion.addEventListener('change', resetFeedback);
 finePointer.addEventListener('change', resetFeedback);
+document.addEventListener('scroll', clearBudgetReflection, { capture: true, passive: true });
 
 // Observe the four persistent summary hosts, whose children are re-rendered.
 if ('IntersectionObserver' in window) {

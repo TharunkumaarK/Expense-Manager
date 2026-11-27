@@ -28,10 +28,10 @@ console.log("  ✓ All required HTML elements and containers are present");
 // 2. Check CSS Grid for Desktop 3-Columns
 console.log("\nTEST 2: Desktop 3-Column Category Grid Verification");
 console.assert(cssContent.includes('.budgets-categories-grid'), ".budgets-categories-grid CSS rule must exist");
-const gridMatches = cssContent.match(/\.budgets-categories-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*1fr\)[^}]*\}/s);
-console.assert(gridMatches !== null, "Desktop must enforce repeat(3, 1fr) for .budgets-categories-grid");
+const gridMatches = cssContent.match(/\.budgets-categories-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)[^}]*\}/s);
+if (!gridMatches) throw new Error("Desktop budget grid must have three flexible columns that can shrink with long amounts.");
 console.assert(!cssContent.includes('@media (max-width: 1280px) {\n    .budgets-categories-grid {\n        grid-template-columns: repeat(2, 1fr);'), "1280px media query dropping to 2 columns must be removed");
-console.log("  ✓ Desktop 3-column grid rule enforced: repeat(3, 1fr)");
+console.log("  ✓ Desktop budget grid has three shrinkable columns");
 
 // 3. Check Progress Streak and Glimmer Effect
 console.log("\nTEST 3: Thin Elegant Progress Streak & Glimmer Animation");

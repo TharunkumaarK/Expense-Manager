@@ -53,7 +53,8 @@ REQUIRED_THEME_IDS.forEach(themeId => {
 
 // 2. Horizontal Header Toolbar Redesign
 console.log("\nTEST 2: Horizontal Header Toolbar Redesign");
-testAssert(indexHtml.includes('class="wallets-toolbar-header"'), "index.html has wallets-toolbar-header");
+testAssert(indexHtml.includes('class="wallets-toolbar"') && !indexHtml.includes('class="wallets-page-title"'),
+    "Wallets uses the shared page title and a single actions toolbar");
 testAssert(indexHtml.includes('class="wallets-toolbar-actions"'), "index.html has wallets-toolbar-actions");
 testAssert(indexHtml.includes('onclick="app.openAddWalletModal()"'), "Add Wallet button present in toolbar actions");
 testAssert(indexHtml.includes("app.openTransactionModal('transfer')"), "Transfer button present in toolbar actions");
@@ -76,10 +77,12 @@ testAssert(appJs.includes('wallet-card-secondary'), "Secondary wallet class appl
 // Typographic Contrast & Hierarchy
 const labelWeight = cssContent.match(/\.wallet-balance-label\s*\{[^}]*font-weight:\s*(\d+)/s);
 testAssert(labelWeight && (labelWeight[1] === '400' || labelWeight[1] === '500'), "wallet-balance-label has regular/medium weight (400/500)");
-const valWeight = cssContent.match(/\.wallet-balance-val\s*\{[^}]*font-weight:\s*(\d+)/s);
-testAssert(valWeight && (valWeight[1] === '600' || valWeight[1] === '700'), "wallet-balance-val has prominent semibold/bold weight (600/700)");
-const nameWeight = cssContent.match(/\.wallet-card\s+\.wallet-name\s*\{[^}]*font-weight:\s*(\d+)/s);
-testAssert(nameWeight && nameWeight[1] === '500', "wallet-name has medium weight 500");
+testAssert(/data-figure="wallet" class="wallet-balance-val\b/.test(appJs) &&
+    /\[data-figure="wallet"\]\s*\{\s*--figure-size:\s*var\(--type-wallet-amount\)/.test(cssContent),
+    "Wallet balance uses the T3 editorial amount role");
+testAssert(appJs.includes('class="wallet-name" data-type-role="card-label"') &&
+    /\[data-type-role="card-label"\][^{}]*\{\s*font:\s*550\b[^;]*var\(--font-sans\)/.test(cssContent),
+    "Wallet name uses the T3 Geist label role at weight 550");
 const badgeWeight = cssContent.match(/\.wallet-badge-secondary\s*\{[^}]*font-weight:\s*(\d+)/s);
 testAssert(badgeWeight && (badgeWeight[1] === '400' || badgeWeight[1] === '500'), "wallet-badge-secondary has regular/medium weight (400/500)");
 
