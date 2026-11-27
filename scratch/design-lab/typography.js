@@ -9,11 +9,17 @@ const typeFigures = document.querySelector('#type-figures');
 const typeRoles = [
     ['Brand display', '.auth-brand-name'],
     ['Page title', '.toolbar-start h3'],
-    ['Section title', '.dash-section .section-line h3'],
+    ['Editorial section', '[data-type-role="editorial-section"]'],
+    ['Functional panel heading', '[data-type-role="panel-heading"]'],
     ['Hero financial balance', '.country .amount'],
     ['Primary KPI', '.kpi .amount'],
-    ['Budget amount', '.budget-amounts strong'],
+    ['Overall budget amount', '.summary-tally strong'],
+    ['Category budget amount', '.budget-amounts strong'],
+    ['Donut total', '.donut-center .amount'],
     ['Wallet balance', '.wallet-card .amount'],
+    ['Login welcome', '#auth-title'],
+    ['Login introduction', '.auth-headline'],
+    ['Illustrative account balance', '.auth-showcase .amount'],
     ['Functional heading', '.budget-head h4'],
     ['Standard UI text', 'html'],
     ['Button', '.dash-toolbar .action'],
@@ -72,7 +78,7 @@ function writeTypeSpec() {
 }
 
 function setTypeTreatment(choice) {
-    typeRoot.dataset.type = choice === 'baseline' ? 'baseline' : 't2';
+    typeRoot.dataset.type = ['baseline', 't2', 't3'].includes(choice) ? choice : 't3';
     typeSelector.value = typeRoot.dataset.type;
     // Reading layout here ensures the active face is requested before waiting to draw.
     drawTypeCanvas();

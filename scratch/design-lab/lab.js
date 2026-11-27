@@ -143,7 +143,7 @@ function budgetCard(region, index, instance, variant = '') {
     return `<article class="budget-card matte" data-budget-card data-utilization="${status}" ${variant ? `data-variant="${variant}"` : ''}>
         <div class="optics" aria-hidden="true"><span class="edge-spot"></span><span class="shine-spot"></span></div>
         <div class="budget-head">${icon(glyph)}<h4 id="${id}">${name}</h4></div>
-        <p class="budget-amounts"><strong>${amount(region, spent[index])}</strong> of ${amount(region, budget[index])}</p>
+        <p class="budget-amounts"><strong>${amount(region, spent[index])}</strong> <span class="budget-limit">of ${amount(region, budget[index])}</span></p>
         ${progress(`${name} budget`, percent)}
         <p class="budget-foot"><span class="amount">${percent}% used</span><span class="state">${{ safe: 'On track', warn: 'Near limit', over: 'Over budget' }[status]}</span></p>
         <button type="button" class="budget-hit" data-command="${variant ? 'replay-budget' : 'budget-detail'}"
@@ -157,7 +157,7 @@ function summaryCard(region) {
     const percent = utilization(used, limit);
     const remaining = limit - used;
     return `<article class="summary-card matte" data-summary data-utilization="${statusFor(percent)}">
-        <div class="summary-top"><h4>Overall budget</h4><span class="label">${period}</span></div>
+        <div class="summary-top"><h4 data-type-role="panel-heading">Overall budget</h4><span class="label">${period}</span></div>
         <p class="summary-tally"><strong>${amount(region, used)}</strong> of ${amount(region, limit)}</p>
         ${progress('Overall budget', percent)}
         <div class="summary-foot"><span class="amount">${percent}% used</span><span>${amount(region, remaining)} ${remaining < 0 ? 'over' : 'remaining'}</span></div>
@@ -228,7 +228,7 @@ function dashboardContent(scope, state) {
     const outflows = total(spent);
     return `<div class="main-column">
         <section class="dash-section" id="${scope}-overview" tabindex="-1">
-            <div class="section-line"><h3>Balances</h3>${regionChoices(region)}</div>
+            <div class="section-line"><h3 data-type-role="panel-heading">Balances</h3>${regionChoices(region)}</div>
             <div class="country-grid">${country('jp')}${country(region === 'de' ? 'de' : 'in')}</div>
             <div class="kpi-grid">
                 ${kpi('Monthly income', income, region, 'down', false, 'income')}
@@ -237,18 +237,18 @@ function dashboardContent(scope, state) {
             </div>
         </section>
         <section class="dash-section" id="${scope}-budgets" tabindex="-1">
-            <div class="section-line"><h3>${regions[region].name} spending</h3><span class="label">Category budgets</span></div>
+            <div class="section-line"><h3 data-type-role="editorial-section">${regions[region].name} spending</h3><span class="label">Category budgets</span></div>
             ${summaryCard(region)}
             <div class="budget-grid" data-budget-group>${categoryNames.map((_, index) => budgetCard(region, index, scope)).join('')}</div>
         </section>
     </div>
     <div class="right-column">
         <section class="dash-panel matte" id="${scope}-analytics" tabindex="-1">
-            <div class="section-line"><h3>Expense breakdown</h3><span class="label">${regions[region].code}</span></div>
+            <div class="section-line"><h3 data-type-role="panel-heading">Expense breakdown</h3><span class="label">${regions[region].code}</span></div>
             ${chart(region)}
         </section>
         <section class="dash-panel matte" id="${scope}-transactions" tabindex="-1">
-            <div class="section-line"><h3>Recent activity</h3><span class="label">${period}</span></div>
+            <div class="section-line"><h3 data-type-role="panel-heading">Recent activity</h3><span class="label">${period}</span></div>
             ${transactionList(region)}
         </section>
         <section class="dash-section" id="${scope}-wallets" tabindex="-1">${walletPanel(state)}</section>
@@ -287,7 +287,7 @@ function dashboard(scope) {
             <header class="dash-toolbar">
                 <div class="toolbar-start">
                     ${mobile ? utility('open-drawer', 'Open navigation', 'menu', 'aria-expanded="false" aria-controls="mobile-drawer"') : ''}
-                    <h3>Dashboard</h3>
+                    <h3 data-type-role="page-title">Dashboard</h3>
                 </div>
                 <div class="toolbar-actions">
                     <span class="period">${icon('calendar')}${period}</span>
@@ -316,13 +316,13 @@ $('#reflection-samples').innerHTML = Object.entries(variants).map(([id, label]) 
 $('#action-samples').innerHTML = action('View ledger', 'sample-action', 'ledger', { secondary: true }) + action('Add transaction', 'sample-action', 'plus');
 $('#login-preview').innerHTML = `<div class="auth-shell">
     <div class="auth-brand-pane">
-        <h1 class="auth-brand-name">Expense Manager</h1>
+        <h1 class="auth-brand-name" data-type-role="brand">Expense Manager</h1>
         <p class="auth-headline">Cross-border finances,<br> unified in one ledger.</p>
         <div class="auth-showcase">${country('jp', false)}${country('in', false)}</div>
         <p class="auth-description">Track balances across Japan and India, with budgets in each currency.</p>
     </div>
     <section class="auth-form-pane" aria-labelledby="auth-title">
-        <h2 id="auth-title">Welcome!</h2><p class="label auth-instruction">Sign in to access your sample ledger.</p>
+        <h2 id="auth-title" data-type-role="page-title">Welcome!</h2><p class="label auth-instruction">Sign in to access your sample ledger.</p>
         <div class="auth-form" aria-label="Synthetic sign-in preview">
             <label><span class="label">Email</span><input type="email" value="maya@example.test" autocomplete="off" readonly></label>
             <div>

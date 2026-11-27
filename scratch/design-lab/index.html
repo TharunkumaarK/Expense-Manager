@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-type="t2">
+<html lang="en" data-type="t3">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,7 +13,8 @@
             if (['desktop', 'mobile', 'login', 'login-mobile', 'type'].includes(preview)) root.dataset.preview = preview;
             let saved;
             try { saved = localStorage.getItem('expense-manager-typography-4c2t'); } catch {}
-            root.dataset.type = (params.get('type') ?? saved) === 'baseline' ? 'baseline' : 't2';
+            const treatment = params.get('type') ?? saved;
+            root.dataset.type = ['baseline', 't2', 't3'].includes(treatment) ? treatment : 't3';
         }
     </script>
     <link rel="stylesheet" href="lab.css">
@@ -79,7 +80,8 @@
                 <label class="state-field">Preview typography
                     <select id="type-treatment">
                         <option value="baseline">Approved SF Pro baseline</option>
-                        <option value="t2" selected>T2 · Expressive Financial Editorial</option>
+                        <option value="t2">T2 · Expressive Financial Editorial</option>
+                        <option value="t3" selected>T3 · Optically refined editorial typography</option>
                     </select>
                 </label>
                 <button type="button" id="copy-type" class="quiet">Copy typography specification</button>
