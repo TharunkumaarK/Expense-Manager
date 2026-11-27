@@ -1,21 +1,34 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-type="t2">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#09090b">
     <title>Visual design lab · Expense Manager</title>
+    <script>
+        {
+            const params = new URLSearchParams(location.search);
+            const root = document.documentElement;
+            const preview = params.get('preview');
+            if (['desktop', 'mobile', 'login', 'login-mobile', 'type'].includes(preview)) root.dataset.preview = preview;
+            let saved;
+            try { saved = localStorage.getItem('expense-manager-typography-4c2t'); } catch {}
+            root.dataset.type = (params.get('type') ?? saved) === 'baseline' ? 'baseline' : 't2';
+        }
+    </script>
     <link rel="stylesheet" href="lab.css">
     <link rel="stylesheet" href="identity.css">
+    <link rel="stylesheet" href="typography.css">
     <script src="icons.js" defer></script>
     <script src="lab.js" defer></script>
+    <script src="typography.js" defer></script>
 </head>
 <body>
     <a class="skip-link" href="#main">Skip to previews</a>
     <header class="lab-header">
         <a class="wordmark" href="#main">Expense Manager <span>Design lab</span></a>
         <nav aria-label="Design lab sections">
-            <a href="#desktop">Desktop</a><a href="#mobile">Mobile</a><a href="#materials">Materials</a>
+            <a href="#desktop">Desktop</a><a href="#mobile">Mobile</a><a href="#login">Login</a><a href="#typography">Typography</a><a href="#materials">Materials</a>
             <a href="#reflections">Reflections</a><a href="#actions">Actions</a><a href="#controls">Controls</a>
         </nav>
     </header>
@@ -50,7 +63,46 @@
                     <select id="action-state"><option value="normal">Normal</option><option value="disabled">Disabled</option><option value="busy">Busy</option></select>
                 </label>
             </div>
+        </section>
+
+        <section id="login" class="comparison" aria-labelledby="login-title">
+            <div class="section-line">
+                <h2 id="login-title">Login preview</h2>
+                <div class="preview-links"><a href="?preview=login">Desktop</a><a href="?preview=login-mobile">Mobile</a></div>
+            </div>
             <div id="login-preview"></div>
+        </section>
+
+        <section id="typography" class="comparison" aria-labelledby="typography-title">
+            <h2 id="typography-title">Financial typography</h2>
+            <div class="type-controls">
+                <label class="state-field">Preview typography
+                    <select id="type-treatment">
+                        <option value="baseline">Approved SF Pro baseline</option>
+                        <option value="t2" selected>T2 · Expressive Financial Editorial</option>
+                    </select>
+                </label>
+                <button type="button" id="copy-type" class="quiet">Copy typography specification</button>
+            </div>
+            <details id="type-details"><summary>Typography specification</summary>
+                <label class="sr-only" for="type-spec">Typography specification text</label>
+                <textarea id="type-spec" readonly rows="10"></textarea>
+            </details>
+            <article class="type-specimen matte" id="type-specimen" aria-labelledby="specimen-title">
+                <h3 id="specimen-title">Financial figures</h3>
+                <div id="type-figures"></div>
+                <div class="specimen-detail">
+                    <div>
+                        <h4 class="specimen-label">Category labels</h4>
+                        <p class="specimen-category">International travel and family remittances</p>
+                        <p class="specimen-category" lang="ja">食費・日用品の予算</p>
+                    </div>
+                    <div>
+                        <h4 class="specimen-label">Chart labels · Canvas</h4>
+                        <canvas id="type-canvas" role="img" aria-label="Groceries chart label, with a reference value of ¥350,000"></canvas>
+                    </div>
+                </div>
+            </article>
         </section>
 
         <section id="controls" class="comparison" aria-labelledby="controls-title">

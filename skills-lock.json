@@ -1,6 +1,13 @@
 {
   "version": 2,
   "skills": {
+    "better-typography": {
+      "source": "jakubkrehel/skills",
+      "commit": "672ae44ace6aaed65b86cbb1e2fd6fbea0e79578",
+      "sourceType": "github",
+      "skillPath": "skills/better-typography/SKILL.md",
+      "computedHash": "4a1b00bc0f9c3c7a83f9cb94dfa67359bdd12e160afc3cd69a01c0c1f6d240ff"
+    },
     "design-taste-frontend": {
       "source": "Leonxlnx/taste-skill",
       "commit": "d1a2bb41d927083ac7118f60cfc9cdf711810ea0",
@@ -29,12 +36,26 @@
       "skillPath": "skills/verification-before-completion/SKILL.md",
       "computedHash": "09b0e3a4689c1c38a3b8fc6ef57a1d4165aa33c0013d546dbde9dd348941a319"
     },
+    "visual-design-foundations": {
+      "source": "wshobson/agents",
+      "commit": "c96b5f6552dba32e4492307493ee613581430715",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/visual-design-foundations/SKILL.md",
+      "computedHash": "ca2bebbf7c248e5e32356bc074bc899285243c5a169782f4e163346b758fa1c9"
+    },
     "web-design-guidelines": {
       "source": "vercel-labs/agent-skills",
       "commit": "5a37a6329fbad3666c3207392a6a7c0110e92efb",
       "sourceType": "github",
       "skillPath": "skills/web-design-guidelines/SKILL.md",
       "computedHash": "5994e4cfd86144903d2ba750f862b9e36af15e3297aac983679e347b99f6cb71"
+    },
+    "web-typography": {
+      "source": "wondelai/skills",
+      "commit": "c37678106e63ef1c5472d848fb3d8b8c5b33fafe",
+      "sourceType": "github",
+      "skillPath": "web-typography/SKILL.md",
+      "computedHash": "dec11effdd7686fbbf0efda5e41ce2a5681a2f83b339bcec9ca41bf855b1841f"
     },
     "webapp-testing": {
       "source": "anthropics/skills",

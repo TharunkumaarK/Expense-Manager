@@ -1,0 +1,186 @@
+@font-face {
+    font-family: Geist;
+    src: url("typefaces/geist-variable.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Playfair Display";
+    src: url("typefaces/playfair-display-variable.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 400 900;
+    font-display: swap;
+}
+
+/* Activate the editorial type scale without replacing the SF Pro baseline. */
+:root[data-type="t2"] {
+    --font-ui: Geist, system-ui, "Noto Sans CJK JP", sans-serif;
+    --font-editorial: "Playfair Display", Geist, Georgia, serif;
+    --size-brand: clamp(2.25rem, calc(1.6rem + 2.2cqw), 3.3rem);
+    --size-page: 2.05rem;
+    --size-section: 1.52rem;
+    --size-hero: clamp(1.9rem, calc(1.35rem + 1.6cqw), 3rem);
+    --size-kpi: clamp(1.46rem, calc(1.2rem + .9cqw), 2.12rem);
+    --size-budget: 1.48rem;
+    --size-wallet: 1.95rem;
+    --size-functional: 1rem;
+    --size-label: .93rem;
+    --size-meta: .86rem;
+    --size-chart: .9rem;
+    --size-button: .96rem;
+    --size-input: 1.143rem;
+    --size-ledger: 1rem;
+    --track-title: -.012em;
+    --track-figure: -.006em;
+    font: 400 87.5%/1.45 var(--font-ui);
+    font-kerning: normal;
+    font-synthesis-weight: none;
+}
+
+[data-type="t2"] :is(.auth-brand-name, .toolbar-start h3, #auth-title, .dash-section .section-line h3,
+    .dash-panel .section-line h3, .summary-top h4, .specimen-label, #specimen-title) {
+    font-family: var(--font-editorial);
+    font-weight: 550;
+    letter-spacing: var(--track-title);
+}
+
+[data-type="t2"] .auth-brand-name { font-size: var(--size-brand); line-height: 1.13; }
+[data-type="t2"] :is(.toolbar-start h3, #auth-title) { font-size: var(--size-page); line-height: 1.18; }
+[data-type="t2"] :is(.dash-section .section-line h3, .dash-panel .section-line h3, .summary-top h4, .specimen-label, #specimen-title) {
+    font-size: var(--size-section);
+    line-height: 1.22;
+}
+
+[data-type="t2"] :is(.country .amount, .kpi .amount, .budget-amounts strong, .summary-tally strong,
+    .wallet-card .amount, .donut-center .amount, .specimen-editorial, .wallet-fallback .amount) {
+    font-family: var(--font-editorial);
+    font-weight: 575;
+    line-height: 1.15;
+    letter-spacing: var(--track-figure);
+    font-variant-numeric: lining-nums proportional-nums;
+    overflow-wrap: anywhere;
+}
+
+[data-type="t2"] .country .amount { font-size: var(--size-hero); }
+[data-type="t2"] :is(.kpi .amount, .donut-center .amount) { font-size: var(--size-kpi); white-space: normal; }
+[data-type="t2"] :is(.budget-amounts strong, .summary-tally strong, .specimen-editorial) { font-size: var(--size-budget); }
+[data-type="t2"] :is(.budget-amounts, .summary-tally) strong .amount { font-variant-numeric: inherit; }
+[data-type="t2"] :is(.wallet-card .amount, .wallet-fallback .amount) { font-size: var(--size-wallet); }
+
+[data-type="t2"] :is(.budget-head h4, .wallet-top h4, .country-name, .specimen-category) {
+    font: 550 var(--size-functional)/1.35 var(--font-ui);
+    letter-spacing: normal;
+}
+
+[data-type="t2"] :is(.nav-link, .action, .auth-form .quiet) { font: 500 var(--size-button)/1.3 var(--font-ui); }
+[data-type="t2"] .auth-form input { font: 400 var(--size-input)/1.4 var(--font-ui); }
+[data-type="t2"] .auth-form label > .label,
+[data-type="t2"] .auth-form .label-row > label { font: 500 1rem/1.4 var(--font-ui); }
+[data-type="t2"] :is(.label, .tx-title, .budget-amounts, .summary-tally, .auth-description) { font-size: var(--size-label); }
+[data-type="t2"] :is(.period, .tx-subtitle, .budget-foot, .summary-foot, .country-meta, .wallet-choice) {
+    font-size: var(--size-meta);
+    line-height: 1.4;
+}
+
+[data-type="t2"] :is(.transaction-list li > :last-child, .specimen-ledger) {
+    font: 500 var(--size-ledger)/1.3 var(--font-ui);
+    font-variant-numeric: lining-nums tabular-nums;
+    text-align: end;
+}
+[data-type="t2"] :is(.chart-legend li, #type-canvas) { font: 400 var(--size-chart)/1.4 var(--font-ui); }
+[data-type="t2"] :is(.amount, .specimen-ledger) { unicode-bidi: isolate; }
+
+[data-type="t2"] .mobile-workspace {
+    --size-page: 1.55rem;
+    --size-section: 1.33rem;
+    --size-hero: clamp(1.24rem, calc(1rem + 3.5cqw), 2rem);
+    --size-kpi: clamp(1.01rem, calc(.8rem + 1.95cqw), 1.55rem);
+    --size-budget: 1.28rem;
+    --size-wallet: 1.68rem;
+    --size-functional: .94rem;
+    --size-label: .87rem;
+}
+[data-type="t2"] .mobile-workspace :is(.dash-toolbar, .section-line, .country-head) { flex-wrap: wrap; }
+[data-type="t2"] .mobile-workspace .kpi .label { font-size: var(--size-label); }
+
+@container (max-width: 1010px) {
+    [data-type="t2"] .desktop-workspace .budget-head h4 { font-size: var(--size-functional); }
+}
+
+/* One login composition serves both type treatments and both viewport modes. */
+#login-preview { container-type: inline-size; }
+.preview-links { display: flex; gap: 14px; }
+.auth-brand-pane { border-inline-end: 1px solid var(--line); }
+.auth-brand-name { font-size: 1em; }
+[data-type="baseline"] #auth-title { font-size: 1rem; letter-spacing: -.009em; }
+.auth-headline { max-inline-size: 27ch; }
+[data-type="t2"] .auth-headline { font: 500 1.42rem/1.42 var(--font-ui); letter-spacing: -.01em; }
+.auth-description { max-inline-size: 41ch; color: var(--muted); }
+.auth-instruction { margin-top: 6px; }
+[data-type="t2"] :is(.auth-instruction, .auth-description) { font-size: 1rem; }
+.auth-showcase {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 0;
+    max-inline-size: 28rem;
+}
+.auth-showcase .country:first-child { grid-area: 1 / 1 / 2 / 9; align-self: start; }
+.auth-showcase .country:last-child { grid-area: 1 / 5 / 2 / 13; align-self: end; margin-block-start: 78px; }
+.auth-showcase .country { min-height: 109px; }
+[data-type="t2"] .auth-showcase .country .amount { font-size: clamp(1.5rem, calc(1.1rem + 1.6cqw), 2.12rem); }
+.auth-wrap input { padding-right: 43px; }
+
+@container (max-width: 700px) {
+    .auth-shell { grid-template-columns: minmax(0, 1fr); }
+    .auth-brand-pane { display: grid; border-inline-end: 0; border-block-end: 1px solid var(--line); }
+    .auth-showcase, .auth-description { display: none; }
+    [data-type="t2"] .auth-shell { --size-brand: 2.28rem; --size-page: 1.92rem; }
+    .auth-headline br { display: none; }
+}
+
+:root:is([data-preview^="login"], [data-preview="type"]) .preview-section,
+:root:is([data-preview="desktop"], [data-preview="mobile"], [data-preview="type"]) #login,
+:root:is([data-preview="desktop"], [data-preview="mobile"], [data-preview^="login"]) #typography { display: none; }
+:root[data-preview^="login"] #login {
+    display: grid;
+    align-content: center;
+    min-block-size: 100svh;
+    margin-block: 0;
+    padding-block: 24px;
+}
+:root[data-preview^="login"] #login > .section-line,
+:root[data-preview="type"] :is(#typography-title, .type-controls, #type-details) { display: none; }
+:root[data-preview="login-mobile"] #login { width: min(100% - 28px, 390px); }
+:root[data-preview="type"] #typography { display: block; margin-block: 24px; max-inline-size: 58rem; }
+@media (max-width: 700px) {
+    :root[data-preview^="login"] #login { align-content: start; padding-block: clamp(24px, 7svh, 55px); }
+}
+
+.type-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-block: 14px; }
+#type-spec {
+    width: 100%;
+    margin-block: 9px;
+    padding: 10px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    font: inherit;
+    resize: vertical;
+}
+.type-specimen { padding: clamp(12px, 3vw, 26px); margin-block: 18px; }
+#type-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; margin-block: 14px; }
+.specimen-figure { border-top: 1px solid var(--line); padding-block: 5px; line-height: 1.35; min-width: 0; overflow-wrap: anywhere; }
+.specimen-ledger { text-align: end; font-variant-numeric: lining-nums tabular-nums; }
+.specimen-head { padding-block: 6px; color: var(--muted); }
+.specimen-head:nth-child(2) { text-align: end; }
+.specimen-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.specimen-detail > div { min-width: 0; }
+.specimen-category { overflow-wrap: anywhere; margin-top: 5px; }
+#type-canvas { width: 100%; height: 52px; display: block; color: var(--muted); font: inherit; }
+
+@media (max-width: 520px) {
+    .specimen-detail { grid-template-columns: minmax(0, 1fr); gap: 13px; }
+    [data-type="t2"] .type-specimen { --size-budget: 1.32rem; --size-ledger: .94rem; }
+}

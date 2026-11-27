@@ -119,16 +119,16 @@ section[id] { scroll-margin-top: 18px; }
 .sample-label { margin-block-start: 11px; font-size: .91rem; }
 .lab-footer { border-top: 1px solid var(--line); padding-block: 18px; color: var(--quiet); font-size: .86rem; }
 
-body[data-preview] .lab-header,
-body[data-preview] .preview-heading,
-body[data-preview] .comparison,
-body[data-preview] .lab-footer { display: none; }
-body[data-preview="desktop"] #mobile,
-body[data-preview="mobile"] #desktop { display: none; }
-body[data-preview] #desktop-preview,
-body[data-preview] #mobile-preview { width: 100%; }
-body[data-preview] .preview-section { margin: 0; }
-body[data-preview] .workspace { border: 0; border-radius: 0; }
+:root[data-preview] .lab-header,
+:root[data-preview] .preview-heading,
+:root[data-preview] .comparison,
+:root[data-preview] .lab-footer { display: none; }
+:root[data-preview="desktop"] #mobile,
+:root[data-preview="mobile"] #desktop { display: none; }
+:root[data-preview] #desktop-preview,
+:root[data-preview] #mobile-preview { width: 100%; }
+:root[data-preview] .preview-section { margin: 0; }
+:root[data-preview] .workspace { border: 0; border-radius: 0; }
 
 .workspace {
     position: relative;

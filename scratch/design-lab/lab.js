@@ -56,9 +56,6 @@ const nav = [
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const finePointer = matchMedia('(any-hover: hover) and (any-pointer: fine)');
-const preview = new URLSearchParams(location.search).get('preview');
-if (['desktop', 'mobile'].includes(preview)) document.body.dataset.preview = preview;
-
 const compactLab = matchMedia('(max-width: 700px)');
 function orderPreviews() {
     const desktopSection = $('#desktop');
@@ -66,7 +63,7 @@ function orderPreviews() {
     if (compactLab.matches) desktopSection.before(mobileSection);
     else mobileSection.before(desktopSection);
 }
-if (!document.body.dataset.preview) {
+if (!document.documentElement.dataset.preview) {
     orderPreviews();
     compactLab.addEventListener('change', orderPreviews);
 }
@@ -214,7 +211,7 @@ function walletCard(id, override) {
 }
 
 function walletPanel(state) {
-    if (state.region === 'de') return `<article class="dash-panel matte"><h4>Giro account</h4>${amount('de', regions.de.balance)}</article>`;
+    if (state.region === 'de') return `<article class="dash-panel matte wallet-fallback"><h4>Giro account</h4>${amount('de', regions.de.balance)}</article>`;
     const region = state.region;
     const options = sampleWalletThemes.filter(([, item]) => item.region === region);
     const account = options[0][0];
@@ -319,12 +316,13 @@ $('#reflection-samples').innerHTML = Object.entries(variants).map(([id, label]) 
 $('#action-samples').innerHTML = action('View ledger', 'sample-action', 'ledger', { secondary: true }) + action('Add transaction', 'sample-action', 'plus');
 $('#login-preview').innerHTML = `<div class="auth-shell">
     <div class="auth-brand-pane">
-        <p class="auth-brand-name">Expense Manager</p>
-        <p class="auth-headline">Cross-border finances,<br>unified in one ledger.</p>
+        <h1 class="auth-brand-name">Expense Manager</h1>
+        <p class="auth-headline">Cross-border finances,<br> unified in one ledger.</p>
         <div class="auth-showcase">${country('jp', false)}${country('in', false)}</div>
+        <p class="auth-description">Track balances across Japan and India, with budgets in each currency.</p>
     </div>
-    <div class="auth-form-pane">
-        <h3>Welcome!</h3><p class="label">Sign in to access your sample ledger.</p>
+    <section class="auth-form-pane" aria-labelledby="auth-title">
+        <h2 id="auth-title">Welcome!</h2><p class="label auth-instruction">Sign in to access your sample ledger.</p>
         <div class="auth-form" aria-label="Synthetic sign-in preview">
             <label><span class="label">Email</span><input type="email" value="maya@example.test" autocomplete="off" readonly></label>
             <div>
@@ -336,7 +334,7 @@ $('#login-preview').innerHTML = `<div class="auth-shell">
             ${action('Sign in', 'sign-in')}
         </div>
         <p class="auth-feedback label" id="login-status" role="status"></p>
-    </div>
+    </section>
 </div>`;
 $('#close-dialog').innerHTML = icon('close');
 
