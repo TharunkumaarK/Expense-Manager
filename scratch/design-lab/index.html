@@ -3,100 +3,83 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#131313">
+    <meta name="theme-color" content="#09090b">
     <title>Visual design lab · Expense Manager</title>
     <link rel="stylesheet" href="lab.css">
+    <link rel="stylesheet" href="identity.css">
+    <script src="icons.js" defer></script>
     <script src="lab.js" defer></script>
 </head>
 <body>
-    <a class="skip-link" href="#main">Skip to comparisons</a>
+    <a class="skip-link" href="#main">Skip to previews</a>
     <header class="lab-header">
-        <div class="lab-header-inner">
-            <a class="wordmark" href="#main"><span class="mark" aria-hidden="true"></span>Expense Manager</a>
-            <nav aria-label="Design lab sections">
-                <a href="#buttons">Buttons</a><a href="#hierarchy">Toolbar</a><a href="#glass">Glass</a>
-                <a href="#budget">Budget</a><a href="#desktop">Desktop</a><a href="#mobile">Mobile</a>
-            </nav>
-        </div>
+        <a class="wordmark" href="#main">Expense Manager <span>Design lab</span></a>
+        <nav aria-label="Design lab sections">
+            <a href="#desktop">Desktop</a><a href="#mobile">Mobile</a><a href="#materials">Materials</a>
+            <a href="#reflections">Reflections</a><a href="#actions">Actions</a><a href="#controls">Controls</a>
+        </nav>
     </header>
-    <main id="main" class="lab">
-        <div class="intro">
-            <div><p class="kicker">Phase 4C.1P</p><h1>Visual design lab</h1></div>
-            <p>Compare interaction and materials with the same sample financial data. Preview your selections in the desktop and mobile dashboards.</p>
-        </div>
-
-        <section id="buttons" class="lab-section" aria-labelledby="buttons-title">
-            <div class="section-heading">
-                <div><h2 id="buttons-title">Primary actions</h2><p>Hover, tap, or activate with the keyboard.</p></div>
-            </div>
-            <div class="interaction-grid">
-                <div class="variant-stack" id="button-samples"></div>
-                <form id="motion-controls" class="motion-controls" autocomplete="off">
-                    <div class="controls-title"><h3>Motion and stroke</h3><button class="quiet-text" type="reset">Reset to defaults</button></div>
-                    <div class="presets" role="group" aria-label="Motion presets">
-                        <button type="button" data-preset="subtle" aria-pressed="false">Subtle</button>
-                        <button type="button" data-preset="balanced" aria-pressed="true">Balanced</button>
-                        <button type="button" data-preset="expressive" aria-pressed="false">Expressive</button>
-                    </div>
-                    <div class="sliders">
-                        <label>Fill transition <output for="fill" id="fill-value"></output><input id="fill" type="range" min="60" max="240" step="5"></label>
-                        <label>Glimmer travel <output for="travel" id="travel-value"></output><input id="travel" type="range" min="450" max="1250" step="10"></label>
-                        <label>Highlight length <output for="length" id="length-value"></output><input id="length" type="range" min="10" max="55" step="1"></label>
-                        <label>Highlight opacity <output for="opacity" id="opacity-value"></output><input id="opacity" type="range" min="10" max="100" step="1"></label>
-                        <label>Border thickness <output for="edge" id="edge-value"></output><input id="edge" type="range" min="0.5" max="2" step="0.25"></label>
-                        <label>Highlight intensity <output for="intensity" id="intensity-value"></output><input id="intensity" type="range" min="0" max="100" step="1"></label>
-                    </div>
-                    <label class="check"><input id="glimmer" type="checkbox" checked> Enable edge effects on A2 and A3</label>
-                </form>
-            </div>
-        </section>
-
-        <section id="hierarchy" class="lab-section" aria-labelledby="hierarchy-title">
-            <div class="section-heading"><div><h2 id="hierarchy-title">Interaction hierarchy</h2><p>Move across the toolbar to compare signature, standard, and utility actions.</p></div></div>
-            <div class="toolbar-lab" id="toolbar-demo"></div>
-        </section>
-
-        <section id="mobile-press" class="lab-section" aria-labelledby="press-title">
-            <div class="section-heading"><div><h2 id="press-title">Mobile press</h2><p>Tap the A variants and open the floating transaction menu.</p></div></div>
-            <div class="press-lab atmosphere" id="press-demo"></div>
-        </section>
-
-        <section id="glass" class="lab-section" aria-labelledby="glass-title">
-            <div class="section-heading"><div><h2 id="glass-title">Glass surfaces</h2><p>The same account summary under your selected atmosphere.</p></div><span class="context" id="glass-context"></span></div>
-            <div class="comparison-grid" id="glass-samples"></div>
-        </section>
-
-        <section id="background" class="lab-section" aria-labelledby="background-title">
-            <div class="section-heading"><div><h2 id="background-title">Graphite atmospheres</h2><p>Each light setting is shown behind your selected glass surface.</p></div><span class="context" id="background-context"></span></div>
-            <div class="comparison-grid" id="background-samples"></div>
-        </section>
-
-        <section id="budget" class="lab-section" aria-labelledby="budget-title">
-            <div class="section-heading">
-                <div><h2 id="budget-title">Budget streaks</h2><p>Compare static illumination with the slow sheen.</p></div>
-                <label class="check budget-switch"><input id="sheen" type="checkbox"> Animate budget sheen</label>
-            </div>
-            <div class="budget-stage atmosphere"><div class="comparison-grid" id="budget-samples"></div></div>
-        </section>
-
-        <section id="desktop" class="lab-section" aria-labelledby="desktop-title">
-            <div class="section-heading"><div><h2 id="desktop-title">Desktop dashboard</h2><p>Change the treatments in context. These choices also update the mobile preview.</p></div></div>
-            <div class="dashboard-settings" id="desktop-settings"></div>
+    <main id="main">
+        <h1 class="sr-only">Expense Manager design lab</h1>
+        <section id="desktop" class="preview-section" aria-labelledby="desktop-title">
+            <div class="preview-heading"><h2 id="desktop-title">Desktop dashboard</h2><a href="?preview=desktop">Open preview</a></div>
             <div id="desktop-preview"></div>
         </section>
-
-        <section id="mobile" class="lab-section" aria-labelledby="mobile-title">
-            <div class="section-heading"><div><h2 id="mobile-title">Mobile dashboard</h2><p>The same account in a stacked workspace with a floating action button.</p></div></div>
-            <div class="dashboard-settings" id="mobile-settings"></div>
-            <div class="phone-frame" id="mobile-preview"></div>
+        <section id="mobile" class="preview-section" aria-labelledby="mobile-title">
+            <div class="preview-heading"><h2 id="mobile-title">Mobile dashboard</h2><a href="?preview=mobile">Open preview</a></div>
+            <div id="mobile-preview"></div>
         </section>
-        <footer class="lab-footer"><span>Expense Manager visual lab · Synthetic data</span><a href="#main">Back to top ↑</a></footer>
-    </main>
 
-    <dialog id="action-dialog" aria-labelledby="dialog-title">
-        <div class="dialog-heading"><h2 id="dialog-title">Add transaction</h2><form method="dialog"><button class="utility icon-only" aria-label="Close transaction menu">×</button></form></div>
-        <div id="dialog-actions"></div>
+        <section id="materials" class="comparison" aria-labelledby="material-title">
+            <h2 id="material-title">Glass materials</h2>
+            <div class="sample-grid material-grid" id="material-samples"></div>
+        </section>
+
+        <section id="reflections" class="comparison" aria-labelledby="reflection-title">
+            <h2 id="reflection-title">Budget card reflections</h2>
+            <p class="support">Hover or tap the same card in each sample. Choose a treatment to apply it to both dashboard grids.</p>
+            <div class="sample-grid" id="reflection-samples"></div>
+        </section>
+
+        <section id="actions" class="comparison" aria-labelledby="action-title">
+            <h2 id="action-title">Buttons and navigation</h2>
+            <p class="support">Hover or press the actions, or tab to them to see focus. Try the frameless rail in the desktop preview.</p>
+            <div class="action-demo matte">
+                <div id="action-samples"></div>
+                <label class="state-field">Preview action state
+                    <select id="action-state"><option value="normal">Normal</option><option value="disabled">Disabled</option><option value="busy">Busy</option></select>
+                </label>
+            </div>
+            <div id="login-preview"></div>
+        </section>
+
+        <section id="controls" class="comparison" aria-labelledby="controls-title">
+            <h2 id="controls-title">Optical controls</h2>
+            <form id="optical-controls" class="control-panel matte">
+                <div class="control-grid">
+                    <label>Budget reflection <select name="variant" id="variant"></select></label>
+                    <label>Reflection direction
+                        <select name="direction"><option value="forward">Top edge · left to right</option><option value="reverse">Bottom edge · right to left</option></select>
+                    </label>
+                    <label>Edge intensity <output for="edgeIntensity"></output><input id="edgeIntensity" name="edgeIntensity" type="range" min="15" max="90" step="1"></label>
+                    <label>Edge length <output for="edgeLength"></output><input id="edgeLength" name="edgeLength" type="range" min="8" max="35" step="1"></label>
+                    <label>Shine intensity <output for="shineIntensity"></output><input id="shineIntensity" name="shineIntensity" type="range" min="3" max="24" step="1"></label>
+                    <label>Shine width <output for="shineWidth"></output><input id="shineWidth" name="shineWidth" type="range" min="18" max="58" step="1"></label>
+                    <label>Reflection duration <output for="duration"></output><input id="duration" name="duration" type="range" min="600" max="950" step="10"></label>
+                    <label>Desktop static light <output for="desktopLight"></output><input id="desktopLight" name="desktopLight" type="range" min="30" max="120" step="1"></label>
+                    <label>Mobile static light <output for="mobileLight"></output><input id="mobileLight" name="mobileLight" type="range" min="30" max="120" step="1"></label>
+                    <label class="checkbox"><input type="checkbox" name="summarySheen"> Animate overall budget streak</label>
+                </div>
+                <div class="control-actions"><button class="quiet" type="reset">Reset defaults</button><button class="quiet" type="button" id="copy-config">Copy configuration</button></div>
+                <details><summary>Configuration summary</summary><pre id="configuration"></pre></details>
+            </form>
+        </section>
+        <footer class="lab-footer">Expense Manager · Synthetic sample data</footer>
+    </main>
+    <dialog id="preview-dialog" aria-labelledby="dialog-title">
+        <div class="dialog-heading"><h2 id="dialog-title"></h2><form method="dialog"><button class="icon-button" aria-label="Close preview" id="close-dialog"></button></form></div>
+        <div id="dialog-body"></div>
     </dialog>
-    <span class="notice" id="notice" role="status" aria-live="polite"></span>
+    <p class="status-toast" id="notice" role="status"></p>
 </body>
 </html>

@@ -1,0 +1,97 @@
+/* Regional and wallet materials from the Expense Manager application. */
+
+.country-card-jp {
+    background: radial-gradient(circle at 10% 15%, rgba(225, 29, 72, 0.28), transparent 50%),
+        radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), transparent 55%),
+        linear-gradient(145deg, #181116, #100b10) !important;
+    border: 1px solid rgba(225, 29, 72, 0.26) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.country-card-in {
+    background: radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.24), transparent 50%),
+        radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), transparent 55%),
+        linear-gradient(145deg, #171510, #0c120e) !important;
+    border: 1px solid rgba(245, 158, 11, 0.24) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.country-card-de {
+    background: radial-gradient(circle at 10% 15%, rgba(220, 38, 38, 0.22), transparent 50%),
+        radial-gradient(circle at 90% 85%, rgba(234, 179, 8, 0.18), transparent 55%),
+        linear-gradient(145deg, #16181d, #0d0f14) !important;
+    border: 1px solid rgba(234, 179, 8, 0.22) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.wallet-theme-crimson-paypay {
+    background: radial-gradient(circle at 12% 18%, rgba(255, 0, 51, 0.38), transparent 50%),
+        radial-gradient(circle at 88% 85%, rgba(153, 0, 31, 0.26), transparent 55%),
+        linear-gradient(145deg, #1c0509, #110003);
+    border: 1px solid rgba(255, 0, 51, 0.32);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.wallet-theme-emerald-salary {
+    background: radial-gradient(circle at 12% 18%, rgba(16, 185, 129, 0.34), transparent 50%),
+        radial-gradient(circle at 88% 85%, rgba(4, 120, 87, 0.24), transparent 55%),
+        linear-gradient(145deg, #051a14, #02100c);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.wallet-theme-burgundy-axis {
+    background: radial-gradient(circle at 12% 18%, rgba(151, 20, 77, 0.38), transparent 50%),
+        radial-gradient(circle at 88% 85%, rgba(92, 9, 45, 0.26), transparent 55%),
+        linear-gradient(145deg, #1a0610, #100208);
+    border: 1px solid rgba(151, 20, 77, 0.34);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.wallet-theme-baroda-orange {
+    background: radial-gradient(circle at 12% 18%, rgba(234, 88, 12, 0.35), transparent 50%),
+        radial-gradient(circle at 88% 85%, rgba(194, 65, 12, 0.24), transparent 55%),
+        linear-gradient(145deg, #1c0e06, #120702);
+    border: 1px solid rgba(234, 88, 12, 0.3);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .country-card-jp:hover {
+        border-color: rgba(225, 29, 72, 0.45) !important;
+        box-shadow: 0 0 0 1px rgba(225, 29, 72, 0.35), 0 12px 32px rgba(225, 29, 72, 0.22), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+        transform: none !important;
+    }
+
+    .country-card-in:hover {
+        border-color: rgba(245, 158, 11, 0.45) !important;
+        box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 12px 32px rgba(245, 158, 11, 0.20), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+        transform: none !important;
+    }
+
+    .country-card-de:hover {
+        border-color: rgba(234, 179, 8, 0.45) !important;
+        box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.35), 0 12px 32px rgba(234, 179, 8, 0.20), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+        transform: none !important;
+    }
+
+    .wallet-theme-crimson-paypay:hover {
+        border-color: rgba(255, 0, 51, 0.55);
+        box-shadow: 0 10px 28px rgba(255, 0, 51, 0.22);
+    }
+
+    .wallet-theme-emerald-salary:hover {
+        border-color: rgba(16, 185, 129, 0.52);
+        box-shadow: 0 10px 28px rgba(16, 185, 129, 0.2);
+    }
+
+    .wallet-theme-burgundy-axis:hover {
+        border-color: rgba(151, 20, 77, 0.55);
+        box-shadow: 0 10px 28px rgba(151, 20, 77, 0.22);
+    }
+
+    .wallet-theme-baroda-orange:hover {
+        border-color: rgba(234, 88, 12, 0.52);
+        box-shadow: 0 10px 28px rgba(234, 88, 12, 0.2);
+    }
+}

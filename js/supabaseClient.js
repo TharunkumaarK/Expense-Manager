@@ -187,7 +187,8 @@ const supabaseClient = {
         const email = document.getElementById('auth-email').value;
         const password = document.getElementById('auth-password').value;
         const btn = document.getElementById('auth-btn');
-        btn.innerText = 'Loading...';
+        const label = document.getElementById('auth-btn-label');
+        label.textContent = 'Loading...';
         btn.disabled = true;
 
         // Try to log in
@@ -216,7 +217,7 @@ const supabaseClient = {
             await this.updateUI(true);
         }
         
-        btn.innerText = 'Sign In / Sign Up';
+        label.textContent = 'Sign In / Sign Up';
         btn.disabled = false;
     },
 
@@ -378,7 +379,8 @@ const supabaseClient = {
         }
         
         const btn = document.getElementById('auth-btn');
-        btn.innerText = 'Sending link...';
+        const label = document.getElementById('auth-btn-label');
+        label.textContent = 'Sending link...';
         btn.disabled = true;
 
         const { data, error } = await this.client.auth.resetPasswordForEmail(email, {
@@ -397,7 +399,7 @@ const supabaseClient = {
             if (errEl) errEl.style.color = 'var(--green)';
         }
 
-        btn.innerText = 'Sign In / Sign Up';
+        label.textContent = 'Sign In / Sign Up';
         btn.disabled = false;
     },
 

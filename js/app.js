@@ -102,7 +102,6 @@ class App {
         this.ledgerSearchQuery = '';
         this.syncJapanAnalyticsPreferences();
         storage.checkRollover();
-        this.initSidebarState();
         this.setupNavigation();
         this.setupInactivityMonitoring();
         this.updatePrivacyUI();
@@ -397,6 +396,35 @@ class App {
         if (this.navigationEventsRegistered) return;
         this.navigationEventsRegistered = true;
 
+        const sidebar = document.getElementById('desktop-sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle-btn');
+        const desktop = matchMedia('(min-width: 1024px)');
+        const hoverSidebar = matchMedia('(min-width: 1024px) and (any-hover: hover) and (any-pointer: fine)');
+
+        sidebar?.addEventListener('pointerenter', event => {
+            if (event.pointerType === 'mouse' && hoverSidebar.matches && !sidebar.dataset.sidebarExpanded) {
+                this.setDesktopSidebarMode('hover');
+            }
+        });
+        sidebar?.addEventListener('pointerleave', event => {
+            if (event.pointerType === 'mouse' && sidebar.dataset.sidebarExpanded === 'hover') {
+                this.setDesktopSidebarMode(null);
+            }
+        });
+        sidebarToggle?.addEventListener('click', event => {
+            const mode = sidebar.dataset.sidebarExpanded ? null : 'manual';
+            this.setDesktopSidebarMode(mode, event.detail === 0);
+        });
+        desktop.addEventListener('change', () => {
+            this.setDesktopSidebarMode(null, true);
+            if (desktop.matches && sidebar?.classList.contains('mobile-open')) this.closeMobileSidebar();
+        });
+        hoverSidebar.addEventListener('change', () => {
+            if (!hoverSidebar.matches && sidebar?.dataset.sidebarExpanded === 'hover') {
+                this.setDesktopSidebarMode(null, true);
+            }
+        });
+
         // Desktop & Mobile drawer navigation items
         document.querySelectorAll('.desktop-nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
@@ -409,7 +437,6 @@ class App {
         // Keyboard shortcuts (Escape key dismisses mobile drawer, fab menu, focus overlay and modals)
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                const sidebar = document.getElementById('desktop-sidebar');
                 if (sidebar && sidebar.classList.contains('mobile-open')) {
                     this.closeMobileSidebar();
                     return;
@@ -450,17 +477,26 @@ class App {
                     this.closeFocusOverlay();
                     return;
                 }
-                ['add-wallet-modal', 'edit-wallet-modal', 'transaction-modal', 'tx-action-selector-modal', 'quick-edit-modal', 'color-picker-modal', 'pdf-modal', 'category-manage-modal'].forEach(mId => {
+                const openModals = ['add-wallet-modal', 'edit-wallet-modal', 'transaction-modal', 'tx-action-selector-modal', 'quick-edit-modal', 'color-picker-modal', 'pdf-modal', 'category-manage-modal'].filter(mId => {
                     const el = document.getElementById(mId);
-                    if (el && el.classList.contains('active')) {
-                        this.closeModal(mId);
-                    }
+                    return el?.classList.contains('active');
                 });
+                if (openModals.length) {
+                    openModals.forEach(mId => this.closeModal(mId));
+                    return;
+                }
+                if (desktop.matches && sidebar?.dataset.sidebarExpanded) {
+                    if (sidebar.contains(document.activeElement)) sidebarToggle.focus();
+                    this.setDesktopSidebarMode(null, true);
+                }
             }
         });
 
         // Close sidebar account popover on outside click
         document.addEventListener('click', (e) => {
+            if (desktop.matches && sidebar?.dataset.sidebarExpanded === 'manual' && !sidebar.contains(e.target)) {
+                this.setDesktopSidebarMode(null);
+            }
             const menu = document.getElementById('sidebar-account-menu');
             const card = document.getElementById('sidebar-account-card');
             if (menu && menu.classList.contains('active')) {
@@ -545,12 +581,10 @@ class App {
 
         // Synchronize active item on sidebar
         document.querySelectorAll('.desktop-nav-item').forEach(n => {
-            const t = n.getAttribute('data-target');
-            if (t === resolvedId || (resolvedId === 'home-view' && t === 'home-view')) {
-                n.classList.add('active');
-            } else {
-                n.classList.remove('active');
-            }
+            const active = n.dataset.target === resolvedId;
+            n.classList.toggle('active', active);
+            if (active) n.setAttribute('aria-current', 'page');
+            else n.removeAttribute('aria-current');
         });
 
         // Ensure mobile drawer is closed upon view transition
@@ -601,25 +635,21 @@ class App {
         this.refreshIcons(targetView);
     }
 
-    toggleSidebarCollapse() {
+    setDesktopSidebarMode(mode, instant = false) {
         const sidebar = document.getElementById('desktop-sidebar');
-        if (!sidebar) return;
-        const isCollapsed = sidebar.classList.toggle('collapsed');
-        try {
-            localStorage.setItem('em_sidebar_collapsed', isCollapsed ? 'true' : 'false');
-        } catch (e) {
-            console.warn('[UI] Failed to save sidebar collapse state:');
-        }
-    }
-
-    initSidebarState() {
-        try {
-            if (localStorage.getItem('em_sidebar_collapsed') === 'true') {
-                const sidebar = document.getElementById('desktop-sidebar');
-                if (sidebar) sidebar.classList.add('collapsed');
+        const toggle = document.getElementById('sidebar-toggle-btn');
+        if (!sidebar || !toggle) return;
+        sidebar.toggleAttribute('data-sidebar-instant', instant);
+        toggle.setAttribute('aria-expanded', String(Boolean(mode)));
+        if (mode) {
+            sidebar.dataset.sidebarExpanded = mode;
+        } else if (sidebar.dataset.sidebarExpanded) {
+            if (sidebar.contains(document.activeElement) &&
+                document.activeElement.closest('.account-popover-menu, .account-logout-btn')) {
+                toggle.focus();
             }
-        } catch (e) {
-            console.warn('[UI] Failed to read sidebar collapse state:');
+            delete sidebar.dataset.sidebarExpanded;
+            this.closeAccountMenu();
         }
     }
 
@@ -2626,6 +2656,10 @@ class App {
         if (event) event.stopPropagation();
         const menu = document.getElementById('sidebar-account-menu');
         if (!menu) return;
+        const sidebar = menu.closest('.desktop-sidebar');
+        if (!sidebar.dataset.sidebarExpanded && matchMedia('(min-width: 1024px)').matches) {
+            this.setDesktopSidebarMode('manual');
+        }
         menu.classList.toggle('active');
     }
 

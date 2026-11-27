@@ -205,8 +205,9 @@
                             </div>
                         </div>
 
-                        <button type="submit" id="auth-btn" class="btn btn-primary auth-submit-btn">
-                            <span>Sign In</span>
+                        <button type="submit" id="auth-btn" class="btn btn-primary auth-submit-btn" data-signature-action>
+                            <svg class="action-rim" aria-hidden="true" focusable="false"><rect/></svg>
+                            <span id="auth-btn-label">Sign In</span>
                         </button>
                     </form>
                 </div>
@@ -502,9 +503,9 @@
                             <span class="brand-name">Expense Manager</span>
                         </div>
                     </div>
-                    <button id="sidebar-toggle-btn" class="sidebar-toggle" title="Collapse sidebar"
-                        aria-label="Collapse sidebar" onclick="app.toggleSidebarCollapse()">
-                        <i data-lucide="panel-left-close" id="sidebar-toggle-icon" class="sidebar-toggle-icon"></i>
+                    <button type="button" id="sidebar-toggle-btn" class="sidebar-toggle" title="Toggle sidebar"
+                        aria-label="Toggle sidebar" aria-controls="desktop-sidebar" aria-expanded="false">
+                        <i data-lucide="menu" class="sidebar-toggle-icon"></i>
                     </button>
                 </div>
 
@@ -513,7 +514,7 @@
                     <div class="nav-group-label sidebar-text">MAIN MENU</div>
                     <ul class="nav-list">
                         <li>
-                            <a href="#" class="desktop-nav-item active" data-target="home-view" data-tooltip="Dashboard"
+                            <a href="#" class="desktop-nav-item active" data-target="home-view" aria-current="page"
                                 title="Dashboard">
                                 <i data-lucide="layout-dashboard"></i>
                                 <span class="sidebar-text">Dashboard</span>
@@ -521,42 +522,37 @@
                         </li>
                         <li>
                             <a href="#" class="desktop-nav-item" data-target="transactions-view"
-                                data-tooltip="Transactions" title="Transactions">
+                                title="Transactions">
                                 <i data-lucide="receipt"></i>
                                 <span class="sidebar-text">Transactions</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#" class="desktop-nav-item" data-target="analytics-view" data-tooltip="Analytics"
-                                title="Analytics">
+                            <a href="#" class="desktop-nav-item" data-target="analytics-view" title="Analytics">
                                 <i data-lucide="line-chart"></i>
                                 <span class="sidebar-text">Analytics</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#" class="desktop-nav-item" data-target="reports-view" data-tooltip="Reports"
-                                title="Reports">
+                            <a href="#" class="desktop-nav-item" data-target="reports-view" title="Reports">
                                 <i data-lucide="file-text"></i>
                                 <span class="sidebar-text">Reports</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#" class="desktop-nav-item" data-target="budgets-view" data-tooltip="Budgets"
-                                title="Budgets">
+                            <a href="#" class="desktop-nav-item" data-target="budgets-view" title="Budgets">
                                 <i data-lucide="pie-chart"></i>
                                 <span class="sidebar-text">Budgets</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#" class="desktop-nav-item" data-target="wallets-view" data-tooltip="Wallets"
-                                title="Wallets">
+                            <a href="#" class="desktop-nav-item" data-target="wallets-view" title="Wallets">
                                 <i data-lucide="wallet"></i>
                                 <span class="sidebar-text">Wallets</span>
                             </a>
                         </li>
                         <li>
-                            <a href="#" class="desktop-nav-item" data-target="settings-view" data-tooltip="Settings"
-                                title="Settings">
+                            <a href="#" class="desktop-nav-item" data-target="settings-view" title="Settings">
                                 <i data-lucide="settings"></i>
                                 <span class="sidebar-text">Settings</span>
                             </a>
@@ -985,9 +981,10 @@
                                             <span class="dash-chart-period-badge" id="dash-recent-count-badge">This
                                                 Month</span>
                                         </div>
-                                        <button type="button" class="dash-see-all-btn"
+                                        <button type="button" class="btn btn-secondary dash-see-all-btn" data-signature-action
                                             onclick="app.switchView('transactions-view')"
                                             title="View continuous ledger">
+                                            <svg class="action-rim" aria-hidden="true" focusable="false"><rect/></svg>
                                             <span>See All</span>
                                             <i data-lucide="arrow-right"></i>
                                         </button>

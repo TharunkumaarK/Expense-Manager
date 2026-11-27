@@ -76,7 +76,7 @@ document.addEventListener('pointerdown', event => {
     clearPress(true);
     const button = event.target.closest('button, a.btn');
     button?.classList.remove('button-hover');
-    if (!button?.matches('.btn-primary, [data-signature-action]') || button.matches(unavailableAction)) return;
+    if (!button?.matches('.btn-primary, .btn-secondary, [data-signature-action]') || button.matches(unavailableAction)) return;
     button.classList.add('button-press');
     press = { button, id: event.pointerId, x: event.clientX, y: event.clientY };
     playRim(button);

@@ -1,481 +1,863 @@
 'use strict';
 
-const buttons = [
-    { id: 'A1', name: 'Stroke to fill', description: 'A quiet fill and a still bronze edge.' },
-    { id: 'A2', name: 'Edge catch', description: 'Light briefly catches one part of the rim.' },
-    { id: 'A3', name: 'Clockwise lap', description: 'A short highlight follows the rounded rim.' },
-];
-const surfaces = [
-    { id: 'C1', name: 'Satin glass' },
-    { id: 'C2', name: 'Frosted glass' },
-    { id: 'C3', name: 'Sculpted dark glass' },
-];
-const atmospheres = [
-    { id: 'D1', name: 'Restrained' },
-    { id: 'D2', name: 'Balanced' },
-    { id: 'D3', name: 'Directional' },
-];
-const presets = {
-    subtle: { fill: 90, travel: 920, length: 20, opacity: 44, edge: .75, intensity: 38 },
-    balanced: { fill: 110, travel: 900, length: 29, opacity: 67, edge: 1, intensity: 65 },
-    expressive: { fill: 145, travel: 1050, length: 44, opacity: 84, edge: 1.5, intensity: 85 },
-};
-const labels = { fill: 'ms', travel: 'ms', length: 'px', opacity: '%', edge: 'px', intensity: '%' };
-const picks = { button: 'A1', surface: 'C1', atmosphere: 'D2' };
-const sections = { button: buttons, surface: surfaces, atmosphere: atmospheres };
-let motion = { ...presets.balanced };
-let glimmerEnabled = true;
-let noticeTimer;
-
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
-const icons = {
-    plus: '<path d="M12 5v14M5 12h14"/>',
-    eye: '<path d="M2 12s3.6-6.2 10-6.2S22 12 22 12s-3.6 6.2-10 6.2S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/>',
-    filter: '<path d="M4 7h16M7 12h10m-7 5h4"/>',
-    menu: '<path d="M5 7h14M5 12h14M5 17h14"/>',
-    more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
-    trash: '<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 3v6m4-6v6"/>',
-    wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v3m0 0h2v11H5a2 2 0 0 1-2-2V7m0 1h17m-4 5h1"/>',
-    home: '<path d="M3 10 12 3l9 7v10H3Zm6 10v-6h6v6"/>',
-    ledger: '<path d="M5 4h14v16H5Zm4 5h6m-6 4h6m-6 4h4"/>',
-    budget: '<path d="M3 19h18M6 15v-4m6 4V6m6 9V9"/>',
-    up: '<path d="M6 18 18 6M8 6h10v10"/>',
-    down: '<path d="M18 6 6 18m0-10v10h10"/>',
-    transfer: '<path d="M3 8h17m-4-4 4 4-4 4M21 16H4m4-4-4 4 4 4"/>',
-    chevron: '<path d="m9 6 6 6-6 6"/>',
-    adjust: '<path d="M4 7h16M4 17h16M9 4v6m6 4v6"/>',
-};
-// With equal local and CSS dimensions, one SVG unit maps to one CSS pixel.
-// The clockwise path begins on the top edge and closes with a tangent join.
-const roundRect = 'M84 1.35H159A7.65 7.65 0 0 1 166.65 9V35A7.65 7.65 0 0 1 159 42.65H9A7.65 7.65 0 0 1 1.35 35V9A7.65 7.65 0 0 1 9 1.35Z';
-const circle = 'M27 1.35A25.65 25.65 0 1 1 27 52.65A25.65 25.65 0 1 1 27 1.35Z';
-const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`;
+const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${labIcons[name]}</svg>`;
 
-function signature({ variant, fab = false, action = 'sample', scope }) {
-    const behavior = variant ? `data-variant="${variant}"` : 'data-shared-button';
-    const context = scope ? `data-scope="${scope}"` : '';
-    return `<button type="button" class="signature${fab ? ' fab' : ''}" ${behavior} data-command="${action}" ${context}
-        ${fab ? 'aria-label="Add transaction" ' : ''}${action === 'add' ? 'aria-haspopup="dialog"' : ''}>
-        ${icon('plus')}${fab ? '' : '<span>Add transaction</span>'}
-        <svg class="edge-light" viewBox="${fab ? '0 0 54 54' : '0 0 168 44'}" aria-hidden="true"><path d="${fab ? circle : roundRect}"/></svg>
+const variants = {
+    B1: 'Edge glimmer only',
+    B2: 'Surface shine only',
+    B3: 'Combined optical reflection',
+};
+const defaults = {
+    variant: 'B3', direction: 'forward', edgeIntensity: 56, edgeLength: 19,
+    shineIntensity: 11, shineWidth: 37, duration: 790, desktopLight: 78,
+    mobileLight: 89, summarySheen: true,
+};
+const regions = {
+    jp: { name: 'Japan', code: 'JPY', locale: 'en-US', balance: 532510, income: 342000,
+        spent: [28760, 17890, 12340, 14720, 29850, 6400, 9200, 22000, 3750],
+        budget: [42000, 20000, 18000, 16000, 24000, 12000, 13000, 35000, 8000] },
+    in: { name: 'India', code: 'INR', locale: 'en-IN', balance: 187120, income: 80500,
+        spent: [8240, 4360, 3750, 3940, 7830, 2490, 2290, 5600, 1350],
+        budget: [10000, 5000, 4500, 5000, 7000, 4000, 3000, 8000, 2000] },
+    de: { name: 'Germany', code: 'EUR', locale: 'en-IE', balance: 3240, income: 2860,
+        spent: [304, 178, 89, 171, 281, 52, 76, 160, 33],
+        budget: [430, 210, 125, 200, 220, 110, 125, 255, 80] },
+};
+const categoryNames = [
+    ['Groceries', 'groceries'], ['Dining', 'dining'], ['Transport', 'transport'],
+    ['Utilities', 'utilities'], ['Shopping', 'shopping'], ['Entertainment', 'entertainment'],
+    ['Personal care', 'care'], ['Travel', 'travel'], ['Other expenses', 'other'],
+];
+const wallets = {
+    salary: { name: 'Salary account', theme: 'emerald-salary', region: 'jp', balance: 486200, digits: '0412' },
+    paypay: { name: 'PayPay', theme: 'crimson-paypay', region: 'jp', balance: 17480, digits: '6025' },
+    axis: { name: 'Axis Bank', theme: 'burgundy-axis', region: 'in', balance: 128320, digits: '7128' },
+    baroda: { name: 'Bank of Baroda', theme: 'baroda-orange', region: 'in', balance: 58800, digits: '3086' },
+};
+const activity = {
+    jp: [['Dinner in Shibuya', 'Dining', 'PayPay', 26, -5460], ['Monthly salary', 'Income', 'Salary account', 25, 342000],
+        ['Weekend groceries', 'Groceries', 'PayPay', 24, -14260], ['Commuter pass', 'Transport', 'Suica', 21, -12340],
+        ['Electricity and gas', 'Utilities', 'Salary account', 19, -14720]],
+    in: [['Household supplies', 'Shopping', 'Bank of Baroda', 26, -3560], ['Weekend groceries', 'Groceries', 'Axis Bank', 24, -3070],
+        ['Fuel', 'Transport', 'Axis Bank', 22, -1250], ['Electricity bill', 'Utilities', 'Axis Bank', 20, -3940],
+        ['Consulting income', 'Income', 'Axis Bank', 18, 80500]],
+    de: [['Groceries', 'Groceries', 'Giro account', 25, -74], ['Train ticket', 'Transport', 'Giro account', 21, -39],
+        ['Cinema', 'Entertainment', 'Giro account', 20, -25], ['Electricity', 'Utilities', 'Giro account', 19, -171],
+        ['Monthly salary', 'Income', 'Giro account', 18, 2860]],
+};
+const nav = [
+    ['Dashboard', 'home', 'overview'], ['Transactions', 'ledger', 'transactions'],
+    ['Analytics', 'chart', 'analytics'], ['Reports', 'reports', 'report'],
+    ['Budgets', 'budget', 'budgets'], ['Wallets', 'wallet', 'wallets'],
+    ['Settings', 'settings', 'controls'],
+];
+
+const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+const finePointer = matchMedia('(any-hover: hover) and (any-pointer: fine)');
+const preview = new URLSearchParams(location.search).get('preview');
+if (['desktop', 'mobile'].includes(preview)) document.body.dataset.preview = preview;
+
+const compactLab = matchMedia('(max-width: 700px)');
+function orderPreviews() {
+    const desktopSection = $('#desktop');
+    const mobileSection = $('#mobile');
+    if (compactLab.matches) desktopSection.before(mobileSection);
+    else mobileSection.before(desktopSection);
+}
+if (!document.body.dataset.preview) {
+    orderPreviews();
+    compactLab.addEventListener('change', orderPreviews);
+}
+
+const total = values => values.reduce((a, b) => a + b, 0);
+const month = new Date(2026, 10, 1);
+const period = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' }).format(month);
+const currency = Object.fromEntries(Object.entries(regions).map(([id, region]) =>
+    [id, new Intl.NumberFormat(region.locale, { style: 'currency', currency: region.code, maximumFractionDigits: 0 })]));
+const money = (id, number) => currency[id].format(Math.abs(number));
+const amount = (id, number, signed = false) =>
+    `<span class="amount" data-amount>${number < 0 ? '−' : signed ? '+' : ''}${money(id, number)}</span>`;
+const statusFor = percent => percent > 100 ? 'over' : percent >= 75 ? 'warn' : 'safe';
+const utilization = (spent, limit) => Math.round(100 * spent / limit);
+const settingsKey = 'expense-manager-optics-4c2v';
+const dashboards = new Map();
+const sampleWalletThemes = Object.entries(wallets);
+let dialogWorkspace;
+let noticeTimer;
+let summaryObserver;
+let loginTimer;
+
+function flag(id) {
+    const contents = {
+        jp: '<rect width="24" height="24" fill="#eee"/><circle cx="12" cy="12" r="5" fill="#d80027"/>',
+        in: '<path fill="#ff9933" d="M0 0h24v8H0z"/><path fill="#fff" d="M0 8h24v8H0z"/><path fill="#138808" d="M0 16h24v8H0z"/><circle cx="12" cy="12" r="2.45" fill="none" stroke="#000080" stroke-width="1"/>',
+        de: '<path fill="#171717" d="M0 0h24v8H0z"/><path fill="#dc2626" d="M0 8h24v8H0z"/><path fill="#ffce00" d="M0 16h24v8H0z"/>',
+    };
+    return `<svg class="flag" viewBox="0 0 24 24" aria-hidden="true">${contents[id]}</svg>`;
+}
+
+function action(label, command, glyph, options = {}) {
+    const { secondary = false, fab = false, glimmer = true } = options;
+    return `<button type="button" class="action${secondary ? ' secondary' : ''}${fab ? ' fab' : ''}" data-command="${command}"
+        ${fab ? `aria-label="${label}"` : ''} ${glimmer ? 'data-glimmer' : ''}>
+        ${glyph ? icon(glyph) : ''}${fab ? '' : `<span class="action-label">${label}</span>`}
+        ${glimmer ? '<svg class="rim" aria-hidden="true" focusable="false"><rect/></svg>' : ''}
     </button>`;
 }
 
-function utility(command, name, glyph, extra = '') {
-    return `<button type="button" class="utility icon-only ${extra}" data-command="${command}" aria-label="${name}" title="${name}">${icon(glyph)}</button>`;
+function utility(command, label, glyph, attributes = '') {
+    return `<button type="button" class="icon-button" data-command="${command}" aria-label="${label}" title="${label}" ${attributes}>${icon(glyph)}</button>`;
 }
 
-function standard(type, extra = '') {
-    const name = type[0].toUpperCase() + type.slice(1);
-    const glyph = { expense: 'up', income: 'down', transfer: 'transfer' }[type];
-    return `<button type="button" class="standard ${type}" data-command="${type}" ${extra}>${icon(glyph)}${name}</button>`;
+function country(id, interactive = true) {
+    const { name, balance, code } = regions[id];
+    const inner = `<span class="country-head"><span class="country-name">${flag(id)}${name}</span>
+        <span class="country-meta">${code}${interactive ? icon('arrow') : ''}</span></span>
+        ${amount(id, balance)}<span class="label">Total balance</span>`;
+    const className = `country country-card-${id}`;
+    return interactive
+        ? `<button type="button" class="${className}" data-command="portfolio" data-region="${id}" aria-haspopup="dialog">${inner}</button>`
+        : `<article class="${className}">${inner}</article>`;
 }
 
-function accountSummary(surface, shared = '') {
-    return `<article class="glass" data-surface="${surface}" ${shared}>
-        <div class="glass-title"><h3>Monthly cash flow</h3>${icon('wallet')}</div>
-        <p class="balance">¥61,200</p>
-        <div class="split-numbers">
-            <p><span class="meta">Income</span><span class="income">+¥320,000</span></p>
-            <p><span class="meta">Outflows</span><span class="expense">−¥258,800</span></p>
-        </div>
+function kpi(title, sum, region, glyph, signature = false, tone = '') {
+    return `<article class="kpi ${signature ? 'luminous' : 'matte'}">
+        <p class="label">${title}${icon(glyph)}</p>
+        <p class="${tone}">${amount(region, sum, true)}</p>
     </article>`;
 }
 
-const budgetCases = [
-    { status: 'safe', caption: 'On track', spent: '¥12,000', limit: '¥30,000', used: 40 },
-    { status: 'warn', caption: 'Near limit', spent: '¥25,500', limit: '¥30,000', used: 85 },
-    { status: 'over', caption: 'Over limit', spent: '¥34,200', limit: '¥30,000', used: 114 },
-];
-function budgetCard({ status, caption, spent, limit, used }, surface, heading = 'Food & groceries') {
-    return `<article class="glass budget-card ${status}" data-shared-surface data-surface="${surface}">
-        <div class="glass-title"><h3>${heading}</h3><span class="meta utilization">${caption}</span></div>
-        <p class="meta"><span class="amount">${spent}</span> of <span class="amount">${limit}</span></p>
-        <div class="budget-track" role="progressbar" aria-label="${heading} · ${caption}" aria-valuenow="${Math.min(used, 100)}"
-            aria-valuemin="0" aria-valuemax="100" aria-valuetext="${used}% used"><span class="budget-fill" style="--usage: ${used}%"></span></div>
-        <p class="meta utilization">${used}% used</p>
-    </article>`;
-}
-
-function optionCards(key) {
-    return sections[key].map(({ id, name }) => {
-        const isSurface = key === 'surface';
-        return `<div class="sample">
-            <div class="sample-room atmosphere" data-atmosphere="${isSurface ? picks.atmosphere : id}" ${isSurface ? 'data-shared-atmosphere' : ''}>
-                ${accountSummary(isSurface ? id : picks.surface, isSurface ? '' : 'data-shared-surface')}
-            </div>
-            <div class="sample-choice">
-                <label><input name="${key}-choice" type="radio" value="${id}" data-select="${key}" ${id === picks[key] ? 'checked' : ''}><span class="variant-id">${id}</span> ${name}</label>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function settings(scope) {
-    const names = { button: 'Signature action', surface: 'Glass surface', atmosphere: 'Atmosphere' };
-    return Object.entries(sections).map(([key, values]) =>
-        `<label for="${scope}-${key}">${names[key]}
-            <select id="${scope}-${key}" data-select="${key}">
-                ${values.map(({ id, name }) => `<option ${id === picks[key] ? 'selected' : ''} value="${id}">${id} · ${name}</option>`).join('')}
-            </select>
-        </label>`
-    ).join('');
-}
-
-function dashboard(scope, mobile) {
-    const rail = [
-        { id: 'overview', name: 'Overview', glyph: 'home' },
-        { id: 'wallets', name: 'Wallets', glyph: 'wallet' },
-        { id: 'budgets', name: 'Budgets', glyph: 'budget' },
-        { id: 'transactions', name: 'Transactions', glyph: 'ledger' },
-    ];
-    const kpis = [
-        { name: 'Income', amount: '+¥320,000', type: 'income' },
-        { name: 'Outflows', amount: '−¥258,800', type: 'expense' },
-        { name: 'Net savings', amount: '¥61,200', type: 'net' },
-    ];
-    return `<div class="${mobile ? 'mobile-preview' : 'desktop-preview'}">
-        <div class="dashboard atmosphere" data-dashboard data-shared-atmosphere data-atmosphere="${picks.atmosphere}">
-            ${mobile ? '' : `<aside class="dash-rail">
-                <button class="utility icon-only" type="button" data-command="rail" aria-label="Toggle sidebar" aria-controls="${scope}-nav" aria-expanded="false">${icon('menu')}</button>
-                <nav id="${scope}-nav" aria-label="Dashboard sections">${rail.map(({ id, name, glyph }, index) =>
-                    `<a class="utility rail-link" href="#${scope}-${id}" ${index === 0 ? 'aria-current="true"' : ''}>${icon(glyph)}<span>${name}</span></a>`).join('')}</nav>
-            </aside>`}
-            <div class="dash-content">
-                <header class="dash-toolbar">
-                    <div><h3>Dashboard</h3><p class="meta">November 2026</p></div>
-                    <div class="action-row">
-                        ${utility('privacy', 'Hide amounts', 'eye')}
-                        ${utility('filter', 'Show expenses only', 'filter')}
-                        ${mobile ? '' : signature({ action: 'add', scope })}
-                    </div>
-                </header>
-                <div class="dash-body">
-                    <div class="dash-kpis" id="${scope}-overview" tabindex="-1">${kpis.map(({ name, amount, type }) =>
-                        `<article class="glass" data-shared-surface data-surface="${picks.surface}"><p class="meta">${name}</p><p class="balance amount ${type}">${amount}</p></article>`).join('')}</div>
-                    <div class="dash-duo" id="${scope}-wallets" tabindex="-1">
-                        <article class="wallet wallet-em" data-wallet>
-                            <div class="glass-title"><h3 data-wallet-name>Emerald Salary</h3>${utility('wallet', 'Switch wallet theme', 'more')}</div>
-                            <p class="meta">Current balance</p><p class="balance amount" data-wallet-balance>¥482,600</p>
-                        </article>
-                        <article class="country country-jp" data-country>
-                            <button class="country-control" type="button" data-command="country" aria-label="Show India balances">
-                                <span class="flag" aria-hidden="true">🇯🇵</span><span data-country-name>Japan</span>${icon('chevron')}
-                            </button>
-                            <p class="meta">Total balances</p><p class="balance amount" data-country-balance>¥618,200</p>
-                        </article>
-                    </div>
-                    <div class="dash-lower">
-                        <div id="${scope}-budgets" tabindex="-1">${budgetCard(budgetCases[1], picks.surface)}</div>
-                        <article class="glass transactions" id="${scope}-transactions" tabindex="-1" data-shared-surface data-surface="${picks.surface}">
-                            <div class="glass-title"><h3>Recent transactions</h3></div>
-                            <ul>
-                                <li class="tx" data-expense><div>Food &amp; groceries<span class="meta">Japan · Nov 25</span></div><span class="amount expense">−¥3,200</span></li>
-                                <li class="tx"><div>Monthly salary<span class="meta">Japan · Nov 24</span></div><span class="amount income">+¥320,000</span></li>
-                                <li class="tx"><div>Wallet transfer<span class="meta">Japan · Nov 23</span></div><span class="amount transfer">¥15,000</span></li>
-                            </ul>
-                        </article>
-                    </div>
-                </div>
-            </div>
-            ${mobile ? `<div class="phone-actions">${signature({ fab: true, action: 'add', scope })}</div>` : ''}
-        </div>
+function progress(label, percent) {
+    return `<div class="track" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100"
+        aria-valuenow="${Math.min(100, percent)}" aria-valuetext="${percent}% used">
+        <span class="fill" style="--usage:${percent}%"></span>
     </div>`;
 }
 
-$('#button-samples').innerHTML = buttons.map(({ id, name, description }) =>
-    `<div class="variant-row"><div><h3 class="variant-name"><span class="variant-id">${id}</span>${name}</h3><p>${description}</p></div>${signature({ variant: id })}</div>`
-).join('');
+function budgetCard(region, index, instance, variant = '') {
+    const [name, glyph] = categoryNames[index];
+    const { spent, budget } = regions[region];
+    const percent = utilization(spent[index], budget[index]);
+    const status = statusFor(percent);
+    const id = `budget-${instance}-${index}`;
+    return `<article class="budget-card matte" data-budget-card data-utilization="${status}" ${variant ? `data-variant="${variant}"` : ''}>
+        <div class="optics" aria-hidden="true"><span class="edge-spot"></span><span class="shine-spot"></span></div>
+        <div class="budget-head">${icon(glyph)}<h4 id="${id}">${name}</h4></div>
+        <p class="budget-amounts"><strong>${amount(region, spent[index])}</strong> of ${amount(region, budget[index])}</p>
+        ${progress(`${name} budget`, percent)}
+        <p class="budget-foot"><span class="amount">${percent}% used</span><span class="state">${{ safe: 'On track', warn: 'Near limit', over: 'Over budget' }[status]}</span></p>
+        <button type="button" class="budget-hit" data-command="${variant ? 'replay-budget' : 'budget-detail'}"
+            data-index="${index}" ${variant ? `aria-label="Replay ${variants[variant]} on ${name}"` : `aria-labelledby="${id}" aria-haspopup="dialog"`}></button>
+    </article>`;
+}
 
-$('#toolbar-demo').innerHTML = `
-    <div class="level"><h3>Level 1 · Signature</h3><div class="action-row">${signature({ action: 'add' })}</div></div>
-    <div class="level"><h3>Level 2 · Standard</h3><div class="action-row">${['expense', 'income', 'transfer'].map(type => standard(type)).join('')}</div></div>
-    <div class="level"><h3>Level 3 · Utility</h3><div class="action-row">
-        ${utility('privacy', 'Hide amounts', 'eye')}
-        ${utility('filter', 'Show expenses only', 'filter')}
-        ${utility('wallet', 'Switch wallet theme', 'more')}
-        ${utility('sheen', 'Toggle budget sheen', 'adjust')}
-        ${utility('delete', 'Remove sample transaction', 'trash', 'danger')}
-    </div></div>`;
+function summaryCard(region) {
+    const used = total(regions[region].spent);
+    const limit = total(regions[region].budget);
+    const percent = utilization(used, limit);
+    const remaining = limit - used;
+    return `<article class="summary-card matte" data-summary data-utilization="${statusFor(percent)}">
+        <div class="summary-top"><h4>Overall budget</h4><span class="label">${period}</span></div>
+        <p class="summary-tally"><strong>${amount(region, used)}</strong> of ${amount(region, limit)}</p>
+        ${progress('Overall budget', percent)}
+        <div class="summary-foot"><span class="amount">${percent}% used</span><span>${amount(region, remaining)} ${remaining < 0 ? 'over' : 'remaining'}</span></div>
+    </article>`;
+}
 
-$('#press-demo').innerHTML = `<div class="press-samples">${buttons.map(({ id }) =>
-    `<div><span class="variant-id">${id}</span>${signature({ variant: id })}</div>`).join('')}</div>
-    <div>${signature({ fab: true, action: 'add', scope: 'press' })}</div>`;
+function regionChoices(region) {
+    return `<div class="region-choice" role="group" aria-label="Reporting region">
+        ${Object.entries(regions).map(([id, value]) => `<button type="button" data-command="region" data-region="${id}"
+            aria-label="${value.name}" aria-pressed="${id === region}">${id.toUpperCase()}</button>`).join('')}
+    </div>`;
+}
 
-$('#glass-samples').innerHTML = optionCards('surface');
-$('#background-samples').innerHTML = optionCards('atmosphere');
-$('#budget-samples').innerHTML = budgetCases.map(item => budgetCard(item, picks.surface)).join('');
-$('#desktop-settings').innerHTML = settings('desktop');
-$('#mobile-settings').innerHTML = settings('mobile');
-$('#desktop-preview').innerHTML = dashboard('wide', false);
-$('#mobile-preview').innerHTML = dashboard('phone', true);
-$('#dialog-actions').innerHTML = ['expense', 'income', 'transfer'].map(type => standard(type, 'data-dialog-choice')).join('');
+function chart(region) {
+    const spending = regions[region].spent;
+    const sum = total(spending);
+    const series = spending.map((value, index) => [categoryNames[index][0], value]).sort((a, b) => b[1] - a[1]);
+    const categories = [...series.slice(0, 5), ['Other', total(series.slice(5).map(([, value]) => value))]];
+    const colors = ['#6c83bd', '#9a79c5', '#6eb49f', '#ce9455', '#77aab9', '#b27c93'];
+    let offset = 0;
+    const slices = categories.map(([, value], index) => {
+        const length = value / sum * 100;
+        const slice = `<circle cx="64" cy="64" r="53" pathLength="100" stroke="${colors[index]}" stroke-dasharray="${length - 1} ${101 - length}" stroke-dashoffset="${-offset}"/>`;
+        offset += length;
+        return slice;
+    }).join('');
+    return `<div class="donut-area">
+        <div class="donut"><svg viewBox="0 0 128 128" aria-hidden="true"><g fill="none" stroke-width="13" transform="rotate(-90 64 64)">
+            <circle cx="64" cy="64" r="53" stroke="#252529"/>${slices}
+        </g></svg></div>
+        <div class="donut-center"><span class="label">Total spent</span>${amount(region, sum)}</div>
+    </div>
+    <ul class="chart-legend">${categories.map(([label, value], index) =>
+        `<li><span><i class="chart-dot" style="--series:${colors[index]}"></i>${label}</span>${amount(region, value)}</li>`).join('')}</ul>`;
+}
 
-function updatePicks() {
-    for (const [key, value] of Object.entries(picks)) {
-        for (const input of $$('[data-select]')) {
-            if (input.dataset.select !== key) continue;
-            if (input.type === 'radio') input.checked = input.value === value;
-            else input.value = value;
+function transactionList(region, limit = 5, category = '') {
+    const rows = category ? activity[region].filter(row => row[1] === category) : activity[region];
+    return `<ul class="transaction-list">${rows.slice(0, limit).map(([title, category, wallet, day, value]) =>
+        `<li><span class="tx-icon ${value > 0 ? 'income' : 'expense'}">${icon(value > 0 ? 'down' : 'arrow')}</span>
+        <div><p class="tx-title">${title}</p><p class="tx-subtitle">${day} Nov · ${wallet} · ${category}</p></div>
+        <span class="${value > 0 ? 'income' : 'expense'}">${amount(region, value, true)}</span></li>`).join('')}</ul>`;
+}
+
+function walletCard(id, override) {
+    const item = wallets[id];
+    return `<article class="wallet-card wallet-theme-${wallets[override || id].theme}">
+        <div class="wallet-top"><h4>${item.name}</h4>${icon('wallet')}</div>
+        ${amount(item.region, item.balance)}<p class="label">${regions[item.region].code} · •••• ${item.digits}</p>
+    </article>`;
+}
+
+function walletPanel(state) {
+    if (state.region === 'de') return `<article class="dash-panel matte"><h4>Giro account</h4>${amount('de', regions.de.balance)}</article>`;
+    const region = state.region;
+    const options = sampleWalletThemes.filter(([, item]) => item.region === region);
+    const account = options[0][0];
+    return `${walletCard(account, state.themes[region] || account)}
+        <label class="wallet-choice">Wallet theme
+            <select data-wallet-theme>${sampleWalletThemes.map(([id, item]) =>
+                `<option value="${id}" ${(state.themes[region] || account) === id ? 'selected' : ''}>${item.name}</option>`).join('')}</select>
+        </label>`;
+}
+
+function dashboardContent(scope, state) {
+    const { region } = state;
+    const { spent, income } = regions[region];
+    const outflows = total(spent);
+    return `<div class="main-column">
+        <section class="dash-section" id="${scope}-overview" tabindex="-1">
+            <div class="section-line"><h3>Balances</h3>${regionChoices(region)}</div>
+            <div class="country-grid">${country('jp')}${country(region === 'de' ? 'de' : 'in')}</div>
+            <div class="kpi-grid">
+                ${kpi('Monthly income', income, region, 'down', false, 'income')}
+                ${kpi('Total outflows', -outflows, region, 'arrow', false, 'expense')}
+                ${kpi('Net savings', income - outflows, region, 'chart', true)}
+            </div>
+        </section>
+        <section class="dash-section" id="${scope}-budgets" tabindex="-1">
+            <div class="section-line"><h3>${regions[region].name} spending</h3><span class="label">Category budgets</span></div>
+            ${summaryCard(region)}
+            <div class="budget-grid" data-budget-group>${categoryNames.map((_, index) => budgetCard(region, index, scope)).join('')}</div>
+        </section>
+    </div>
+    <div class="right-column">
+        <section class="dash-panel matte" id="${scope}-analytics" tabindex="-1">
+            <div class="section-line"><h3>Expense breakdown</h3><span class="label">${regions[region].code}</span></div>
+            ${chart(region)}
+        </section>
+        <section class="dash-panel matte" id="${scope}-transactions" tabindex="-1">
+            <div class="section-line"><h3>Recent activity</h3><span class="label">${period}</span></div>
+            ${transactionList(region)}
+        </section>
+        <section class="dash-section" id="${scope}-wallets" tabindex="-1">${walletPanel(state)}</section>
+    </div>`;
+}
+
+function drawer(scope, mobile) {
+    const className = mobile ? 'mobile-drawer' : 'desktop-drawer';
+    return `<aside class="${className}" id="${scope}-drawer" ${mobile ? 'inert' : ''} aria-label="${mobile ? 'Mobile' : 'Desktop'} navigation">
+        <div class="drawer-inner">
+            <div class="drawer-head">
+                ${mobile ? utility('close-drawer', 'Close navigation', 'close') :
+                    utility('toggle-rail', 'Toggle sidebar', 'menu', `aria-expanded="false" aria-controls="${scope}-nav"`)}
+                <span>Expense Manager</span>
+            </div>
+            <nav class="drawer-nav" id="${scope}-nav" aria-label="Dashboard sections">
+                ${nav.map(([label, glyph, target]) => {
+                    const href = target === 'controls' ? './#controls' : `#${scope}-${target === 'report' ? 'analytics' : target}`;
+                    return `<a class="nav-link" href="${href}" aria-label="${label}" data-destination="${target}" ${target === 'overview' ? 'aria-current="page"' : ''}>
+                        ${icon(glyph)}<span>${label}</span></a>`;
+                }).join('')}
+            </nav>
+            <p class="drawer-foot">${icon('check')}<span class="label">Sample ledger</span></p>
+        </div>
+    </aside>`;
+}
+
+function dashboard(scope) {
+    const mobile = scope === 'mobile';
+    const state = { region: 'jp', concealed: false, themes: {} };
+    const host = $(`#${scope}-preview`);
+    host.innerHTML = `<div class="workspace ${scope}-workspace" data-workspace="${scope}">
+        ${drawer(scope, mobile)}
+        ${mobile ? '<button type="button" class="drawer-scrim" data-command="close-drawer" tabindex="-1" aria-label="Close navigation" hidden></button>' : ''}
+        <div class="dash-content">
+            <header class="dash-toolbar">
+                <div class="toolbar-start">
+                    ${mobile ? utility('open-drawer', 'Open navigation', 'menu', 'aria-expanded="false" aria-controls="mobile-drawer"') : ''}
+                    <h3>Dashboard</h3>
+                </div>
+                <div class="toolbar-actions">
+                    <span class="period">${icon('calendar')}${period}</span>
+                    ${utility('privacy', 'Hide monetary values', 'eye', 'aria-pressed="false"')}
+                    ${mobile ? '' : `${action('View ledger', 'ledger', 'ledger', { secondary: true })}${action('Add transaction', 'add', 'plus')}`}
+                </div>
+            </header>
+            <div class="dash-body">${dashboardContent(scope, state)}</div>
+        </div>
+        ${mobile ? `<div class="phone-actions">${action('Add transaction', 'add', 'plus', { fab: true })}</div>` : ''}
+    </div>`;
+    const workspace = $('.workspace', host);
+    dashboards.set(workspace, state);
+    return workspace;
+}
+
+const desktop = dashboard('desktop');
+const mobile = dashboard('mobile');
+$('#material-samples').innerHTML = [true, false].map(signature =>
+    `<div>${kpi('Net savings', regions.jp.income - total(regions.jp.spent), 'jp', 'chart', signature)}
+    <p class="sample-label"><strong>${signature ? 'A' : 'B'}</strong> · ${signature ? 'Signature luminous glass' : 'Dark matte glass'}</p></div>`).join('');
+$('#reflection-samples').innerHTML = Object.entries(variants).map(([id, label]) =>
+    `<div>${budgetCard('jp', 0, id, id)}
+        <label class="sample-select"><input type="radio" name="budget-variant" value="${id}"><span><strong>${id}</strong> · ${label}</span></label>
+    </div>`).join('');
+$('#action-samples').innerHTML = action('View ledger', 'sample-action', 'ledger', { secondary: true }) + action('Add transaction', 'sample-action', 'plus');
+$('#login-preview').innerHTML = `<div class="auth-shell">
+    <div class="auth-brand-pane">
+        <p class="auth-brand-name">Expense Manager</p>
+        <p class="auth-headline">Cross-border finances,<br>unified in one ledger.</p>
+        <div class="auth-showcase">${country('jp', false)}${country('in', false)}</div>
+    </div>
+    <div class="auth-form-pane">
+        <h3>Welcome!</h3><p class="label">Sign in to access your sample ledger.</p>
+        <div class="auth-form" aria-label="Synthetic sign-in preview">
+            <label><span class="label">Email</span><input type="email" value="maya@example.test" autocomplete="off" readonly></label>
+            <div>
+                <div class="label-row"><label class="label" for="sample-password">Password</label>
+                    <button type="button" class="quiet" data-command="forgot">Forgot password?</button></div>
+                <div class="auth-wrap"><input id="sample-password" type="password" readonly value="sample-only" autocomplete="off">
+                    ${utility('password', 'Show sample password', 'eye', 'aria-pressed="false"')}</div>
+            </div>
+            ${action('Sign in', 'sign-in')}
+        </div>
+        <p class="auth-feedback label" id="login-status" role="status"></p>
+    </div>
+</div>`;
+$('#close-dialog').innerHTML = icon('close');
+
+const controlForm = $('#optical-controls');
+$('#variant').innerHTML = Object.entries(variants).map(([id, label]) => `<option value="${id}">${id} · ${label}</option>`).join('');
+let settings = { ...defaults };
+try {
+    const saved = JSON.parse(localStorage.getItem(settingsKey));
+    if (saved) {
+        for (const [key, fallback] of Object.entries(defaults)) {
+            const field = controlForm.elements.namedItem(key);
+            const value = saved[key];
+            if (typeof fallback === 'number' && typeof value === 'number' &&
+                value >= Number(field.min) && value <= Number(field.max)) settings[key] = value;
+            if (typeof fallback === 'boolean' && typeof value === 'boolean') settings[key] = value;
+            if (field instanceof HTMLSelectElement && [...field.options].some(option => option.value === value)) settings[key] = value;
         }
-        for (const element of $$(`[data-shared-${key}]`)) element.dataset[key === 'button' ? 'variant' : key] = value;
     }
-    $('.budget-stage').dataset.atmosphere = picks.atmosphere;
-    $('#press-demo').dataset.atmosphere = picks.atmosphere;
-    $('#glass-context').textContent = `Atmosphere ${picks.atmosphere} · ${atmospheres.find(item => item.id === picks.atmosphere).name}`;
-    $('#background-context').textContent = `Surface ${picks.surface} · ${surfaces.find(item => item.id === picks.surface).name}`;
+} catch {
+    // A blocked or invalid local storage entry falls back to the sample settings.
 }
-updatePicks();
 
-function updateMotion(presetName) {
-    document.documentElement.style.setProperty('--fill-time', `${motion.fill}ms`);
-    document.documentElement.style.setProperty('--stroke', `${motion.edge}px`);
-    document.documentElement.style.setProperty('--glimmer-strength', `${motion.intensity}%`);
-    for (const [key, unit] of Object.entries(labels)) {
-        $(`#${key}`).value = motion[key];
-        $(`#${key}-value`).value = `${motion[key]}${unit}`;
+function observeSummaries() {
+    summaryObserver?.disconnect();
+    for (const card of $$('[data-summary]')) {
+        card.classList.remove('summary-visible');
+        if (settings.summarySheen && !reduced.matches && !document.hidden) summaryObserver?.observe(card);
     }
-    for (const button of $$('[data-preset]')) button.setAttribute('aria-pressed', String(button.dataset.preset === presetName));
-    $('#glimmer').checked = glimmerEnabled;
-}
-updateMotion('balanced');
-
-const finePointer = matchMedia('(any-hover: hover) and (any-pointer: fine)');
-const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-const feedback = new WeakMap();
-function stopLight(button) {
-    feedback.get(button).effect?.cancel();
-}
-function stopLights() {
-    for (const button of $$('.signature')) stopLight(button);
 }
 
-$('#motion-controls').addEventListener('input', event => {
-    const { id, value, checked } = event.target;
-    if (id === 'glimmer') glimmerEnabled = checked;
-    else if (id in labels) motion[id] = Number(value);
-    updateMotion();
-    stopLights();
-});
-function setPreset(name) {
-    motion = { ...presets[name] };
-    glimmerEnabled = true;
-    updateMotion(name);
-    stopLights();
+if ('IntersectionObserver' in window) {
+    summaryObserver = new IntersectionObserver(entries => {
+        for (const { target, isIntersecting } of entries) {
+            target.classList.toggle('summary-visible', isIntersecting && settings.summarySheen && !reduced.matches && !document.hidden);
+        }
+    });
 }
-$('#motion-controls').addEventListener('click', event => {
-    const preset = event.target.closest('[data-preset]');
-    if (preset) setPreset(preset.dataset.preset);
+
+function applySettings() {
+    const root = document.documentElement;
+    root.dataset.direction = settings.direction;
+    root.style.setProperty('--edge-length', `${settings.edgeLength}%`);
+    root.style.setProperty('--shine-width', `${settings.shineWidth}%`);
+    root.style.setProperty('--desktop-light', settings.desktopLight / 100);
+    root.style.setProperty('--mobile-light', settings.mobileLight / 100);
+    for (const [key, value] of Object.entries(settings)) {
+        const field = controlForm.elements.namedItem(key);
+        if (typeof value === 'boolean') field.checked = value;
+        else field.value = value;
+        const readout = $(`output[for="${key}"]`, controlForm);
+        if (readout) readout.value = `${value}${key === 'duration' ? ' ms' : '%'}`;
+    }
+    for (const choice of $$('[name="budget-variant"]')) choice.checked = choice.value === settings.variant;
+    $('#configuration').textContent = JSON.stringify(settings, null, 2);
+}
+
+function updateSettings(key, value) {
+    clearOptics();
+    settings[key] = value;
+    applySettings();
+    if (key === 'summarySheen') observeSummaries();
+    try { localStorage.setItem(settingsKey, JSON.stringify(settings)); } catch {}
+}
+
+controlForm.addEventListener('input', event => {
+    const field = event.target;
+    const value = field.type === 'checkbox' ? field.checked :
+        field.type === 'range' ? field.valueAsNumber : field.value;
+    updateSettings(field.name, value);
 });
-$('#motion-controls').addEventListener('reset', event => {
+controlForm.addEventListener('reset', event => {
     event.preventDefault();
-    setPreset('balanced');
+    clearOptics();
+    settings = { ...defaults };
+    applySettings();
+    observeSummaries();
+    try { localStorage.removeItem(settingsKey); } catch {}
+    notify('Optical defaults restored.');
+});
+$('#reflection-samples').addEventListener('change', event => {
+    if (event.target.name === 'budget-variant') updateSettings('variant', event.target.value);
+});
+$('#copy-config').addEventListener('click', async () => {
+    try {
+        await navigator.clipboard.writeText($('#configuration').textContent);
+        notify('Configuration copied.');
+    } catch {
+        $('details', controlForm).open = true;
+        const range = document.createRange();
+        range.selectNodeContents($('#configuration'));
+        document.getSelection().removeAllRanges();
+        document.getSelection().addRange(range);
+        notify('Configuration selected. Copy it to share.');
+    }
 });
 
-function playLight(button) {
-    const { variant } = button.dataset;
-    if (!glimmerEnabled || reduced.matches || variant === 'A1' || button.disabled) return;
-    const state = feedback.get(button);
-    const { path, perimeter } = state;
-    stopLight(button);
-    const opacity = motion.opacity / 100;
-    const length = Math.min(motion.length * (variant === 'A2' ? .76 : 1), perimeter * .24);
-    path.style.strokeDasharray = `${length} ${perimeter - length}`;
-    if (variant === 'A2') {
-        path.style.strokeDashoffset = `-${perimeter * .87}`;
-        state.effect = path.animate([{ opacity: 0 }, { opacity: opacity * .72, offset: .24 }, { opacity: 0 }],
-            { duration: Math.min(360, motion.travel * .36), easing: 'linear' });
+function notify(message) {
+    clearTimeout(noticeTimer);
+    $('#notice').textContent = message;
+    noticeTimer = setTimeout(() => { $('#notice').textContent = ''; }, 2800);
+}
+
+function setPrivacy(workspace) {
+    const hidden = dashboards.get(workspace).concealed;
+    for (const node of $$('[data-amount]', workspace)) {
+        node.dataset.original ??= node.textContent;
+        node.textContent = hidden ? '••••' : node.dataset.original;
+    }
+    const control = $('[data-command="privacy"]', workspace);
+    control.innerHTML = icon(hidden ? 'eyeOff' : 'eye');
+    const label = hidden ? 'Reveal monetary values' : 'Hide monetary values';
+    control.setAttribute('aria-label', label);
+    control.setAttribute('aria-pressed', String(hidden));
+    control.title = label;
+}
+
+function setRegion(workspace, id) {
+    const state = dashboards.get(workspace);
+    if (state.region === id) return;
+    clearOptics();
+    const restoreFocus = document.activeElement?.matches('[data-command="region"]');
+    state.region = id;
+    $('.dash-body', workspace).innerHTML = dashboardContent(workspace.dataset.workspace, state);
+    setPrivacy(workspace);
+    observeSummaries();
+    if (restoreFocus) $(`[data-command="region"][data-region="${id}"]`, workspace).focus();
+}
+
+function setDesktopDrawer(mode, instant = false) {
+    const drawer = $('.desktop-drawer', desktop);
+    const toggle = $('[data-command="toggle-rail"]', drawer);
+    drawer.toggleAttribute('data-instant', instant);
+    if (mode) drawer.dataset.open = mode;
+    else delete drawer.dataset.open;
+    toggle.setAttribute('aria-expanded', String(Boolean(mode)));
+}
+
+const desktopDrawer = $('.desktop-drawer .drawer-inner', desktop);
+desktopDrawer.addEventListener('pointerenter', event => {
+    if (event.pointerType === 'mouse' && finePointer.matches && !desktopDrawer.parentElement.dataset.open) setDesktopDrawer('hover');
+});
+desktopDrawer.addEventListener('pointerleave', event => {
+    if (event.pointerType === 'mouse' && desktopDrawer.parentElement.dataset.open === 'hover') setDesktopDrawer(null);
+});
+finePointer.addEventListener('change', ({ matches }) => {
+    if (!matches && desktopDrawer.parentElement.dataset.open === 'hover') setDesktopDrawer(null, true);
+});
+
+function setMobileDrawer(open, focusTarget = true) {
+    const drawer = $('.mobile-drawer', mobile);
+    const toggle = $('[data-command="open-drawer"]', mobile);
+    drawer.toggleAttribute('data-open', open);
+    drawer.inert = !open;
+    $('.drawer-scrim', mobile).hidden = !open;
+    $('.dash-content', mobile).inert = open;
+    $('.phone-actions', mobile).inert = open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (focusTarget) (open ? $('[data-command="close-drawer"]', drawer) : toggle).focus({ preventScroll: true });
+}
+
+function navigatePreview(event, link) {
+    const workspace = link.closest('[data-workspace]');
+    const destination = link.dataset.destination;
+    if (workspace === mobile) setMobileDrawer(false, false);
+    if (destination === 'controls') return;
+    event.preventDefault();
+    if (destination === 'report') {
+        const { region, concealed } = dashboards.get(workspace);
+        showDialog('November spending report', chart(region), workspace, concealed);
         return;
     }
-    // This property follows the rendered SVG arc length. The opacity envelope is independent.
-    state.effect = path.animate([
+    for (const item of $$('.nav-link[aria-current]', workspace)) item.removeAttribute('aria-current');
+    link.setAttribute('aria-current', 'page');
+    const target = $(`#${workspace.dataset.workspace}-${destination}`);
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: 'nearest' });
+}
+
+const dialog = $('#preview-dialog');
+function showDialog(title, content, workspace, conceal = false) {
+    dialogWorkspace = workspace;
+    $('#dialog-title').textContent = title;
+    $('#dialog-body').innerHTML = content;
+    if (conceal) for (const node of $$('[data-amount]', dialog)) node.textContent = '••••';
+    if (!dialog.open) dialog.showModal();
+}
+
+function showPortfolio(region, workspace) {
+    const cards = sampleWalletThemes.filter(([, item]) => item.region === region).map(([id]) => walletCard(id));
+    showDialog(`${regions[region].name} portfolio`, `<div class="region-choice dialog-region" role="group" aria-label="Portfolio region">
+        ${Object.entries(regions).map(([id, item]) => `<button type="button" data-command="dialog-region" data-region="${id}"
+            aria-pressed="${id === region}">${flag(id)} ${item.name}</button>`).join('')}
+        </div><div class="dialog-wallets">${cards.length ? cards.join('') : `<div class="matte dash-panel">Giro account ${amount(region, regions[region].balance)}</div>`}</div>`,
+    workspace, dashboards.get(workspace).concealed);
+}
+
+function showBudget(workspace, index) {
+    const { region, concealed } = dashboards.get(workspace);
+    const [category] = categoryNames[index];
+    const { spent, budget } = regions[region];
+    const percentage = utilization(spent[index], budget[index]);
+    showDialog(`${category} budget`, `<div class="summary-card matte" data-utilization="${statusFor(percentage)}">
+        <p class="summary-tally"><strong>${amount(region, spent[index])}</strong> of ${amount(region, budget[index])}</p>
+        ${progress(`${category} budget`, percentage)}</div>
+        <div class="dash-panel">${activity[region].some(row => row[1] === category)
+            ? transactionList(region, 5, category) : '<p class="label">No recent sample transactions in this category.</p>'}</div>`, workspace, concealed);
+}
+
+function applyActionState() {
+    const state = $('#action-state').value;
+    for (const button of $$('.dash-toolbar .action, #action-samples .action, #login-preview .action')) {
+        const label = $('.action-label', button);
+        label.dataset.label ??= label.textContent;
+        const login = button.dataset.command === 'sign-in';
+        const busy = state === 'busy' || (login && loginTimer);
+        button.disabled = state === 'disabled' || Boolean(busy);
+        button.setAttribute('aria-busy', String(Boolean(busy)));
+        label.textContent = busy ? (login ? 'Signing in…' : 'Working…') : label.dataset.label;
+        if (button.disabled) {
+            button.classList.remove('is-hovered', 'is-pressed');
+            stopRim(button);
+        }
+    }
+}
+
+$('#action-state').addEventListener('change', applyActionState);
+
+const budgetDwell = 105;
+const pendingOptics = new Map();
+const runningOptics = new Map();
+let budgetTouch;
+let actionTouch;
+
+function opticsGroup(card) {
+    return card.closest('[data-budget-group]') || $('#reflection-samples');
+}
+
+function cancelOptics(card) {
+    clearTimeout(pendingOptics.get(card));
+    pendingOptics.delete(card);
+    const group = opticsGroup(card);
+    const playing = runningOptics.get(group);
+    if (playing?.card === card) {
+        playing.effects.forEach(effect => effect.cancel());
+        runningOptics.delete(group);
+    }
+}
+
+function clearOptics() {
+    for (const timer of pendingOptics.values()) clearTimeout(timer);
+    pendingOptics.clear();
+    for (const { effects } of runningOptics.values()) effects.forEach(effect => effect.cancel());
+    runningOptics.clear();
+}
+
+function reflect(card) {
+    if (reduced.matches) return;
+    const group = opticsGroup(card);
+    const playing = runningOptics.get(group);
+    if (playing) cancelOptics(playing.card);
+    const variant = card.dataset.variant || settings.variant;
+    const reverse = settings.direction === 'reverse';
+    const sign = reverse ? -1 : 1;
+    const timing = { duration: settings.duration, easing: 'linear' };
+    const effects = [];
+    if (variant !== 'B2') {
+        effects.push($('.edge-spot', card).animate([
+            { transform: `translateX(${-36 * sign}%)`, opacity: 0 },
+            { offset: .19, opacity: settings.edgeIntensity / 100 },
+            { offset: .68, opacity: settings.edgeIntensity / 100 },
+            { transform: `translateX(${36 * sign}%)`, opacity: 0 },
+        ], timing));
+    }
+    if (variant !== 'B1') {
+        const tilt = reverse ? 22 : -22;
+        const start = -110;
+        const end = 10000 / settings.shineWidth + 33;
+        effects.push($('.shine-spot', card).animate([
+            { transform: `translateX(${reverse ? end : start}%) rotate(${tilt}deg)`, opacity: 0 },
+            { offset: .29, opacity: settings.shineIntensity / 100 },
+            { offset: .62, opacity: settings.shineIntensity / 100 },
+            { transform: `translateX(${reverse ? start : end}%) rotate(${tilt}deg)`, opacity: 0 },
+        ], timing));
+    }
+    const current = { card, effects };
+    runningOptics.set(group, current);
+    effects[0].onfinish = () => {
+        if (runningOptics.get(group) === current) runningOptics.delete(group);
+    };
+}
+
+function scheduleOptics(card, delay = budgetDwell) {
+    if (reduced.matches || pendingOptics.has(card)) return;
+    pendingOptics.set(card, setTimeout(() => {
+        pendingOptics.delete(card);
+        reflect(card);
+    }, delay));
+}
+
+function stopRim(button) {
+    $('.rim rect', button)?.getAnimations().forEach(effect => effect.cancel());
+}
+
+function playRim(button) {
+    const rect = $('.rim rect', button);
+    if (!rect || reduced.matches || button.disabled) return;
+    stopRim(button);
+    const perimeter = rect.getTotalLength();
+    if (!perimeter) return;
+    const style = getComputedStyle(button);
+    const length = parseFloat(style.getPropertyValue('--rim-length'));
+    const opacity = Number(style.getPropertyValue('--rim-opacity'));
+    rect.style.strokeDasharray = `${length} ${perimeter - length}`;
+    rect.animate([
         { strokeDashoffset: 0, opacity: 0 },
         { strokeDashoffset: -perimeter * .08, opacity, offset: .08 },
         { strokeDashoffset: -perimeter * .92, opacity, offset: .92 },
         { strokeDashoffset: -perimeter, opacity: 0 },
-    ], { duration: motion.travel, easing: 'linear' });
+    ], { duration: parseFloat(style.getPropertyValue('--rim-time')), easing: 'linear' });
 }
 
-function clearPress(button, cancelLight = false) {
-    const state = feedback.get(button);
-    clearTimeout(state.timer);
-    state.pointer = undefined;
-    button.classList.remove('is-pressed');
-    if (cancelLight) stopLight(button);
-}
-function releaseSoon(button) {
-    const state = feedback.get(button);
-    state.pointer = undefined;
-    clearTimeout(state.timer);
-    state.timer = setTimeout(() => clearPress(button), 170);
+function clearActionTouch(cancelRim = false) {
+    if (!actionTouch) return;
+    clearTimeout(actionTouch.timer);
+    actionTouch.button.classList.remove('is-pressed');
+    if (cancelRim) stopRim(actionTouch.button);
+    actionTouch = undefined;
 }
 
-for (const button of $$('.signature')) {
-    const path = $('.edge-light path', button);
-    feedback.set(button, { path, perimeter: path.getTotalLength() });
-    button.addEventListener('pointerenter', event => {
-        if (event.pointerType !== 'mouse' || !finePointer.matches || button.disabled) return;
+document.addEventListener('pointerover', event => {
+    if (event.pointerType !== 'mouse' || !finePointer.matches) return;
+    const card = event.target.closest('[data-budget-card]');
+    if (card && !card.contains(event.relatedTarget)) scheduleOptics(card);
+    const button = event.target.closest('.action:not(:disabled)');
+    if (button && !button.contains(event.relatedTarget)) {
         button.classList.add('is-hovered');
-        playLight(button);
-    });
-    button.addEventListener('pointerleave', event => {
-        if (event.pointerType === 'mouse') button.classList.remove('is-hovered');
-    });
-    button.addEventListener('pointerdown', event => {
-        if (!event.isPrimary || event.pointerType === 'mouse' || button.disabled) return;
-        clearPress(button);
+        playRim(button);
+    }
+}, { passive: true });
+
+document.addEventListener('pointerout', event => {
+    if (event.pointerType !== 'mouse') return;
+    const card = event.target.closest('[data-budget-card]');
+    if (card && !card.contains(event.relatedTarget)) {
+        clearTimeout(pendingOptics.get(card));
+        pendingOptics.delete(card);
+    }
+    const button = event.target.closest('.action.is-hovered');
+    if (button && !button.contains(event.relatedTarget)) button.classList.remove('is-hovered');
+}, { passive: true });
+
+document.addEventListener('pointerdown', event => {
+    if (!event.isPrimary || event.pointerType === 'mouse') return;
+    const { pointerId: id, clientX: x, clientY: y } = event;
+    const card = event.target.closest('[data-budget-card]');
+    if (card) {
+        budgetTouch = { card, id, x, y };
+        scheduleOptics(card, 80);
+    }
+    clearActionTouch(true);
+    const button = event.target.closest('.action:not(:disabled)');
+    if (button) {
         button.classList.remove('is-hovered');
         button.classList.add('is-pressed');
-        feedback.get(button).pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
-        playLight(button);
-    }, { passive: true });
-    button.addEventListener('pointermove', event => {
-        const pointer = feedback.get(button).pointer;
-        if (pointer?.id === event.pointerId && Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 12) {
-            clearPress(button, true);
+        actionTouch = { button, id, x, y };
+        playRim(button);
+    }
+}, { passive: true });
+
+document.addEventListener('pointermove', event => {
+    const moved = touch => touch?.id === event.pointerId && Math.hypot(event.clientX - touch.x, event.clientY - touch.y) > 11;
+    if (moved(budgetTouch)) {
+        cancelOptics(budgetTouch.card);
+        budgetTouch = undefined;
+    }
+    if (moved(actionTouch)) clearActionTouch(true);
+}, { passive: true });
+
+document.addEventListener('pointerup', event => {
+    if (budgetTouch?.id === event.pointerId) budgetTouch = undefined;
+    if (actionTouch?.id === event.pointerId) {
+        actionTouch.id = null;
+        actionTouch.timer = setTimeout(clearActionTouch, 170);
+    }
+}, { passive: true });
+
+for (const type of ['pointercancel', 'lostpointercapture']) {
+    document.addEventListener(type, event => {
+        if (budgetTouch?.id === event.pointerId) {
+            cancelOptics(budgetTouch.card);
+            budgetTouch = undefined;
         }
+        if (actionTouch?.id === event.pointerId) clearActionTouch(true);
     }, { passive: true });
-    button.addEventListener('pointerup', event => {
-        if (feedback.get(button).pointer?.id === event.pointerId) releaseSoon(button);
-    }, { passive: true });
-    button.addEventListener('pointercancel', () => clearPress(button, true), { passive: true });
-    button.addEventListener('lostpointercapture', event => {
-        if (feedback.get(button).pointer?.id === event.pointerId) clearPress(button, true);
-    }, { passive: true });
-    button.addEventListener('click', event => {
-        if (event.detail !== 0) return;
-        button.classList.add('is-pressed');
-        releaseSoon(button);
-    });
 }
-finePointer.addEventListener('change', () => {
-    if (!finePointer.matches) for (const button of $$('.is-hovered')) button.classList.remove('is-hovered');
+
+function resetDecorations() {
+    clearOptics();
+    clearActionTouch(true);
+    for (const button of $$('.action')) {
+        button.classList.remove('is-hovered');
+        stopRim(button);
+    }
+}
+reduced.addEventListener('change', () => {
+    resetDecorations();
+    observeSummaries();
 });
-reduced.addEventListener('change', stopLights);
+finePointer.addEventListener('change', resetDecorations);
+window.addEventListener('blur', resetDecorations);
+document.addEventListener('visibilitychange', observeSummaries);
 
-$('main').addEventListener('change', event => {
-    const key = event.target.dataset.select;
-    if (!key) return;
-    picks[key] = event.target.value;
-    updatePicks();
-    if (key === 'button') stopLights();
-});
-
-function notify(message) {
-    const notice = $('#notice');
-    clearTimeout(noticeTimer);
-    notice.textContent = message;
-    noticeTimer = setTimeout(() => { notice.textContent = ''; }, 2200);
-}
-let enabledSheen = false;
-function updateSheen(checked) {
-    enabledSheen = checked;
-    $('#sheen').checked = checked;
-    $('[data-command="sheen"]').setAttribute('aria-pressed', String(checked));
-    document.body.classList.toggle('sheen-on', checked);
-}
-updateSheen(false);
-$('#sheen').addEventListener('change', event => updateSheen(event.target.checked));
-
-const dialog = $('#action-dialog');
-dialog.addEventListener('click', event => {
-    if (event.target === dialog) dialog.close();
-});
-
-function refreshRows(dash) {
-    for (const row of $$('.tx', dash)) row.hidden = row.dataset.removed === 'true' || (dash.classList.contains('expenses-only') && !row.hasAttribute('data-expense'));
-}
-function toggleUtility(button, state, on, off) {
-    button.setAttribute('aria-pressed', String(state));
-    const label = state ? on : off;
-    button.setAttribute('aria-label', label);
-    button.title = label;
-}
-
-document.body.addEventListener('click', event => {
-    const button = event.target.closest('[data-command]');
-    if (!button) return;
-    const { command, variant } = button.dataset;
-    const dash = button.closest('[data-dashboard]') || $('#desktop-preview [data-dashboard]');
+document.addEventListener('click', event => {
+    if (desktopDrawer.parentElement.dataset.open === 'manual' && !desktopDrawer.contains(event.target)) {
+        setDesktopDrawer(null);
+    }
+    const link = event.target.closest('.nav-link');
+    if (link) {
+        navigatePreview(event, link);
+        return;
+    }
+    const control = event.target.closest('[data-command]');
+    if (!control || control.disabled) return;
+    const workspace = control.closest('[data-workspace]');
+    const state = dashboards.get(workspace);
+    const { command, region, index } = control.dataset;
     switch (command) {
-        case 'sample':
-            notify(`${variant} · Add transaction pressed`);
+        case 'toggle-rail':
+            setDesktopDrawer(desktopDrawer.parentElement.dataset.open ? null : 'manual', event.detail === 0);
+            break;
+        case 'open-drawer':
+            setMobileDrawer(true);
+            break;
+        case 'close-drawer':
+            setMobileDrawer(false);
+            break;
+        case 'privacy':
+            state.concealed = !state.concealed;
+            setPrivacy(workspace);
+            break;
+        case 'region':
+            setRegion(workspace, region);
+            break;
+        case 'portfolio':
+            showPortfolio(region, workspace);
+            break;
+        case 'dialog-region':
+            showPortfolio(region, dialogWorkspace);
+            $(`[data-command="dialog-region"][data-region="${region}"]`, dialog).focus();
+            break;
+        case 'ledger':
+            showDialog('Ledger preview', transactionList(state.region), workspace, state.concealed);
             break;
         case 'add':
-            dialog.showModal();
+            showDialog('Add transaction', `<div class="type-options">${['Expense', 'Income', 'Transfer'].map((type, index) =>
+                `<button class="quiet" type="button" data-command="sample-transaction" data-type="${type}">${icon(['arrow', 'down', 'transfer'][index])}${type}</button>`).join('')}</div>`, workspace);
             break;
-        case 'income':
-        case 'expense':
-        case 'transfer':
-            if (button.hasAttribute('data-dialog-choice')) dialog.close();
-            notify(`Selected ${command}`);
+        case 'sample-transaction':
+            dialog.close();
+            notify(`${control.dataset.type} selected in the sample ledger.`);
             break;
-        case 'privacy': {
-            const hidden = dash.classList.toggle('is-private');
-            for (const item of $$('.amount', dash)) item.setAttribute('aria-hidden', String(hidden));
-            for (const control of $$('[data-command="privacy"]')) {
-                if ((control.closest('[data-dashboard]') || $('#desktop-preview [data-dashboard]')) === dash) {
-                    toggleUtility(control, hidden, 'Show amounts', 'Hide amounts');
-                }
+        case 'budget-detail':
+            showBudget(workspace, Number(index));
+            break;
+        case 'replay-budget': {
+            const card = control.closest('[data-budget-card]');
+            if (event.detail === 0 || runningOptics.get(opticsGroup(card))?.card !== card) {
+                cancelOptics(card);
+                reflect(card);
             }
-            notify(hidden ? 'Sample amounts hidden' : 'Sample amounts shown');
             break;
         }
-        case 'filter': {
-            const filtered = dash.classList.toggle('expenses-only');
-            refreshRows(dash);
-            for (const control of $$('[data-command="filter"]')) {
-                if ((control.closest('[data-dashboard]') || $('#desktop-preview [data-dashboard]')) === dash) {
-                    toggleUtility(control, filtered, 'Show all transactions', 'Show expenses only');
-                }
-            }
-            notify(filtered ? 'Showing expenses only' : 'Showing all sample transactions');
+        case 'sample-action':
+            notify('Sample action activated.');
+            break;
+        case 'sign-in':
+            $('#login-status').textContent = 'Opening the sample ledger…';
+            loginTimer = setTimeout(() => {
+                loginTimer = undefined;
+                applyActionState();
+                $('#login-status').textContent = 'Sample sign-in complete.';
+            }, 850);
+            applyActionState();
+            break;
+        case 'password': {
+            const field = $('#sample-password');
+            const show = field.type === 'password';
+            field.type = show ? 'text' : 'password';
+            control.innerHTML = icon(show ? 'eyeOff' : 'eye');
+            control.setAttribute('aria-pressed', String(show));
+            control.setAttribute('aria-label', show ? 'Hide sample password' : 'Show sample password');
             break;
         }
-        case 'wallet': {
-            const wallet = $('[data-wallet]', dash);
-            const india = wallet.classList.toggle('wallet-axis');
-            wallet.classList.toggle('wallet-em', !india);
-            $('[data-wallet-name]', wallet).textContent = india ? 'Burgundy Axis' : 'Emerald Salary';
-            $('[data-wallet-balance]', wallet).textContent = india ? '₹72,540' : '¥482,600';
-            notify(india ? 'Burgundy Axis wallet theme' : 'Emerald Salary wallet theme');
+        case 'forgot':
+            $('#login-status').textContent = 'Password recovery is simulated in this preview.';
             break;
-        }
-        case 'country': {
-            const country = button.closest('[data-country]');
-            const india = country.classList.toggle('country-in');
-            country.classList.toggle('country-jp', !india);
-            $('[data-country-name]', country).textContent = india ? 'India' : 'Japan';
-            $('[data-country-balance]', country).textContent = india ? '₹98,420' : '¥618,200';
-            $('.flag', country).textContent = india ? '🇮🇳' : '🇯🇵';
-            button.setAttribute('aria-label', india ? 'Show Japan balances' : 'Show India balances');
-            break;
-        }
-        case 'sheen':
-            updateSheen(!enabledSheen);
-            notify(enabledSheen ? 'Budget sheen enabled' : 'Static budget illumination');
-            break;
-        case 'delete': {
-            const row = $('.tx:last-child', dash);
-            const removed = row.dataset.removed !== 'true';
-            row.dataset.removed = String(removed);
-            refreshRows(dash);
-            toggleUtility(button, removed, 'Restore sample transaction', 'Remove sample transaction');
-            notify(removed ? 'Sample transfer removed' : 'Sample transfer restored');
-            break;
-        }
-        case 'rail': {
-            const open = button.closest('.dash-rail').classList.toggle('rail-open');
-            button.setAttribute('aria-expanded', String(open));
-            break;
-        }
     }
 });
 
-$('.dash-rail nav').addEventListener('click', event => {
-    const link = event.target.closest('a');
-    if (!link) return;
-    for (const item of $$('.rail-link')) item.removeAttribute('aria-current');
-    link.setAttribute('aria-current', 'true');
+document.addEventListener('change', event => {
+    const field = event.target.closest('[data-wallet-theme]');
+    if (!field || !Object.hasOwn(wallets, field.value)) return;
+    const workspace = field.closest('[data-workspace]');
+    const state = dashboards.get(workspace);
+    state.themes[state.region] = field.value;
+    const card = $('.wallet-card', workspace);
+    const previous = [...card.classList].find(name => name.startsWith('wallet-theme-'));
+    card.classList.replace(previous, `wallet-theme-${wallets[field.value].theme}`);
 });
+
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || dialog.open) return;
+    if ($('.mobile-drawer', mobile).hasAttribute('data-open')) {
+        setMobileDrawer(false);
+        return;
+    }
+    if (desktopDrawer.parentElement.dataset.open) {
+        if (desktopDrawer.contains(document.activeElement)) $('[data-command="toggle-rail"]', desktop).focus();
+        setDesktopDrawer(null, true);
+    }
+});
+
+applySettings();
+observeSummaries();
+applyActionState();
