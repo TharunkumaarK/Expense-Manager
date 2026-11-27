@@ -10,7 +10,7 @@ const variants = {
     B3: 'Combined optical reflection',
 };
 const defaults = {
-    variant: 'B3', direction: 'forward', edgeIntensity: 56, edgeLength: 19,
+    variant: 'B1', direction: 'forward', edgeIntensity: 56, edgeLength: 19,
     shineIntensity: 11, shineWidth: 37, duration: 790, desktopLight: 78,
     mobileLight: 89, summarySheen: true,
 };
@@ -82,6 +82,7 @@ const amount = (id, number, signed = false) =>
 const statusFor = percent => percent > 100 ? 'over' : percent >= 75 ? 'warn' : 'safe';
 const utilization = (spent, limit) => Math.round(100 * spent / limit);
 const settingsKey = 'expense-manager-optics-4c2v';
+const settingsVersion = 1;
 const dashboards = new Map();
 const sampleWalletThemes = Object.entries(wallets);
 let dialogWorkspace;
@@ -345,14 +346,18 @@ let settings = { ...defaults };
 try {
     const saved = JSON.parse(localStorage.getItem(settingsKey));
     if (saved) {
+        const legacy = saved.version === undefined;
         for (const [key, fallback] of Object.entries(defaults)) {
             const field = controlForm.elements.namedItem(key);
             const value = saved[key];
+            // The old payload stored B3 even when only a slider had been changed.
+            if (legacy && key === 'variant' && value === 'B3') continue;
             if (typeof fallback === 'number' && typeof value === 'number' &&
                 value >= Number(field.min) && value <= Number(field.max)) settings[key] = value;
             if (typeof fallback === 'boolean' && typeof value === 'boolean') settings[key] = value;
             if (field instanceof HTMLSelectElement && [...field.options].some(option => option.value === value)) settings[key] = value;
         }
+        if (legacy) saveSettings();
     }
 } catch {
     // A blocked or invalid local storage entry falls back to the sample settings.
@@ -392,12 +397,16 @@ function applySettings() {
     $('#configuration').textContent = JSON.stringify(settings, null, 2);
 }
 
+function saveSettings() {
+    try { localStorage.setItem(settingsKey, JSON.stringify({ version: settingsVersion, ...settings })); } catch {}
+}
+
 function updateSettings(key, value) {
     clearOptics();
     settings[key] = value;
     applySettings();
     if (key === 'summarySheen') observeSummaries();
-    try { localStorage.setItem(settingsKey, JSON.stringify(settings)); } catch {}
+    saveSettings();
 }
 
 controlForm.addEventListener('input', event => {

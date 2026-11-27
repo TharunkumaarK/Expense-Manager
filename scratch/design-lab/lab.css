@@ -480,6 +480,7 @@ body[data-preview] .workspace { border: 0; border-radius: 0; }
 }
 .drawer-inner { display: flex; flex-direction: column; }
 .drawer-head { display: flex; align-items: center; gap: 16px; min-height: 62px; padding-left: 14px; border-bottom: 1px solid var(--line); white-space: nowrap; font-weight: 600; }
+:is(.drawer-head, .toolbar-start) > .icon-button:is(:hover, :active) { background-color: transparent; }
 .drawer-nav { display: grid; gap: 4px; padding: 13px 9px; }
 .nav-link {
     position: relative;
@@ -509,7 +510,6 @@ body[data-preview] .workspace { border: 0; border-radius: 0; }
 .desktop-drawer:not([data-open]) .nav-link:focus-visible .icon { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 2px; }
 @media (hover: hover) and (pointer: fine) {
     .nav-link:hover { color: var(--text); }
-    [data-open] .nav-link:hover { background: #1b1b20; }
 }
 .drawer-foot {
     display: flex;
