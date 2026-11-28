@@ -12,7 +12,7 @@ const isDevelopment = ['branch-deploy', 'deploy-preview'].includes(context) &&
 
 const scripts = [
     'supabase-config', 'supabaseClient', 'country-config', 'storage',
-    'charts', 'wallet', 'onboarding', 'app', 'startup'
+    'charts', 'wallet', 'onboarding', 'print-report', 'app', 'startup'
 ];
 const libraries = [
     ['lucide', 'dist/umd/lucide.min.js', 'https://unpkg.com/lucide@1.80.0/dist/umd/lucide.min.js'],

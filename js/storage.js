@@ -973,6 +973,7 @@ class StorageManager {
 
         // If the user changed or this is first init:
         if (previousUserId !== userId) {
+            if (typeof app !== 'undefined') app.cancelCurrentReportPrint?.();
             this.initialSyncDone = false;
             this.accountStatus = 'UNRESOLVED';
             this.cloudSyncStatus = 'IDLE';
@@ -995,6 +996,7 @@ class StorageManager {
      * bleeds into subsequent logins or unauthenticated views.
      */
     onUserLogout() {
+        if (typeof app !== 'undefined') app.cancelCurrentReportPrint?.();
         this.currentUserId = null;
         this.initialSyncDone = false;
         this.accountStatus = 'UNRESOLVED';

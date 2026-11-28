@@ -3192,7 +3192,10 @@
                         <span id="focus-back-label">Japan Overview</span>
                     </button>
                     <span class="focus-header-divider" id="focus-header-divider" style="display: none;">/</span>
-                    <h3 id="focus-modal-title">Japan Overview</h3>
+                    <div class="focus-title-group" id="focus-title-group">
+                        <span class="focus-title-badge" id="focus-type-badge">Country Portfolio</span>
+                        <h3 id="focus-modal-title">Japan Overview</h3>
+                    </div>
                 </div>
                 <button class="focus-close-btn" onclick="app.closeFocusOverlay()" aria-label="Close focus view"
                     title="Close (Esc)">
@@ -3650,12 +3653,13 @@
                 <select id="pdf-to-month"
                     style="width:100%;padding:10px;background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-main);font-family:inherit;font-size:0.9rem;"></select>
             </div>
-            <p class="help-text text-sm text-muted mt-2" style="margin-bottom:15px;">Print balances, regional spending, budgets, and transactions from the selected months.</p>
+            <p class="help-text text-sm text-muted mt-2" style="margin-bottom:15px;">Transactions will be merged
+                chronologically and presented in a clean table format.</p>
             <div style="display:flex;gap:10px;margin-top:20px;">
                 <button class="btn btn-secondary" style="flex:1;"
                     onclick="document.getElementById('pdf-modal').classList.remove('active')">Cancel</button>
                 <button class="btn btn-primary" style="flex:1;"
-                    onclick="app.generatePdf()"><span>Print / Save as PDF</span></button>
+                    onclick="app.generatePdf()"><span>Generate</span></button>
             </div>
         </div>
     </div>
@@ -4041,7 +4045,6 @@
     <script src="js/charts.js?v=20261118_v123"></script>
     <script src="js/wallet.js?v=20261118_v123"></script>
     <script src="js/onboarding.js?v=20261118_v123"></script>
-    <script src="js/print-report.js"></script>
     <script src="js/app.js?v=20261118_v123"></script>
     <script src="js/startup.js"></script>
 </body>

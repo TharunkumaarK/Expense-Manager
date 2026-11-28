@@ -1,3 +1,20 @@
+const expenseChartPalette = [
+    '62, 99, 221',    // SpendIQ Primary Blue (#3e63dd)
+    '191, 90, 242',   // SpendIQ Purple (#bf5af2)
+    '52, 211, 153',   // Emerald (#34d399)
+    '249, 115, 22',   // Vibrant Orange (#f97316)
+    '6, 182, 212',    // Cyan (#06b6d4)
+    '251, 113, 133',  // Rose (#fb7185)
+    '234, 179, 8',    // Amber (#eab308)
+    '147, 51, 234',   // Violet (#9333ea)
+    '14, 165, 233',   // Sky (#0ea5e9)
+    '244, 63, 94'     // Rose Red (#f43f5e)
+];
+const expenseChartGradientStops = [
+    [0, 0.85],
+    [1, 0.35]
+];
+
 class ChartManager {
     constructor() {
         this.jpTrendChart = null;
@@ -45,28 +62,15 @@ class ChartManager {
     }
 
     getGlassStyles(canvasCtx, count, height = 300) {
-        // SpendIQ vibrant glass palette
-        const baseColors = [
-            '62, 99, 221',    // SpendIQ Primary Blue (#3e63dd)
-            '191, 90, 242',   // SpendIQ Purple (#bf5af2)
-            '52, 211, 153',   // Emerald (#34d399)
-            '249, 115, 22',   // Vibrant Orange (#f97316)
-            '6, 182, 212',    // Cyan (#06b6d4)
-            '251, 113, 133',  // Rose (#fb7185)
-            '234, 179, 8',    // Amber (#eab308)
-            '147, 51, 234',   // Violet (#9333ea)
-            '14, 165, 233',   // Sky (#0ea5e9)
-            '244, 63, 94'     // Rose Red (#f43f5e)
-        ];
-
         const backgrounds = [];
         const borders = [];
 
         for (let i = 0; i < count; i++) {
-            const rgb = baseColors[i % baseColors.length];
+            const rgb = expenseChartPalette[i % expenseChartPalette.length];
             const grad = canvasCtx.createLinearGradient(0, 0, 0, height);
-            grad.addColorStop(0, `rgba(${rgb}, 0.85)`);
-            grad.addColorStop(1, `rgba(${rgb}, 0.35)`);
+            for (const [offset, opacity] of expenseChartGradientStops) {
+                grad.addColorStop(offset, `rgba(${rgb}, ${opacity})`);
+            }
             backgrounds.push(grad);
             borders.push(`rgba(${rgb}, 1.0)`);
         }
