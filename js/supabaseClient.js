@@ -279,8 +279,10 @@ const supabaseClient = {
 
             // Sync from Supabase — if remote is newer, fully re-initialize the app
             if (typeof storage !== 'undefined') {
-                storage.onUserLogin(this.session.user.id);
+                const userId = this.session.user.id;
+                storage.onUserLogin(userId);
                 const stateChanged = await storage.syncFromSupabase();
+                if (this.session?.user?.id !== userId || storage.currentUserId !== userId) return;
                 const accountStatus = storage.getAccountStatus();
 
                 // 1. If initial sync failed (network error, HTTP 503, offline), block dashboard safely

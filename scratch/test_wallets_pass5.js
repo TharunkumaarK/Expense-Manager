@@ -125,8 +125,8 @@ testAssert(modalZ >= 1100, `modal-overlay z-index (${modalZ}) is >= 1100`);
 console.log("\nTEST 8: Liquid Net Position Separation & Privacy Concealment");
 testAssert(indexHtml.includes('Japan Balances'), "Japan Balances heading exists");
 testAssert(indexHtml.includes('India Balances'), "India Balances heading exists");
-testAssert(indexHtml.includes('financial-amount privacy-blur" id="wallets-page-jp-total"'), "Japan total has financial-amount privacy-blur");
-testAssert(indexHtml.includes('financial-amount privacy-blur" id="wallets-page-in-total"'), "India total has financial-amount privacy-blur");
+testAssert(/class="[^"]*financial-amount privacy-blur"\s+id="wallets-page-jp-total"/.test(indexHtml), "Japan total has financial-amount privacy-blur");
+testAssert(/class="[^"]*financial-amount privacy-blur"\s+id="wallets-page-in-total"/.test(indexHtml), "India total has financial-amount privacy-blur");
 testAssert(appJs.includes('financial-amount privacy-blur">${this.formatMoney(w.balance, w.currency)}'), "Card balance has financial-amount privacy-blur");
 
 // 9. Interactivity & FLIP Focus Overlay

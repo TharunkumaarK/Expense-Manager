@@ -712,9 +712,6 @@ class WalletManager {
             if (!this.isValidAmount(amt, w.currency)) {
                 return { valid: false, error: `Amount ${tx.amount} violates precision or magnitude bounds for ${w.currency}.` };
             }
-            if (tx.type === 'expense' && !tx.categoryId) {
-                return { valid: false, error: 'Expense category is required.' };
-            }
             return { valid: true };
         }
 

@@ -113,6 +113,8 @@
                 </div>
             </div>
 
+            <div class="auth-divider" aria-hidden="true"></div>
+
             <!-- Right Pane: Authentication Workspace -->
             <div class="auth-form-pane">
                 <div class="auth-form-card">
@@ -188,11 +190,11 @@
     <div id="reset-password-screen" class="auth-viewport">
         <div class="auth-ambient-glow" aria-hidden="true"></div>
         <div class="auth-reset-container">
+            <div class="auth-reset-brand">
+                <p class="auth-brand-title">Expense Manager</p>
+                <p class="auth-headline">Cross-border finances, unified in one ledger.</p>
+            </div>
             <div class="auth-form-card auth-reset-card">
-                <div class="auth-brand-logo mb-3" style="justify-content: center;">
-                    <span class="auth-brand-name" style="font-size: 1.25rem;">Expense Manager</span>
-                </div>
-
                 <div class="auth-form-intro text-center">
                     <h2 class="auth-title">Set new password</h2>
                     <p class="auth-desc">Create a secure password for your account.</p>
@@ -536,11 +538,6 @@
                             <span class="account-popover-name" id="popover-account-name">Account</span>
                             <span class="account-popover-email" id="popover-account-email">user@example.com</span>
                         </div>
-                        <div class="account-popover-status">
-                            <span class="sync-dot"
-                                style="width: 7px; height: 7px; background: #22c55e; border-radius: 50%;"></span>
-                            <span id="popover-sync-label">Cloud Synced</span>
-                        </div>
                         <div class="account-popover-divider"></div>
                         <button class="account-popover-item" onclick="app.navigateToSettingsSection('profile')">
                             <i data-lucide="user"></i>
@@ -565,11 +562,13 @@
                         </button>
                     </div>
 
-                    <div class="sync-status-indicator" id="sidebar-sync-indicator"
-                        title="Cloud Sync Active (Development)">
-                        <span class="sync-dot" id="sync-status-dot"></span>
-                        <span class="sync-text sidebar-text" id="sync-status-text">Cloud Synced</span>
-                    </div>
+                    <button class="sync-status-indicator" id="sidebar-sync-indicator" type="button"
+                        title="Checking sync. View synchronization details."
+                        aria-label="Checking sync. View synchronization details."
+                        onclick="app.handleSidebarSyncAction()">
+                        <i data-lucide="cloud" aria-hidden="true"></i>
+                        <span class="sidebar-text" id="sync-status-text">Checking sync</span>
+                    </button>
                     <div class="account-card" id="sidebar-account-card" onclick="app.toggleAccountMenu(event)"
                         style="cursor: pointer;" title="Account menu">
                         <div class="account-avatar">
@@ -619,13 +618,6 @@
                     </div>
 
                     <div class="header-right">
-                        <!-- Desktop Sync Status Indicator -->
-                        <div id="desktop-sync-status-pill" class="sync-status-pill sync-pill-synced"
-                            title="All changes saved locally and confirmed in cloud">
-                            <span class="sync-pill-dot"></span>
-                            <span class="sync-pill-text">Synced</span>
-                        </div>
-
                         <!-- Monetary Concealment Toggle (Icon-Only Control) -->
                         <button class="global-privacy-btn desktop-privacy-btn" data-privacy-toggle
                             aria-label="Toggle monetary concealment" title="Toggle monetary concealment">
@@ -822,7 +814,7 @@
                                     onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); app.toggleCollapse('jp-categories-wrap', 'jp-chevron'); }">
                                     <div class="section-title-wrap">
                                         <span class="section-badge-dot jp-dot"></span>
-                                        <h3 class="section-title" data-type-role="editorial-heading">Japan Spending
+                                        <h3 class="section-title" data-type-role="panel-heading">Japan Spending
                                             Categories
                                         </h3>
                                     </div>
@@ -848,7 +840,7 @@
                                     style="display: none;">
                                     <div class="section-title-wrap">
                                         <span class="section-badge-dot in-dot"></span>
-                                        <h3 class="section-title" data-type-role="editorial-heading">India Spending
+                                        <h3 class="section-title" data-type-role="panel-heading">India Spending
                                             Categories
                                         </h3>
                                     </div>
@@ -874,7 +866,7 @@
                                     style="display: none;">
                                     <div class="section-title-wrap">
                                         <span class="section-badge-dot de-dot"></span>
-                                        <h3 class="section-title" data-type-role="editorial-heading">Germany Spending
+                                        <h3 class="section-title" data-type-role="panel-heading">Germany Spending
                                             Categories
                                         </h3>
                                     </div>
@@ -1966,7 +1958,7 @@
                                 </div>
 
                                 <!-- Budget Action Buttons -->
-                                <div class="budgets-toolbar-actions">
+                                <div class="budgets-toolbar-actions hidden">
                                     <button class="btn btn-secondary btn-sm" id="btn-edit-overall-budget"
                                         onclick="app.openOverallBudgetModal()" title="Configure Overall Monthly Limit">
                                         <i data-lucide="sliders"></i>
@@ -1995,7 +1987,7 @@
                             </div>
 
                             <!-- Category Allocations Workspace -->
-                            <div class="budgets-categories-section">
+                            <div class="budgets-categories-section hidden">
                                 <div class="budgets-section-header">
                                     <div>
                                         <h3 class="budgets-section-title" data-type-role="editorial-heading">Category
@@ -2300,41 +2292,41 @@
                                     <div class="settings-nav-title">Sections</div>
                                     <div class="settings-tab-list">
                                         <button class="settings-tab-btn active" data-section="profile"
-                                            onclick="app.switchSettingsSection('profile')">
+                                            aria-pressed="true" onclick="app.switchSettingsSection('profile')">
                                             <i data-lucide="user"></i>
                                             <span>Profile</span>
                                         </button>
-                                        <button class="settings-tab-btn" data-section="regional"
+                                        <button class="settings-tab-btn" data-section="regional" aria-pressed="false"
                                             onclick="app.switchSettingsSection('regional')">
                                             <i data-lucide="globe"></i>
                                             <span>Regional Preferences</span>
                                         </button>
-                                        <button class="settings-tab-btn" data-section="appearance"
+                                        <button class="settings-tab-btn" data-section="appearance" aria-pressed="false"
                                             onclick="app.switchSettingsSection('appearance')">
                                             <i data-lucide="palette"></i>
                                             <span>Appearance</span>
                                         </button>
-                                        <button class="settings-tab-btn" data-section="privacy"
+                                        <button class="settings-tab-btn" data-section="privacy" aria-pressed="false"
                                             onclick="app.switchSettingsSection('privacy')">
                                             <i data-lucide="eye-off"></i>
                                             <span>Privacy</span>
                                         </button>
-                                        <button class="settings-tab-btn" data-section="security"
+                                        <button class="settings-tab-btn" data-section="security" aria-pressed="false"
                                             onclick="app.switchSettingsSection('security')">
                                             <i data-lucide="shield"></i>
                                             <span>Security</span>
                                         </button>
-                                        <button class="settings-tab-btn" data-section="data"
+                                        <button class="settings-tab-btn" data-section="data" aria-pressed="false"
                                             onclick="app.switchSettingsSection('data')">
                                             <i data-lucide="database"></i>
                                             <span>Data Management</span>
                                         </button>
-                                        <button class="settings-tab-btn" data-section="help"
+                                        <button class="settings-tab-btn" data-section="help" aria-pressed="false"
                                             onclick="app.switchSettingsSection('help')">
                                             <i data-lucide="help-circle"></i>
                                             <span>Help & Getting Started</span>
                                         </button>
-                                        <button class="settings-tab-btn" data-section="about"
+                                        <button class="settings-tab-btn" data-section="about" aria-pressed="false"
                                             onclick="app.switchSettingsSection('about')">
                                             <i data-lucide="info"></i>
                                             <span>About</span>
@@ -3114,16 +3106,12 @@
                                                         connectivity.</div>
                                                 </div>
                                                 <div class="settings-control-wrap">
-                                                    <div
-                                                        style="display:flex; align-items:center; gap:8px; font-size:0.82rem;">
-                                                        <span class="sync-dot"
-                                                            style="width:8px; height:8px; background:#22c55e; border-radius:50%;"></span>
-                                                        <span style="color:#fff; font-weight:600;"
-                                                            id="about-sync-status">Connected</span>
-                                                    </div>
-                                                    <div style="font-size:0.75rem; color:var(--text-muted);">
-                                                        Environment: <code id="about-env-label">Loading...</code><br>
-                                                        Last Synced: <span id="about-last-synced">Just now</span>
+                                                    <div class="settings-sync-status" id="about-sync-status"
+                                                        role="status">Checking sync</div>
+                                                    <div class="settings-sync-details">
+                                                        Environment: <code id="about-env-label">Loading…</code><br>
+                                                        Last confirmed: <time id="about-last-synced">Not yet
+                                                            confirmed</time>
                                                     </div>
                                                 </div>
                                             </div>
@@ -3151,41 +3139,39 @@
                         </div>
                     </section>
                 </div> <!-- /.desktop-content-area -->
-                <div class="mobile-action-dock">
-                    <!-- Floating Action Button (Mobile Add Transaction) -->
-                    <button class="fab" id="main-fab" aria-label="Add Transaction" aria-controls="fab-menu"
-                        aria-expanded="false" data-signature-action>
-                        <svg class="action-rim" aria-hidden="true" focusable="false">
-                            <rect />
-                        </svg>
-                        <i data-lucide="plus"></i>
-                    </button>
+                <!-- Floating Action Button (Mobile Add Transaction) -->
+                <button class="fab" id="main-fab" aria-label="Add Transaction" aria-controls="fab-menu"
+                    aria-expanded="false" data-signature-action>
+                    <svg class="action-rim" aria-hidden="true" focusable="false">
+                        <rect />
+                    </svg>
+                    <i data-lucide="plus"></i>
+                </button>
 
-                    <!-- FAB Overlay Menu -->
-                    <div class="fab-menu-overlay" id="fab-menu" inert
-                        onclick="if(event.target === this) app.toggleFabMenu()">
-                        <div class="fab-actions">
-                            <button class="fab-action" data-action-accent="expense"
-                                onclick="app.openTransactionModal('expense')">
-                                <span class="fab-label">Expense</span>
-                                <div class="fab-icon fab-icon-expense"><i data-lucide="arrow-up-right"></i></div>
-                            </button>
-                            <button class="fab-action" data-action-accent="transfer"
-                                onclick="app.openTransactionModal('transfer')">
-                                <span class="fab-label">Transfer</span>
-                                <div class="fab-icon fab-icon-transfer"><i data-lucide="arrow-left-right"></i></div>
-                            </button>
-                            <button class="fab-action" id="fab-action-remittance" data-action-accent="transfer"
-                                onclick="app.openTransactionModal('remittance')">
-                                <span class="fab-label">International Transfer</span>
-                                <div class="fab-icon fab-icon-remittance"><i data-lucide="send"></i></div>
-                            </button>
-                            <button class="fab-action" data-action-accent="income"
-                                onclick="app.openTransactionModal('income')">
-                                <span class="fab-label">Income</span>
-                                <div class="fab-icon fab-icon-income"><i data-lucide="arrow-down-left"></i></div>
-                            </button>
-                        </div>
+                <!-- FAB Overlay Menu -->
+                <div class="fab-menu-overlay" id="fab-menu" inert
+                    onclick="if(event.target === this) app.toggleFabMenu()">
+                    <div class="fab-actions">
+                        <button class="fab-action" data-action-accent="expense"
+                            onclick="app.openTransactionModal('expense')">
+                            <span class="fab-label">Expense</span>
+                            <div class="fab-icon fab-icon-expense"><i data-lucide="arrow-up-right"></i></div>
+                        </button>
+                        <button class="fab-action" data-action-accent="transfer"
+                            onclick="app.openTransactionModal('transfer')">
+                            <span class="fab-label">Transfer</span>
+                            <div class="fab-icon fab-icon-transfer"><i data-lucide="arrow-left-right"></i></div>
+                        </button>
+                        <button class="fab-action" id="fab-action-remittance" data-action-accent="transfer"
+                            onclick="app.openTransactionModal('remittance')">
+                            <span class="fab-label">International Transfer</span>
+                            <div class="fab-icon fab-icon-remittance"><i data-lucide="send"></i></div>
+                        </button>
+                        <button class="fab-action" data-action-accent="income"
+                            onclick="app.openTransactionModal('income')">
+                            <span class="fab-label">Income</span>
+                            <div class="fab-icon fab-icon-income"><i data-lucide="arrow-down-left"></i></div>
+                        </button>
                     </div>
                 </div>
             </div> <!-- /.desktop-main-wrapper -->
@@ -3805,10 +3791,11 @@
                             style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Region
                             Availability</label>
                         <select id="cat-edit-country"
+                            onchange="document.getElementById('cat-edit-curr-label').textContent = CountryConfig.get(this.value)?.currency || ''"
                             style="width: 100%; padding: 10px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
                             <option value="JP">Japan Only (JPY ¥)</option>
                             <option value="IN">India Only (INR ₹)</option>
-                            <option value="ALL">Both Regions (Global)</option>
+                            <option value="DE">Germany Only (EUR €)</option>
                         </select>
                     </div>
                 </div>

@@ -129,6 +129,7 @@ class StorageManager {
         this.tabId = 'tab_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
         this.lastConfirmedCloudFingerprint = null;
         this.lastConfirmedCloudPersistedFingerprint = null;
+        this.confirmedInSession = false;
         this.lastConfirmedCloudRevision = this._loadConfirmedCloudRevision();
         this.activeConflict = null;
         this.syncChannel = null;
@@ -150,7 +151,8 @@ class StorageManager {
      * Prevents initializing blindly from unconfirmed local revisions.
      */
     _loadConfirmedCloudRevision() {
-        if (typeof localStorage !== 'undefined') {
+        this.lastConfirmedCloudAt = null;
+        if (this.currentUserId && typeof localStorage !== 'undefined') {
             try {
                 const raw = localStorage.getItem(this._getSyncMetaKey());
                 if (raw) {
@@ -158,6 +160,9 @@ class StorageManager {
                     if (typeof parsed?.lastConfirmedCloudRevision === 'number') {
                         this.lastConfirmedCloudFingerprint = parsed.lastConfirmedFingerprint || null;
                         this.lastConfirmedCloudPersistedFingerprint = parsed.lastConfirmedPersistedFingerprint || null;
+                        if (parsed.lastConfirmedCloudRevision > 0 && Number.isFinite(Date.parse(parsed.lastConfirmedAt))) {
+                            this.lastConfirmedCloudAt = parsed.lastConfirmedAt;
+                        }
                         return parsed.lastConfirmedCloudRevision;
                     }
                 }
@@ -173,6 +178,8 @@ class StorageManager {
      */
     _persistConfirmedCloudRevision(rev, fingerprint = null, persistedFingerprint = null) {
         this.lastConfirmedCloudRevision = Number(rev) || 0;
+        this.confirmedInSession = Boolean(this.currentUserId && this.lastConfirmedCloudRevision > 0);
+        this.lastConfirmedCloudAt = this.confirmedInSession ? new Date().toISOString() : null;
         this.lastConfirmedCloudFingerprint = fingerprint || (this.state ? this.computeFinancialFingerprint(this.state) : null);
         this.lastConfirmedCloudPersistedFingerprint = persistedFingerprint || (this.state ? this.computePersistedStateFingerprint(this.state) : null);
         if (typeof localStorage !== 'undefined') {
@@ -181,7 +188,7 @@ class StorageManager {
                     lastConfirmedCloudRevision: this.lastConfirmedCloudRevision,
                     lastConfirmedFingerprint: this.lastConfirmedCloudFingerprint,
                     lastConfirmedPersistedFingerprint: this.lastConfirmedCloudPersistedFingerprint,
-                    lastConfirmedAt: new Date().toISOString()
+                    lastConfirmedAt: this.lastConfirmedCloudAt
                 }));
             } catch (e) { }
         }
@@ -394,8 +401,14 @@ class StorageManager {
             });
 
             // 7. Enqueue into serialized cloud synchronization queue (unless caller explicitly opted out, e.g. local backup restore)
-            if (!options.skipCloudSync && this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
-                this.enqueueCloudSync(this.state.revision);
+            if (!options.skipCloudSync) {
+                const hasSession = typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id;
+                if (hasSession && this.initialSyncDone) {
+                    this.enqueueCloudSync(this.state.revision);
+                } else if (!hasSession) {
+                    this.cloudSyncStatus = 'LOCAL_SAVED';
+                    this.notifySyncStatus();
+                }
             }
 
             return result !== undefined ? result : true;
@@ -422,12 +435,10 @@ class StorageManager {
      * Guarantees monotonic, ordered, non-overlapping cloud pushes.
      * @param {number} targetRevision
      */
-    enqueueCloudSync(targetRevision) {
+    enqueueCloudSync(targetRevision, { retry = false } = {}) {
         if (typeof supabaseClient === 'undefined' || !supabaseClient.session?.user?.id) {
             this.cloudSyncStatus = 'LOCAL_SAVED';
-            if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                app.updateSyncStatusPill('LOCAL_ONLY');
-            }
+            this.notifySyncStatus();
             return;
         }
         if (this.cloudSyncStatus === 'CONFLICT') {
@@ -445,24 +456,23 @@ class StorageManager {
             } catch (e) { }
         }
         this.cloudSyncStatus = 'SYNC_PENDING';
-        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-            app.updateSyncStatusPill('SYNC_PENDING');
-        }
-        this._drainSyncQueue();
+        this.notifySyncStatus();
+        this._drainSyncQueue({ retry });
     }
 
     /**
      * Drain the cloud synchronization queue sequentially.
      * Ensures only one in-flight push occurs per client and revisions advance monotonically.
      */
-    async _drainSyncQueue() {
+    async _drainSyncQueue({ retry = false } = {}) {
         if (this._isSyncWorkerRunning) return;
         if (typeof supabaseClient === 'undefined' || !supabaseClient.session?.user?.id) return;
         if (this.cloudSyncStatus === 'CONFLICT') return;
 
+        const workerUserId = supabaseClient.session.user.id;
         this._isSyncWorkerRunning = true;
         try {
-            while (typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
+            while (supabaseClient.session?.user?.id === workerUserId) {
                 if (this.cloudSyncStatus === 'CONFLICT') break;
 
                 // Account isolation guard: ensure active session matches StorageManager authenticated context
@@ -482,23 +492,21 @@ class StorageManager {
 
                 // Only confirm if revision AND fingerprints match verified server state
                 const isPersistedMatch = !this.lastConfirmedCloudPersistedFingerprint || this.lastConfirmedCloudPersistedFingerprint === currentPersistedFingerprint;
-                if (currentConfirmed >= targetRev && isPersistedMatch && this.lastConfirmedCloudFingerprint === currentFingerprint) {
+                if (!retry && currentConfirmed >= targetRev && isPersistedMatch && this.lastConfirmedCloudFingerprint === currentFingerprint) {
                     this.cloudSyncStatus = 'CONFIRMED';
                     if (typeof localStorage !== 'undefined') {
                         localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
                     }
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNCED');
-                    }
+                    this.notifySyncStatus();
                     break;
                 }
 
                 this.cloudSyncStatus = 'SYNCING';
-                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                    app.updateSyncStatusPill('SYNCING');
-                }
+                this.notifySyncStatus();
 
+                retry = false;
                 const pushOk = await this.pushToSupabase();
+                if (this.currentUserId !== workerUserId) break;
                 if (pushOk) {
                     const freshTargetRev = Number(this.state.revision) || 1;
                     const freshConfirmed = Number(this.lastConfirmedCloudRevision) || 0;
@@ -510,9 +518,7 @@ class StorageManager {
                         if (typeof localStorage !== 'undefined') {
                             localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
                         }
-                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                            app.updateSyncStatusPill('SYNCED');
-                        }
+                        this.notifySyncStatus();
                         break;
                     }
                 } else {
@@ -520,7 +526,7 @@ class StorageManager {
                 }
             }
         } finally {
-            this._isSyncWorkerRunning = false;
+            if (!this.currentUserId || this.currentUserId === workerUserId) this._isSyncWorkerRunning = false;
         }
     }
 
@@ -655,13 +661,7 @@ class StorageManager {
                 if (typeof app !== 'undefined') {
                     if (typeof app.renderAll === 'function') app.renderAll();
                     if (typeof app.updateTransferPreview === 'function') app.updateTransferPreview();
-                    // Receiving local broadcast does NOT prove cloud save succeeded: reflect actual pending queue state
-                    if (typeof app.updateSyncStatusPill === 'function') {
-                        const pillStatus = (typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id)
-                            ? 'SYNC_PENDING'
-                            : 'LOCAL_ONLY';
-                        app.updateSyncStatusPill(pillStatus);
-                    }
+                    this.notifySyncStatus();
                 }
             }
         }
@@ -672,11 +672,10 @@ class StorageManager {
      * Routes retries strictly through the serialized cloud queue coordinator.
      */
     onNetworkOnline() {
+        if (this.cloudSyncStatus === 'CONFLICT') return;
         console.log('[StorageManager] Network online detected. Attempting pending cloud synchronization...');
         this.cloudSyncStatus = 'SYNCING';
-        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-            app.updateSyncStatusPill('SYNC_PENDING');
-        }
+        this.notifySyncStatus();
         if (this.initialSyncDone && typeof supabaseClient !== 'undefined' && supabaseClient.session?.user?.id) {
             this.enqueueCloudSync(this.state.revision);
         }
@@ -686,11 +685,10 @@ class StorageManager {
      * Handle network drop.
      */
     onNetworkOffline() {
+        if (this.cloudSyncStatus === 'CONFLICT') return;
         console.log('[StorageManager] Network offline detected. Switching to local persistence mode.');
         this.cloudSyncStatus = 'FAILED';
-        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-            app.updateSyncStatusPill('SYNC_FAILED', 'Offline');
-        }
+        this.notifySyncStatus();
     }
 
     /**
@@ -794,7 +792,7 @@ class StorageManager {
                     localStorage.removeItem(`${this.getActiveStorageKey()}_conflict_stash`);
                 }
                 if (typeof app !== 'undefined') {
-                    app.updateSyncStatusPill('SYNCED');
+                    this.notifySyncStatus();
                     app.renderAll();
                 }
                 return { success: true, strategy: 'overwrite_cloud' };
@@ -851,7 +849,7 @@ class StorageManager {
                 localStorage.removeItem(`${this.getActiveStorageKey()}_conflict_stash`);
             }
             if (typeof app !== 'undefined') {
-                app.updateSyncStatusPill('SYNCED');
+                this.notifySyncStatus();
                 app.renderAll();
             }
             return { success: true, strategy: 'accept_cloud' };
@@ -984,8 +982,10 @@ class StorageManager {
             this.state = this.loadData();
             this.lastConfirmedCloudFingerprint = null;
             this.lastConfirmedCloudPersistedFingerprint = null;
+            this.confirmedInSession = false;
             this.lastConfirmedCloudRevision = this._loadConfirmedCloudRevision();
             this.isFirstLoad = !localStorage.getItem(this.getActiveStorageKey());
+            this.notifySyncStatus();
         }
     }
 
@@ -1004,10 +1004,13 @@ class StorageManager {
         this.lastConfirmedCloudRevision = 0;
         this.lastConfirmedCloudFingerprint = null;
         this.lastConfirmedCloudPersistedFingerprint = null;
+        this.confirmedInSession = false;
+        this.lastConfirmedCloudAt = null;
         this.activeConflict = null;
         this._isSyncWorkerRunning = false;
         this.state = JSON.parse(JSON.stringify(defaultState));
         this._attachBudgetAccessors(this.state);
+        this.notifySyncStatus();
     }
 
     loadData() {
@@ -1245,6 +1248,52 @@ class StorageManager {
      */
     getCloudSyncStatus() {
         return this.cloudSyncStatus || 'IDLE';
+    }
+
+    /**
+     * Presentation derived from the current account and the engine's confirmation record.
+     * A save or acknowledgement for a previous revision cannot confirm the current state.
+     */
+    getSyncPresentation() {
+        const aliases = {
+            LOCAL_ONLY: 'LOCAL_SAVED', SYNCED: 'CONFIRMED',
+            SYNC_FAILED: 'FAILED', CONFLICT_DETECTED: 'CONFLICT'
+        };
+        const rawStatus = this.getCloudSyncStatus();
+        const status = aliases[rawStatus] || rawStatus;
+        const sessionUserId = typeof supabaseClient !== 'undefined' ? supabaseClient.session?.user?.id : null;
+        if (!this.currentUserId || this.currentUserId !== sessionUserId) {
+            return { status: status === 'LOCAL_SAVED' ? status : 'IDLE', lastConfirmedAt: null, pending: false };
+        }
+
+        const lastConfirmedAt = this.lastConfirmedCloudRevision > 0 ? this.lastConfirmedCloudAt : null;
+        const revision = Number(this.state?.revision) || 1;
+        const hasConfirmation = this.lastConfirmedCloudRevision > 0;
+        const matchesConfirmation = hasConfirmation &&
+            this.lastConfirmedCloudRevision >= revision &&
+            this.lastConfirmedCloudFingerprint === this.computeFinancialFingerprint(this.state) &&
+            this.lastConfirmedCloudPersistedFingerprint === this.computePersistedStateFingerprint(this.state);
+        let pending = ['LOCAL_SAVED', 'SYNC_PENDING', 'SYNCING'].includes(status) ||
+            (hasConfirmation && !matchesConfirmation);
+        if (!pending) {
+            try {
+                const queued = JSON.parse(localStorage.getItem(`${this.getActiveStorageKey()}_pending_sync`));
+                pending = queued?.userId === this.currentUserId;
+            } catch (e) { }
+        }
+
+        let visibleStatus = status;
+        if (status === 'CONFLICT' || this.activeConflict) visibleStatus = 'CONFLICT';
+        else if (typeof navigator !== 'undefined' && navigator.onLine === false) visibleStatus = 'OFFLINE';
+        else if (status === 'CONFIRMED' && (!this.confirmedInSession || !matchesConfirmation)) {
+            visibleStatus = pending ? 'SYNC_PENDING' : 'IDLE';
+        }
+
+        return { status: visibleStatus, lastConfirmedAt, pending };
+    }
+
+    notifySyncStatus() {
+        if (typeof app !== 'undefined') app.renderSyncStatus?.();
     }
 
     /**
@@ -1816,6 +1865,8 @@ class StorageManager {
                 .eq('user_id', userId)
                 .single();
 
+            if (this.currentUserId !== userId || supabaseClient.session?.user?.id !== userId) return false;
+
             if (error) {
                 if (error.code === 'PGRST116') {
                     // No remote state found in Supabase for this user
@@ -1942,9 +1993,7 @@ class StorageManager {
                         await this.pushToSupabase({ expectedRemoteRevision: remoteRev });
                     }
 
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNCED');
-                    }
+                    this.notifySyncStatus();
                     return true;
                 }
 
@@ -1957,9 +2006,7 @@ class StorageManager {
                         this.accountStatus = 'EXISTING_USER';
                         this.cloudSyncStatus = 'CONFIRMED';
                         this.initialSyncDone = true;
-                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                            app.updateSyncStatusPill('SYNCED');
-                        }
+                        this.notifySyncStatus();
                         return false;
                     } else if (remoteRev > localRev) {
                         console.log(`[Sync] Remote revision is ahead (${remoteRev} vs ${localRev}) with identical content. Fast-forwarding local revision...`);
@@ -1970,18 +2017,14 @@ class StorageManager {
                         this.accountStatus = 'EXISTING_USER';
                         this.cloudSyncStatus = 'CONFIRMED';
                         this.initialSyncDone = true;
-                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                            app.updateSyncStatusPill('SYNCED');
-                        }
+                        this.notifySyncStatus();
                         return false;
                     } else {
                         console.log(`[Sync] Local revision is ahead (${localRev} vs ${remoteRev}) with identical content. Enqueuing sync...`);
                         this.accountStatus = 'EXISTING_USER';
                         this.cloudSyncStatus = 'SYNC_PENDING';
                         this.initialSyncDone = true;
-                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                            app.updateSyncStatusPill('SYNC_PENDING');
-                        }
+                        this.notifySyncStatus();
                         this.enqueueCloudSync(this.state.revision);
                         return false;
                     }
@@ -1997,9 +2040,7 @@ class StorageManager {
                     this.accountStatus = 'EXISTING_USER';
                     this.cloudSyncStatus = 'SYNC_PENDING';
                     this.initialSyncDone = true;
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNC_PENDING');
-                    }
+                    this.notifySyncStatus();
                     this.enqueueCloudSync(this.state.revision);
                     return false;
                 } else if (!hasPendingLocalEdits && hasRemoteAdvanced) {
@@ -2032,9 +2073,7 @@ class StorageManager {
                         await this.pushToSupabase({ expectedRemoteRevision: remoteRev });
                     }
 
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNCED');
-                    }
+                    this.notifySyncStatus();
                     return true;
                 } else {
                     // Case C & Case D:
@@ -2052,20 +2091,27 @@ class StorageManager {
                         : 'Local and cloud states have conflicting content at the same revision.';
                     this.initialSyncDone = true;
                     if (typeof app !== 'undefined') {
-                        if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                        this.notifySyncStatus();
                         if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
                     }
                     return false;
                 }
             }
         } catch (e) {
+            if (this.currentUserId !== userId || supabaseClient.session?.user?.id !== userId) return false;
             console.error('[Sync] Supabase sync failed with exception:');
             this.accountStatus = 'SYNC_FAILED';
             this.cloudSyncStatus = 'FAILED';
             this.syncError = e.message || String(e);
             this.initialSyncDone = true;
+        } finally {
+            this.notifySyncStatus();
         }
         return false;
+    }
+
+    retryPendingSync() {
+        if (!this._isSyncWorkerRunning) this.enqueueCloudSync(this.state.revision, { retry: true });
     }
 
     async pushToSupabase(options = {}) {
@@ -2115,6 +2161,8 @@ class StorageManager {
 
         // Capture immutable snapshot of outbound state before initiating asynchronous network request
         const requestUserId = userId;
+        const isCurrentAccount = () => supabaseClient.session?.user?.id === requestUserId &&
+            (!this.currentUserId || this.currentUserId === requestUserId);
         const expectedRev = options.expectedRemoteRevision !== undefined
             ? Number(options.expectedRemoteRevision)
             : (Number(this.lastConfirmedCloudRevision) || 1);
@@ -2142,8 +2190,7 @@ class StorageManager {
                 const { data, error: insertErr } = await insertQuery;
 
                 // Account isolation guard after await: ensure user session did not mutate during flight
-                const sessionUserIdAfter = supabaseClient.session?.user?.id;
-                if (!sessionUserIdAfter || sessionUserIdAfter !== requestUserId || (this.currentUserId && this.currentUserId !== requestUserId)) {
+                if (!isCurrentAccount()) {
                     console.warn('[Sync] User session changed while cloud initialization request was in flight. Discarding acknowledgment.');
                     return false;
                 }
@@ -2157,6 +2204,7 @@ class StorageManager {
                             .select('user_id, state, updated_at')
                             .eq('user_id', requestUserId)
                             .single();
+                        if (!isCurrentAccount()) return false;
                         if (remoteRow && remoteRow.state) {
                             const remoteRev = Number(remoteRow.state.revision);
                             const remoteFingerprint = this.computeFinancialFingerprint(remoteRow.state);
@@ -2173,14 +2221,10 @@ class StorageManager {
                                     if (typeof localStorage !== 'undefined') {
                                         localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
                                     }
-                                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                                        app.updateSyncStatusPill('SYNCED');
-                                    }
+                                    this.notifySyncStatus();
                                 } else {
                                     this.cloudSyncStatus = 'SYNC_PENDING';
-                                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                                        app.updateSyncStatusPill('SYNC_PENDING');
-                                    }
+                                    this.notifySyncStatus();
                                 }
                                 return true;
                             }
@@ -2188,24 +2232,20 @@ class StorageManager {
                             this.stashConflictState(this.state, remoteRow.state);
                             this.cloudSyncStatus = 'CONFLICT';
                             if (typeof app !== 'undefined') {
-                                if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                                this.notifySyncStatus();
                                 if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
                             }
                         } else {
                             this.cloudSyncStatus = 'FAILED';
                             this.syncError = (fetchErr && fetchErr.message) || 'Cloud row already initialized; could not fetch remote state.';
-                            if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                                app.updateSyncStatusPill('SYNC_FAILED');
-                            }
+                            this.notifySyncStatus();
                         }
                         return false;
                     }
                     console.error("[Sync] Initial cloud row insert failed:");
                     this.syncError = insertErr.message || String(insertErr);
                     this.cloudSyncStatus = 'FAILED';
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNC_FAILED');
-                    }
+                    this.notifySyncStatus();
                     return false;
                 }
 
@@ -2216,9 +2256,7 @@ class StorageManager {
                     console.error('[Sync] Account mismatch on insert: server response belongs to another user:');
                     this.syncError = 'Account mismatch in server response.';
                     this.cloudSyncStatus = 'FAILED';
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNC_FAILED');
-                    }
+                    this.notifySyncStatus();
                     return false;
                 }
                 const serverState = serverRow?.state;
@@ -2227,9 +2265,7 @@ class StorageManager {
                         console.error('[Sync] Malformed server response on insert: state is not an object.');
                         this.syncError = 'Malformed server response.';
                         this.cloudSyncStatus = 'FAILED';
-                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                            app.updateSyncStatusPill('SYNC_FAILED');
-                        }
+                        this.notifySyncStatus();
                         return false;
                     }
                     if (typeof serverState.revision !== 'undefined') {
@@ -2238,9 +2274,7 @@ class StorageManager {
                             console.error(`[Sync] Malformed acknowledgment on insert: server returned revision ${sRev}, expected ${outboundRevision}`);
                             this.syncError = 'Server revision mismatch in response.';
                             this.cloudSyncStatus = 'FAILED';
-                            if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                                app.updateSyncStatusPill('SYNC_FAILED');
-                            }
+                            this.notifySyncStatus();
                             return false;
                         }
                         confirmedRev = sRev;
@@ -2263,14 +2297,10 @@ class StorageManager {
                     if (typeof localStorage !== 'undefined') {
                         localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
                     }
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNCED');
-                    }
+                    this.notifySyncStatus();
                 } else {
                     this.cloudSyncStatus = 'SYNC_PENDING';
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNC_PENDING');
-                    }
+                    this.notifySyncStatus();
                 }
                 return true;
             }
@@ -2287,8 +2317,7 @@ class StorageManager {
                 .select('user_id, state, updated_at');
 
             // Account isolation guard after await: ensure user session did not mutate during flight
-            const sessionUserIdAfter = supabaseClient.session?.user?.id;
-            if (!sessionUserIdAfter || sessionUserIdAfter !== requestUserId || (this.currentUserId && this.currentUserId !== requestUserId)) {
+            if (!isCurrentAccount()) {
                 console.warn('[Sync] User session changed while cloud update request was in flight. Discarding acknowledgment.');
                 return false;
             }
@@ -2297,9 +2326,7 @@ class StorageManager {
                 console.error("[Sync] Conditional CAS update failed:");
                 this.syncError = error.message || String(error);
                 this.cloudSyncStatus = 'FAILED';
-                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                    app.updateSyncStatusPill('SYNC_FAILED');
-                }
+                this.notifySyncStatus();
                 return false;
             }
 
@@ -2312,6 +2339,7 @@ class StorageManager {
                     .eq('user_id', requestUserId)
                     .single();
 
+                if (!isCurrentAccount()) return false;
                 if (remoteRow && remoteRow.state) {
                     const remoteRev = Number(remoteRow.state.revision);
                     const remoteFingerprint = this.computeFinancialFingerprint(remoteRow.state);
@@ -2328,14 +2356,10 @@ class StorageManager {
                             if (typeof localStorage !== 'undefined') {
                                 localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
                             }
-                            if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                                app.updateSyncStatusPill('SYNCED');
-                            }
+                            this.notifySyncStatus();
                         } else {
                             this.cloudSyncStatus = 'SYNC_PENDING';
-                            if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                                app.updateSyncStatusPill('SYNC_PENDING');
-                            }
+                            this.notifySyncStatus();
                         }
                         return true;
                     }
@@ -2344,15 +2368,13 @@ class StorageManager {
                     this.cloudSyncStatus = 'CONFLICT';
                     this.syncError = 'Cloud state was modified on another device.';
                     if (typeof app !== 'undefined') {
-                        if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                        this.notifySyncStatus();
                         if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
                     }
                 } else {
                     this.cloudSyncStatus = 'FAILED';
                     this.syncError = (fetchErr && fetchErr.message) || 'CAS revision mismatch; could not fetch remote state.';
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNC_FAILED');
-                    }
+                    this.notifySyncStatus();
                 }
                 return false;
             }
@@ -2364,9 +2386,7 @@ class StorageManager {
                 console.error('[Sync] Account mismatch: server response belongs to another user:');
                 this.syncError = 'Account mismatch in server response.';
                 this.cloudSyncStatus = 'FAILED';
-                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                    app.updateSyncStatusPill('SYNC_FAILED');
-                }
+                this.notifySyncStatus();
                 return false;
             }
             const serverState = serverRow?.state;
@@ -2375,9 +2395,7 @@ class StorageManager {
                     console.error('[Sync] Malformed server response payload: state is not an object.');
                     this.syncError = 'Malformed server response.';
                     this.cloudSyncStatus = 'FAILED';
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('SYNC_FAILED');
-                    }
+                    this.notifySyncStatus();
                     return false;
                 }
                 if (typeof serverState.revision !== 'undefined') {
@@ -2386,9 +2404,7 @@ class StorageManager {
                         console.error(`[Sync] Malformed acknowledgment: server returned revision ${sRev}, expected ${outboundRevision}`);
                         this.syncError = 'Server revision mismatch in response.';
                         this.cloudSyncStatus = 'FAILED';
-                        if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                            app.updateSyncStatusPill('SYNC_FAILED');
-                        }
+                        this.notifySyncStatus();
                         return false;
                     }
                     confirmedRev = sRev;
@@ -2411,23 +2427,18 @@ class StorageManager {
                 if (typeof localStorage !== 'undefined') {
                     localStorage.removeItem(`${this.getActiveStorageKey()}_pending_sync`);
                 }
-                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                    app.updateSyncStatusPill('SYNCED');
-                }
+                this.notifySyncStatus();
             } else {
                 this.cloudSyncStatus = 'SYNC_PENDING';
-                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                    app.updateSyncStatusPill('SYNC_PENDING');
-                }
+                this.notifySyncStatus();
             }
             return true;
         } catch (e) {
+            if (!isCurrentAccount()) return false;
             console.error("[Sync] Push to Supabase failed:");
             this.syncError = e.message || String(e);
             this.cloudSyncStatus = 'FAILED';
-            if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                app.updateSyncStatusPill('SYNC_FAILED');
-            }
+            this.notifySyncStatus();
             return false;
         }
     }
@@ -2457,9 +2468,7 @@ class StorageManager {
                     this._saveDataDirect();
                 }
                 this.cloudSyncStatus = 'CONFIRMED';
-                if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                    app.updateSyncStatusPill('SYNCED');
-                }
+                this.notifySyncStatus();
             }
             return false;
         }
@@ -2470,7 +2479,7 @@ class StorageManager {
             this.stashConflictState(this.state, remoteState);
             this.cloudSyncStatus = 'CONFLICT';
             if (typeof app !== 'undefined') {
-                if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                this.notifySyncStatus();
                 if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
             }
             return false;
@@ -2483,7 +2492,7 @@ class StorageManager {
                 this.stashConflictState(this.state, remoteState);
                 this.cloudSyncStatus = 'CONFLICT';
                 if (typeof app !== 'undefined') {
-                    if (typeof app.updateSyncStatusPill === 'function') app.updateSyncStatusPill('CONFLICT_DETECTED');
+                    this.notifySyncStatus();
                     if (typeof app.openConflictResolutionModal === 'function') app.openConflictResolutionModal();
                 }
             }
@@ -2496,12 +2505,14 @@ class StorageManager {
             console.error('[Realtime] Incoming update failed migration preview:');
             return false;
         }
-        this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true });
+        if (!this.applyContinuousLedgerMigration(preview, { isAuthoritativeRemote: true })) return false;
         this.lastConfirmedCloudRevision = remoteRev;
         this.lastConfirmedCloudFingerprint = this.computeFinancialFingerprint(this.state);
         this.lastConfirmedCloudPersistedFingerprint = this.computePersistedStateFingerprint(this.state);
         this._persistConfirmedCloudRevision(this.lastConfirmedCloudRevision, this.lastConfirmedCloudFingerprint, this.lastConfirmedCloudPersistedFingerprint);
+        this.cloudSyncStatus = 'CONFIRMED';
         this.checkRollover();
+        this.notifySyncStatus();
         return true; // signals caller to re-render
     }
 
@@ -3513,9 +3524,7 @@ class StorageManager {
                     this.lastConfirmedCloudPersistedFingerprint = null;
                     this._persistConfirmedCloudRevision(0, null, null);
                     this.cloudSyncStatus = 'LOCAL_SAVED';
-                    if (typeof app !== 'undefined' && typeof app.updateSyncStatusPill === 'function') {
-                        app.updateSyncStatusPill('LOCAL_SAVED', 'Restored Locally');
-                    }
+                    this.notifySyncStatus();
                     callback(true, null, validation);
                 } else {
                     callback(false, res?.error || 'Failed to apply backup migration within coordinator lock.');

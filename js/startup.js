@@ -1,5 +1,9 @@
 if (window.lucide) window.lucide.createIcons();
 
+const figureFitObserver = new ResizeObserver(() => app.scheduleFinancialFigureFit());
+figureFitObserver.observe(document.getElementById('desktop-content-area'));
+document.fonts.ready.then(() => app.scheduleFinancialFigureFit());
+
 document.getElementById('backup-export-button').addEventListener('click', () => storage.exportJSON());
 
 const unavailableAction = ':disabled, [aria-disabled="true"], [aria-busy="true"]';

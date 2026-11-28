@@ -332,7 +332,49 @@ class App {
         this.refreshIcons();
     }
 
+    scheduleFinancialFigureFit() {
+        if (this.financialFigureFitFrame) return;
+        this.financialFigureFitFrame = requestAnimationFrame(() => {
+            this.financialFigureFitFrame = null;
+            const view = document.getElementById(this.currentView);
+            if (!view) return;
+
+            const amounts = [...view.querySelectorAll(
+                '.country-total-amount, .monthly-stat-value, [data-figure="budget-summary"], ' +
+                '[data-figure="financial-summary"], [data-figure="category"], [data-figure="wallet"], ' +
+                '[data-figure="regional"]'
+            )].filter(amount => amount.getClientRects().length);
+
+            for (const amount of amounts) {
+                amount.classList.add('fit-financial-figure');
+                amount.style.removeProperty('--fitted-figure-size');
+            }
+
+            const range = document.createRange();
+            const minimum = 0.78 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+            const fits = amounts.map(amount => {
+                range.selectNodeContents(amount);
+                const textWidth = range.getBoundingClientRect().width;
+                const available = amount.getBoundingClientRect().width;
+                if (textWidth <= available + 0.5) return null;
+                const original = parseFloat(getComputedStyle(amount).fontSize);
+                const target = original * Math.max(0, available - 1) / textWidth;
+                const floor = Math.min(minimum, original);
+                return { size: Math.max(floor, target), wrap: target < floor };
+            });
+
+            amounts.forEach((amount, index) => {
+                const fit = fits[index];
+                if (!fit) return;
+                amount.style.setProperty('--fitted-figure-size', `${fit.size}px`);
+                amount.classList.toggle('fit-financial-figure', !fit.wrap);
+            });
+        });
+    }
+
     refreshIcons(rootEl) {
+        if (rootEl?.matches?.('.view')) this.scheduleFinancialFigureFit();
+
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             if (rootEl && (rootEl.nodeType === 1 || rootEl.nodeType === 9)) {
                 try {
@@ -724,23 +766,6 @@ class App {
         }
     }
 
-    setSyncStatus(status = 'synced') {
-        const dot = document.getElementById('sync-status-dot');
-        const text = document.getElementById('sync-status-text');
-        if (!dot || !text) return;
-
-        dot.classList.remove('syncing', 'offline');
-        if (status === 'syncing') {
-            dot.classList.add('syncing');
-            text.innerText = 'Syncing...';
-        } else if (status === 'offline') {
-            dot.classList.add('offline');
-            text.innerText = 'Offline';
-        } else {
-            text.innerText = 'Cloud Synced';
-        }
-    }
-
     toggleFabMenu() {
         const fab = document.getElementById('main-fab');
         const menu = document.getElementById('fab-menu');
@@ -917,7 +942,7 @@ class App {
                         ${allWalletOpts}
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group hidden" id="tx-category-group">
                     <label for="tx-category">Category</label>
                     <select id="tx-category" onchange="app.handleCategoryChange()"></select>
                 </div>
@@ -1094,7 +1119,6 @@ class App {
                     const w = Object.values(storage.state?.wallets || {}).find(item => item.region === context.region);
                     if (w) sel.value = w.id;
                 }
-                this.updateExpenseCategories();
             } else if (type === 'income') {
                 const sel = document.getElementById('tx-wallet');
                 if (context.walletId && sel) {
@@ -1198,15 +1222,16 @@ class App {
             if (walletSelect) walletSelect.value = tx.walletId;
             this.updateExpenseCategories();
 
-            if (tx.categoryId && tx.categoryId.startsWith('jp-utility-')) {
-                const catSelect = document.getElementById('tx-category');
-                if (catSelect) catSelect.value = 'utility-group';
-                this.handleCategoryChange();
-                const subSelect = document.getElementById('tx-subcategory');
-                if (subSelect) subSelect.value = tx.categoryId;
-            } else {
-                const catSelect = document.getElementById('tx-category');
-                if (catSelect) catSelect.value = tx.categoryId;
+            const catSelect = document.getElementById('tx-category');
+            if (catSelect && !catSelect.disabled) {
+                const categoryId = tx.categoryId || tx.category || '';
+                if (categoryId.startsWith('jp-utility-')) {
+                    catSelect.value = 'utility-group';
+                    document.getElementById('tx-subcategory').value = categoryId;
+                } else {
+                    if (!categoryId) catSelect.add(new Option('No category', ''));
+                    catSelect.value = categoryId;
+                }
                 this.handleCategoryChange();
             }
 
@@ -1489,22 +1514,29 @@ class App {
                     alert('Please select a valid wallet.');
                     return false;
                 }
-                if (!cat) {
-                    alert('Please select a category.');
-                    return false;
-                }
+                const saveExpense = await storage.runExclusive((state) => {
+                    const wallet = state.wallets?.[walletId];
+                    if (!wallet) return { success: false, error: 'Please select a valid wallet.' };
 
-                if (editId) {
-                    updatedData = { ...updatedData, walletId, categoryId: cat, amount: amt, note };
-                } else {
-                    res = await storage.runExclusive(async () => {
-                        return walletManager.addExpense(walletId, cat, amt, note, date);
-                    });
-                    if (res === false || (res && res.success === false)) {
-                        const errMsg = (res && (res.error || res.message)) || 'Could not record expense. Please verify details and retry.';
-                        alert(errMsg);
-                        return false;
+                    const budgeting = storage.isBudgetEnabled(wallet.region);
+                    const original = editId ? walletManager.findTransaction(editId)?.tx : null;
+                    const existingUncategorized = original && !original.categoryId && !original.category;
+                    const categoryExists = state.categories?.[wallet.region]?.some(category => category.id === cat && category.isActive !== false);
+                    if (budgeting && !categoryExists && !(existingUncategorized && !cat)) {
+                        return { success: false, error: 'Please select a category.' };
                     }
+
+                    if (editId) {
+                        const changes = { date, walletId, amount: amt, note };
+                        if (budgeting && categoryExists) changes.categoryId = cat;
+                        return walletManager.updateTransaction(editId, changes);
+                    }
+                    return walletManager.addExpense(walletId, budgeting ? cat : null, amt, note, date);
+                });
+                if (saveExpense === false || saveExpense?.success === false) {
+                    const action = editId ? 'update' : 'record';
+                    alert(saveExpense?.error || `Could not ${action} expense. Please verify details and retry.`);
+                    return false;
                 }
             } else if (type === 'income') {
                 const walletEl = document.getElementById('tx-wallet');
@@ -1588,7 +1620,7 @@ class App {
                 }
             }
 
-            if (editId) {
+            if (editId && type !== 'expense') {
                 res = await storage.runExclusive(async () => {
                     return walletManager.updateTransaction(editId, updatedData);
                 });
@@ -1800,63 +1832,65 @@ class App {
         }
     }
 
-    /**
-     * Update the desktop header synchronization status indicator.
-     * Renders minimal, unobtrusive states: Synced, Saved locally, Syncing..., Offline, Sync Conflict.
-     * @param {string} [status]
-     * @param {string} [customLabel]
-     */
-    updateSyncStatusPill(status = storage.cloudSyncStatus, customLabel = null) {
-        const pill = document.getElementById('desktop-sync-status-pill');
-        if (!pill) return;
-
-        pill.className = 'sync-status-pill';
-        let iconHtml = '<span class="sync-pill-dot"></span>';
-        let label = customLabel || 'Synced';
-
-        switch (status) {
-            case 'SYNCED':
-            case 'CONFIRMED':
-                pill.classList.add('sync-pill-synced');
-                pill.title = 'All changes saved locally and confirmed in cloud';
-                label = customLabel || 'Synced';
-                pill.onclick = null;
-                break;
-            case 'LOCAL_SAVED':
-                pill.classList.add('sync-pill-local');
-                pill.title = 'Saved locally on this device; cloud synchronization queued';
-                label = customLabel || 'Saved locally';
-                pill.onclick = null;
-                break;
-            case 'SYNC_PENDING':
-            case 'SYNCING':
-                pill.classList.add('sync-pill-pending');
-                pill.title = 'Synchronizing with cloud...';
-                iconHtml = '<i data-lucide="refresh-cw" class="spin-icon" style="width:12px;height:12px;"></i>';
-                label = customLabel || 'Syncing...';
-                pill.onclick = null;
-                break;
-            case 'CONFLICT':
-            case 'CONFLICT_DETECTED':
-                pill.classList.add('sync-pill-conflict');
-                pill.title = 'Cloud state modified elsewhere. Click to review and resolve conflict.';
-                iconHtml = '<i data-lucide="alert-triangle" style="width:12px;height:12px;"></i>';
-                label = customLabel || 'Sync Conflict';
-                pill.onclick = () => this.openConflictResolutionModal();
-                break;
-            case 'SYNC_FAILED':
-            case 'FAILED':
-            default:
-                pill.classList.add('sync-pill-failed');
-                pill.title = 'Offline or cloud sync error. Data is safely stored locally. Click to retry.';
-                iconHtml = '<i data-lucide="cloud-off" style="width:12px;height:12px;"></i>';
-                label = customLabel || 'Offline';
-                pill.onclick = () => storage.pushToSupabase();
-                break;
+    renderSyncStatus() {
+        const { status, lastConfirmedAt, pending } = storage.getSyncPresentation();
+        const states = {
+            IDLE: ['Checking sync', 'cloud'],
+            LOCAL_SAVED: ['Saved locally', 'hard-drive'],
+            SYNC_PENDING: ['Sync pending', 'cloud-upload'],
+            SYNCING: ['Syncing', 'refresh-cw'],
+            CONFIRMED: ['Cloud synced', 'cloud-check'],
+            OFFLINE: ['Offline', 'cloud-off', 'Retry synchronization'],
+            FAILED: ['Sync failed', 'cloud-off', 'Retry synchronization'],
+            CONFLICT: ['Sync conflict', 'triangle-exclamation-point', 'Review synchronization conflict']
+        };
+        const [label, icon, action = 'View synchronization details'] = states[status] || states.IDLE;
+        const button = document.getElementById('sidebar-sync-indicator');
+        if (button && button.dataset.syncState !== status) {
+            button.dataset.syncState = status;
+            button.title = `${label}. ${action}.`;
+            button.setAttribute('aria-label', button.title);
+            const statusText = document.getElementById('sync-status-text');
+            statusText.textContent = label;
+            const graphic = document.createElement('i');
+            graphic.dataset.lucide = icon;
+            graphic.setAttribute('aria-hidden', 'true');
+            button.firstElementChild.replaceWith(graphic);
+            this.refreshIcons(button);
         }
 
-        pill.innerHTML = `${iconHtml}<span class="sync-pill-text">${this.escapeHtml(label)}</span>`;
-        if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        const details = document.getElementById('about-sync-status');
+        if (details) {
+            const text = status === 'OFFLINE'
+                ? `${label} · ${pending ? 'Changes waiting to sync' : 'No changes waiting to sync'}`
+                : label;
+            details.dataset.syncState = status;
+            if (details.textContent !== text) details.textContent = text;
+        }
+        const confirmed = document.getElementById('about-last-synced');
+        if (confirmed) {
+            if (lastConfirmedAt) {
+                confirmed.dateTime = lastConfirmedAt;
+                confirmed.textContent = new Date(lastConfirmedAt).toLocaleString();
+            } else {
+                confirmed.removeAttribute('datetime');
+                confirmed.textContent = 'Not yet confirmed';
+            }
+        }
+    }
+
+    handleSidebarSyncAction() {
+        const { status } = storage.getSyncPresentation();
+        if (status === 'CONFLICT') {
+            this.closeMobileSidebar();
+            this.openConflictResolutionModal();
+            document.querySelector('#conflict-resolution-modal button')?.focus({ preventScroll: true });
+        } else if (status === 'FAILED' || status === 'OFFLINE') {
+            storage.retryPendingSync();
+        } else {
+            this.navigateToSettingsSection('about');
+            document.querySelector('.settings-tab-btn[data-section="about"]')?.focus({ preventScroll: true });
+        }
     }
 
     /**
@@ -1918,7 +1952,7 @@ class App {
         const res = await storage.resolveConflict(strategy);
         if (res && res.success) {
             this.closeModal('conflict-resolution-modal');
-            this.updateSyncStatusPill('SYNCED');
+            this.renderSyncStatus();
             this.renderAll();
             if (typeof this.showToast === 'function') {
                 this.showToast('Conflict resolved successfully.', 'success');
@@ -1944,6 +1978,8 @@ class App {
             alert("Cannot edit budgets or wallets while viewing past months. Return to Current Month first.");
             return;
         }
+
+        if (type === 'category' && !storage.isBudgetEnabled(region)) return;
 
         document.getElementById('quick-edit-type').value = type;
         document.getElementById('quick-edit-id').value = id;
@@ -1989,21 +2025,27 @@ class App {
         const subGroup = document.getElementById('tx-subcategory-group');
         if (!catSelect || !subGroup) return;
 
-        if (catSelect.value === 'utility-group') {
-            subGroup.classList.remove('hidden');
-        } else {
-            subGroup.classList.add('hidden');
-        }
+        subGroup.classList.toggle('hidden', catSelect.disabled || catSelect.value !== 'utility-group');
     }
 
     updateExpenseCategories() {
         const walletSelect = document.getElementById('tx-wallet');
         if (!walletSelect) return;
 
-        const wallet = storage.state.wallets[walletSelect.value];
-        const region = wallet ? wallet.region : 'JP';
         const catSelect = document.getElementById('tx-category');
+        if (!catSelect) return;
         const subSelect = document.getElementById('tx-subcategory');
+
+        const region = storage.state.wallets[walletSelect.value]?.region;
+        const budgeting = storage.isBudgetEnabled(region);
+        document.getElementById('tx-category-group').classList.toggle('hidden', !budgeting);
+        catSelect.disabled = !budgeting;
+        if (subSelect) subSelect.replaceChildren();
+        if (!budgeting) {
+            catSelect.replaceChildren();
+            this.handleCategoryChange();
+            return;
+        }
 
         let html = '';
         if (region === 'JP') {
@@ -2507,21 +2549,13 @@ class App {
         if (privTimeoutEl) privTimeoutEl.value = String(priv.timeoutMinutes ?? 3);
 
         // About section
-        const syncStatusEl = document.getElementById('about-sync-status');
-        if (syncStatusEl) {
-            syncStatusEl.innerText = (typeof supabaseClient !== 'undefined' && supabaseClient.session) ? 'Connected & Synced' : 'Connected';
-        }
+        this.renderSyncStatus();
         const aboutEnvEl = document.getElementById('about-env-label');
         if (aboutEnvEl) {
             const envName = (window.SUPABASE_CONFIG?.environment === 'production') ? 'Production' : 'Development';
             const projectRef = window.SUPABASE_CONFIG?.projectRef || 'unconfigured';
             aboutEnvEl.innerText = `${envName} (${projectRef})`;
         }
-        const lastSyncedEl = document.getElementById('about-last-synced');
-        if (lastSyncedEl) {
-            lastSyncedEl.innerText = this.lastSyncTime ? new Date(this.lastSyncTime).toLocaleTimeString() : 'Just now';
-        }
-
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             lucide.createIcons();
         }
@@ -2573,15 +2607,20 @@ class App {
         this.renderSettingsPage();
     }
 
-    updateCountryBudgetPref(code, enabled, monthlyTotal, rolloverEnabled) {
+    async updateCountryBudgetPref(code, enabled, monthlyTotal, rolloverEnabled) {
         const cur = storage.getBudgetPreference(code);
         const newEnabled = enabled !== undefined ? enabled : cur.enabled;
         const newTotal = monthlyTotal !== undefined ? Number(monthlyTotal) : cur.monthlyTotal;
         const newRollover = rolloverEnabled !== undefined ? rolloverEnabled : cur.rolloverEnabled;
 
-        storage.setBudgetEnabled(code, newEnabled, newTotal, newRollover);
+        const result = await storage.setBudgetEnabled(code, newEnabled, newTotal, newRollover);
+        if (result === false || result?.success === false) {
+            alert(result?.error || 'Could not update budgeting preferences.');
+        }
         this.renderAll();
-        this.renderSettingsPage();
+        if (this.currentView === 'budgets-view') this.renderBudgetsPage();
+        if (this.currentView === 'transactions-view') this.renderTransactionsPage();
+        this.updateExpenseCategories();
     }
 
     async updateLoanPref(field, value) {
@@ -2627,17 +2666,24 @@ class App {
 
     switchSettingsSection(sectionId) {
         this.currentSettingsSection = sectionId;
-        const tabs = document.querySelectorAll('.settings-tab-btn');
+        const list = document.querySelector('.settings-tab-list');
+        const tabs = list.querySelectorAll('.settings-tab-btn');
+        let selectedTab;
         tabs.forEach(tab => {
-            if (tab.getAttribute('data-section') === sectionId) {
-                tab.classList.add('active');
-                if (typeof tab.scrollIntoView === 'function') {
-                    tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                }
-            } else {
-                tab.classList.remove('active');
-            }
+            const selected = tab.dataset.section === sectionId;
+            tab.classList.toggle('active', selected);
+            tab.setAttribute('aria-pressed', String(selected));
+            if (selected) selectedTab = tab;
         });
+
+        if (selectedTab && list.scrollWidth > list.clientWidth) {
+            const viewport = list.getBoundingClientRect();
+            const tab = selectedTab.getBoundingClientRect();
+            const left = viewport.left + list.clientLeft;
+            const right = left + list.clientWidth;
+            if (tab.left < left) list.scrollLeft += tab.left - left;
+            else if (tab.right > right) list.scrollLeft += tab.right - right;
+        }
 
         const cards = document.querySelectorAll('.settings-section-card');
         cards.forEach(card => {
@@ -2872,11 +2918,9 @@ class App {
                 this._pendingRestoreData = null;
                 this.cancelRestore();
                 // Reset confirmed cloud metadata so restored data never automatically overwrites cloud
-                storage.lastConfirmedCloudRevision = 0;
-                storage.lastConfirmedCloudFingerprint = null;
-                storage._persistConfirmedCloudRevision(0, null);
+                storage._persistConfirmedCloudRevision(0);
                 storage.cloudSyncStatus = 'LOCAL_SAVED';
-                this.updateSyncStatusPill('LOCAL_SAVED', 'Restored Locally');
+                this.renderSyncStatus();
                 alert('Backup successfully restored! Refreshing workspace...');
                 this.init();
                 this.renderAll();
@@ -2909,9 +2953,10 @@ class App {
     }
 
     async removeCategory(region, id) {
+        if (!storage.isBudgetEnabled(region)) return;
         if (!confirm('Remove this category?')) return;
         const res = await storage.runExclusive(async (state) => {
-            if (state.categories && state.categories[region]) {
+            if (storage.isBudgetEnabled(region) && state.categories?.[region]) {
                 state.categories[region] = state.categories[region].filter(c => c.id !== id);
                 return true;
             }
@@ -2940,6 +2985,7 @@ class App {
         }
 
         const res = await storage.runExclusive(async (state) => {
+            if (!storage.isBudgetEnabled(region)) return false;
             if (!state.categories) state.categories = {};
             if (!state.categories[region]) state.categories[region] = [];
             state.categories[region].push(newCat);
@@ -2960,7 +3006,7 @@ class App {
             let found = null;
             for (const r of ['JP', 'IN', 'DE']) {
                 const cat = (state.categories?.[r] || []).find(c => c.id === id);
-                if (cat) {
+                if (cat && storage.isBudgetEnabled(r)) {
                     cat.budget = (r === 'JP') ? Math.round(numVal) : Math.round(numVal * 100) / 100;
                     found = cat;
                     break;
@@ -3176,7 +3222,7 @@ class App {
     async reorderCategories(region, draggedId, targetId) {
         await storage.runExclusive(async (state) => {
             const cats = state.categories?.[region];
-            if (!cats) return false;
+            if (!cats || !storage.isBudgetEnabled(region)) return false;
             const draggedIndex = cats.findIndex(c => c.id === draggedId);
             const targetIndex = cats.findIndex(c => c.id === targetId);
 
@@ -3850,10 +3896,10 @@ class App {
                 amountCls = 'tx-amt-expense';
                 sign = '-';
 
-                const categoryName = this.getTransactionCategory(tx);
+                const categoryName = this.showExpenseCategory(tx) ? this.getTransactionCategory(tx) : '';
                 const walletName = this.getWalletName(tx.walletId);
 
-                title = tx.note || categoryName;
+                title = tx.note || categoryName || 'Expense';
                 if (tx.note && categoryName && tx.note !== categoryName) {
                     const metaParts = [dateStr, walletName, categoryName].filter(Boolean);
                     meta = metaParts.join(' • ');
@@ -3893,6 +3939,7 @@ class App {
         if (!storage.getActiveCountries().includes(region)) return;
         this.monthlySummaryRegion = region;
         this.renderMonthlySummary();
+        this.scheduleFinancialFigureFit();
     }
 
     renderMonthlySummary() {
@@ -3957,7 +4004,7 @@ class App {
                 <div class="monthly-stat-value privacy-blur financial-amount" style="color: var(--emerald);">
                     ${this.formatMoney(income, currency, { prefix: '+' })}
                 </div>
-                <div class="monthly-stat-sub">Earned this month</div>
+                <div class="monthly-stat-sub">Total earned</div>
             </div>
 
             <div class="monthly-stat-card">
@@ -3970,10 +4017,10 @@ class App {
                 <div class="monthly-stat-value privacy-blur financial-amount" style="color: var(--rose);">
                     ${this.formatMoney(expenses, currency, { prefix: '-' })}
                 </div>
-                <div class="monthly-stat-sub">Spent this month</div>
+                <div class="monthly-stat-sub">Total spent</div>
             </div>
 
-            <div class="monthly-stat-card" data-material="signature">
+            <div class="monthly-stat-card">
                 <div class="monthly-stat-header">
                     <span class="monthly-stat-label">Net Savings</span>
                     <span class="monthly-stat-icon">
@@ -3983,7 +4030,7 @@ class App {
                 <div class="monthly-stat-value privacy-blur financial-amount ${netSavingsClass}">
                     ${this.formatMoney(net, currency, { prefix: netSavingsSign })}
                 </div>
-                <div class="monthly-stat-sub">Inflows minus outflows</div>
+                <div class="monthly-stat-sub">Inflow − outflow</div>
             </div>
         `;
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -4058,17 +4105,20 @@ class App {
             }
         }
 
-        const activeTxs = this.getActiveTransactions();
-        const totals = {};
+        const budgeting = storage.isBudgetEnabled(region);
+        const categories = budgeting ? (storage.state.categories?.[region] || []).filter(c => c.isActive !== false) : [];
+        const activeIds = new Set(categories.map(category => category.id));
+        const totals = Object.create(null);
+        const otherId = '_unallocated_expenses';
 
-        activeTxs.forEach(tx => {
-            if (tx.type === 'expense' && tx.region === region) {
-                const amt = Number(tx.amount) || 0;
-                totals[tx.categoryId] = (totals[tx.categoryId] || 0) + amt;
-            }
-        });
-
-        const categories = (storage.state?.categories?.[region] || []).filter(c => c.isActive !== false);
+        for (const tx of this.getActiveTransactions()) {
+            if (tx.type !== 'expense' || tx.region !== region) continue;
+            const id = activeIds.has(tx.categoryId) ? tx.categoryId : otherId;
+            totals[id] = (totals[id] || 0) + (Number(tx.amount) || 0);
+        }
+        if (totals[otherId]) {
+            categories.push({ id: otherId, name: budgeting ? 'Uncategorized / historical' : 'Expenses' });
+        }
 
         const periodBadge = document.getElementById('dash-chart-period-badge');
         if (periodBadge) {
@@ -4587,7 +4637,7 @@ class App {
                 let icon = 'arrow-up-right';
                 let colorCls = 'text-rose';
                 let sign = '-';
-                const catName = this.getTransactionCategory(tx);
+                const catName = effectiveType === 'expense' && !this.showExpenseCategory(tx) ? 'Expense' : this.getTransactionCategory(tx);
                 let label = tx.note || catName;
 
                 if (effectiveType === 'income') {
@@ -5430,7 +5480,7 @@ class App {
                 <div class="loan-card-topbar">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <i data-lucide="landmark" style="width: 16px; height: 16px; color: var(--text-secondary);"></i>
-                        <h3 class="dash-chart-title" style="margin: 0; font-size: 0.92rem;">Loan Tracker</h3>
+                        <h3 class="dash-chart-title" data-type-role="panel-heading">Loan Tracker</h3>
                     </div>
                     <button type="button" id="log-emi-btn" class="btn btn-primary btn-sm loan-log-emi-btn" onclick="app.openLogEmiModal()" style="height: 28px; padding: 2px 10px; font-size: 11.5px; gap: 6px;" title="Record monthly EMI installment">
                         <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
@@ -5438,23 +5488,19 @@ class App {
                     </button>
                 </div>
 
-                <div class="loan-header" style="display: flex; justify-content: space-between; flex-wrap: wrap; padding: 0 0 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
-                    <div style="width: 50%;">
-                        <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.totalPrincipal, loanCurrency, { locale: loanLocale })}</div>
-                        <div class="loan-label">Total Loan</div>
+                <div class="loan-header">
+                    <div class="loan-label">Outstanding principal</div>
+                    <div class="financial-amount privacy-blur" data-figure="financial-summary">
+                        ${this.formatMoney(loanState.principalLeft, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}
                     </div>
-                    <div style="width: 50%; text-align: right;">
-                        <div class="loan-value financial-amount privacy-blur">${this.formatMoney(loanState.config.emi, loanCurrency, { locale: loanLocale })}</div>
-                        <div class="loan-label">Monthly EMI</div>
-                    </div>
-                    <div style="width: 100%; text-align: center; font-size: 0.72rem; color: var(--text-muted); margin-top: 10px;">
-                        Next draw in <span style="color: var(--text-main); font-weight: 600;">${loanState.daysUntilNextEmi} Days</span> (${loanState.nextEmiDateStr})
+                    <div class="loan-next-draw">
+                        Next draw in <strong>${loanState.daysUntilNextEmi} days</strong> (${loanState.nextEmiDateStr})
                     </div>
                 </div>
-                
+
                 <div class="loan-progress-box" style="padding: 12px 0 0 0;">
                     <div class="loan-progress-header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                        <span class="loan-percent financial-amount" style="font-size: 2.2rem; font-weight: 700; color: #10b981; line-height: 1;">${loanState.percentPaid}%</span>
+                        <span class="loan-percent financial-amount">${loanState.percentPaid}%</span>
                         <div style="display:flex; flex-direction:column; line-height:1.2; text-align:left;">
                             <span class="loan-label" style="font-size:0.75rem; margin:0;">${loanState.percentLabel || 'Principal'}</span>
                             <span class="loan-label" style="font-size:0.75rem; margin:0;">${loanState.subLabel || 'Repaid'}</span>
@@ -5470,16 +5516,19 @@ class App {
                         <span style="font-weight: 500; color: var(--text-secondary);"><strong style="color: var(--text-primary); font-weight: 600;">${monthsLeft}</strong> months left</span>
                     </div>
                     
-                    <div class="loan-stats-grid" style="display: grid; grid-template-columns: 1fr auto; row-gap: 6px; font-size: 0.8rem;">
+                    <div class="loan-stats-grid">
+                        <span class="loan-stat-label">Total Loan</span>
+                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.config.totalPrincipal, loanCurrency, { locale: loanLocale })}</span>
+
+                        <span class="loan-stat-label">Monthly EMI</span>
+                        <span class="loan-stat-value financial-amount privacy-blur">${this.formatMoney(loanState.config.emi, loanCurrency, { locale: loanLocale })}</span>
+
                         <span class="loan-stat-label" style="color: var(--text-muted);">Amount Paid</span>
                         <span class="loan-stat-value financial-amount privacy-blur" style="font-weight: 600; text-align: right;">${this.formatMoney(loanState.amountPaid, loanCurrency, { locale: loanLocale })}</span>
                         
                         <span class="loan-stat-label" style="color: var(--text-muted);">Principal Paid</span>
                         <span class="loan-stat-value financial-amount privacy-blur" style="font-weight: 600; text-align: right;">${this.formatMoney(loanState.principalPaid, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
                         
-                        <span class="loan-stat-label" style="color: var(--text-muted);">Principal Left</span>
-                        <span class="loan-stat-value financial-amount privacy-blur" style="font-weight: 600; text-align: right;">${this.formatMoney(loanState.principalLeft, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
-
                         ${loanState.totalInterest > 0 ? `
                             <span class="loan-stat-label" style="color: var(--text-muted);">Total Interest</span>
                             <span class="loan-stat-value financial-amount privacy-blur" style="font-weight: 600; text-align: right; color: #f59e0b;">${this.formatMoney(loanState.totalInterest, loanCurrency, { locale: loanLocale, formatOptions: { minimumFractionDigits: 2, maximumFractionDigits: 2 } })}</span>
@@ -5487,7 +5536,8 @@ class App {
                     </div>
                 </div>
             `;
-            if (window.lucide && lucide.createIcons) lucide.createIcons({ root: widget });
+            this.scheduleFinancialFigureFit();
+            this.refreshIcons(widget);
         }
     }
 
@@ -6049,6 +6099,11 @@ class App {
         return (catId && catId !== 'undefined' && catId !== 'null') ? catId : 'Uncategorized';
     }
 
+    showExpenseCategory(tx) {
+        const region = tx.region || storage.state.wallets?.[tx.walletId]?.region;
+        return storage.isBudgetEnabled(region);
+    }
+
     // Helper: Transaction Category resolution (handles income, transfer, remittance & expense)
     getTransactionCategory(tx) {
         if (!tx) return 'Uncategorized';
@@ -6263,7 +6318,8 @@ class App {
         if (!catSelect.dataset) catSelect.dataset = {};
 
         const rawEnabled = Array.isArray(activeCountries) ? activeCountries : this._getLedgerActiveCountries();
-        const enabled = rawEnabled.map(c => String(c).toUpperCase());
+        const enabled = rawEnabled.map(c => String(c).toUpperCase()).filter(region =>
+            storage.isBudgetEnabled(region) && (this.ledgerFilters.region === 'all' || this.ledgerFilters.region === region));
         const availableRegions = ['JP', 'IN', 'DE'].filter(r => enabled.includes(r));
         if (storage.state?.categories) {
             Object.keys(storage.state.categories).forEach(r => {
@@ -6283,6 +6339,7 @@ class App {
         });
         const optionsSig = sigParts.join('|');
         const totalActiveCats = availableRegions.reduce((sum, reg) => sum + (regionCats[reg] || []).length, 0);
+        catSelect.closest?.('.filter-group')?.classList.toggle('hidden', totalActiveCats === 0);
 
         const needsRebuild = !catSelect.dataset.optionsSig ||
             catSelect.dataset.optionsSig !== optionsSig ||
@@ -6497,9 +6554,9 @@ class App {
                 .filter(([_, net]) => net !== 0)
                 .map(([sym, net]) => {
                     const formatted = this.escapeHtml(this.formatMoney(Math.abs(net), sym));
-                    return net > 0 ? `+${formatted}` : `-${formatted}`;
+                    return `<span>${net > 0 ? '+' : '-'}${formatted}</span>`;
                 });
-            const subtotalHtml = subtotalChips.join(' &bull; ');
+            const subtotalHtml = subtotalChips.join('');
 
             html += `
                 <div class="ledger-date-group">
@@ -6519,7 +6576,8 @@ class App {
                 let icon = 'arrow-up-right';
                 let typeCls = 'expense';
                 let sign = '-';
-                const categoryName = this.getTransactionCategory(tx);
+                const showCategory = effectiveType !== 'expense' || this.showExpenseCategory(tx);
+                const categoryName = showCategory ? this.getTransactionCategory(tx) : 'Expense';
                 let title = tx.note || categoryName;
                 let walletName = this.getWalletName(tx.walletId);
                 const flag = tx.region ? this.getCountryFlagSvg(tx.region, 14, 10.5) : '';
@@ -6554,8 +6612,10 @@ class App {
                 // Refined typographic metadata line
                 let metaItemsHtml = '';
                 if (effectiveType === 'expense') {
-                    metaItemsHtml += `<span class="ledger-tx-meta-item category">${this.escapeHtml(categoryName)}</span>`;
-                    metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
+                    if (showCategory) {
+                        metaItemsHtml += `<span class="ledger-tx-meta-item category">${this.escapeHtml(categoryName)}</span>`;
+                        metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
+                    }
                     metaItemsHtml += `<span class="ledger-tx-meta-item account">${this.escapeHtml(walletName)}</span>`;
                     if (tx.note && tx.note !== title) {
                         metaItemsHtml += `<span class="ledger-tx-meta-sep">•</span>`;
@@ -7055,7 +7115,8 @@ class App {
             amountVal.className = `tx-detail-amount-val privacy-blur ${tx.type || 'expense'}`;
         }
 
-        const categoryName = this.getTransactionCategory(tx);
+        const showCategory = tx.type !== 'expense' || this.showExpenseCategory(tx);
+        const categoryName = showCategory ? this.getTransactionCategory(tx) : 'Expense';
 
         if (subtitle) {
             if (tx.type === 'expense') {
@@ -7075,8 +7136,8 @@ class App {
         }
 
         if (tx.type === 'expense' || tx.type === 'income') {
-            if (categoryWrap) categoryWrap.style.display = 'flex';
-            if (categoryVal) categoryVal.innerText = categoryName;
+            if (categoryWrap) categoryWrap.style.display = showCategory ? 'flex' : 'none';
+            if (categoryVal) categoryVal.innerText = showCategory ? categoryName : '';
             if (destWrap) destWrap.style.display = 'none';
             if (rateWrap) rateWrap.style.display = 'none';
         } else if (tx.type === 'transfer') {
@@ -7476,7 +7537,8 @@ class App {
         const totalExpenses = expenseTxs.reduce((s, t) => s + Number(t.amount || 0), 0);
 
         // Analytical spending (excluding configured lifestyle categories)
-        const analyticalTxs = expenseTxs.filter(t => !this.jpExclusions.has(t.categoryId));
+        const budgeting = storage.isBudgetEnabled('JP');
+        const analyticalTxs = budgeting ? expenseTxs.filter(t => !this.jpExclusions.has(t.categoryId)) : expenseTxs;
         const analyticalExpenses = analyticalTxs.reduce((s, t) => s + Number(t.amount || 0), 0);
         const excludedDiff = totalExpenses - analyticalExpenses;
 
@@ -7545,8 +7607,11 @@ class App {
         if (statExcludedDiff) statExcludedDiff.innerText = this.formatMoney(Math.abs(excludedDiff), '¥', { prefix: excludedDiff < 0 ? '+' : '-' });
         if (statExcludedDiffWrap) statExcludedDiffWrap.style.display = excludedDiff !== 0 ? 'flex' : 'none';
 
-        const jpCategories = new Map((storage.state?.categories?.JP || []).filter(cat => cat?.id).map(cat => [cat.id, cat]));
-        if (exclusionsChips) {
+        document.getElementById('analytics-customize-analysis')?.classList.toggle('hidden', !budgeting);
+        const jpCategories = new Map((budgeting ? storage.state.categories?.JP || [] : [])
+            .filter(cat => cat?.id).map(cat => [cat.id, cat]));
+        if (exclusionsChips && !budgeting) exclusionsChips.replaceChildren();
+        if (exclusionsChips && budgeting) {
             // Selectable candidate categories for lifestyle exclusion
             const candidateCats = [...jpCategories.values()].filter(c => {
                 return c.id === 'jp-food' || c.id === 'jp-dining' || c.id === 'jp-shopping' ||
@@ -7583,7 +7648,7 @@ class App {
         }
         const activeCats = !Number.isFinite(analyticalExpenses) || analyticalExpenses === 0 ? [] : [...categoryTotals]
             .filter(([, amount]) => amount !== 0)
-            .map(([id, amount]) => ({ id, name: jpCategories.get(id)?.name || 'Uncategorized / Historical', amount }))
+            .map(([id, amount]) => ({ id, name: jpCategories.get(id)?.name || (budgeting ? 'Uncategorized / Historical' : 'Expenses'), amount }))
             .sort((a, b) => b.amount - a.amount);
 
         const catRankingList = document.getElementById('jp-category-ranking-list');
@@ -7635,11 +7700,13 @@ class App {
         }
 
         // 7. Category Drilldown view (if active)
-        this.renderCategoryDrilldownView(analyticalTxs);
+        if (budgeting) this.renderCategoryDrilldownView(analyticalTxs);
+        else this.closeCategoryDrilldown();
 
         // 8. Budget Performance
         const budgetBody = document.getElementById('jp-budget-perf-body');
-        if (budgetBody) {
+        budgetBody?.parentElement.classList.toggle('hidden', !budgeting);
+        if (budgetBody && budgeting) {
             const jpBudget = storage.state?.jpTotalBudget || 0;
             const remainingBudget = Math.max(0, jpBudget - totalExpenses);
             const budgetPct = jpBudget > 0 ? Math.min(100, (totalExpenses / jpBudget) * 100).toFixed(1) : 0;
@@ -7670,7 +7737,7 @@ class App {
             let insightsHtml = '';
 
             // Insight 1: Top Category
-            if (analyticalExpenses > 0 && activeCats.length > 0) {
+            if (budgeting && analyticalExpenses > 0 && activeCats.length > 0) {
                 const topCat = activeCats[0];
                 const topName = this.escapeHtml(topCat.name);
                 const topPct = ((topCat.amount / analyticalExpenses) * 100).toFixed(1);
@@ -7712,7 +7779,7 @@ class App {
                             <div class="insight-icon"><i data-lucide="alert-circle"></i></div>
                             <div class="insight-content">
                                 <span class="insight-title">Peak Transaction Outlay</span>
-                                <p class="insight-desc">Largest single transaction was <span class="privacy-blur">${this.formatMoney(maxTx.amount, '¥')}</span> on ${this.escapeHtml(maxTx.date)} (${this.escapeHtml(maxTx.note || this.getTransactionCategory(maxTx))}).</p>
+                                <p class="insight-desc">Largest single transaction was <span class="privacy-blur">${this.formatMoney(maxTx.amount, '¥')}</span> on ${this.escapeHtml(maxTx.date)} (${this.escapeHtml(maxTx.note || (budgeting ? this.getTransactionCategory(maxTx) : 'Expense'))}).</p>
                             </div>
                         </div>
                     `;
@@ -7751,6 +7818,7 @@ class App {
     }
 
     async toggleCategoryExclusion(catId) {
+        if (!storage.isBudgetEnabled('JP')) return;
         const userId = storage.currentUserId;
         // Serialize clicks even when Storage uses its fallback lock.
         while (this.jpExclusionSave) await this.jpExclusionSave;
@@ -7788,7 +7856,7 @@ class App {
     }
 
     openCategoryDrilldown(catId) {
-        if (catId == null || this.getJapanExclusions(storage.state).includes(catId)) return;
+        if (!storage.isBudgetEnabled('JP') || catId == null || this.getJapanExclusions(storage.state).includes(catId)) return;
         this.selectedDrilldownCategoryId = catId;
         const drilldownSection = document.getElementById('jp-drilldown-section');
         if (drilldownSection) {
@@ -7908,6 +7976,8 @@ class App {
             } else {
                 let html = '';
                 latestIndian.forEach(tx => {
+                    const showCategory = tx.type !== 'expense' || this.showExpenseCategory(tx);
+                    const categoryName = showCategory ? this.getTransactionCategory(tx) : 'Expense';
                     let sign = tx.type === 'income' ? '+' : '-';
                     let typeCls = tx.type === 'income' ? 'income' : 'expense';
                     html += `
@@ -7916,12 +7986,12 @@ class App {
                                 <div class="tx-type-icon ${typeCls}"><i data-lucide="${tx.type === 'income' ? 'arrow-down-left' : 'arrow-up-right'}"></i></div>
                                 <div class="ledger-tx-details">
                                     <div class="ledger-tx-primary-line">
-                                        <span class="ledger-tx-title">${this.escapeHtml(tx.note || this.getTransactionCategory(tx))}</span>
+                                        <span class="ledger-tx-title">${this.escapeHtml(tx.note || categoryName)}</span>
                                     </div>
                                     <div class="tx-meta-pills">
                                         <span class="tx-pill">${this.escapeHtml(tx.date)}</span>
                                         <span class="tx-pill">${this.escapeHtml(this.getWalletName(tx.walletId))}</span>
-                                        <span class="tx-pill">${this.escapeHtml(this.getTransactionCategory(tx))}</span>
+                                        ${showCategory ? `<span class="tx-pill">${this.escapeHtml(categoryName)}</span>` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -8666,6 +8736,7 @@ class App {
         // 5. Historical Budget Handling (Honoring Section 5: inspect data model without assumptions)
         const isClosed = storage.state.closedMonths && storage.state.closedMonths[this.reportMonthKey];
         const closedMeta = isClosed ? storage.state.closedMonths[this.reportMonthKey] : null;
+        const budgeting = storage.isBudgetEnabled(this.reportRegion);
 
         let periodTotalBudget = 0;
         let periodCatBudgets = {};
@@ -8683,10 +8754,12 @@ class App {
             }
         } else if (this.reportMonthKey === storage.state.currentMonthKey) {
             // Current active month
-            periodTotalBudget = storage.getTotalBudget(this.reportRegion);
-            (storage.state.categories?.[this.reportRegion] || []).forEach(c => {
-                periodCatBudgets[c.id] = c.budget || 0;
-            });
+            if (budgeting) {
+                periodTotalBudget = storage.getTotalBudget(this.reportRegion);
+                (storage.state.categories?.[this.reportRegion] || []).forEach(c => {
+                    periodCatBudgets[c.id] = c.budget || 0;
+                });
+            }
         } else {
             historicalBudgetNote = `Unclosed historical period: No archived budget record exists for month ${this.reportMonthKey}. Current spending is ledger-calculated.`;
         }
@@ -8824,7 +8897,10 @@ class App {
 
         // 8. Render Category Breakdown Table
         const breakdownCard = document.getElementById('report-category-breakdown-card');
-        if (breakdownCard) {
+        const showBreakdown = Boolean(isClosed || budgeting);
+        breakdownCard?.classList.toggle('hidden', !showBreakdown);
+        document.getElementById('report-pie-chart-card')?.classList.toggle('hidden', !showBreakdown);
+        if (breakdownCard && showBreakdown) {
             const allRegionCats = storage.state.categories[this.reportRegion] || [];
 
             // Collect all categories that either exist in config or have transactions
@@ -9020,22 +9096,15 @@ class App {
         walletSelect.innerHTML = '<option value="ALL">All Wallets</option>' +
             filteredWallets.map(w => `<option value="${this.escapeHtml(w.id)}" ${w.id === currentWallet ? 'selected' : ''}>${this.escapeHtml(w.id)} (${this.escapeHtml(w.currency || (w.region === 'JP' ? '¥' : w.region === 'DE' ? '€' : '₹'))})</option>`).join('');
 
-        // Categories
-        let cats = [];
-        if (selectedRegion === 'ALL') {
-            const jpCats = storage.state.categories?.JP || [];
-            const inCats = storage.state.categories?.IN || [];
-            const deCats = storage.state.categories?.DE || [];
-            const seen = new Set();
-            [...jpCats, ...inCats, ...deCats].forEach(c => {
-                if (!seen.has(c.id)) {
-                    seen.add(c.id);
-                    cats.push(c);
-                }
-            });
-        } else {
-            cats = storage.state.categories?.[selectedRegion] || [];
+        const regions = selectedRegion === 'ALL' ? storage.getActiveCountries() : [selectedRegion];
+        const categoriesById = new Map();
+        for (const region of regions.filter(code => storage.isBudgetEnabled(code))) {
+            for (const category of storage.state.categories?.[region] || []) {
+                if (!categoriesById.has(category.id)) categoriesById.set(category.id, category);
+            }
         }
+        const cats = [...categoriesById.values()];
+        catSelect.closest('.custom-field-group')?.classList.toggle('hidden', cats.length === 0);
 
         catSelect.innerHTML = '<option value="ALL">All Categories</option>' +
             cats.map(c => `<option value="${this.escapeHtml(c.id)}" ${c.id === currentCat ? 'selected' : ''}>${this.escapeHtml(c.name)}</option>`).join('');
@@ -10135,12 +10204,16 @@ class App {
         const isBudgetEnabled = storage.isBudgetEnabled(region);
         const disabledBanner = document.getElementById('budgets-disabled-banner');
         const summaryBanner = document.getElementById('budgets-summary-banner');
+        document.querySelectorAll('#budgets-view .budgets-categories-section, #budgets-view .budgets-toolbar-actions, #btn-header-edit-overall, #btn-header-add-category')
+            .forEach(element => element.classList.toggle('hidden', !isBudgetEnabled));
         if (disabledBanner) {
-            disabledBanner.style.display = isBudgetEnabled ? 'none' : 'block';
+            disabledBanner.style.display = isBudgetEnabled ? 'none' : '';
         }
         if (summaryBanner) {
             summaryBanner.style.display = isBudgetEnabled ? 'block' : 'none';
         }
+
+        if (!isBudgetEnabled) return;
 
         // Transactions in active month for active region
         const allTxs = storage.state.transactions || [];
@@ -10197,16 +10270,14 @@ class App {
         if (countOverEl) countOverEl.innerText = overBudgetCatsCount;
 
         // 1. Render Consolidated Budgets Overview Card (Reuses Dashboard Central Card)
-        if (isBudgetEnabled) {
-            this.renderBudgetOverviewCard('budgets-summary-banner', {
-                region: region,
-                monthKey: curMonth,
-                totalSpent: totalSpent,
-                allocatedBudget: allocatedBudget,
-                isInteractive: true,
-                showEditButton: true
-            });
-        }
+        this.renderBudgetOverviewCard('budgets-summary-banner', {
+            region,
+            monthKey: curMonth,
+            totalSpent,
+            allocatedBudget,
+            isInteractive: true,
+            showEditButton: true
+        });
 
         // 2. Filter Category List according to active segmented control & search input
         const currentFilter = this.budgetsCatFilter || 'all';
@@ -10333,7 +10404,7 @@ class App {
 
     openOverallBudgetModal(region = null) {
         const targetRegion = region || this.budgetsRegion || 'JP';
-        this.overallBudgetModalRegion = targetRegion;
+        if (!storage.isBudgetEnabled(targetRegion)) return;
 
         const modal = document.getElementById('overall-budget-modal');
         if (!modal) return;
@@ -10356,14 +10427,18 @@ class App {
     }
 
     setOverallBudgetRegion(region, updateFocus = true) {
+        if (!storage.isBudgetEnabled(region)) return;
         this.overallBudgetModalRegion = region;
         const currency = (typeof CountryConfig !== 'undefined' && CountryConfig.get(region)?.currency)
             || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
 
         const btnJp = document.getElementById('overall-budget-btn-jp');
         const btnIn = document.getElementById('overall-budget-btn-in');
-        if (btnJp) btnJp.classList.toggle('active', region === 'JP');
-        if (btnIn) btnIn.classList.toggle('active', region === 'IN');
+        for (const [button, code] of [[btnJp, 'JP'], [btnIn, 'IN']]) {
+            if (!button) continue;
+            button.classList.toggle('active', region === code);
+            button.classList.toggle('hidden', !storage.isBudgetEnabled(code));
+        }
 
         const currLabel = document.getElementById('overall-budget-curr-label');
         const currPrefix = document.getElementById('overall-budget-curr-prefix');
@@ -10450,7 +10525,8 @@ class App {
             return;
         }
 
-        await storage.runExclusive(async (state) => {
+        const saved = await storage.runExclusive(async (state) => {
+            if (!storage.isBudgetEnabled(region)) return false;
             if (typeof storage.setTotalBudget === 'function') {
                 storage.setTotalBudget(region, numVal);
             } else {
@@ -10462,6 +10538,11 @@ class App {
             }
             return true;
         });
+
+        if (saved === false || saved?.success === false) {
+            alert(saved?.error || 'Could not save the budget. Check that budgeting is enabled.');
+            return;
+        }
 
         // Update settings inputs if present
         const jpBudEl = document.getElementById('setting-jp-budget');
@@ -10536,8 +10617,9 @@ class App {
     }
 
     openCategoryManageModal(catId = null, region = null) {
-        this.editingCatId = catId;
         const targetRegion = region || this.budgetsRegion || 'JP';
+        if (!storage.isBudgetEnabled(targetRegion)) return;
+        this.editingCatId = catId;
         this.editingCatRegion = targetRegion;
         this.activeIconGroup = 'All';
         this.catIconSearchQuery = '';
@@ -10556,14 +10638,21 @@ class App {
         const searchInput = document.getElementById('cat-icon-search-input');
 
         if (searchInput) searchInput.value = '';
-        if (currLabel) currLabel.innerText = targetRegion === 'JP' ? '¥' : '₹';
+        if (currLabel) currLabel.innerText = CountryConfig.get(targetRegion)?.currency || '';
+        if (countrySelect) {
+            const activeCountries = storage.getActiveCountries();
+            for (const option of countrySelect.options) {
+                option.disabled = !activeCountries.includes(option.value) || !storage.isBudgetEnabled(option.value);
+                option.hidden = option.disabled;
+            }
+        }
 
         let category = null;
         if (catId) {
             category = (storage.state.categories[targetRegion] || []).find(c => c.id === catId);
             if (!category) {
                 // Check across all regions in case region was switched
-                for (const reg of ['JP', 'IN']) {
+                for (const reg of storage.getActiveCountries().filter(code => storage.isBudgetEnabled(code))) {
                     const found = (storage.state.categories[reg] || []).find(c => c.id === catId);
                     if (found) {
                         category = found;
@@ -10574,7 +10663,9 @@ class App {
             }
         }
 
+        if (catId && !category) return;
         if (category) {
+            if (currLabel) currLabel.innerText = CountryConfig.get(this.editingCatRegion)?.currency || '';
             if (titleEl) titleEl.innerText = `Edit ${category.name}`;
             if (idInput) idInput.value = category.id;
             if (nameInput) nameInput.value = category.name;
@@ -10766,6 +10857,9 @@ class App {
         const origRegion = this.editingCatRegion || targetRegion;
 
         const res = await storage.runExclusive(async (state) => {
+            if (!storage.isBudgetEnabled(targetRegion) || (catId && !storage.isBudgetEnabled(origRegion))) {
+                return { success: false, error: 'Enable budgeting for the country before configuring categories.' };
+            }
             if (!state.categories) {
                 state.categories = {};
             }
@@ -10825,16 +10919,8 @@ class App {
         const editingCatId = this.editingCatId;
 
         const res = await storage.runExclusive(async (state) => {
-            if (!state.categories) return false;
-            let cat = (state.categories[targetRegion] || []).find(c => c.id === editingCatId);
-
-            if (!cat) {
-                for (const r of ['JP', 'IN', 'DE']) {
-                    const found = (state.categories[r] || []).find(c => c.id === editingCatId);
-                    if (found) { cat = found; break; }
-                }
-            }
-
+            if (!storage.isBudgetEnabled(targetRegion)) return false;
+            const cat = state.categories?.[targetRegion]?.find(c => c.id === editingCatId);
             if (!cat) return false;
 
             cat.isActive = !(cat.isActive !== false);
