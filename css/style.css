@@ -59,7 +59,6 @@
     --font-display: var(--font-sans);
     --font-numeric: var(--font-sans);
     --font-editorial: "Playfair Display", Geist, Georgia, serif;
-    --font-print: "SF Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --type-brand: clamp(1.96875rem, calc(1.4rem + 2.2cqw), 2.8875rem);
     --type-page: 1.79375rem;
     --type-welcome: var(--type-page);
@@ -3946,25 +3945,10 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     flex-shrink: 0;
 }
 
-.focus-title-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.focus-title-badge {
-    font-size: 0.74rem;
-    font-weight: 500;
-    padding: 3px 10px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #f5f5f7;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: var(--radius-full);
-}
-
 #focus-modal-title {
+    font-family: var(--font-editorial);
     font-size: 1.15rem;
-    font-weight: 600;
+    font-weight: 500;
     margin: 0;
     color: var(--text-primary);
 }
@@ -6254,564 +6238,299 @@ body:has(#reset-password-screen:not([style*="display: none"])) .top-bar {
     user-select: auto !important;
 }
 
-/* --- Print Styles --- */
+/* Financial documents are independent of the application viewport and theme. */
 @media screen {
     #print-container {
-        position: absolute !important;
-        left: -9999px !important;
-        top: -9999px !important;
-        width: 100% !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
+        display: none !important;
     }
 }
 
 @media print {
     @page {
-        margin: 0 !important;
         size: A4 portrait;
+        margin: 11mm 13mm 12mm;
+        background: #09090b;
+
+        @bottom-center {
+            content: "Expense Manager  ·  " counter(page) " / " counter(pages);
+            color: #a8a8b2;
+            font: 400 8pt Geist, sans-serif;
+        }
     }
 
-    body,
-    html {
-        background-color: #000000 !important;
-        background: #000000 !important;
-        color: #f8f9fa !important;
+    html,
+    body {
         margin: 0 !important;
         padding: 0 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        min-height: 100% !important;
+        display: block !important;
         height: auto !important;
-        width: 100% !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        background: #09090b !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
     }
 
-    /* Hide everything except print container */
-    #app-content,
-    .desktop-sidebar,
-    .bottom-nav,
-    .fab,
-    .modal-overlay,
-    #toast-container,
-    .fab-menu-overlay,
-    #auth-screen,
-    #reset-password-screen {
+    body > :not(#print-container) {
         display: none !important;
     }
 
     #print-container {
+        position: static !important;
         display: block !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        min-height: 100vh !important;
-        margin: 0 !important;
-        padding: 32px 28px !important;
-        background-color: #000000 !important;
-        background: #000000 !important;
-        color: #f8f9fa !important;
-        font-family: var(--font-print) !important;
-        box-sizing: border-box !important;
-    }
-
-    /* --- Obsidian Dark PDF Financial Report Styles --- */
-    .print-report-wrapper {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        color: #f8f9fa;
-        font-family: var(--font-print);
-        box-sizing: border-box;
-    }
-
-    .print-header-banner {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        padding: 16px 20px;
-        background: #111118 !important;
-        border: 1px solid #111118 !important;
-        border-radius: 12px;
-        box-shadow: none !important;
-        break-inside: avoid;
-        page-break-inside: avoid;
-    }
-
-    .print-header-left {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .print-brand-tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 1.2px;
-        text-transform: uppercase;
-        color: #8b8b99;
-    }
-
-    .print-report-title {
         margin: 0;
-        font-size: 20px;
-        font-weight: 700;
-        color: #ffffff;
-        letter-spacing: -0.3px;
+        background: #09090b;
+        color: #f5f5f7;
+        font: 400 9.5pt/1.36 Geist, sans-serif;
+        font-variant-numeric: lining-nums tabular-nums;
+        --pdf-secondary: #b9b9c3;
+        --pdf-line: #303036;
+        --pdf-surface: #141416;
+        --pdf-bronze: #d6b98e;
     }
 
-    .print-report-subtitle {
+    #print-container :is(h1, h2, h3, h4, h5, p, figure) {
         margin: 0;
-        font-size: 12px;
-        color: #a0a0ab;
+        letter-spacing: normal;
     }
 
-    .print-header-right {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 4px;
-        text-align: right;
-    }
-
-    .print-status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 3px 8px;
-        border-radius: 9999px;
-        font-size: 10px;
-        font-weight: 600;
-        letter-spacing: 0.3px;
-    }
-
-    .print-status-badge.closed {
-        background: rgba(16, 185, 129, 0.15) !important;
-        color: #34d399 !important;
-        border: 1px solid rgba(16, 185, 129, 0.25) !important;
-    }
-
-    .print-status-badge.active {
-        background: rgba(62, 99, 221, 0.15) !important;
-        color: #7090ff !important;
-        border: 1px solid rgba(62, 99, 221, 0.25) !important;
-    }
-
-    .print-meta-line {
-        font-size: 10.5px;
-        color: #8b8b99;
-    }
-
-    /* KPI Financial Summaries */
-    .print-kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        break-inside: avoid;
-        page-break-inside: avoid;
-    }
-
-    .print-kpi-card {
-        background: #111118 !important;
-        border: 1px solid #111118 !important;
-        border-radius: 10px;
-        box-shadow: none !important;
-        padding: 12px 14px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .print-kpi-label {
-        font-size: 10px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: #8b8b99;
-    }
-
-    .print-kpi-value {
-        font-size: 18px;
-        font-weight: 700;
-        letter-spacing: -0.2px;
-        font-family: inherit;
-    }
-
-    .print-kpi-value.income {
-        color: #34d399 !important;
-    }
-
-    .print-kpi-value.expense {
-        color: #fb7185 !important;
-    }
-
-    .print-kpi-value.savings-pos {
-        color: #34d399 !important;
-    }
-
-    .print-kpi-value.savings-neg {
-        color: #fb7185 !important;
-    }
-
-    .print-kpi-sub {
-        font-size: 10.5px;
-        color: #6b6b78;
-    }
-
-    /* Budget Performance Card */
-    .print-budget-card {
-        background: #111118 !important;
-        border: 1px solid #111118 !important;
-        border-radius: 10px;
-        box-shadow: none !important;
-        padding: 12px 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        break-inside: avoid;
-        page-break-inside: avoid;
-    }
-
-    .print-budget-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .print-budget-title {
-        font-size: 12px;
-        font-weight: 600;
-        color: #f0f0f5;
-        margin: 0;
-    }
-
-    .print-budget-status {
-        font-size: 10.5px;
-        font-weight: 600;
-        padding: 2px 7px;
-        border-radius: 4px;
-    }
-
-    .print-budget-status.safe {
-        background: rgba(16, 185, 129, 0.12) !important;
-        color: #34d399 !important;
-        border: 1px solid rgba(16, 185, 129, 0.2) !important;
-    }
-
-    .print-budget-status.over {
-        background: rgba(244, 63, 94, 0.12) !important;
-        color: #fb7185 !important;
-        border: 1px solid rgba(244, 63, 94, 0.2) !important;
-    }
-
-    .print-budget-bar-track {
-        height: 6px;
-        background: rgba(255, 255, 255, 0.08) !important;
-        border-radius: 3px;
-        overflow: hidden;
-    }
-
-    .print-budget-bar-fill {
-        height: 100%;
-        border-radius: 3px;
-    }
-
-    .print-budget-bar-fill.safe {
-        background: #10b981 !important;
-    }
-
-    .print-budget-bar-fill.warn {
-        background: #f59e0b !important;
-    }
-
-    .print-budget-bar-fill.danger {
-        background: #f43f5e !important;
-    }
-
-    .print-budget-stats {
-        display: flex;
-        justify-content: space-between;
-        font-size: 10.5px;
-        color: #a0a0ab;
-    }
-
-    /* Analytics Chart & Distribution */
-    .print-analytics-card {
-        background: #111118 !important;
-        border: 1px solid #111118 !important;
-        border-radius: 10px;
-        box-shadow: none !important;
-        padding: 14px 18px;
-        break-inside: avoid;
-        page-break-inside: avoid;
-    }
-
-    .print-section-title {
-        margin: 0 0 10px 0;
-        font-size: 13px;
-        font-weight: 600;
-        color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .print-chart-grid {
-        display: flex;
-        align-items: center;
-        gap: 24px;
-    }
-
-    .print-chart-visual {
-        flex-shrink: 0;
-        width: 190px;
-        height: 190px;
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .print-chart-legend {
-        flex: 1;
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 6px 12px;
-    }
-
-    .print-legend-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 5px 8px;
-        background: #161622 !important;
-        border: 1px solid #161622 !important;
-        border-radius: 6px;
-        font-size: 10.5px;
-    }
-
-    .print-legend-left {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        overflow: hidden;
-    }
-
-    .print-legend-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-    }
-
-    .print-legend-name {
-        color: #e4e4e7;
+    #print-container :is(h1, h2, h3, .pdf-figure) {
+        font-family: "Playfair Display", Geist, serif;
         font-weight: 500;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-variant-numeric: lining-nums proportional-nums;
+        line-height: 1.12;
     }
 
-    .print-legend-right {
+    #print-container :is(h4, h5) {
+        font-family: Geist, sans-serif;
+        font-weight: 550;
+        line-height: 1.25;
+    }
+
+    #print-container :is(h1, h2, h3, h4, h5) {
+        break-after: avoid;
+        overflow-wrap: anywhere;
+    }
+
+    #print-container h1 { font-size: 27pt; font-weight: 525; }
+    #print-container h2 { font-size: 21pt; }
+    #print-container h3 { font-size: 17pt; }
+    #print-container h4 { font-size: 11pt; }
+    #print-container h5 { font-size: 9pt; }
+
+    .pdf-period + .pdf-period { break-before: page; }
+
+    .pdf-header {
+        break-inside: avoid;
+        border-top: 1pt solid var(--pdf-bronze);
+        border-bottom: 0.6pt solid var(--pdf-line);
+        padding: 3mm 0 3mm;
+        margin-bottom: 4mm;
+    }
+
+    #print-container .pdf-wordmark {
+        margin-bottom: 1.8mm;
+        color: var(--pdf-bronze);
+        font-size: 9pt;
+        font-weight: 600;
+    }
+
+    .pdf-period-line {
         display: flex;
         align-items: baseline;
-        gap: 6px;
-        flex-shrink: 0;
+        flex-wrap: wrap;
+        gap: 1mm 3mm;
+        margin-top: 3mm;
     }
 
-    .print-legend-pct {
-        font-size: 9.5px;
-        color: #8b8b99;
-        font-weight: 600;
+    :is(.pdf-period-line > span, .pdf-metadata, .pdf-balance p, .pdf-budget-figures > span, .pdf-budget-meta, .pdf-transaction-meta) {
+        color: var(--pdf-secondary);
+        font-size: 8.5pt;
     }
 
-    .print-legend-amt {
-        color: #ffffff;
-        font-weight: 600;
+    .pdf-metadata, .pdf-budget-meta, .pdf-region-totals {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 1mm 4mm;
     }
 
-    /* Category Breakdown Table */
-    .print-table-card {
-        background: #111118 !important;
-        border: 1px solid #111118 !important;
-        border-radius: 10px;
-        box-shadow: none !important;
-        padding: 14px 18px;
-        break-inside: auto;
-    }
+    #print-container .pdf-metadata { margin-top: 2.5mm; }
 
-    .print-report-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 10.5px;
-        text-align: left;
-    }
-
-    .print-report-table thead th {
-        padding: 6px 8px;
-        border-bottom: 1px solid #1e1e2b !important;
-        color: #8b8b99;
-        font-size: 9.5px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-    }
-
-    .print-report-table tbody tr {
-        border-bottom: 1px solid #161622 !important;
-    }
-
-    .print-report-table tbody tr:last-child {
-        border-bottom: none !important;
-    }
-
-    .print-report-table td {
-        padding: 6px 8px;
-        color: #e4e4e7;
-    }
-
-    /* Transactions Audit Log */
-    .print-transactions-section {
-        margin-top: 6px;
-        break-inside: auto;
-    }
-
-    .print-tx-group {
-        margin-bottom: 12px;
+    .pdf-balances {
+        display: flex;
+        gap: 2.5mm;
+        margin-bottom: 4.5mm;
         break-inside: avoid;
-        page-break-inside: avoid;
     }
 
-    .print-date-header {
-        font-size: 10.5px;
-        font-weight: 700;
-        color: #7090ff;
-        padding: 3px 6px;
-        border-left: 2px solid #3e63dd !important;
-        border-top: none !important;
-        border-right: none !important;
-        border-bottom: none !important;
-        background: #111118 !important;
-        border-radius: 0 4px 4px 0;
-        margin-bottom: 4px;
-        letter-spacing: 0.3px;
+    .pdf-balance {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 4.2mm 3.5mm;
+        border: 0.7pt solid var(--pdf-line);
+        border-radius: 3mm;
+        background: var(--pdf-surface);
+        overflow-wrap: anywhere;
     }
 
-    .print-tx-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 10.5px;
+    .pdf-balance[data-region="JP"] {
+        background: radial-gradient(circle at 10% 15%, rgba(225, 29, 72, 0.28), transparent 50%),
+            radial-gradient(circle at 90% 85%, rgba(190, 18, 60, 0.18), transparent 55%),
+            linear-gradient(145deg, #181116, #100b10);
+        border-color: rgba(225, 29, 72, 0.32);
     }
 
-    .print-tx-table tr {
-        border-bottom: 1px solid #14141d !important;
+    .pdf-balance[data-region="IN"] {
+        background: radial-gradient(circle at 10% 15%, rgba(245, 158, 11, 0.24), transparent 50%),
+            radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.18), transparent 55%),
+            linear-gradient(145deg, #171510, #0c120e);
+        border-color: rgba(245, 158, 11, 0.30);
     }
 
-    .print-tx-table td {
-        padding: 5px 6px;
+    .pdf-balance[data-region="DE"] {
+        background: radial-gradient(circle at 10% 15%, rgba(220, 38, 38, 0.22), transparent 50%),
+            radial-gradient(circle at 90% 85%, rgba(234, 179, 8, 0.18), transparent 55%),
+            linear-gradient(145deg, #16181d, #0d0f14);
+        border-color: rgba(234, 179, 8, 0.28);
     }
 
-    .print-tx-table .tx-amount-in {
-        color: #34d399 !important;
-        font-weight: 600;
-        text-align: right;
+    #print-container .pdf-balance h3 {
+        font: 550 10pt/1.2 Geist, sans-serif;
+        margin-bottom: 1.8mm;
     }
 
-    .print-tx-table .tx-amount-out {
-        color: #f4f4f5 !important;
-        font-weight: 600;
-        text-align: right;
+    .pdf-balance svg, .pdf-region > h3 svg, .pdf-budget-heading svg {
+        width: 5mm;
+        height: 3.75mm;
+        vertical-align: -0.15em;
+        margin-right: 1mm;
     }
 
-    /* Document Footer */
-    .print-footer {
+    .pdf-balance small, .pdf-region > h3 small {
+        color: var(--pdf-secondary);
+        font: 500 8pt/1.2 Geist, sans-serif;
+        margin-left: 1mm;
+    }
+
+    .pdf-balance > :is(strong, span) { display: block; margin-top: 1mm; }
+    .pdf-balance strong { font-size: 21pt; }
+
+    .pdf-region + .pdf-region, .pdf-transactions { margin-top: 4.5mm; }
+    #print-container .pdf-region > h3 { margin-bottom: 2.5mm; }
+
+    .pdf-chart-block, .pdf-panel, .pdf-legend-continuation {
+        border: 0.6pt solid var(--pdf-line);
+        border-radius: 2.8mm;
+        padding: 3mm;
+        background: var(--pdf-surface);
+    }
+
+    .pdf-chart-block, .pdf-panel { padding-block: 3.8mm; }
+
+    .pdf-chart-block, .pdf-budget, .pdf-category-row, .pdf-legend-row, .pdf-date-start, .pdf-transaction {
+        break-inside: avoid;
+    }
+
+    .pdf-chart-layout {
+        display: grid;
+        grid-template-columns: 43mm minmax(0, 1fr);
+        align-items: center;
+        gap: 5mm;
+    }
+
+    .pdf-donut { position: relative; }
+    .pdf-donut > svg { display: block; width: 100%; }
+    .pdf-donut figcaption {
+        position: absolute;
+        display: grid;
+        align-content: center;
+        inset: 0 16%;
+        text-align: center;
+        color: var(--pdf-secondary);
+        font-size: 8pt;
+    }
+
+    .pdf-donut strong { color: #f5f5f7; font-size: 13.5pt; overflow-wrap: anywhere; }
+    .pdf-donut .pdf-figure-long { font-size: 10pt; }
+    #print-container .pdf-chart-note { font-size: 8pt; color: var(--pdf-secondary); }
+
+    .pdf-legend-item {
+        display: grid;
+        grid-template-columns: 2.5mm minmax(0, 1fr) auto minmax(0, auto);
+        align-items: baseline;
+        gap: 1.6mm;
+        padding: 0.85mm 0;
+        border-bottom: 0.6pt solid var(--pdf-line);
+        font-size: 8.5pt;
+    }
+
+    .pdf-legend-item svg { width: 2.1mm; height: 2.1mm; align-self: center; }
+    .pdf-legend-item :is(span, strong) { overflow-wrap: anywhere; }
+    .pdf-legend-item span:nth-child(3) { color: var(--pdf-secondary); text-align: right; }
+    .pdf-legend-item strong { font-weight: 500; text-align: right; }
+    .pdf-legend > :last-child { border-bottom: 0; }
+
+    .pdf-legend-continuation { margin-top: 1.5mm; }
+    .pdf-category-row, .pdf-legend-row { display: flex; gap: 2mm; }
+    .pdf-category-row > *, .pdf-legend-row > * { flex: 0 0 calc(50% - 1mm); min-width: 0; }
+    .pdf-category-row + .pdf-category-row { margin-top: 1.8mm; }
+
+    .pdf-budget { margin-top: 2mm; }
+    #print-container .pdf-section-title { margin: 3mm 0 1.7mm; }
+
+    .pdf-budget-heading {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        padding-top: 10px;
-        border-top: 1px solid #1e1e2b !important;
-        font-size: 9.5px;
-        color: #6b6b78;
-        break-inside: avoid;
-        page-break-inside: avoid;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.5mm 2mm;
     }
 
-    /* Legacy PDF Document Styles for Settings Statement */
-    .print-header {
-        text-align: center;
-        margin-bottom: 30px;
-        font-family: var(--font-print);
-    }
+    .pdf-category { padding-block: 3.2mm; }
+    #print-container .pdf-category h4 { font-size: 9.5pt; }
+    .pdf-budget-heading svg { width: 3.5mm; height: 3.5mm; color: var(--pdf-secondary); }
+    .pdf-budget-status { font-size: 8pt; font-weight: 550; }
 
-    .print-header h1 {
-        margin: 0;
-        font-size: 24px;
-        color: #ffffff;
-    }
-
-    .print-header p {
-        margin: 5px 0 0 0;
-        color: #a0a0b0;
-    }
-
-    .print-summary {
+    .pdf-budget-figures {
         display: flex;
-        justify-content: space-around;
-        margin-bottom: 30px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(255, 255, 255, 0.03);
-        padding: 15px;
-        border-radius: 8px;
-        font-family: var(--font-print);
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.5mm 2.2mm;
+        margin-top: 1.4mm;
+        overflow-wrap: anywhere;
     }
 
-    .print-summary-item {
-        text-align: center;
+    .pdf-budget-figures strong { font-size: 16pt; }
+    .pdf-category .pdf-budget-figures strong { font-size: 12.75pt; font-weight: 450 !important; }
+    .pdf-region-totals { margin-top: 1.7mm; font-size: 8.5pt; color: var(--pdf-secondary); }
+    .pdf-region-totals b { font-weight: 550; color: #f5f5f7; }
+
+    .pdf-progress { height: 2.625pt; margin: 1.35mm 0 0.65mm; border-radius: 9pt; background: #34343a; }
+    .pdf-progress span { display: block; height: 100%; border-radius: inherit; background: currentColor; }
+    #print-container [data-tone="safe"], .pdf-tx-amount[data-kind="income"] { color: #46d6a0; }
+    #print-container [data-tone="warn"] { color: #f1c46a; }
+    #print-container [data-tone="danger"], .pdf-tx-amount[data-kind="expense"] { color: #fb91a3; }
+    .pdf-tx-amount:is([data-kind="remittance"], [data-kind="transfer"]) { color: #bac9e8; }
+    #print-container .pdf-empty p, #print-container p.pdf-empty { margin-top: 1mm; color: var(--pdf-secondary); }
+
+    .pdf-transactions { border-top: 0.6pt solid var(--pdf-line); padding-top: 3mm; }
+    .pdf-date-group { margin-top: 2mm; }
+    #print-container .pdf-date-start h4 { color: var(--pdf-secondary); font-size: 8.5pt; margin-bottom: 0.8mm; }
+
+    .pdf-transaction {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 32%);
+        align-items: baseline;
+        column-gap: 4mm;
+        padding: 1.25mm 0;
+        border-top: 0.6pt solid var(--pdf-line);
+        overflow-wrap: anywhere;
     }
 
-    .print-summary-item span {
-        display: block;
-        color: #a0a0b0;
-        font-size: 14px;
-        margin-bottom: 5px;
-    }
-
-    .print-summary-item strong {
-        display: block;
-        font-size: 18px;
-        color: #ffffff;
-    }
-
-    .print-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-        font-family: var(--font-print);
-        font-size: 14px;
-    }
-
-    .print-table th,
-    .print-table td {
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 12px;
-        text-align: left;
-    }
-
-    .print-table th {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        font-weight: 600;
-        color: #ffffff;
-    }
-
-    .print-table td.amount-out {
-        color: #fb7185 !important;
-    }
-
-    .print-table td.amount-in {
-        color: #34d399 !important;
-    }
+    .pdf-transaction-meta { margin-top: 0.45mm; }
+    .pdf-tx-amount { text-align: right; font-size: 10pt; font-weight: 500; }
 }
 
 /* ==========================================================================

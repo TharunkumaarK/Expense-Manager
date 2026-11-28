@@ -301,12 +301,10 @@ class App {
 
         // If focus overlay is visible, refresh its privacy-blurred items
         const overlay = document.getElementById('focus-overlay');
-        if (overlay && overlay.style.display !== 'none') {
-            const typeBadge = document.getElementById('focus-type-badge');
+        if (overlay?.classList.contains('active')) {
             const titleEl = document.getElementById('focus-modal-title');
-            if (typeBadge && typeBadge.innerText === 'Country View') {
-                const reg = titleEl && titleEl.innerText.includes('India') ? 'IN' : (titleEl && titleEl.innerText.includes('Germany') ? 'DE' : 'JP');
-                this.openCountryExpansion(reg);
+            if (overlay.dataset.focusType === 'country') {
+                this.openCountryExpansion(this.focusCurrentRegion);
             } else if (titleEl) {
                 this.openWalletFocus(titleEl.innerText);
             }
@@ -4429,19 +4427,15 @@ class App {
         const overlay = document.getElementById('focus-overlay');
         const backBtn = document.getElementById('focus-back-btn');
         const divider = document.getElementById('focus-header-divider');
-        const typeBadge = document.getElementById('focus-type-badge');
         const modalTitle = document.getElementById('focus-modal-title');
         const primaryPanel = document.getElementById('focus-primary-panel');
         const secondaryPanel = document.getElementById('focus-secondary-panel');
 
         if (!overlay || !primaryPanel || !secondaryPanel) return;
 
+        overlay.dataset.focusType = 'country';
         if (backBtn) backBtn.style.display = 'none';
         if (divider) divider.style.display = 'none';
-        if (typeBadge) {
-            typeBadge.style.display = 'inline-flex';
-            typeBadge.innerText = 'Country Portfolio';
-        }
         if (modalTitle) modalTitle.innerText = `${countryName} Overview`;
 
         primaryPanel.innerHTML = `
@@ -4544,31 +4538,29 @@ class App {
         const backBtn = document.getElementById('focus-back-btn');
         const backLabel = document.getElementById('focus-back-label');
         const divider = document.getElementById('focus-header-divider');
-        const typeBadge = document.getElementById('focus-type-badge');
         const modalTitle = document.getElementById('focus-modal-title');
         const primaryPanel = document.getElementById('focus-primary-panel');
         const secondaryPanel = document.getElementById('focus-secondary-panel');
 
         if (!overlay || !primaryPanel || !secondaryPanel) return;
 
-        if (this.focusHistory && this.focusHistory.length > 0) {
+        overlay.dataset.focusType = 'wallet';
+        const hasBack = this.focusHistory?.length > 0;
+        if (hasBack) {
             if (backBtn) backBtn.style.display = 'inline-flex';
             const prev = this.focusHistory[this.focusHistory.length - 1];
             const countryName = prev.region === 'JP' ? 'Japan' : (prev.region === 'DE' ? 'Germany' : 'India');
             if (backLabel) backLabel.innerText = `${countryName} Overview`;
             if (divider) divider.style.display = 'inline';
-            if (typeBadge) typeBadge.style.display = 'none';
         } else {
             if (backBtn) backBtn.style.display = 'none';
             if (divider) divider.style.display = 'none';
-            if (typeBadge) {
-                typeBadge.style.display = 'inline-flex';
-                typeBadge.innerText = 'Account Focus';
-            }
         }
 
         modalTitle.innerText = `${w.id}`;
         const escId = this.escapeHtml(w.id);
+        const walletType = String(w.type || 'Account');
+        const walletTypeLabel = walletType[0].toUpperCase() + walletType.slice(1);
 
         primaryPanel.innerHTML = `
             <div class="wallet-card ${theme.cls}${secondaryCls} focus-wallet-card">
@@ -4593,7 +4585,7 @@ class App {
                 </div>
                 <div class="wallet-card-footer">
                     <div class="wallet-name" data-type-role="card-label" title="${escId}">${escId}</div>
-                    <div class="wallet-type-tag">${this.escapeHtml(w.type || 'Account')} • ${this.escapeHtml(w.currency)}</div>
+                    <div class="wallet-type-tag">${this.escapeHtml(walletTypeLabel)} • ${this.escapeHtml(w.currency)}</div>
                 </div>
             </div>
             <div class="focus-wallet-actions">
@@ -5764,284 +5756,34 @@ class App {
         }
     }
     openPdfModal() {
-        const fromSelect = document.getElementById('pdf-from-month');
-        const toSelect = document.getElementById('pdf-to-month');
-        fromSelect.replaceChildren();
-        toSelect.replaceChildren();
-
-        // Gather all months
-        const months = storage.state.history.map(h => h.monthKey);
-        // Sort chronologically ascending
-        months.sort((a, b) => a.localeCompare(b));
-        // Add current month at the end
-        months.push(storage.state.currentMonthKey);
-
-        months.forEach(m => {
-            const label = m === storage.state.currentMonthKey ? `${m} (Current)` : m;
-            fromSelect.innerHTML += `<option value="${this.escapeHtml(m)}">${this.escapeHtml(label)}</option>`;
-            toSelect.innerHTML += `<option value="${this.escapeHtml(m)}">${this.escapeHtml(label)}</option>`;
-        });
-
-        // Select the earliest month for "From" and latest for "To"
-        if (months.length > 0) {
-            fromSelect.value = months[0];
-            toSelect.value = months[months.length - 1];
-        }
-
+        const report = new FinancialPrintReport(this, storage.state);
+        const months = report.months();
+        const from = document.getElementById('pdf-from-month');
+        const to = document.getElementById('pdf-to-month');
+        const options = () => months.map(month => new Option(report.monthLabel(month), month));
+        from.replaceChildren(...options());
+        to.replaceChildren(...options());
+        if (months.length) to.value = months[months.length - 1];
         document.getElementById('pdf-modal').classList.add('active');
     }
 
     generatePdf() {
-        this.cancelCurrentReportPrint();
-        const printContainer = document.getElementById('print-container');
-        if (!printContainer) return;
-        const money = (amount, currency, options) => this.formatMoney(amount, currency, { ...options, ignorePrivacy: true });
-
-        const fromMonth = document.getElementById('pdf-from-month').value;
-        const toMonth = document.getElementById('pdf-to-month').value;
-
-        if (fromMonth.localeCompare(toMonth) > 0) {
-            alert('Invalid range. "From Month" must be before or equal to "To Month".');
-            return;
+        const from = document.getElementById('pdf-from-month').value;
+        const to = document.getElementById('pdf-to-month').value;
+        if (!FinancialPrintReport.validMonth(from) || !FinancialPrintReport.validMonth(to) || from > to) {
+            alert('Select a valid month range.');
+            return false;
         }
 
-        // Collect ledgers to print
-        let ledgersToPrint = storage.state.history.filter(h =>
-            h.monthKey.localeCompare(fromMonth) >= 0 && h.monthKey.localeCompare(toMonth) <= 0
-        );
-
-        if (storage.state.currentMonthKey.localeCompare(fromMonth) >= 0 && storage.state.currentMonthKey.localeCompare(toMonth) <= 0) {
-            // Mock a ledger structure for current month scoped to currentMonthKey
-            const currentTxs = typeof walletManager !== 'undefined' && typeof walletManager.getTransactions === 'function'
-                ? walletManager.getTransactions({ monthKey: storage.state.currentMonthKey })
-                : (storage.state.transactions || []).filter(t => this.isTransactionInMonth(t, storage.state.currentMonthKey));
-            ledgersToPrint.push({
-                monthKey: storage.state.currentMonthKey,
-                label: storage.state.currentMonthKey + ' (Current)',
-                transactions: currentTxs,
-                walletsSnapshot: JSON.parse(JSON.stringify(storage.state.wallets))
-            });
+        const report = new FinancialPrintReport(this, storage.state);
+        const months = report.months().filter(month => month >= from && month <= to);
+        if (!months.length) {
+            alert('There are no reporting months in this range.');
+            return false;
         }
 
-        // Filter out any ledgers that have 0 transactions (like an empty current month)
-        ledgersToPrint = ledgersToPrint.filter(h => h.transactions && h.transactions.length > 0);
-
-        if (ledgersToPrint.length === 0) {
-            alert("No transactions found in this range. Nothing to generate.");
-            return;
-        }
-
-        let html = '';
-        const chartDataToRender = []; // To store chart data for rendering after DOM injection
-
-        ledgersToPrint.forEach((h, index) => {
-            const totals = { JP: {}, IN: {} };
-            h.transactions.forEach(tx => {
-                if (tx.type === 'expense') {
-                    let region = tx.region;
-                    if (!region) {
-                        region = storage.state.categories.JP.some(c => c.id === tx.categoryId) ? 'JP' : 'IN';
-                    }
-                    if (totals[region]) {
-                        totals[region][tx.categoryId] = (totals[region][tx.categoryId] || 0) + tx.amount;
-                    }
-                }
-            });
-
-            let jpBalance = 0;
-            let inBalance = 0;
-            if (h.walletsSnapshot) {
-                Object.values(h.walletsSnapshot).forEach(w => {
-                    if (w.region === 'JP') jpBalance += w.balance;
-                    if (w.region === 'IN') inBalance += w.balance;
-                });
-            }
-
-            let balanceHtml = '';
-            if (h.walletsSnapshot) {
-                balanceHtml = `
-                    <div style="display:flex; gap:16px; margin-top:8px; font-size:0.8rem;">
-                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">JP:</span> ${money(jpBalance, '¥')}</span>
-                        <span style="color:var(--text-main); font-weight:500;"><span class="text-muted">IN:</span> ${money(inBalance, '₹', { locale: 'en-IN' })}</span>
-                    </div>
-                `;
-            }
-
-            let catsHtml = '';
-            ['JP', 'IN'].forEach(region => {
-                const currency = region === 'JP' ? '¥' : '₹';
-                let regionSpent = 0;
-                let regionBudget = 0;
-                let catCardsHtml = '';
-
-                storage.state.categories[region].forEach(catDef => {
-                    const spent = (totals[region] && totals[region][catDef.id]) || 0;
-                    if (spent === 0) return;
-
-                    const activeBudget = walletManager.getEffectiveBudget(catDef.id, region, h.monthKey);
-                    const isOver = activeBudget > 0 && spent > activeBudget;
-                    regionSpent += spent;
-
-                    let catProgressHtml = '';
-                    if (activeBudget > 0) {
-                        regionBudget += activeBudget;
-                        const pct = Math.min((spent / activeBudget) * 100, 100);
-                        let barClass = 'neon-safe';
-                        if (pct > 90) barClass = 'neon-danger';
-                        else if (pct > 75) barClass = 'neon-warn';
-
-                        catProgressHtml = `
-                            <div class="neon-bar-bg">
-                                <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
-                            </div>
-                            <div class="neon-amount-sub" style="margin-top: 4px; display:flex; justify-content:space-between;">
-                                <span>${money(spent, currency)}</span>
-                                <span>${money(activeBudget, currency)}</span>
-                            </div>
-                        `;
-                    } else {
-                        catProgressHtml = `<div class="neon-amount-sub" style="margin-top: 4px;">Spent: ${money(spent, currency)}</div>`;
-                    }
-
-                    catCardsHtml += `
-                        <div class="neon-row ${isOver ? 'is-overbudget' : ''}" style="padding: 12px;">
-                            <div class="neon-header" style="margin-bottom: 8px;">
-                                <span class="neon-title"><i data-lucide="${this.categoryIcon(catDef.icon)}"></i> ${this.escapeHtml(catDef.name)}</span>
-                            </div>
-                            ${catProgressHtml}
-                        </div>
-                    `;
-                });
-
-                if (regionSpent === 0) return;
-
-                let overallHtml = '';
-                if (regionBudget > 0) {
-                    const pct = Math.min((regionSpent / regionBudget) * 100, 100);
-                    const barClass = pct > 90 ? 'neon-danger' : pct > 75 ? 'neon-warn' : 'neon-safe';
-                    const statusText = pct > 90
-                        ? `<span style="color:#ef4444; font-weight:600;">Over Budget!</span>`
-                        : pct > 75
-                            ? `<span style="color:#f59e0b; font-weight:600;">Nearing Limit</span>`
-                            : `<span style="color:#10b981; font-weight:600;">Under Budget!</span>`;
-
-                    overallHtml = `
-                        <div class="neon-row" style="padding: 12px; margin-bottom: 16px;">
-                            <div class="neon-header" style="margin-bottom: 8px;">
-                                <span class="neon-title" style="font-size:0.85rem;">
-                                    <i data-lucide="bar-chart-2" style="width:14px;height:14px;"></i> Overall Budget
-                                </span>
-                                ${statusText}
-                            </div>
-                            <div class="neon-bar-bg">
-                                <div class="neon-bar-fill ${barClass}" style="width: ${pct}%"></div>
-                            </div>
-                            <div class="neon-amount-sub" style="margin-top: 6px; display:flex; justify-content:space-between;">
-                                <span>Spent: ${money(regionSpent, currency)}</span>
-                                <span>Budget: ${money(regionBudget, currency)}</span>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    overallHtml = `
-                        <div class="neon-row" style="padding:12px; margin-bottom:16px;">
-                            <div class="neon-amount-sub">Total Spent: ${money(regionSpent, currency)}</div>
-                        </div>
-                    `;
-                }
-
-                // Add canvas with unique print ID
-                const canvasId = `print-donut-${index}-${region}`;
-                catsHtml += `
-                    <div style="margin-top:16px; break-inside: avoid;">
-                        <h4 style="color:var(--text-muted); font-size:0.85rem; font-weight: 500; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                            ${this.getCountryFlagSvg(region, 16, 12)}
-                            <span>${region === 'JP' ? 'Japan' : 'India'} Analytics</span>
-                        </h4>
-
-                        <div style="height: 180px; margin-bottom: 16px; position: relative;">
-                            <canvas id="${canvasId}"></canvas>
-                        </div>
-
-                        ${overallHtml}
-
-                        ${catCardsHtml ? `
-                            <h5 style="color:var(--text-muted); font-size:0.75rem; font-weight: 500; margin: 12px 0 10px;">By Category</h5>
-                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
-                                ${catCardsHtml}
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-
-                chartDataToRender.push({ id: canvasId, region: region, totals: totals[region] });
-            });
-
-            let txsHtml = '<div style="margin-top: 24px; break-inside: avoid;"><h4 style="color:var(--text-muted); font-size:0.85rem; font-weight: 500; margin-bottom:12px;">Transactions</h4>';
-
-            if (h.transactions && h.transactions.length > 0) {
-                const groupedTxs = {};
-                h.transactions.forEach(tx => {
-                    const dStr = new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-                    if (!groupedTxs[dStr]) groupedTxs[dStr] = [];
-                    groupedTxs[dStr].push(tx);
-                });
-
-                Object.keys(groupedTxs).forEach(dateStr => {
-                    txsHtml += `
-                        <div style="margin-top: 16px;">
-                            <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; padding-left: 4px; border-left: 2px solid var(--accent);">${dateStr}</div>
-                    `;
-                    groupedTxs[dateStr].forEach(tx => {
-                        txsHtml += this.getTransactionHtml(tx, false, false, true); // editable=false
-                    });
-                    txsHtml += `</div>`;
-                });
-            } else {
-                txsHtml += '<p class="text-muted text-sm">No transactions found.</p>';
-            }
-            txsHtml += '</div>';
-
-            html += `
-                <div class="card" style="margin-bottom: 24px; page-break-after: always; box-shadow: none; border: 1px solid rgba(255,255,255,0.1);">
-                    <h3 style="margin:0;">${this.escapeHtml(h.label || h.monthKey)}</h3>
-                    <p class="text-muted text-sm mt-1 mb-0">${h.transactions.length} transactions recorded</p>
-                    ${balanceHtml}
-                    <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top:16px;">
-                        ${catsHtml}
-                        ${txsHtml}
-                    </div>
-                </div>
-            `;
-        });
-
-        const job = { container: printContainer, timer: null, charts: [] };
-        this._currentReportPrint = job;
-        try {
-            printContainer.innerHTML = html;
-            this.closeModal('pdf-modal');
-            this.refreshIcons(printContainer);
-
-            for (const chart of chartDataToRender) {
-                const canvas = document.getElementById(chart.id);
-                try {
-                    charts.renderHistoryDonut(chart.id, chart.region, chart.totals, true);
-                } catch {
-                    console.warn('[Print] History chart rendering failed.');
-                }
-                const instance = canvas && window.Chart?.getChart?.(canvas);
-                if (instance) job.charts.push(instance);
-            }
-        } catch (error) {
-            this.cancelCurrentReportPrint();
-            throw error;
-        }
-
-        this.scheduleReportPrint(job, 500, () => {
-            for (const chart of job.charts) {
-                this.replacePrintCanvas(chart.canvas, { width: '100%', height: '100%', objectFit: 'contain' });
-            }
-        });
+        document.getElementById('pdf-modal').classList.remove('active');
+        return this.prepareReportPrint('Financial statement', report, () => months.map(month => report.monthlySection(month)));
     }
 
     /* ==========================================================================
@@ -8178,455 +7920,69 @@ class App {
     }
 
     printCurrentReport() {
+        const month = this.reportMonthKey || storage.state.currentMonthKey;
+        const region = this.reportRegion || storage.getActiveCountries()[0];
+        if (!FinancialPrintReport.validMonth(month) || !region || !CountryConfig.get(region)) return false;
+        const report = new FinancialPrintReport(this, storage.state);
+        return this.prepareReportPrint('Financial snapshot', report, () => [report.monthlySection(month, region)]);
+    }
+
+    async prepareReportPrint(title, report, sections) {
+        if (this._currentReportPrint?.printing) return false;
         this.cancelCurrentReportPrint();
-        const printContainer = document.getElementById('print-container');
-        if (!printContainer) return;
-        const formatMoney = (amount, currency) => this.formatMoney(amount, currency, { ignorePrivacy: true });
 
-        const monthKey = this.reportMonthKey || (storage.state && storage.state.currentMonthKey) || new Date().toISOString().slice(0, 7);
-        const region = this.reportRegion || 'JP';
-        const countryCfg = typeof CountryConfig !== 'undefined' ? CountryConfig.get(region) : null;
-        const currency = (countryCfg && countryCfg.currency) || (region === 'JP' ? '¥' : region === 'DE' ? '€' : '₹');
-        const countryName = (countryCfg && countryCfg.name) || (region === 'JP' ? 'Japan' : region === 'DE' ? 'Germany' : 'India');
-        const currencyCode = (countryCfg && countryCfg.currencyCode) || (region === 'JP' ? 'JPY' : region === 'DE' ? 'EUR' : 'INR');
-
-        const allTxs = storage.state.transactions || [];
-        const reportTxs = allTxs.filter(tx => tx.region === region && this.isTransactionInMonth(tx, monthKey));
-
-        // 1. Calculate Financial Aggregates
-        let totalIncome = 0;
-        let totalExpense = 0;
-        const categorySpendMap = {};
-        const categoryTxCountMap = {};
-
-        reportTxs.forEach(tx => {
-            const amt = Number(tx.amount || 0);
-            if (tx.type === 'income') {
-                totalIncome += amt;
-            } else if (tx.type === 'expense') {
-                totalExpense += amt;
-                const cId = tx.categoryId || 'misc';
-                categorySpendMap[cId] = (categorySpendMap[cId] || 0) + amt;
-                categoryTxCountMap[cId] = (categoryTxCountMap[cId] || 0) + 1;
-            }
-        });
-
-        const netSavings = totalIncome - totalExpense;
-        const savingsRate = totalIncome > 0 ? Math.max(0, ((netSavings / totalIncome) * 100)).toFixed(1) : '0.0';
-
-        // 2. Budget Handling
-        const isClosed = storage.state.closedMonths && storage.state.closedMonths[monthKey];
-        const closedMeta = isClosed ? storage.state.closedMonths[monthKey] : null;
-
-        let periodTotalBudget = 0;
-        const periodCatBudgets = {};
-
-        if (closedMeta) {
-            periodTotalBudget = region === 'JP' ? (closedMeta.jpTotalBudget || 0) : region === 'DE' ? (closedMeta.deTotalBudget || 0) : (closedMeta.inTotalBudget || 0);
-            if (closedMeta.categoriesSnapshot && closedMeta.categoriesSnapshot[region]) {
-                closedMeta.categoriesSnapshot[region].forEach(c => {
-                    periodCatBudgets[c.id] = c.budget || 0;
-                });
-            }
-        } else if (monthKey === storage.state.currentMonthKey) {
-            if (typeof storage.getTotalBudget === 'function') {
-                periodTotalBudget = storage.getTotalBudget(region);
-                if (!periodTotalBudget && region === 'IN') {
-                    periodTotalBudget = (storage.state.categories?.['IN'] || []).reduce((sum, c) => sum + (c.budget || 0), 0);
-                }
-            } else if (region === 'JP') {
-                periodTotalBudget = storage.state.jpTotalBudget || 0;
-            } else if (region === 'DE') {
-                periodTotalBudget = storage.state.budgets?.DE?.monthlyTotal || (storage.state.categories?.['DE'] || []).reduce((sum, c) => sum + (c.budget || 0), 0);
-            } else {
-                periodTotalBudget = storage.state.inTotalBudget || (storage.state.categories?.['IN'] || []).reduce((sum, c) => sum + (c.budget || 0), 0);
-            }
-            (storage.state.categories[region] || []).forEach(c => {
-                periodCatBudgets[c.id] = c.budget || 0;
-            });
-        }
-
-        const budgetPct = periodTotalBudget > 0 ? Math.min((totalExpense / periodTotalBudget) * 100, 100).toFixed(1) : 0;
-        const budgetRem = periodTotalBudget - totalExpense;
-        const isOverBudget = budgetRem < 0;
-        const budgetBarClass = Number(budgetPct) > 90 ? 'danger' : (Number(budgetPct) > 75 ? 'warn' : 'safe');
-
-        // 3. Snapshot Metadata
-        const cacheKey = `${region}_${monthKey}`;
-        const snapshotMeta = (this.reportSnapshotsCache && this.reportSnapshotsCache[cacheKey]) || {
-            generatedAt: new Date().toLocaleString(),
-            revisionsCount: 1
+        const container = document.getElementById('print-container');
+        if (!container) return false;
+        const job = {
+            container,
+            accountId: storage.currentUserId,
+            sessionId: supabaseClient.session?.user?.id,
+            controller: new AbortController()
         };
-
-        // 4. Categories & Chart Data
-        const allRegionCats = (storage.state.categories && storage.state.categories[region]) || [];
-        const catMap = new Map();
-        allRegionCats.forEach(c => catMap.set(c.id, c));
-        Object.keys(categorySpendMap).forEach(id => {
-            if (!catMap.has(id)) {
-                catMap.set(id, { id: id, name: this.getCategoryName(id, region), icon: 'tag' });
-            }
-        });
-
-        const allCategoriesList = Array.from(catMap.values()).map(cat => {
-            const spent = categorySpendMap[cat.id] || 0;
-            const budgetLimit = periodCatBudgets[cat.id] || 0;
-            const txCount = categoryTxCountMap[cat.id] || 0;
-            const pctOfTotal = totalExpense > 0 ? ((spent / totalExpense) * 100).toFixed(1) : '0.0';
-            const variance = budgetLimit > 0 ? (budgetLimit - spent) : null;
-            return {
-                ...cat,
-                spent,
-                budgetLimit,
-                txCount,
-                pctOfTotal,
-                variance
-            };
-        });
-
-        allCategoriesList.sort((a, b) => {
-            if (b.spent !== a.spent) return b.spent - a.spent;
-            if (b.budgetLimit !== a.budgetLimit) return b.budgetLimit - a.budgetLimit;
-            return a.name.localeCompare(b.name);
-        });
-
-        const activeCategories = allCategoriesList.filter(c => c.spent > 0);
-
-        // 5. Build HTML Structure
-        const incomeCount = reportTxs.filter(t => t.type === 'income').length;
-        const expenseCount = reportTxs.filter(t => t.type === 'expense').length;
-
-        const headerHtml = `
-            <div class="print-header-banner">
-                <div class="print-header-left">
-                    <div class="print-brand-tag">
-                        ${this.getCountryFlagSvg(region, 18, 13)}
-                        <span>EXPENSE MANAGER</span>
-                    </div>
-                    <h1 class="print-report-title">${this.escapeHtml(monthKey)} Financial Statement</h1>
-                    <p class="print-report-subtitle">${countryName} Portfolio (${currencyCode} ${currency}) • Monthly Financial Snapshot & Continuous Audit</p>
-                </div>
-                <div class="print-header-right">
-                    <span class="print-status-badge ${isClosed ? 'closed' : 'active'}">
-                        ${isClosed ? '● Closed & Reconciled' : '● Active Ledger Snapshot'}
-                    </span>
-                    <span class="print-meta-line">Generated: ${this.escapeHtml(snapshotMeta.generatedAt || new Date().toLocaleString())} (Rev ${this.escapeHtml(snapshotMeta.revisionsCount || 1)})</span>
-                    <span class="print-meta-line">${reportTxs.length} Transactions Captured</span>
-                </div>
-            </div>
-        `;
-
-        const kpisHtml = `
-            <div class="print-kpi-grid">
-                <div class="print-kpi-card">
-                    <span class="print-kpi-label">Total Income</span>
-                    <span class="print-kpi-value income">+${formatMoney(totalIncome, currency)}</span>
-                    <span class="print-kpi-sub">${incomeCount} income credit${incomeCount === 1 ? '' : 's'}</span>
-                </div>
-                <div class="print-kpi-card">
-                    <span class="print-kpi-label">Total Expenses</span>
-                    <span class="print-kpi-value expense">-${formatMoney(totalExpense, currency)}</span>
-                    <span class="print-kpi-sub">${expenseCount} expense debit${expenseCount === 1 ? '' : 's'}</span>
-                </div>
-                <div class="print-kpi-card">
-                    <span class="print-kpi-label">Net Savings / Surplus</span>
-                    <span class="print-kpi-value ${netSavings >= 0 ? 'savings-pos' : 'savings-neg'}">
-                        ${netSavings >= 0 ? '+' : '-'}${formatMoney(Math.abs(netSavings), currency)}
-                    </span>
-                    <span class="print-kpi-sub">${netSavings >= 0 ? `${savingsRate}% savings retained` : 'Deficit spent'}</span>
-                </div>
-            </div>
-        `;
-
-        let budgetHtml = '';
-        if (periodTotalBudget > 0) {
-            budgetHtml = `
-                <div class="print-budget-card">
-                    <div class="print-budget-header">
-                        <h3 class="print-budget-title">Monthly Budget Allocation & Performance</h3>
-                        <span class="print-budget-status ${isOverBudget ? 'over' : 'safe'}">
-                            ${isOverBudget ? `${formatMoney(Math.abs(budgetRem), currency)} Over Budget` : `+${formatMoney(budgetRem, currency)} Cushion Remaining`}
-                        </span>
-                    </div>
-                    <div class="print-budget-bar-track">
-                        <div class="print-budget-bar-fill ${budgetBarClass}" style="width: ${budgetPct}%;"></div>
-                    </div>
-                    <div class="print-budget-stats">
-                        <span>Spent: <strong>${formatMoney(totalExpense, currency)}</strong> (${budgetPct}% consumed)</span>
-                        <span>Monthly Limit: <strong>${formatMoney(periodTotalBudget, currency)}</strong></span>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Japan Analytics Pie Chart (rendered for Japan alone per user confirmation)
-        let pieHtml = '';
-        const chartId = 'print-jp-pie-chart';
-        let chartData = null;
-
-        if (region === 'JP') {
-            const chartCategories = activeCategories.length > 0 ? activeCategories : [];
-            const glassStyles = typeof charts !== 'undefined' && typeof charts.getGlassStyles === 'function'
-                ? charts.getGlassStyles(document.createElement('canvas').getContext('2d'), Math.max(chartCategories.length, 1), 300)
-                : { backgrounds: ['#3e63dd'], borders: ['#3e63dd'] };
-
-            const legendItemsHtml = chartCategories.map((c, i) => {
-                const color = glassStyles.borders[i % glassStyles.borders.length];
-                return `
-                    <div class="print-legend-item">
-                        <div class="print-legend-left">
-                            <span class="print-legend-dot" style="background: ${color};"></span>
-                            <span class="print-legend-name">${this.escapeHtml(c.name)}</span>
-                        </div>
-                        <div class="print-legend-right">
-                            <span class="print-legend-pct">${c.pctOfTotal}%</span>
-                            <span class="print-legend-amt">${formatMoney(c.spent, currency)}</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            pieHtml = `
-                <div class="print-analytics-card">
-                    <div class="print-section-title">
-                        <span>Analytics: Expense Distribution by Category</span>
-                        <span style="font-size: 11px; font-weight: 500; color: #8b8b99;">Proportional Share (${chartCategories.length} Active)</span>
-                    </div>
-                    <div class="print-chart-grid">
-                        <div class="print-chart-visual">
-                            <canvas id="${chartId}" width="380" height="380" style="width: 190px; height: 190px; display: block;"></canvas>
-                        </div>
-                        <div class="print-chart-legend">
-                            ${chartCategories.length > 0 ? legendItemsHtml : '<p style="color:#8b8b99;font-size:12px;margin:auto;">No expense debits recorded in this period.</p>'}
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            chartData = {
-                id: chartId,
-                labels: chartCategories.map(c => c.name),
-                data: chartCategories.map(c => c.spent),
-                glassStyles: glassStyles
-            };
-        }
-
-        // Category Breakdown Table
-        const displayedCats = allCategoriesList.filter(c => c.spent > 0 || c.budgetLimit > 0);
-        const tableRowsHtml = (displayedCats.length > 0 ? displayedCats : allCategoriesList.slice(0, 8)).map(cat => {
-            const varianceHtml = cat.variance !== null
-                ? (cat.variance >= 0
-                    ? `<span style="color:#34d399;font-weight:600;">+${formatMoney(cat.variance, currency)}</span>`
-                    : `<span style="color:#fb7185;font-weight:600;">${formatMoney(cat.variance, currency)}</span>`)
-                : '<span style="color:#6b6b78;">—</span>';
-
-            return `
-                <tr>
-                    <td style="font-weight: 600; color: #ffffff;">${this.escapeHtml(cat.name)}</td>
-                    <td>${cat.budgetLimit > 0 ? formatMoney(cat.budgetLimit, currency) : '<span style="color:#6b6b78;">—</span>'}</td>
-                    <td style="font-weight: 600;">${formatMoney(cat.spent, currency)}</td>
-                    <td>${varianceHtml}</td>
-                    <td style="color:#8b8b99;font-weight:600;">${cat.pctOfTotal}%</td>
-                    <td style="color:#8b8b99;">${cat.txCount}</td>
-                </tr>
-            `;
-        }).join('');
-
-        const tableHtml = `
-            <div class="print-table-card">
-                <div class="print-section-title">
-                    <span>Category Breakdown & Budget Cushion Audit</span>
-                    <span style="font-size: 11px; font-weight: 500; color: #8b8b99;">${displayedCats.length} Categories</span>
-                </div>
-                <table class="print-report-table">
-                    <thead>
-                        <tr>
-                            <th>Category</th>
-                            <th>Allocated Budget</th>
-                            <th>Actual Spent</th>
-                            <th>Variance / Cushion</th>
-                            <th>% of Total</th>
-                            <th>Count</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tableRowsHtml || '<tr><td colspan="6" style="text-align:center;color:#8b8b99;padding:16px;">No category records.</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        `;
-
-        // Itemized Transactions
-        let txsHtml = '';
-        if (reportTxs.length > 0) {
-            const sortedTxs = reportTxs.toSorted((a, b) => (b.date || '').localeCompare(a.date || ''));
-            const groupedTxs = Object.groupBy(sortedTxs, tx => tx.date || 'Undated');
-
-            let groupsHtml = '';
-            Object.keys(groupedTxs).forEach(dateStr => {
-                const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric'
-                });
-
-                const groupRowsHtml = groupedTxs[dateStr].map(tx => {
-                    const isIncome = tx.type === 'income';
-                    const walletName = this.getWalletName(tx.walletId) || '-';
-                    const catName = this.getTransactionCategory(tx);
-                    const noteText = tx.note || catName;
-
-                    return `
-                        <tr>
-                            <td style="width: 25%; font-weight: 500; color: #ffffff;">${this.escapeHtml(noteText)}</td>
-                            <td style="width: 25%; color: #8b8b99;">${this.escapeHtml(catName)}</td>
-                            <td style="width: 25%; color: #8b8b99;">${this.escapeHtml(walletName)}</td>
-                            <td style="width: 25%;" class="${isIncome ? 'tx-amount-in' : 'tx-amount-out'}">
-                                ${isIncome ? '+' : '-'}${formatMoney(tx.amount, currency)}
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-
-                groupsHtml += `
-                    <div class="print-tx-group">
-                        <div class="print-date-header">${formattedDate}</div>
-                        <table class="print-tx-table">
-                            <tbody>
-                                ${groupRowsHtml}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            });
-
-            txsHtml = `
-                <div class="print-transactions-section">
-                    <div class="print-section-title" style="margin-bottom: 10px;">
-                        <span>Itemized Transactions Audit Ledger</span>
-                        <span style="font-size: 11px; font-weight: 500; color: #8b8b99;">${reportTxs.length} Records</span>
-                    </div>
-                    ${groupsHtml}
-                </div>
-            `;
-        }
-
-        const footerHtml = `
-            <div class="print-footer">
-                <span>Expense Manager • Financial Statement Snapshot (${this.escapeHtml(monthKey)} • ${region})</span>
-                <span>Continuous Ledger Integrity Verified • Generated ${new Date().toLocaleDateString()}</span>
-            </div>
-        `;
-
-        const job = { container: printContainer, timer: null, chart: null };
         this._currentReportPrint = job;
+
         try {
-            printContainer.innerHTML = `
-                <div class="print-report-wrapper">
-                    ${headerHtml}
-                    ${kpisHtml}
-                    ${budgetHtml}
-                    ${pieHtml}
-                    ${tableHtml}
-                    ${txsHtml}
-                    ${footerHtml}
-                </div>
-            `;
-            if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                lucide.createIcons({ root: printContainer });
+            container.innerHTML = report.render(title, sections());
+            this.refreshIcons(container);
+            const glyphs = 'Expense Manager ¥₹€0123456789−+';
+            await Promise.all([
+                document.fonts.load('500 20pt "Playfair Display"', glyphs),
+                document.fonts.load('400 10pt Geist', glyphs),
+                document.fonts.load('500 10pt Geist', glyphs),
+                document.fonts.load('600 10pt Geist', glyphs)
+            ]);
+            if (this._currentReportPrint !== job) return false;
+            if (job.accountId !== storage.currentUserId || job.sessionId !== supabaseClient.session?.user?.id) {
+                this.cancelCurrentReportPrint();
+                return false;
             }
-        } catch (error) {
-            this.cancelCurrentReportPrint();
-            throw error;
-        }
 
-        let canvasEl;
-        if (region === 'JP' && chartData && chartData.data.length > 0 && typeof Chart !== 'undefined') {
-            canvasEl = document.getElementById(chartData.id);
-            if (canvasEl) {
-                try {
-                    job.chart = new Chart(canvasEl, {
-                        type: 'doughnut',
-                        data: {
-                            labels: chartData.labels,
-                            datasets: [{
-                                data: chartData.data,
-                                backgroundColor: chartData.glassStyles.backgrounds,
-                                borderColor: chartData.glassStyles.borders,
-                                borderWidth: 1.5,
-                                hoverOffset: 0
-                            }]
-                        },
-                        options: {
-                            responsive: false,
-                            animation: false,
-                            cutout: '70%',
-                            devicePixelRatio: 2,
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: { enabled: false }
-                            }
-                        }
-                    });
-                } catch (e) {
-                    job.chart = Chart.getChart?.(canvasEl);
-                    canvasEl = null;
-                    console.warn('[Print] Chart rendering failed:');
-                }
-            }
-        }
-
-        this.scheduleReportPrint(job, job.chart ? 400 : 300, () => {
-            if (canvasEl && job.chart) {
-                this.replacePrintCanvas(canvasEl, {
-                    width: '190px', height: '190px', display: 'block', margin: '0 auto'
-                });
-            }
-        });
-    }
-
-    replacePrintCanvas(canvas, style) {
-        try {
-            const image = document.createElement('img');
-            image.src = canvas.toDataURL('image/png');
-            Object.assign(image.style, style);
-            canvas.replaceWith(image);
-        } catch {
-            console.warn('[Print] Canvas image unavailable.');
-        }
-    }
-
-    scheduleReportPrint(job, delay, prepare = () => { }) {
-        job.timer = setTimeout(() => {
-            if (this._currentReportPrint !== job) return;
-            prepare();
-            try {
-                window.print();
-            } catch (error) {
-                console.warn('[Print] Browser print failed:');
+            const cleanup = () => {
                 if (this._currentReportPrint === job) this.cancelCurrentReportPrint();
-                return;
-            }
+            };
+            const options = { signal: job.controller.signal };
+            window.addEventListener('afterprint', cleanup, { ...options, once: true });
+            window.matchMedia('print').addEventListener('change', event => {
+                if (!event.matches) cleanup();
+            }, options);
+            job.printing = true;
+            window.print();
+            return true;
+        } catch (error) {
             if (this._currentReportPrint === job) {
-                job.timer = setTimeout(() => {
-                    if (this._currentReportPrint === job) this.cancelCurrentReportPrint();
-                }, 1000);
+                this.cancelCurrentReportPrint();
+                console.error('[Print] Could not prepare the financial report.', error);
+                alert('The report could not be prepared for printing. Please try again.');
             }
-        }, delay);
+            return false;
+        }
     }
 
     cancelCurrentReportPrint() {
         const job = this._currentReportPrint;
         if (!job) return;
         this._currentReportPrint = null;
-        clearTimeout(job.timer);
-        for (const chart of job.charts || (job.chart ? [job.chart] : [])) {
-            try {
-                chart.destroy();
-            } catch {
-                console.warn('[Print] Chart cleanup failed.');
-            }
-        }
+        job.controller.abort();
         job.container.replaceChildren();
     }
 
@@ -9289,6 +8645,8 @@ class App {
         const sortedCats = Object.values(catMap).sort((a, b) => b.amount - a.amount);
 
         this.lastCustomReportData = {
+            accountId: storage.currentUserId,
+            sessionId: supabaseClient.session?.user?.id,
             startDate: start,
             endDate: end,
             region: selRegion,
@@ -9386,9 +8744,9 @@ class App {
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span class="report-status-badge active" style="font-size: 0.74rem;">${customTxs.length} transactions included</span>
-                        <button class="btn btn-secondary btn-sm" id="btn-custom-report-pdf" onclick="app.exportCustomReportPdf()" title="Download PDF Statement">
+                        <button class="btn btn-secondary btn-sm" id="btn-custom-report-pdf" onclick="app.exportCustomReportPdf()" title="Print or save statement as PDF">
                             <i data-lucide="file-down"></i>
-                            <span>Download PDF</span>
+                            <span>Print / Save as PDF</span>
                         </button>
                     </div>
                 </div>
@@ -9407,109 +8765,14 @@ class App {
     }
 
     exportCustomReportPdf() {
-        if (!this.lastCustomReportData) {
-            alert('Please generate a custom report first before exporting.');
-            return;
-        }
-
         const data = this.lastCustomReportData;
-        const printContainer = document.getElementById('print-container');
-        if (!printContainer) return;
-
-        this.cancelCurrentReportPrint();
-        const fmt = (val, cur) => this.formatMoney(val, cur, { ignorePrivacy: true });
-
-        let sectionsHtml = '';
-        const renderPdfRegionSection = (code, txs, inc, exp, net, isSubsequent) => {
-            const cfg = typeof CountryConfig !== 'undefined' ? CountryConfig.get(code) : null;
-            const cur = (cfg && cfg.currency) || (code === 'JP' ? '¥' : code === 'DE' ? '€' : '₹');
-            const name = (cfg && cfg.name) || (code === 'JP' ? 'Japan' : code === 'DE' ? 'Germany' : 'India');
-            const curCode = (cfg && cfg.currencyCode) || (code === 'JP' ? 'JPY' : code === 'DE' ? 'EUR' : 'INR');
-            return `
-                <div class="print-page-section ${isSubsequent ? 'print-page-break' : ''}" style="margin-top: ${isSubsequent ? '40px' : '0'};">
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px;">
-                        <h2 style="margin: 0; font-size: 1.3rem; color: #fff;">${name} Portfolio (${curCode} ${cur})</h2>
-                        <span style="font-size: 0.85rem; color: #aaa;">${txs.length} Transactions</span>
-                    </div>
-                    <div class="print-summary" style="margin-bottom: 20px;">
-                        <div class="print-summary-item">
-                            <span>Total Income</span>
-                            <strong style="color: #34d399;">${fmt(inc, cur)}</strong>
-                        </div>
-                        <div class="print-summary-item">
-                            <span>Total Expenses</span>
-                            <strong style="color: #fb7185;">${fmt(exp, cur)}</strong>
-                        </div>
-                        <div class="print-summary-item">
-                            <span>Net Position</span>
-                            <strong style="color: ${net >= 0 ? '#34d399' : '#fb7185'};">${fmt(net, cur)}</strong>
-                        </div>
-                    </div>
-
-                    <table class="print-table" style="margin-bottom: 30px;">
-                        <thead>
-                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.2); text-align: left;">
-                                <th style="padding: 8px;">Date</th>
-                                <th style="padding: 8px;">Wallet</th>
-                                <th style="padding: 8px;">Category</th>
-                                <th style="padding: 8px;">Note</th>
-                                <th style="padding: 8px; text-align: right;">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${txs.map(t => `
-                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                                    <td style="padding: 6px 8px;">${this.escapeHtml(t.date)}</td>
-                                    <td style="padding: 6px 8px;">${this.escapeHtml(t.walletId || '-')}</td>
-                                    <td style="padding: 6px 8px;">${this.escapeHtml(this.getTransactionCategory(t))}</td>
-                                    <td style="padding: 6px 8px; color: #aaa;">${this.escapeHtml(t.note || '-')}</td>
-                                    <td style="padding: 6px 8px; text-align: right; font-weight: 600; color: ${t.type === 'income' ? '#34d399' : '#ffffff'};">
-                                        ${t.type === 'income' ? '+' : '-'}${fmt(t.amount, cur)}
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        };
-
-        let sectionCount = 0;
-        if (data.region === 'ALL' || data.region === 'JP') {
-            const jpTxs = data.transactions.filter(t => t.region === 'JP' || (!t.region && storage.state.categories?.JP?.some(c => c.id === t.categoryId)));
-            sectionsHtml += renderPdfRegionSection('JP', jpTxs, data.jpIncome, data.jpExpense, data.jpNet, sectionCount > 0);
-            sectionCount++;
-        }
-        if (data.region === 'ALL' || data.region === 'IN') {
-            const inTxs = data.transactions.filter(t => t.region === 'IN' || (!t.region && storage.state.categories?.IN?.some(c => c.id === t.categoryId)));
-            sectionsHtml += renderPdfRegionSection('IN', inTxs, data.inIncome, data.inExpense, data.inNet, sectionCount > 0);
-            sectionCount++;
-        }
-        const deTxs = data.transactions.filter(t => t.region === 'DE' || (!t.region && storage.state.categories?.DE?.some(c => c.id === t.categoryId)));
-        if (data.region === 'DE' || (data.region === 'ALL' && deTxs.length > 0)) {
-            sectionsHtml += renderPdfRegionSection('DE', deTxs, data.deIncome || 0, data.deExpense || 0, data.deNet || 0, sectionCount > 0);
-            sectionCount++;
+        if (!data || data.accountId !== storage.currentUserId || data.sessionId !== supabaseClient.session?.user?.id) {
+            alert('Generate a custom report before exporting it.');
+            return false;
         }
 
-        const now = new Date().toLocaleString();
-        const job = { container: printContainer, timer: null };
-        this._currentReportPrint = job;
-        try {
-            printContainer.innerHTML = `
-            <div class="print-header">
-                <h1>Expense Manager Statement</h1>
-                <p>Statement Period: <strong>${this.escapeHtml(data.startDate)}</strong> to <strong>${this.escapeHtml(data.endDate)}</strong> • Scope: ${this.escapeHtml(data.region)} (${this.escapeHtml(data.wallet)} / ${this.escapeHtml(data.category)})</p>
-                <p style="font-size: 0.78rem; color: #888; margin-top: 4px;">Generated on ${now} • Continuous Ledger Audit Snapshot</p>
-            </div>
-            ${sectionsHtml}
-        `;
-
-            this.refreshIcons(printContainer);
-        } catch (error) {
-            this.cancelCurrentReportPrint();
-            throw error;
-        }
-        this.scheduleReportPrint(job, 300);
+        const report = new FinancialPrintReport(this, storage.state);
+        return this.prepareReportPrint('Financial statement', report, () => [report.customSection(data)]);
     }
 
     // =========================================================================
