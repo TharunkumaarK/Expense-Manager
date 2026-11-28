@@ -3559,6 +3559,7 @@ class App {
         ` : '';
 
         const titleText = this.escapeHtml(options.title || 'Overall budget');
+        const flagHtml = options.showFlag === false ? '' : this.getCountryFlagSvg(region, 20, 15);
         const cardClass = options.cardClass ? ` ${options.cardClass}` : '';
         const interactiveAttr = options.isInteractive ? `onclick="app.openOverallBudgetModal('${region}')" style="cursor: pointer;" title="Configure Overall Monthly Limit"` : '';
         const interactiveCls = options.isInteractive ? ' interactive' : '';
@@ -3570,7 +3571,7 @@ class App {
                     <div class="budget-central-header">
                         <div class="budget-central-header-top">
                             <div class="budget-central-title-group">
-                                ${this.getCountryFlagSvg(region, 20, 15)}
+                                ${flagHtml}
                                 <h3 class="budget-central-title">${titleText}</h3>
                                 <span class="text-xs text-muted font-numeric budget-central-month">(${this.escapeHtml(monthKey)})</span>
                             </div>
@@ -3597,7 +3598,7 @@ class App {
                     <div class="budget-central-header">
                         <div class="budget-central-header-top">
                             <div class="budget-central-title-group">
-                                ${this.getCountryFlagSvg(region, 20, 15)}
+                                ${flagHtml}
                                 <h3 class="budget-central-title">${titleText}</h3>
                                 <span class="text-xs text-muted font-numeric budget-central-month">(${this.escapeHtml(monthKey)})</span>
                             </div>
@@ -3622,7 +3623,7 @@ class App {
                 <div class="budget-central-header">
                     <div class="budget-central-header-top">
                         <div class="budget-central-title-group">
-                            ${this.getCountryFlagSvg(region, 20, 15)}
+                            ${flagHtml}
                             <h3 class="budget-central-title">${titleText}</h3>
                             <span class="text-xs text-muted font-numeric budget-central-month">(${this.escapeHtml(monthKey)})</span>
                         </div>
@@ -3708,7 +3709,11 @@ class App {
                 return;
             }
 
-            if (headerEl) headerEl.style.display = 'flex';
+            if (headerEl) {
+                headerEl.style.display = 'flex';
+                const flag = headerEl.querySelector('.section-country-flag');
+                if (flag && !flag.firstElementChild) flag.innerHTML = this.getCountryFlagSvg(cfg.region, 20, 15);
+            }
             if (wrapEl) {
                 wrapEl.style.display = 'block';
                 if (singleCountry) {
@@ -3734,7 +3739,8 @@ class App {
                         totalSpent: spent,
                         allocatedBudget: storage.getTotalBudget(cfg.region),
                         isInteractive: true,
-                        showEditButton: true
+                        showEditButton: true,
+                        showFlag: false
                     });
                 } else {
                     cardEl.style.display = 'none';
